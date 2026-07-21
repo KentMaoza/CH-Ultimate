@@ -124,6 +124,44 @@ test('new transaction and drawer dialogs restore focus, close on Escape, and res
   expect(workingTrigger).toHaveFocus();
 });
 
+test('a nested cancellation confirmation keeps focus inside Nota Dikerjakan and restores its clicked control', () => {
+  openNota();
+  const workingTrigger = screen.getByRole('button', { name: 'Nota Dikerjakan' });
+  fireEvent.click(workingTrigger);
+  const drawer = screen.getByRole('dialog', { name: 'Nota Dikerjakan' });
+  const cancelTransaction = within(drawer).getByRole('button', { name: 'Batalkan transaksi' });
+  fireEvent.click(cancelTransaction);
+
+  const confirmation = screen.getByRole('dialog', { name: /Batalkan transaksi/i });
+  const cancel = within(confirmation).getByRole('button', { name: 'Batal' });
+  expect(cancel).toHaveFocus();
+  fireEvent.keyDown(cancel, { key: 'Tab', shiftKey: true });
+  expect(within(confirmation).getByRole('button', { name: 'Batalkan' })).toHaveFocus();
+  fireEvent.click(cancel);
+
+  expect(screen.getByRole('dialog', { name: 'Nota Dikerjakan' })).toBeInTheDocument();
+  expect(cancelTransaction).toHaveFocus();
+  expect(workingTrigger).not.toHaveFocus();
+});
+
+test('Escape from a nested reopening confirmation restores the clicked control inside Daftar Nota', async () => {
+  const gateway = new MockOperationsGateway();
+  await gateway.completeNotaTransaction(gateway.getSnapshot().notaTransactions[0]!.id);
+  openNota(gateway);
+  const listTrigger = screen.getByRole('button', { name: 'Daftar Nota' });
+  fireEvent.click(listTrigger);
+  const drawer = screen.getByRole('dialog', { name: 'Daftar Nota' });
+  const reopen = within(drawer).getByRole('button', { name: 'Buka kembali' });
+  fireEvent.click(reopen);
+
+  const confirmation = screen.getByRole('dialog', { name: /Buka kembali nota/i });
+  fireEvent.keyDown(confirmation, { key: 'Escape' });
+
+  expect(screen.getByRole('dialog', { name: 'Daftar Nota' })).toBeInTheDocument();
+  expect(reopen).toHaveFocus();
+  expect(listTrigger).not.toHaveFocus();
+});
+
 test('cancelling a transaction opens Sampah directly', async () => {
   openNota();
   fireEvent.click(screen.getByRole('button', { name: 'Batalkan transaksi' }));
@@ -207,6 +245,28 @@ class DelayedAddGateway extends MockOperationsGateway {
   release() { this.releaseAdd?.(); }
 }
 
+class DelayedCreateGateway extends MockOperationsGateway {
+  private releaseCreate: (() => void) | null = null;
+
+  override async createNotaTransaction() {
+    await new Promise<void>((resolve) => { this.releaseCreate = resolve; });
+    return super.createNotaTransaction();
+  }
+
+  release() { this.releaseCreate?.(); }
+}
+
+class DelayedCompleteGateway extends MockOperationsGateway {
+  private releaseComplete: (() => void) | null = null;
+
+  override async completeNotaTransaction(transactionId: string) {
+    await new Promise<void>((resolve) => { this.releaseComplete = resolve; });
+    return super.completeNotaTransaction(transactionId);
+  }
+
+  release() { this.releaseComplete?.(); }
+}
+
 test('delayed mutations disable mutation controls until the gateway settles', async () => {
   const gateway = new DelayedAddGateway();
   openNota(gateway);
@@ -214,6 +274,57 @@ test('delayed mutations disable mutation controls until the gateway settles', as
   fireEvent.click(add);
   await waitFor(() => expect(add).toBeDisabled());
   expect(screen.getByRole('button', { name: 'Batalkan transaksi' })).toBeDisabled();
+  gateway.release();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Halaman C' })).toHaveAttribute('aria-pressed', 'true'));
+});
+
+test('a pending create disables Batal and ignores Escape and its backdrop', async () => {
+  const gateway = new DelayedCreateGateway();
+  openNota(gateway);
+  fireEvent.click(screen.getByRole('button', { name: 'Transaksi Baru' }));
+  const dialog = screen.getByRole('dialog', { name: 'Transaksi Baru' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Buat transaksi' }));
+
+  const cancel = within(dialog).getByRole('button', { name: 'Batal' });
+  await waitFor(() => expect(cancel).toBeDisabled());
+  fireEvent.keyDown(dialog, { key: 'Escape' });
+  fireEvent.mouseDown(dialog.parentElement!);
+  expect(screen.getByRole('dialog', { name: 'Transaksi Baru' })).toBeInTheDocument();
+
+  gateway.release();
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Transaksi Baru' })).not.toBeInTheDocument());
+});
+
+test('a pending confirmation disables Batal and ignores Escape and its backdrop', async () => {
+  const gateway = new DelayedCompleteGateway();
+  openNota(gateway);
+  fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
+  const dialog = screen.getByRole('dialog', { name: /Selesaikan nota/i });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Selesaikan' }));
+
+  const cancel = within(dialog).getByRole('button', { name: 'Batal' });
+  await waitFor(() => expect(cancel).toBeDisabled());
+  fireEvent.keyDown(dialog, { key: 'Escape' });
+  fireEvent.mouseDown(dialog.parentElement!);
+  expect(screen.getByRole('dialog', { name: /Selesaikan nota/i })).toBeInTheDocument();
+
+  gateway.release();
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: /Selesaikan nota/i })).not.toBeInTheDocument());
+});
+
+test('a pending drawer mutation disables close and ignores Escape and its backdrop', async () => {
+  const gateway = new DelayedAddGateway();
+  openNota(gateway);
+  fireEvent.click(screen.getByRole('button', { name: 'Nota Dikerjakan' }));
+  const drawer = screen.getByRole('dialog', { name: 'Nota Dikerjakan' });
+  fireEvent.click(within(drawer).getByRole('button', { name: 'Tambah Nota' }));
+
+  const close = within(drawer).getByRole('button', { name: 'Tutup Nota Dikerjakan' });
+  await waitFor(() => expect(close).toBeDisabled());
+  fireEvent.keyDown(drawer, { key: 'Escape' });
+  fireEvent.mouseDown(drawer.parentElement!);
+  expect(screen.getByRole('dialog', { name: 'Nota Dikerjakan' })).toBeInTheDocument();
+
   gateway.release();
   await waitFor(() => expect(screen.getByRole('button', { name: 'Halaman C' })).toHaveAttribute('aria-pressed', 'true'));
 });

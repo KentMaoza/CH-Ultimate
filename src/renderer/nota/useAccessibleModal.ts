@@ -2,7 +2,7 @@ import { useEffect, useRef, type KeyboardEvent, type MouseEvent } from 'react';
 
 const focusable = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export function useAccessibleModal<T extends HTMLElement = HTMLElement>(open: boolean, onClose: () => void, restoreFocusTo: HTMLElement | null) {
+export function useAccessibleModal<T extends HTMLElement = HTMLElement>(open: boolean, onClose: () => void, restoreFocusTo: HTMLElement | null, canClose = true) {
   const dialogRef = useRef<T | null>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
 
@@ -13,6 +13,7 @@ export function useAccessibleModal<T extends HTMLElement = HTMLElement>(open: bo
   }, [open, restoreFocusTo]);
 
   const close = () => {
+    if (!canClose) return;
     restoreRef.current?.focus();
     onClose();
   };

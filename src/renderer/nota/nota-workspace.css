@@ -42,8 +42,9 @@
 .chu-nota-workspace__grid-frame output { display: block; min-height: 27px; padding: 5px; outline-offset: -2px; }
 .chu-nota-workspace__sku-cell { position: relative; }
 .chu-nota-workspace__suggestions { position: absolute; z-index: 3; top: calc(100% - 3px); left: 5px; right: 5px; max-height: 160px; margin: 0; padding: 0; overflow: auto; border: 1px solid #111; background: #fff; list-style: none; }
-.chu-nota-workspace__suggestions button { display: block; width: 100%; border: 0; border-bottom: 1px solid #d0d0cc; text-align: left; }
-.chu-nota-workspace__suggestions button[aria-selected='true'] { color: #fff; background: #111; }
+.chu-nota-workspace__linked-sku { display: block; margin-top: 3px; font-size: 9px; font-weight: 800; }
+.chu-nota-workspace__suggestions [role='option'] { display: block; width: 100%; min-height: 26px; padding: 3px 5px; border-bottom: 1px solid #d0d0cc; cursor: pointer; font-size: 9px; font-weight: 750; text-align: left; }
+.chu-nota-workspace__suggestions [role='option'][aria-selected='true'] { color: #fff; background: #111; }
 .chu-nota-workspace__dialog-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 18px; background: rgb(0 0 0 / .38); }
 .chu-nota-workspace__dialog { width: min(390px, 100%); padding: 18px; border: 2px solid #111; background: #fff; }
 .chu-nota-workspace__dialog h2 { margin: 0; font-size: 18px; }

@@ -123,6 +123,58 @@ test('numeric editing keeps invalid raw text, formats valid price on blur, and c
   expect(screen.getByText(/Perbaiki nilai angka/i)).toHaveTextContent(/bilangan bulat/i);
 });
 
+test('blurred grouped numeric values remain valid when completing without refocusing', () => {
+  openNota();
+  fireEvent.change(screen.getByLabelText('Nama barang baris 3'), { target: { value: 'Kopi' } });
+  fireEvent.change(screen.getByLabelText('Jumlah baris 3'), { target: { value: '2' } });
+  const price = screen.getByLabelText('Harga PCS baris 3');
+  fireEvent.change(price, { target: { value: '125000' } });
+  fireEvent.blur(price);
+
+  expect(price).toHaveValue('125.000');
+  expect(price).not.toHaveAttribute('aria-invalid', 'true');
+  fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
+  expect(screen.getByRole('dialog', { name: 'Selesaikan nota?' })).toBeInTheDocument();
+});
+
+test('linked SKU number appears in the grid and disappears with a manual edit', () => {
+  const gateway = new MockOperationsGateway();
+  openNota(gateway);
+  const name = screen.getByRole('combobox', { name: 'Nama barang baris 3' });
+  fireEvent.change(name, { target: { value: 'Beras' } });
+  fireEvent.keyDown(name, { key: 'ArrowDown' });
+  fireEvent.keyDown(name, { key: 'Enter' });
+
+  expect(screen.getByTestId('nota-grid-row-3')).toHaveTextContent('BRS-108-BLK');
+  expect(gateway.getSnapshot().notaTransactions[0]!.pages[0]!.lines[2]).toMatchObject({ skuId: 'sku-1' });
+  fireEvent.change(name, { target: { value: 'Beras eceran' } });
+  expect(screen.getByTestId('nota-grid-row-3')).not.toHaveTextContent('BRS-108-BLK');
+  expect(gateway.getSnapshot().notaTransactions[0]!.pages[0]!.lines[2]?.skuId).toBeUndefined();
+});
+
+test('SKU combobox exposes its passive highlighted option to assistive technology', () => {
+  openNota();
+  const name = screen.getByRole('combobox', { name: 'Nama barang baris 3' });
+  fireEvent.change(name, { target: { value: 'Beras' } });
+
+  const option = screen.getByRole('option', { name: /Beras Hitam Premium 1 kg/ });
+  expect(option.tagName).toBe('LI');
+  expect(option).toHaveAttribute('id');
+  expect(option).toHaveAttribute('aria-selected', 'true');
+  expect(name).toHaveAttribute('aria-activedescendant', option.id);
+  const listbox = screen.getByRole('listbox');
+  const optionIds = within(listbox).getAllByRole('option').map((item) => item.id);
+  expect(new Set(optionIds).size).toBe(optionIds.length);
+  expect(within(listbox).queryByRole('button')).not.toBeInTheDocument();
+
+  fireEvent.keyDown(name, { key: 'Enter' });
+  expect(name).toHaveValue('Beras Hitam Premium 1 kg');
+  fireEvent.change(name, { target: { value: 'Beras' } });
+  fireEvent.mouseDown(screen.getByRole('option', { name: /Beras Hitam Premium 1 kg/ }));
+  fireEvent.click(screen.getByRole('option', { name: /Beras Hitam Premium 1 kg/ }));
+  expect(name).toHaveValue('Beras Hitam Premium 1 kg');
+});
+
 test('unit buttons preserve dual overrides while the active unit controls total', () => {
   openNota();
   fireEvent.change(screen.getByLabelText('Jumlah baris 3'), { target: { value: '2' } });

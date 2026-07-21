@@ -29,6 +29,7 @@ export const NotaGrid = forwardRef<NotaGridHandle, {
   onDelete: (line: NotaLine) => void;
 }>(function NotaGrid({ lines, suffix, skus, editable, onUpdate, onDelete }, ref) {
   const [raw, setRaw] = useState<Record<string, string>>({});
+  const [focusedNumericField, setFocusedNumericField] = useState<string | null>(null);
   const [openRow, setOpenRow] = useState<number | null>(null);
   const [highlight, setHighlight] = useState(0);
   const activeSuggestions = openRow === null ? [] : skus.filter((sku) => !sku.archived && matchesSku(sku, lines[openRow]?.description ?? ''));
@@ -43,9 +44,8 @@ export const NotaGrid = forwardRef<NotaGridHandle, {
 
   function fieldValue(line: NotaLine, field: 'quantity' | 'lsnPrice' | 'pcsPrice') {
     const key = `${line.id}:${field}`;
-    if (key in raw) return raw[key]!;
-    const value = line[field];
-    return value ? format(value) : '';
+    const value = raw[key] ?? (line[field] ? String(line[field]) : '');
+    return focusedNumericField === key || !validInteger(value, field === 'quantity') ? value : value ? format(Number(value)) : '';
   }
   function numericValid(line: NotaLine, field: 'quantity' | 'lsnPrice' | 'pcsPrice') {
     const rawValue = raw[`${line.id}:${field}`] ?? (line[field] ? String(line[field]) : '');
@@ -58,13 +58,12 @@ export const NotaGrid = forwardRef<NotaGridHandle, {
   }
   function numericFocus(line: NotaLine, field: 'quantity' | 'lsnPrice' | 'pcsPrice') {
     const key = `${line.id}:${field}`;
-    const value = raw[key] ?? (line[field] ? String(line[field]) : '');
-    setRaw((current) => ({ ...current, [key]: value.replaceAll('.', '') }));
+    setRaw((current) => ({ ...current, [key]: current[key] ?? (line[field] ? String(line[field]) : '') }));
+    setFocusedNumericField(key);
   }
   function numericBlur(line: NotaLine, field: 'quantity' | 'lsnPrice' | 'pcsPrice') {
     const key = `${line.id}:${field}`;
-    const value = raw[key] ?? (line[field] ? String(line[field]) : '');
-    if (validInteger(value, field === 'quantity')) setRaw((current) => ({ ...current, [key]: value ? format(Number(value)) : '' }));
+    setFocusedNumericField((current) => current === key ? null : current);
   }
   function selectSku(line: NotaLine, sku: Sku) {
     setRaw((current) => {
@@ -108,15 +107,17 @@ export const NotaGrid = forwardRef<NotaGridHandle, {
       <tbody data-testid="nota-grid-body">{lines.slice(0, 15).map((line, index) => {
         const suggestions = openRow === index ? activeSuggestions : [];
         const number = index + 1;
-        return <tr key={line.id}>
+        const linkedSku = skus.find((sku) => sku.id === line.skuId);
+        const activeOptionId = suggestions[highlight] ? `sku-option-${line.id}-${suggestions[highlight]!.id}` : undefined;
+        return <tr key={line.id} data-testid={`nota-grid-row-${number}`}>
           <td>{number}{suffix}</td>
-          <td className="chu-nota-workspace__sku-cell"><input role="combobox" aria-label={`Nama barang baris ${number}`} aria-expanded={openRow === index} aria-controls={`sku-options-${line.id}`} aria-autocomplete="list" data-grid-editable data-row-index={index} data-field="description" disabled={!editable} value={line.description} onFocus={() => { setOpenRow(index); setHighlight(0); }} onChange={(event) => { onUpdate(line, { description: event.target.value, skuId: undefined }); setOpenRow(index); setHighlight(0); }} onKeyDown={(event) => {
+          <td className="chu-nota-workspace__sku-cell"><input role="combobox" aria-label={`Nama barang baris ${number}`} aria-expanded={openRow === index} aria-controls={`sku-options-${line.id}`} aria-activedescendant={activeOptionId} aria-autocomplete="list" data-grid-editable data-row-index={index} data-field="description" disabled={!editable} value={line.description} onFocus={() => { setOpenRow(index); setHighlight(0); }} onChange={(event) => { onUpdate(line, { description: event.target.value, skuId: undefined }); setOpenRow(index); setHighlight(0); }} onKeyDown={(event) => {
             if (event.key === 'Escape') { setOpenRow(null); event.stopPropagation(); }
             if (event.key === 'ArrowDown' && suggestions.length) { event.preventDefault(); event.stopPropagation(); setHighlight((value) => Math.min(suggestions.length - 1, value + 1)); }
             if (event.key === 'ArrowUp' && suggestions.length) { event.preventDefault(); event.stopPropagation(); setHighlight((value) => Math.max(0, value - 1)); }
             if (event.key === 'Enter' && suggestions[highlight]) { event.preventDefault(); event.stopPropagation(); selectSku(line, suggestions[highlight]!); }
-          }} />
-            {openRow === index && suggestions.length > 0 && <ul id={`sku-options-${line.id}`} role="listbox" className="chu-nota-workspace__suggestions">{suggestions.map((sku, suggestionIndex) => <li key={sku.id}><button role="option" aria-selected={suggestionIndex === highlight} onMouseDown={(event) => event.preventDefault()} onClick={() => selectSku(line, sku)}>{sku.name} · {sku.skuNumber}{sku.aliases.length ? ` · ${sku.aliases.join(', ')}` : ''}</button></li>)}</ul>}
+          }} />{linkedSku && <span className="chu-nota-workspace__linked-sku">{linkedSku.skuNumber}</span>}
+            {openRow === index && suggestions.length > 0 && <ul id={`sku-options-${line.id}`} role="listbox" className="chu-nota-workspace__suggestions">{suggestions.map((sku, suggestionIndex) => <li key={sku.id} id={`sku-option-${line.id}-${sku.id}`} role="option" aria-selected={suggestionIndex === highlight} onMouseDown={(event) => event.preventDefault()} onClick={() => selectSku(line, sku)}>{sku.name} · {sku.skuNumber}{sku.aliases.length ? ` · ${sku.aliases.join(', ')}` : ''}</li>)}</ul>}
           </td>
           <td><input aria-label={`Jenis baris ${number}`} data-grid-editable data-row-index={index} data-field="kind" disabled={!editable} value={line.kind} onChange={(event) => onUpdate(line, { kind: event.target.value })} /></td>
           <td><input aria-label={`Jumlah baris ${number}`} inputMode="numeric" data-grid-editable data-row-index={index} data-field="quantity" disabled={!editable} value={fieldValue(line, 'quantity')} aria-invalid={!numericValid(line, 'quantity') || undefined} onFocus={() => numericFocus(line, 'quantity')} onBlur={() => numericBlur(line, 'quantity')} onChange={(event) => numericChange(line, 'quantity', event.target.value)} /></td>

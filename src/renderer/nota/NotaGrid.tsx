@@ -25,9 +25,10 @@ export const NotaGrid = forwardRef<NotaGridHandle, {
   suffix: string;
   skus: Sku[];
   editable: boolean;
+  busy: boolean;
   onUpdate: (line: NotaLine, patch: Partial<NotaLine>) => void;
   onDelete: (line: NotaLine) => void;
-}>(function NotaGrid({ lines, suffix, skus, editable, onUpdate, onDelete }, ref) {
+}>(function NotaGrid({ lines, suffix, skus, editable, busy, onUpdate, onDelete }, ref) {
   const [raw, setRaw] = useState<Record<string, string>>({});
   const [focusedNumericField, setFocusedNumericField] = useState<string | null>(null);
   const [openRow, setOpenRow] = useState<number | null>(null);
@@ -111,7 +112,7 @@ export const NotaGrid = forwardRef<NotaGridHandle, {
         const activeOptionId = suggestions[highlight] ? `sku-option-${line.id}-${suggestions[highlight]!.id}` : undefined;
         return <tr key={line.id} data-testid={`nota-grid-row-${number}`}>
           <td>{number}{suffix}</td>
-          <td className="chu-nota-workspace__sku-cell"><input role="combobox" aria-label={`Nama barang baris ${number}`} aria-expanded={openRow === index} aria-controls={`sku-options-${line.id}`} aria-activedescendant={activeOptionId} aria-autocomplete="list" data-grid-editable data-row-index={index} data-field="description" disabled={!editable} value={line.description} onFocus={() => { setOpenRow(index); setHighlight(0); }} onChange={(event) => { onUpdate(line, { description: event.target.value, skuId: undefined }); setOpenRow(index); setHighlight(0); }} onKeyDown={(event) => {
+          <td className="chu-nota-workspace__sku-cell"><input role="combobox" aria-label={`Nama barang baris ${number}`} aria-expanded={openRow === index} aria-controls={`sku-options-${line.id}`} aria-activedescendant={activeOptionId} aria-autocomplete="list" data-grid-editable data-row-index={index} data-field="description" disabled={!editable || busy} value={line.description} onFocus={() => { setOpenRow(index); setHighlight(0); }} onChange={(event) => { onUpdate(line, { description: event.target.value, skuId: undefined }); setOpenRow(index); setHighlight(0); }} onKeyDown={(event) => {
             if (event.key === 'Escape') { setOpenRow(null); event.stopPropagation(); }
             if (event.key === 'ArrowDown' && suggestions.length) { event.preventDefault(); event.stopPropagation(); setHighlight((value) => Math.min(suggestions.length - 1, value + 1)); }
             if (event.key === 'ArrowUp' && suggestions.length) { event.preventDefault(); event.stopPropagation(); setHighlight((value) => Math.max(0, value - 1)); }
@@ -119,14 +120,14 @@ export const NotaGrid = forwardRef<NotaGridHandle, {
           }} />{linkedSku && <span className="chu-nota-workspace__linked-sku">{linkedSku.skuNumber}</span>}
             {openRow === index && suggestions.length > 0 && <ul id={`sku-options-${line.id}`} role="listbox" className="chu-nota-workspace__suggestions">{suggestions.map((sku, suggestionIndex) => <li key={sku.id} id={`sku-option-${line.id}-${sku.id}`} role="option" aria-selected={suggestionIndex === highlight} onMouseDown={(event) => event.preventDefault()} onClick={() => selectSku(line, sku)}>{sku.name} · {sku.skuNumber}{sku.aliases.length ? ` · ${sku.aliases.join(', ')}` : ''}</li>)}</ul>}
           </td>
-          <td><input aria-label={`Jenis baris ${number}`} data-grid-editable data-row-index={index} data-field="kind" disabled={!editable} value={line.kind} onChange={(event) => onUpdate(line, { kind: event.target.value })} /></td>
-          <td><input aria-label={`Jumlah baris ${number}`} inputMode="numeric" data-grid-editable data-row-index={index} data-field="quantity" disabled={!editable} value={fieldValue(line, 'quantity')} aria-invalid={!numericValid(line, 'quantity') || undefined} onFocus={() => numericFocus(line, 'quantity')} onBlur={() => numericBlur(line, 'quantity')} onChange={(event) => numericChange(line, 'quantity', event.target.value)} /></td>
-          <td><button aria-label={`LSN baris ${number}`} aria-pressed={line.unit === 'lsn'} data-grid-editable data-row-index={index} data-field="lsn" disabled={!editable} onClick={() => onUpdate(line, { unit: 'lsn' as Unit })} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); onUpdate(line, { unit: 'lsn' as Unit }); } }}>LSN</button></td>
-          <td><button aria-label={`PCS baris ${number}`} aria-pressed={line.unit === 'pcs'} data-grid-editable data-row-index={index} data-field="pcs" disabled={!editable} onClick={() => onUpdate(line, { unit: 'pcs' as Unit })} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); onUpdate(line, { unit: 'pcs' as Unit }); } }}>PCS</button></td>
-          <td><input aria-label={`Harga LSN baris ${number}`} inputMode="numeric" data-grid-editable data-row-index={index} data-field="lsnPrice" disabled={!editable} value={fieldValue(line, 'lsnPrice')} aria-invalid={!numericValid(line, 'lsnPrice') || undefined} onFocus={() => numericFocus(line, 'lsnPrice')} onBlur={() => numericBlur(line, 'lsnPrice')} onChange={(event) => numericChange(line, 'lsnPrice', event.target.value)} /></td>
-          <td><input aria-label={`Harga PCS baris ${number}`} inputMode="numeric" data-grid-editable data-row-index={index} data-field="pcsPrice" disabled={!editable} value={fieldValue(line, 'pcsPrice')} aria-invalid={!numericValid(line, 'pcsPrice') || undefined} onFocus={() => numericFocus(line, 'pcsPrice')} onBlur={() => numericBlur(line, 'pcsPrice')} onChange={(event) => numericChange(line, 'pcsPrice', event.target.value)} /></td>
+          <td><input aria-label={`Jenis baris ${number}`} data-grid-editable data-row-index={index} data-field="kind" disabled={!editable || busy} value={line.kind} onChange={(event) => onUpdate(line, { kind: event.target.value })} /></td>
+          <td><input aria-label={`Jumlah baris ${number}`} inputMode="numeric" data-grid-editable data-row-index={index} data-field="quantity" disabled={!editable || busy} value={fieldValue(line, 'quantity')} aria-invalid={!numericValid(line, 'quantity') || undefined} onFocus={() => numericFocus(line, 'quantity')} onBlur={() => numericBlur(line, 'quantity')} onChange={(event) => numericChange(line, 'quantity', event.target.value)} /></td>
+          <td><button aria-label={`LSN baris ${number}`} aria-pressed={line.unit === 'lsn'} data-grid-editable data-row-index={index} data-field="lsn" disabled={!editable || busy} onClick={() => onUpdate(line, { unit: 'lsn' as Unit })} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); onUpdate(line, { unit: 'lsn' as Unit }); } }}>LSN</button></td>
+          <td><button aria-label={`PCS baris ${number}`} aria-pressed={line.unit === 'pcs'} data-grid-editable data-row-index={index} data-field="pcs" disabled={!editable || busy} onClick={() => onUpdate(line, { unit: 'pcs' as Unit })} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); onUpdate(line, { unit: 'pcs' as Unit }); } }}>PCS</button></td>
+          <td><input aria-label={`Harga LSN baris ${number}`} inputMode="numeric" data-grid-editable data-row-index={index} data-field="lsnPrice" disabled={!editable || busy} value={fieldValue(line, 'lsnPrice')} aria-invalid={!numericValid(line, 'lsnPrice') || undefined} onFocus={() => numericFocus(line, 'lsnPrice')} onBlur={() => numericBlur(line, 'lsnPrice')} onChange={(event) => numericChange(line, 'lsnPrice', event.target.value)} /></td>
+          <td><input aria-label={`Harga PCS baris ${number}`} inputMode="numeric" data-grid-editable data-row-index={index} data-field="pcsPrice" disabled={!editable || busy} value={fieldValue(line, 'pcsPrice')} aria-invalid={!numericValid(line, 'pcsPrice') || undefined} onFocus={() => numericFocus(line, 'pcsPrice')} onBlur={() => numericBlur(line, 'pcsPrice')} onChange={(event) => numericChange(line, 'pcsPrice', event.target.value)} /></td>
           <td><output tabIndex={0} aria-label={`Total baris ${number}`} data-grid-editable data-row-index={index} data-field="total">{format(lineTotal(line))}</output></td>
-          <td><button disabled={!editable || blank(line)} onClick={() => onDelete(line)}>Hapus</button></td>
+          <td><button disabled={!editable || busy || blank(line)} onClick={() => onDelete(line)}>Hapus</button></td>
         </tr>;
       })}</tbody>
     </table>

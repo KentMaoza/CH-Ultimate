@@ -35,7 +35,7 @@ export interface OperationsGateway {
   addNotaPage(transactionId: string): Promise<Nota | undefined>;
   cancelNotaPage(transactionId: string, pageId: string): Promise<void>;
   restoreNotaPage(transactionId: string, pageId: string): Promise<void>;
-  updateNotaTransaction(id: string, patch: Partial<Omit<NotaTransaction, 'id' | 'baseNumber' | 'status' | 'completedAt' | 'nextNoteIndex' | 'pages' | 'postedLines' | 'postedStockEffects' | 'cancelledFromStatus'>>): Promise<void>;
+  updateNotaTransaction(id: string, patch: Partial<Omit<NotaTransaction, 'id' | 'baseNumber' | 'status' | 'completedAt' | 'nextNoteIndex' | 'pages' | 'postedLines' | 'postedStockEffects' | 'postedTrackedLineIds' | 'cancelledFromStatus'>>): Promise<void>;
   updateNotaLine(transactionId: string, pageId: string, lineId: string, patch: Partial<NotaLine>): Promise<void>;
   completeNotaTransaction(id: string): Promise<void>;
   reopenNotaTransaction(id: string): Promise<void>;
@@ -112,7 +112,7 @@ export class MockOperationsGateway implements OperationsGateway {
   }
   async cancelNotaPage(transactionId: string, pageId: string): Promise<void> { this.publish(cancelNotaPage(this.state, transactionId, pageId)); }
   async restoreNotaPage(transactionId: string, pageId: string): Promise<void> { this.publish(restoreNotaPage(this.state, transactionId, pageId)); }
-  async updateNotaTransaction(id: string, patch: Partial<Omit<NotaTransaction, 'id' | 'baseNumber' | 'status' | 'completedAt' | 'nextNoteIndex' | 'pages' | 'postedLines' | 'postedStockEffects' | 'cancelledFromStatus'>>): Promise<void> {
+  async updateNotaTransaction(id: string, patch: Partial<Omit<NotaTransaction, 'id' | 'baseNumber' | 'status' | 'completedAt' | 'nextNoteIndex' | 'pages' | 'postedLines' | 'postedStockEffects' | 'postedTrackedLineIds' | 'cancelledFromStatus'>>): Promise<void> {
     const transaction = this.state.notaTransactions.find((item) => item.id === id);
     if (!transaction || !['draft', 'reopened'].includes(transaction.status)) return;
     this.publish({ ...this.state, notaTransactions: this.state.notaTransactions.map((transaction) => transaction.id === id ? { ...transaction, ...patch } : transaction) });

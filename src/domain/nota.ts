@@ -40,7 +40,7 @@ export function createDraftNotaTransaction(sequence: number): NotaTransaction {
     id: `nota-transaction-${Date.now()}-${sequence}`,
     baseNumber: `CHU-${date.replaceAll('-', '')}-${String(sequence).padStart(4, '0')}`,
     customerName: '', customerPlace: '', transactionDate: date, payment: 'unclassified', status: 'draft',
-    nextNoteIndex: 1, pages: [createPage(sequence, 0)], postedLines: [], postedStockEffects: {},
+    nextNoteIndex: 1, pages: [createPage(sequence, 0)], postedLines: [], postedStockEffects: {}, postedTrackedLineIds: {},
   };
 }
 
@@ -97,26 +97,31 @@ function validateLines(lines: NotaLine[]): NotaLine[] {
   return active;
 }
 
-function stockEffects(state: DemoState, lines: NotaLine[]): Map<string, number> {
-  const effects = new Map<string, number>();
-  for (const line of lines) {
-    if (!line.skuId || !state.skus.find((sku) => sku.id === line.skuId)?.tracked) continue;
-    effects.set(line.skuId, (effects.get(line.skuId) ?? 0) + linePieces(line));
-  }
-  return effects;
-}
-
 function effectsFromSnapshot(snapshot: Record<string, number>): Map<string, number> {
   return new Map(Object.entries(snapshot));
 }
 
-function effectsForRecompletion(lines: NotaLine[], previous: Record<string, number>): Map<string, number> {
+function effectsForTrackedLines(lines: NotaLine[], trackedLineIds: Record<string, string>): Map<string, number> {
   const effects = new Map<string, number>();
   for (const line of lines) {
-    if (!line.skuId || !(line.skuId in previous)) continue;
+    if (!line.skuId || trackedLineIds[line.id] !== line.skuId) continue;
     effects.set(line.skuId, (effects.get(line.skuId) ?? 0) + linePieces(line));
   }
   return effects;
+}
+
+function trackedLineIdsForPost(state: DemoState, lines: NotaLine[], transaction?: NotaTransaction): Record<string, string> {
+  const previousLines = new Map(transaction?.postedLines.map((line) => [line.id, line]) ?? []);
+  const trackedLineIds: Record<string, string> = {};
+  for (const line of lines) {
+    if (!line.skuId) continue;
+    const previous = previousLines.get(line.id);
+    const tracked = previous?.skuId === line.skuId
+      ? transaction?.postedTrackedLineIds[line.id] === line.skuId
+      : Boolean(state.skus.find((sku) => sku.id === line.skuId)?.tracked);
+    if (tracked) trackedLineIds[line.id] = line.skuId;
+  }
+  return trackedLineIds;
 }
 
 function applyStockDelta(state: DemoState, transactionId: string, delta: Map<string, number>, direction: -1 | 1): DemoState {
@@ -147,16 +152,15 @@ export function completeNotaTransaction(state: DemoState, transactionId: string)
   const transaction = state.notaTransactions.find((item) => item.id === transactionId);
   if (!transaction || !['draft', 'reopened'].includes(transaction.status)) return state;
   const postedLines = validateLines(activeLines(transaction));
-  const currentEffects = transaction.status === 'draft'
-    ? stockEffects(state, postedLines)
-    : effectsForRecompletion(postedLines, transaction.postedStockEffects);
+  const trackedLineIds = trackedLineIdsForPost(state, postedLines, transaction.status === 'reopened' ? transaction : undefined);
+  const currentEffects = effectsForTrackedLines(postedLines, trackedLineIds);
   const delta = difference(currentEffects, effectsFromSnapshot(transaction.postedStockEffects));
   const next = applyStockDelta(state, transactionId, delta, -1);
   return {
     ...next,
     notaTransactions: next.notaTransactions.map((item) => item.id === transactionId ? {
       ...item, status: 'completed', completedAt: new Date().toISOString(),
-      postedLines: postedLines.map((line) => ({ ...line })), postedStockEffects: Object.fromEntries(currentEffects), cancelledFromStatus: undefined,
+      postedLines: postedLines.map((line) => ({ ...line })), postedStockEffects: Object.fromEntries(currentEffects), postedTrackedLineIds: trackedLineIds, cancelledFromStatus: undefined,
     } : item),
   };
 }

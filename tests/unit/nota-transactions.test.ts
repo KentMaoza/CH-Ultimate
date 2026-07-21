@@ -146,6 +146,42 @@ test('later tracking an originally untracked SKU does not invent posting effects
   expect(state.notaTransactions[0]?.postedStockEffects).toEqual({});
 });
 
+test('reopening then adding a new tracked SKU line deducts its pieces', () => {
+  const transaction = createDraftNotaTransaction(1);
+  transaction.pages[0]!.lines = [line('existing', { skuId: 'sku-1', description: 'Beras', quantity: 1, pcsPrice: 42_000 })];
+  let state = completeNotaTransaction({ ...createInitialState(), notaTransactions: [transaction] }, transaction.id);
+  state = reopenNotaTransaction(state, transaction.id);
+  state = {
+    ...state,
+    notaTransactions: state.notaTransactions.map((item) => item.id === transaction.id ? {
+      ...item,
+      pages: item.pages.map((page) => ({ ...page, lines: [...page.lines, line('new', { skuId: 'sku-4', description: 'Cokelat', quantity: 2, pcsPrice: 18_000 })] })),
+    } : item),
+  };
+  state = completeNotaTransaction(state, transaction.id);
+  expect(state.skus.find((sku) => sku.id === 'sku-1')?.stock).toBe(23);
+  expect(state.skus.find((sku) => sku.id === 'sku-4')?.stock).toBe(14);
+});
+
+test('reopening then changing a line to another tracked SKU reverses the old effect and posts the new one', () => {
+  const transaction = createDraftNotaTransaction(1);
+  transaction.pages[0]!.lines = [line('swapped', { skuId: 'sku-1', description: 'Beras', quantity: 2, pcsPrice: 42_000 })];
+  let state = completeNotaTransaction({ ...createInitialState(), notaTransactions: [transaction] }, transaction.id);
+  state = reopenNotaTransaction(state, transaction.id);
+  state = {
+    ...state,
+    notaTransactions: state.notaTransactions.map((item) => item.id === transaction.id ? {
+      ...item,
+      pages: item.pages.map((page) => ({ ...page, lines: page.lines.map((itemLine) => itemLine.id === 'swapped' ? {
+        ...itemLine, skuId: 'sku-4', description: 'Cokelat', quantity: 3, pcsPrice: 18_000,
+      } : itemLine) })),
+    } : item),
+  };
+  state = completeNotaTransaction(state, transaction.id);
+  expect(state.skus.find((sku) => sku.id === 'sku-1')?.stock).toBe(24);
+  expect(state.skus.find((sku) => sku.id === 'sku-4')?.stock).toBe(13);
+});
+
 test('completion rejects fractional and negative inactive prices', () => {
   for (const lsnPrice of [0.5, -1]) {
     const transaction = createDraftNotaTransaction(1);

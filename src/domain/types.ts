@@ -60,6 +60,7 @@ export interface NotaTransaction {
   pages: Nota[];
   postedLines: NotaLine[];
   postedStockEffects: Record<string, number>;
+  postedTrackedLineIds: Record<string, string>;
   cancelledFromStatus?: 'draft' | 'completed' | 'reopened';
 }
 

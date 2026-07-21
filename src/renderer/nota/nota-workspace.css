@@ -3,6 +3,7 @@
 .chu-nota-workspace button, .chu-nota-workspace input, .chu-nota-workspace select { min-height: 30px; border: 1px solid #111; border-radius: 0; color: #111; background: #fff; font: inherit; }
 .chu-nota-workspace button { padding: 6px 9px; cursor: pointer; font-size: 11px; font-weight: 750; }
 .chu-nota-workspace button:disabled, .chu-nota-workspace input:disabled, .chu-nota-workspace select:disabled { cursor: not-allowed; opacity: .52; }
+.chu-nota-workspace button:focus-visible, .chu-nota-workspace input:focus-visible, .chu-nota-workspace select:focus-visible, .chu-nota-workspace output:focus-visible, .chu-nota-workspace [role='option']:focus-visible { outline: 3px solid #111; outline-offset: 2px; }
 .chu-nota-workspace__toolbar { display: grid; grid-template-columns: max-content 42px max-content max-content minmax(170px, 1fr) max-content max-content max-content; gap: 8px; align-items: center; min-height: 48px; padding: 7px; border: 2px solid #111; background: #fff; }
 .chu-nota-workspace__back { color: #fff !important; background: #111 !important; }
 .chu-nota-workspace__wordmark { display: grid; width: 42px; height: 32px; place-items: center; color: #fff; background: #111; letter-spacing: -.08em; }
@@ -37,8 +38,17 @@
 .chu-nota-workspace__grid-frame td:nth-child(9) { width: 108px; font-weight: 800; text-align: right; }
 .chu-nota-workspace__grid-frame td:nth-child(10) { width: 58px; }
 .chu-nota-workspace__grid-frame input { width: 100%; min-height: 27px; padding: 3px 5px; font-size: 11px; }
-.chu-nota-workspace__grid-frame input[type='radio'] { width: 15px; min-height: 15px; accent-color: #111; }
 .chu-nota-workspace__grid-frame button { min-height: 26px; padding: 3px 5px; font-size: 9px; }
+.chu-nota-workspace__grid-frame output { display: block; min-height: 27px; padding: 5px; outline-offset: -2px; }
+.chu-nota-workspace__sku-cell { position: relative; }
+.chu-nota-workspace__suggestions { position: absolute; z-index: 3; top: calc(100% - 3px); left: 5px; right: 5px; max-height: 160px; margin: 0; padding: 0; overflow: auto; border: 1px solid #111; background: #fff; list-style: none; }
+.chu-nota-workspace__suggestions button { display: block; width: 100%; border: 0; border-bottom: 1px solid #d0d0cc; text-align: left; }
+.chu-nota-workspace__suggestions button[aria-selected='true'] { color: #fff; background: #111; }
+.chu-nota-workspace__dialog-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 18px; background: rgb(0 0 0 / .38); }
+.chu-nota-workspace__dialog { width: min(390px, 100%); padding: 18px; border: 2px solid #111; background: #fff; }
+.chu-nota-workspace__dialog h2 { margin: 0; font-size: 18px; }
+.chu-nota-workspace__dialog p { margin: 10px 0 18px; font-size: 12px; }
+.chu-nota-workspace__dialog > div { display: flex; justify-content: flex-end; gap: 8px; }
 .chu-nota-workspace__footer { display: grid; grid-template-columns: max-content 205px minmax(180px, 1fr) max-content max-content; gap: 12px; align-items: center; margin-top: 10px; padding: 9px 12px; border: 2px solid #111; background: #fff; }
 .chu-nota-workspace__footer > div > strong { display: block; margin-top: 3px; font-size: 22px; }
 .chu-nota-workspace__footer p { margin: 0; color: #555; font-size: 10px; }

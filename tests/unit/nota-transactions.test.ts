@@ -5,6 +5,7 @@ import {
   cancelNotaTransaction,
   completeNotaTransaction,
   createDraftNotaTransaction,
+  deleteNotaLine,
   reopenNotaTransaction,
   restoreNotaPage,
   restoreNotaTransaction,
@@ -112,6 +113,36 @@ test('gateway refuses metadata and line edits outside an editable transaction or
   expect(gateway.getSnapshot().notaTransactions[0]?.pages[1]?.status).toBe('cancelled');
   await gateway.updateNotaLine(resetTransaction.id, resetCancelledPage.id, resetCancelledPage.lines[0]!.id, { description: 'Halaman batal tidak boleh berubah' });
   expect(gateway.getSnapshot().notaTransactions[0]?.pages[1]?.lines[0]?.description).toBe('');
+});
+
+test('gateway row deletion compacts complete lines and keeps fifteen rows with fresh blank identity', async () => {
+  const gateway = new MockOperationsGateway();
+  const transaction = gateway.getSnapshot().notaTransactions[0]!;
+  const page = transaction.pages[0]!;
+  const deleted = page.lines[0]!;
+  const moved = page.lines[1]!;
+  const trailing = page.lines[14]!;
+
+  await gateway.deleteNotaLine(transaction.id, page.id, deleted.id);
+
+  const next = gateway.getSnapshot().notaTransactions[0]!.pages[0]!.lines;
+  expect(next).toHaveLength(15);
+  expect(next[0]).toEqual(moved);
+  expect(next[13]).toEqual(trailing);
+  expect(next[14]).toMatchObject({ description: '', kind: '', quantity: 0, unit: 'pcs', pcsPrice: 0, lsnPrice: 0 });
+  expect(next[14]!.id).not.toBe(deleted.id);
+  expect(next[14]!.id).not.toBe(trailing.id);
+});
+
+test('domain row deletion preserves remaining objects while replacing the deleted slot', () => {
+  const transaction = createDraftNotaTransaction(1);
+  const first = transaction.pages[0]!.lines[0]!;
+  const second = transaction.pages[0]!.lines[1]!;
+  const next = deleteNotaLine({ ...createInitialState(), notaTransactions: [transaction] }, transaction.id, transaction.pages[0]!.id, first.id);
+  const lines = next.notaTransactions[0]!.pages[0]!.lines;
+  expect(lines[0]).toBe(second);
+  expect(lines).toHaveLength(15);
+  expect(lines.at(-1)?.id).not.toBe(first.id);
 });
 
 test('posting effects stay immutable when a previously tracked SKU is later untracked', () => {

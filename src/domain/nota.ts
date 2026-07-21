@@ -78,6 +78,21 @@ export function restoreNotaPage(state: DemoState, transactionId: string, pageId:
   };
 }
 
+export function deleteNotaLine(state: DemoState, transactionId: string, pageId: string, lineId: string): DemoState {
+  const transaction = state.notaTransactions.find((item) => item.id === transactionId);
+  const page = transaction?.pages.find((item) => item.id === pageId);
+  if (!transaction || !['draft', 'reopened'].includes(transaction.status) || page?.status !== 'active' || !page.lines.some((line) => line.id === lineId)) return state;
+  const lines = page.lines.filter((line) => line.id !== lineId);
+  const blank: NotaLine = { id: `nota-line-${Date.now()}-replacement-${lineId}`, description: '', kind: '', quantity: 0, unit: 'pcs', pcsPrice: 0, lsnPrice: 0 };
+  return {
+    ...state,
+    notaTransactions: state.notaTransactions.map((item) => item.id === transactionId ? {
+      ...item,
+      pages: item.pages.map((candidate) => candidate.id === pageId ? { ...candidate, lines: [...lines, blank].slice(0, 15) } : candidate),
+    } : item),
+  };
+}
+
 function activeLines(transaction: NotaTransaction): NotaLine[] {
   return transaction.pages.filter((page) => page.status === 'active').flatMap((page) => page.lines);
 }

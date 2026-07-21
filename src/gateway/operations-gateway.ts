@@ -5,6 +5,7 @@ import {
   cancelNotaTransaction,
   completeNotaTransaction,
   createDraftNotaTransaction,
+  deleteNotaLine,
   reopenNotaTransaction,
   restoreNotaPage,
   restoreNotaTransaction,
@@ -37,6 +38,7 @@ export interface OperationsGateway {
   restoreNotaPage(transactionId: string, pageId: string): Promise<void>;
   updateNotaTransaction(id: string, patch: Partial<Omit<NotaTransaction, 'id' | 'baseNumber' | 'status' | 'completedAt' | 'nextNoteIndex' | 'pages' | 'postedLines' | 'postedStockEffects' | 'postedTrackedLineIds' | 'cancelledFromStatus'>>): Promise<void>;
   updateNotaLine(transactionId: string, pageId: string, lineId: string, patch: Partial<NotaLine>): Promise<void>;
+  deleteNotaLine(transactionId: string, pageId: string, lineId: string): Promise<void>;
   completeNotaTransaction(id: string): Promise<void>;
   reopenNotaTransaction(id: string): Promise<void>;
   cancelNotaTransaction(id: string): Promise<void>;
@@ -124,6 +126,9 @@ export class MockOperationsGateway implements OperationsGateway {
     this.publish({ ...this.state, notaTransactions: this.state.notaTransactions.map((transaction) => transaction.id === transactionId ? {
       ...transaction, pages: transaction.pages.map((page) => page.id === pageId ? { ...page, lines: page.lines.map((line) => line.id === lineId ? { ...line, ...patch } : line) } : page),
     } : transaction) });
+  }
+  async deleteNotaLine(transactionId: string, pageId: string, lineId: string): Promise<void> {
+    this.publish(deleteNotaLine(this.state, transactionId, pageId, lineId));
   }
   async completeNotaTransaction(id: string): Promise<void> { this.publish(completeNotaTransaction(this.state, id)); }
   async reopenNotaTransaction(id: string): Promise<void> { this.publish(reopenNotaTransaction(this.state, id)); }

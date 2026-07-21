@@ -107,6 +107,32 @@ test('tracked and untracked SKU choices both apply 1x and 12x reference prices',
   expect(lines[3]).toMatchObject({ skuId: 'sku-2', pcsPrice: 185_000, lsnPrice: 2_220_000 });
 });
 
+test('SKU selection clears replaced price validation without clearing another invalid field', () => {
+  openNota();
+  const quantity = screen.getByLabelText('Jumlah baris 3');
+  const lsnPrice = screen.getByLabelText('Harga LSN baris 3');
+  const pcsPrice = screen.getByLabelText('Harga PCS baris 3');
+  fireEvent.change(quantity, { target: { value: '1.5' } });
+  fireEvent.change(lsnPrice, { target: { value: '500.5' } });
+  fireEvent.change(pcsPrice, { target: { value: '-1' } });
+
+  const name = screen.getByRole('combobox', { name: 'Nama barang baris 3' });
+  fireEvent.change(name, { target: { value: 'Beras' } });
+  fireEvent.keyDown(name, { key: 'ArrowDown' });
+  fireEvent.keyDown(name, { key: 'Enter' });
+
+  expect(lsnPrice).toHaveValue('504.000');
+  expect(pcsPrice).toHaveValue('42.000');
+  expect(lsnPrice).not.toHaveAttribute('aria-invalid', 'true');
+  expect(pcsPrice).not.toHaveAttribute('aria-invalid', 'true');
+  expect(quantity).toHaveValue('1.5');
+  expect(quantity).toHaveAttribute('aria-invalid', 'true');
+
+  fireEvent.change(quantity, { target: { value: '2' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
+  expect(screen.getByRole('dialog', { name: 'Selesaikan nota?' })).toBeInTheDocument();
+});
+
 test('numeric editing keeps invalid raw text, formats valid price on blur, and completion focuses first invalid value', () => {
   openNota();
   const price = screen.getByLabelText('Harga PCS baris 3');

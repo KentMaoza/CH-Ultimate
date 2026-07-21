@@ -76,6 +76,8 @@ export const NotaGrid = forwardRef<NotaGridHandle, {
       delete next[`${line.id}:pcsPrice`]; delete next[`${line.id}:lsnPrice`];
       return next;
     });
+    onInvalidChange(line.id, 'pcsPrice', null);
+    onInvalidChange(line.id, 'lsnPrice', null);
     onUpdate(line, { skuId: sku.id, description: sku.name, pcsPrice: sku.referencePrice, lsnPrice: sku.referencePrice * 12, unit: line.unit ?? 'pcs' });
     setOpenRow(null);
   }

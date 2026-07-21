@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { OperationsProvider } from './operations-context';
+import { InventoryPage } from './pages/InventoryPage';
+import { CreateSkuPage } from './pages/CreateSkuPage';
 
 export type ModuleId = 'inventory' | 'create' | 'label' | 'nota' | 'revenue' | 'empty' | 'settings';
 
@@ -12,7 +15,7 @@ const modules: Array<{ id: ModuleId; label: string; glyph: string }> = [
   { id: 'settings', label: 'Settings', glyph: '⚙' },
 ];
 
-export function App() {
+function AppLayout() {
   const [active, setActive] = useState<ModuleId>('inventory');
   const [collapsed, setCollapsed] = useState(false);
   const current = modules.find((module) => module.id === active)!;
@@ -48,11 +51,12 @@ export function App() {
           <div><span className="eyebrow">CH ULTIMATE / DEMO</span><h1>{current.label}</h1></div>
           <div className="session-pill">Tidak tersimpan</div>
         </header>
-        <section className="page-placeholder">
-          <span className="placeholder-number">0{modules.findIndex((module) => module.id === active) + 1}</span>
-          <div><h2>{current.label}</h2><p>Frontend operasional sedang aktif. Data hanya berlaku untuk sesi ini.</p></div>
-        </section>
+        {active === 'inventory' ? <InventoryPage /> : active === 'create' ? <CreateSkuPage /> : (
+          <section className="page-placeholder"><span className="placeholder-number">0{modules.findIndex((module) => module.id === active) + 1}</span><div><h2>{current.label}</h2><p>Frontend operasional sedang aktif. Data hanya berlaku untuk sesi ini.</p></div></section>
+        )}
       </main>
     </div>
   );
 }
+
+export function App() { return <OperationsProvider><AppLayout /></OperationsProvider>; }

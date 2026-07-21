@@ -3,11 +3,12 @@ import { App } from '../../src/renderer/App';
 
 test('adjusts a tracked SKU into a negative balance in the current session', async () => {
   render(<App />);
+  expect(screen.getByTestId('sku-stock-sku-1')).toHaveTextContent('24');
   const row = screen.getByRole('row', { name: /BRS-108-BLK/ });
   fireEvent.click(within(row).getByRole('button', { name: 'Atur stok BRS-108-BLK' }));
   fireEvent.change(screen.getByLabelText('Perubahan stok'), { target: { value: '-30' } });
   fireEvent.click(screen.getByRole('button', { name: 'Terapkan perubahan' }));
-  expect(await screen.findByText('-6')).toBeInTheDocument();
+  expect(await screen.findByTestId('sku-stock-sku-1')).toHaveTextContent('-6');
 });
 
 test('creates a SKU and shows it in the warehouse list', async () => {

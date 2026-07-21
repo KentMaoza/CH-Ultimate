@@ -41,7 +41,7 @@ test('working drawer groups transactions and explains why the last page cannot b
   expect(within(drawer).getByText(/minimal satu halaman aktif/i)).toBeInTheDocument();
 });
 
-test('new transaction selects its A page and global search opens from its keyboard shortcut', async () => {
+test('new transaction selects its A page and global search opens from Ctrl or Cmd+K', async () => {
   openNota();
   fireEvent.click(screen.getByRole('button', { name: 'Transaksi Baru' }));
   const dialog = screen.getByRole('dialog', { name: 'Transaksi Baru' });
@@ -53,6 +53,9 @@ test('new transaction selects its A page and global search opens from its keyboa
 
   fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
   const search = screen.getByRole('combobox', { name: 'Cari nota' });
+  expect(search).toHaveFocus();
+  fireEvent.keyDown(search, { key: 'Escape' });
+  fireEvent.keyDown(window, { key: 'k', metaKey: true });
   expect(search).toHaveFocus();
   fireEvent.change(search, { target: { value: 'Budi' } });
   fireEvent.keyDown(search, { key: 'Enter' });

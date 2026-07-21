@@ -77,7 +77,7 @@ export function InventoryPage() {
         <tbody>{filtered.slice(0, 50).map((sku) => (
           <tr key={sku.id}>
             <td><SkuImage sku={sku} /></td><td className="sku-number" title={sku.skuNumber}>{sku.skuNumber}</td><td>{sku.name}<small>{sku.tracked ? 'Stok dilacak' : 'Tanpa stok'}</small></td>
-            <td>{formatRupiah(sku.referencePrice)}</td><td className={`stock-value ${sku.stock < 0 ? 'negative' : ''}`}>{sku.tracked ? sku.stock : '—'}</td><td>{sku.note || '—'}</td><td>{formatDate(sku.createdAt)}</td>
+            <td>{formatRupiah(sku.referencePrice)}</td><td data-testid={`sku-stock-${sku.id}`} className={`stock-value ${sku.stock < 0 ? 'negative' : ''}`}>{sku.tracked ? sku.stock : '—'}</td><td>{sku.note || '—'}</td><td>{formatDate(sku.createdAt)}</td>
             <td><div className="row-actions">{!sku.archived && <button aria-label={`Edit ${sku.skuNumber}`} onClick={() => openEdit(sku)}>Edit</button>}{sku.tracked && !sku.archived && <button aria-label={`Atur stok ${sku.skuNumber}`} onClick={() => setAdjusting(sku)}>±</button>}<button onClick={() => void gateway.setArchived(sku.id, !sku.archived)}>{sku.archived ? 'Pulihkan' : 'Arsip'}</button></div></td>
           </tr>
         ))}</tbody></table>

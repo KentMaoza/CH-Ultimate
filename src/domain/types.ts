@@ -59,6 +59,7 @@ export interface NotaTransaction {
   nextNoteIndex: number;
   pages: Nota[];
   postedLines: NotaLine[];
+  postedStockEffects: Record<string, number>;
   cancelledFromStatus?: 'draft' | 'completed' | 'reopened';
 }
 

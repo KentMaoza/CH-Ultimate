@@ -91,3 +91,65 @@ test('workbook replacement clears the session transactions instead of reseeding 
   await gateway.replaceFromWorkbook({ skus: [], loaded: 0, skipped: 0, warnings: [] }, 'Workbook uji');
   expect(gateway.getSnapshot().notaTransactions).toEqual([]);
 });
+
+test('gateway refuses metadata and line edits outside an editable transaction or active page', async () => {
+  const gateway = new MockOperationsGateway();
+  const transaction = gateway.getSnapshot().notaTransactions[0]!;
+  const activePage = transaction.pages[0]!;
+  await gateway.completeNotaTransaction(transaction.id);
+  await gateway.updateNotaTransaction(transaction.id, { customerName: 'Tidak boleh berubah' });
+  await gateway.updateNotaLine(transaction.id, activePage.id, activePage.lines[0]!.id, { description: 'Tidak boleh berubah' });
+  expect(gateway.getSnapshot().notaTransactions[0]).toMatchObject({ customerName: 'Amelia' });
+  expect(gateway.getSnapshot().notaTransactions[0]?.pages[0]?.lines[0]?.description).toBe('Beras Hitam Premium 1 kg');
+  await gateway.cancelNotaTransaction(transaction.id);
+  await gateway.updateNotaTransaction(transaction.id, { customerName: 'Masih tidak boleh berubah' });
+  await gateway.updateNotaLine(transaction.id, activePage.id, activePage.lines[0]!.id, { description: 'Masih tidak boleh berubah' });
+  expect(gateway.getSnapshot().notaTransactions[0]).toMatchObject({ customerName: 'Amelia' });
+  await gateway.reset();
+  const resetTransaction = gateway.getSnapshot().notaTransactions[0]!;
+  const resetCancelledPage = resetTransaction.pages[1]!;
+  await gateway.cancelNotaPage(resetTransaction.id, resetCancelledPage.id);
+  expect(gateway.getSnapshot().notaTransactions[0]?.pages[1]?.status).toBe('cancelled');
+  await gateway.updateNotaLine(resetTransaction.id, resetCancelledPage.id, resetCancelledPage.lines[0]!.id, { description: 'Halaman batal tidak boleh berubah' });
+  expect(gateway.getSnapshot().notaTransactions[0]?.pages[1]?.lines[0]?.description).toBe('');
+});
+
+test('posting effects stay immutable when a previously tracked SKU is later untracked', () => {
+  const transaction = createDraftNotaTransaction(1);
+  transaction.pages[0]!.lines = [line('tracked', { skuId: 'sku-1', description: 'Beras', quantity: 2, pcsPrice: 42_000 })];
+  let state = completeNotaTransaction({ ...createInitialState(), notaTransactions: [transaction] }, transaction.id);
+  expect(state.notaTransactions[0]?.postedStockEffects).toEqual({ 'sku-1': 2 });
+  state = { ...state, skus: state.skus.map((sku) => sku.id === 'sku-1' ? { ...sku, tracked: false } : sku) };
+  state = reopenNotaTransaction(state, transaction.id);
+  state = {
+    ...state,
+    notaTransactions: state.notaTransactions.map((item) => item.id === transaction.id ? {
+      ...item, pages: item.pages.map((page) => ({ ...page, lines: page.lines.map((itemLine) => ({ ...itemLine, quantity: 5 })) })),
+    } : item),
+  };
+  state = completeNotaTransaction(state, transaction.id);
+  expect(state.skus.find((sku) => sku.id === 'sku-1')?.stock).toBe(19);
+  state = cancelNotaTransaction(state, transaction.id);
+  expect(state.skus.find((sku) => sku.id === 'sku-1')?.stock).toBe(24);
+  state = restoreNotaTransaction(state, transaction.id);
+  expect(state.skus.find((sku) => sku.id === 'sku-1')?.stock).toBe(19);
+});
+
+test('later tracking an originally untracked SKU does not invent posting effects', () => {
+  const transaction = createDraftNotaTransaction(1);
+  transaction.pages[0]!.lines = [line('untracked', { skuId: 'sku-2', description: 'Kemeja', quantity: 2, pcsPrice: 185_000 })];
+  let state = completeNotaTransaction({ ...createInitialState(), notaTransactions: [transaction] }, transaction.id);
+  expect(state.notaTransactions[0]?.postedStockEffects).toEqual({});
+  state = { ...state, skus: state.skus.map((sku) => sku.id === 'sku-2' ? { ...sku, tracked: true } : sku) };
+  state = completeNotaTransaction(reopenNotaTransaction(state, transaction.id), transaction.id);
+  expect(state.skus.find((sku) => sku.id === 'sku-2')?.stock).toBe(0);
+  expect(state.notaTransactions[0]?.postedStockEffects).toEqual({});
+});
+
+test('completion rejects fractional and negative inactive prices', () => {
+  for (const lsnPrice of [0.5, -1]) {
+    const transaction = createDraftNotaTransaction(1);
+    transaction.pages[0]!.lines = [line('price', { description: 'Beras', quantity: 1, pcsPrice: 42_000, lsnPrice })];
+    expect(() => completeNotaTransaction({ ...createInitialState(), notaTransactions: [transaction] }, transaction.id)).toThrow('Harga harus bilangan bulat nol atau lebih.');
+  }
+});

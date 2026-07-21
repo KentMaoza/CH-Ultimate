@@ -40,7 +40,7 @@ export function createDraftNotaTransaction(sequence: number): NotaTransaction {
     id: `nota-transaction-${Date.now()}-${sequence}`,
     baseNumber: `CHU-${date.replaceAll('-', '')}-${String(sequence).padStart(4, '0')}`,
     customerName: '', customerPlace: '', transactionDate: date, payment: 'unclassified', status: 'draft',
-    nextNoteIndex: 1, pages: [createPage(sequence, 0)], postedLines: [],
+    nextNoteIndex: 1, pages: [createPage(sequence, 0)], postedLines: [], postedStockEffects: {},
   };
 }
 
@@ -92,7 +92,7 @@ function validateLines(lines: NotaLine[]): NotaLine[] {
   for (const line of active) {
     if (!line.description.trim()) throw new Error('Nama barang wajib diisi.');
     if (!Number.isInteger(line.quantity) || line.quantity <= 0) throw new Error('Jumlah harus bilangan bulat positif.');
-    if (!Number.isInteger(selectedPrice(line)) || selectedPrice(line) < 0) throw new Error('Harga harus bilangan bulat nol atau lebih.');
+    if (!Number.isInteger(line.pcsPrice) || line.pcsPrice < 0 || !Number.isInteger(line.lsnPrice) || line.lsnPrice < 0) throw new Error('Harga harus bilangan bulat nol atau lebih.');
   }
   return active;
 }
@@ -101,6 +101,19 @@ function stockEffects(state: DemoState, lines: NotaLine[]): Map<string, number> 
   const effects = new Map<string, number>();
   for (const line of lines) {
     if (!line.skuId || !state.skus.find((sku) => sku.id === line.skuId)?.tracked) continue;
+    effects.set(line.skuId, (effects.get(line.skuId) ?? 0) + linePieces(line));
+  }
+  return effects;
+}
+
+function effectsFromSnapshot(snapshot: Record<string, number>): Map<string, number> {
+  return new Map(Object.entries(snapshot));
+}
+
+function effectsForRecompletion(lines: NotaLine[], previous: Record<string, number>): Map<string, number> {
+  const effects = new Map<string, number>();
+  for (const line of lines) {
+    if (!line.skuId || !(line.skuId in previous)) continue;
     effects.set(line.skuId, (effects.get(line.skuId) ?? 0) + linePieces(line));
   }
   return effects;
@@ -134,13 +147,16 @@ export function completeNotaTransaction(state: DemoState, transactionId: string)
   const transaction = state.notaTransactions.find((item) => item.id === transactionId);
   if (!transaction || !['draft', 'reopened'].includes(transaction.status)) return state;
   const postedLines = validateLines(activeLines(transaction));
-  const delta = difference(stockEffects(state, postedLines), stockEffects(state, transaction.postedLines));
+  const currentEffects = transaction.status === 'draft'
+    ? stockEffects(state, postedLines)
+    : effectsForRecompletion(postedLines, transaction.postedStockEffects);
+  const delta = difference(currentEffects, effectsFromSnapshot(transaction.postedStockEffects));
   const next = applyStockDelta(state, transactionId, delta, -1);
   return {
     ...next,
     notaTransactions: next.notaTransactions.map((item) => item.id === transactionId ? {
       ...item, status: 'completed', completedAt: new Date().toISOString(),
-      postedLines: postedLines.map((line) => ({ ...line })), cancelledFromStatus: undefined,
+      postedLines: postedLines.map((line) => ({ ...line })), postedStockEffects: Object.fromEntries(currentEffects), cancelledFromStatus: undefined,
     } : item),
   };
 }
@@ -160,7 +176,7 @@ export function cancelNotaTransaction(state: DemoState, transactionId: string): 
   const cancelledFromStatus = transaction.status;
   const next = transaction.status === 'draft'
     ? state
-    : applyStockDelta(state, transactionId, stockEffects(state, transaction.postedLines), 1);
+    : applyStockDelta(state, transactionId, effectsFromSnapshot(transaction.postedStockEffects), 1);
   return {
     ...next,
     notaTransactions: next.notaTransactions.map((item) => item.id === transactionId ? {
@@ -180,7 +196,7 @@ export function restoreNotaTransaction(state: DemoState, transactionId: string):
         : item),
     };
   }
-  const next = applyStockDelta(state, transactionId, stockEffects(state, transaction.postedLines), -1);
+  const next = applyStockDelta(state, transactionId, effectsFromSnapshot(transaction.postedStockEffects), -1);
   return {
     ...next,
     notaTransactions: next.notaTransactions.map((item) => item.id === transactionId

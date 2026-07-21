@@ -1,6 +1,15 @@
 import { createInitialState, reduceOperation, skuNumberExists } from '../domain/operations';
-import { cancelNota, completeNota, createDraftNota, reopenNota, restoreNota } from '../domain/nota';
-import type { DemoState, LabelTemplate, Nota, NotaLine, Sku, WorkbookImportResult } from '../domain/types';
+import {
+  addNotaPage,
+  cancelNotaPage,
+  cancelNotaTransaction,
+  completeNotaTransaction,
+  createDraftNotaTransaction,
+  reopenNotaTransaction,
+  restoreNotaPage,
+  restoreNotaTransaction,
+} from '../domain/nota';
+import type { DemoState, LabelTemplate, Nota, NotaLine, NotaTransaction, Sku, WorkbookImportResult } from '../domain/types';
 
 export interface CreateSkuInput {
   skuNumber: string;
@@ -22,20 +31,37 @@ export interface OperationsGateway {
   replaceFromWorkbook(result: WorkbookImportResult, sourceLabel: string): Promise<void>;
   reset(): Promise<void>;
   setLabelTemplate(template: LabelTemplate): Promise<void>;
-  createNota(): Promise<Nota>;
-  updateNota(id: string, patch: Partial<Nota>): Promise<void>;
-  updateNotaLine(notaId: string, lineId: string, patch: Partial<NotaLine>): Promise<void>;
-  completeNota(id: string): Promise<void>;
-  reopenNota(id: string): Promise<void>;
-  cancelNota(id: string): Promise<void>;
-  restoreNota(id: string): Promise<void>;
+  createNotaTransaction(): Promise<NotaTransaction>;
+  addNotaPage(transactionId: string): Promise<Nota | undefined>;
+  cancelNotaPage(transactionId: string, pageId: string): Promise<void>;
+  restoreNotaPage(transactionId: string, pageId: string): Promise<void>;
+  updateNotaTransaction(id: string, patch: Partial<Omit<NotaTransaction, 'id' | 'baseNumber' | 'status' | 'completedAt' | 'nextNoteIndex' | 'pages' | 'postedLines' | 'cancelledFromStatus'>>): Promise<void>;
+  updateNotaLine(transactionId: string, pageId: string, lineId: string, patch: Partial<NotaLine>): Promise<void>;
+  completeNotaTransaction(id: string): Promise<void>;
+  reopenNotaTransaction(id: string): Promise<void>;
+  cancelNotaTransaction(id: string): Promise<void>;
+  restoreNotaTransaction(id: string): Promise<void>;
 }
 
 let sequence = 100;
 
 export class MockOperationsGateway implements OperationsGateway {
-  private state = { ...createInitialState(), notas: [createDraftNota(1)] };
+  private state = this.seedState();
   private listeners = new Set<() => void>();
+
+  private seedState(): DemoState {
+    const transaction = createDraftNotaTransaction(1);
+    transaction.customerName = 'Amelia';
+    transaction.customerPlace = 'Saibah';
+    transaction.pages[0]!.lines[0] = {
+      ...transaction.pages[0]!.lines[0]!, skuId: 'sku-1', description: 'Beras Hitam Premium 1 kg', kind: 'Pangan', quantity: 1, pcsPrice: 42_000,
+    };
+    transaction.pages[0]!.lines[1] = {
+      ...transaction.pages[0]!.lines[1]!, description: 'Jasa bungkus', kind: 'Layanan', quantity: 1, pcsPrice: 5_000,
+    };
+    const second = addNotaPage({ ...createInitialState(), notaTransactions: [transaction] }, transaction.id).notaTransactions[0]!;
+    return { ...createInitialState(), notaTransactions: [second] };
+  }
 
   getSnapshot = () => this.state;
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
@@ -72,19 +98,30 @@ export class MockOperationsGateway implements OperationsGateway {
   async replaceFromWorkbook(result: WorkbookImportResult, sourceLabel: string): Promise<void> {
     this.publish(reduceOperation(this.state, { type: 'replace-skus', skus: result.skus, sourceLabel, importSummary: { loaded: result.loaded, skipped: result.skipped, warnings: result.warnings } }));
   }
-  async reset(): Promise<void> { this.publish({ ...createInitialState(), notas: [createDraftNota(1)] }); }
+  async reset(): Promise<void> { this.publish(this.seedState()); }
   async setLabelTemplate(template: LabelTemplate): Promise<void> { this.publish({ ...this.state, labelTemplate: template }); }
-  async createNota(): Promise<Nota> {
-    const nota = createDraftNota(this.state.notas.length + 1);
-    this.publish({ ...this.state, notas: [nota, ...this.state.notas] });
-    return nota;
+  async createNotaTransaction(): Promise<NotaTransaction> {
+    const transaction = createDraftNotaTransaction(this.state.notaTransactions.length + 1);
+    this.publish({ ...this.state, notaTransactions: [transaction, ...this.state.notaTransactions] });
+    return transaction;
   }
-  async updateNota(id: string, patch: Partial<Nota>): Promise<void> { this.publish({ ...this.state, notas: this.state.notas.map((nota) => nota.id === id ? { ...nota, ...patch } : nota) }); }
-  async updateNotaLine(notaId: string, lineId: string, patch: Partial<NotaLine>): Promise<void> {
-    this.publish({ ...this.state, notas: this.state.notas.map((nota) => nota.id === notaId ? { ...nota, lines: nota.lines.map((line) => line.id === lineId ? { ...line, ...patch } : line) } : nota) });
+  async addNotaPage(transactionId: string): Promise<Nota | undefined> {
+    const before = this.state.notaTransactions.find((item) => item.id === transactionId)?.pages.length;
+    this.publish(addNotaPage(this.state, transactionId));
+    return this.state.notaTransactions.find((item) => item.id === transactionId)?.pages[before ?? -1];
   }
-  async completeNota(id: string): Promise<void> { this.publish(completeNota(this.state, id)); }
-  async reopenNota(id: string): Promise<void> { this.publish(reopenNota(this.state, id)); }
-  async cancelNota(id: string): Promise<void> { this.publish(cancelNota(this.state, id)); }
-  async restoreNota(id: string): Promise<void> { this.publish(restoreNota(this.state, id)); }
+  async cancelNotaPage(transactionId: string, pageId: string): Promise<void> { this.publish(cancelNotaPage(this.state, transactionId, pageId)); }
+  async restoreNotaPage(transactionId: string, pageId: string): Promise<void> { this.publish(restoreNotaPage(this.state, transactionId, pageId)); }
+  async updateNotaTransaction(id: string, patch: Partial<Omit<NotaTransaction, 'id' | 'baseNumber' | 'status' | 'completedAt' | 'nextNoteIndex' | 'pages' | 'postedLines' | 'cancelledFromStatus'>>): Promise<void> {
+    this.publish({ ...this.state, notaTransactions: this.state.notaTransactions.map((transaction) => transaction.id === id ? { ...transaction, ...patch } : transaction) });
+  }
+  async updateNotaLine(transactionId: string, pageId: string, lineId: string, patch: Partial<NotaLine>): Promise<void> {
+    this.publish({ ...this.state, notaTransactions: this.state.notaTransactions.map((transaction) => transaction.id === transactionId ? {
+      ...transaction, pages: transaction.pages.map((page) => page.id === pageId ? { ...page, lines: page.lines.map((line) => line.id === lineId ? { ...line, ...patch } : line) } : page),
+    } : transaction) });
+  }
+  async completeNotaTransaction(id: string): Promise<void> { this.publish(completeNotaTransaction(this.state, id)); }
+  async reopenNotaTransaction(id: string): Promise<void> { this.publish(reopenNotaTransaction(this.state, id)); }
+  async cancelNotaTransaction(id: string): Promise<void> { this.publish(cancelNotaTransaction(this.state, id)); }
+  async restoreNotaTransaction(id: string): Promise<void> { this.publish(restoreNotaTransaction(this.state, id)); }
 }

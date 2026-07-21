@@ -1,35 +1,42 @@
 import { createInitialState } from '../../src/domain/operations';
 import { buildEmptyStockItems, buildRevenueReport } from '../../src/domain/reports';
-import { createDraftNota } from '../../src/domain/nota';
+import { createDraftNotaTransaction } from '../../src/domain/nota';
 
-test('revenue includes ad-hoc totals but SKU trends only include linked lines', () => {
+test('revenue flattens active completed pages, includes ad-hoc totals, and excludes reopened and cancelled transactions', () => {
   const state = createInitialState();
-  const nota = createDraftNota(1);
-  nota.status = 'completed';
-  nota.completedAt = '2026-07-21T02:00:00.000Z';
-  nota.lines = [
-    { id: 'l1', skuId: 'sku-1', description: 'Beras', quantity: 2, unit: 'pcs', unitPrice: 42000 },
-    { id: 'l2', description: 'Jasa', quantity: 1, unit: 'pcs', unitPrice: 10000 },
+  const completed = createDraftNotaTransaction(1);
+  completed.status = 'completed';
+  completed.completedAt = '2026-07-21T02:00:00.000Z';
+  completed.pages[0]!.lines = [
+    { id: 'l1', skuId: 'sku-1', description: 'Beras', kind: 'Pangan', quantity: 2, unit: 'pcs', pcsPrice: 42000, lsnPrice: 504000 },
+    { id: 'l2', description: 'Jasa', kind: 'Layanan', quantity: 1, unit: 'pcs', pcsPrice: 10000, lsnPrice: 120000 },
   ];
-  const report = buildRevenueReport({ ...state, notas: [nota] }, new Date('2026-07-21T12:00:00.000Z'));
-  expect(report.today).toBe(94000);
-  expect(report.bySku).toEqual([{ skuId: 'sku-1', name: 'Beras Hitam Premium 1 kg', units: 2, revenue: 84000 }]);
+  completed.pages.push({ id: 'page-b', suffix: 'B', status: 'active', lines: [
+    { id: 'l3', skuId: 'sku-1', description: 'Beras', kind: 'Pangan', quantity: 1, unit: 'lsn', pcsPrice: 42000, lsnPrice: 504000 },
+  ] });
+  const reopened = { ...createDraftNotaTransaction(2), status: 'reopened' as const, completedAt: '2026-07-21T02:00:00.000Z' };
+  reopened.pages[0]!.lines = [{ id: 'ignored', description: 'Tidak masuk', kind: '', quantity: 1, unit: 'pcs', pcsPrice: 999999, lsnPrice: 0 }];
+  const cancelled = { ...createDraftNotaTransaction(3), status: 'cancelled' as const, completedAt: '2026-07-21T02:00:00.000Z' };
+  cancelled.pages[0]!.lines = [{ id: 'ignored-too', description: 'Tidak masuk', kind: '', quantity: 1, unit: 'pcs', pcsPrice: 999999, lsnPrice: 0 }];
+  const report = buildRevenueReport({ ...state, notaTransactions: [completed, reopened, cancelled] }, new Date('2026-07-21T12:00:00.000Z'));
+  expect(report.today).toBe(598000);
+  expect(report.bySku).toEqual([{ skuId: 'sku-1', name: 'Beras Hitam Premium 1 kg', units: 14, revenue: 588000 }]);
 });
 
 test('revenue date range uses the WITA completion date', () => {
   const state = createInitialState();
-  const included = createDraftNota(1);
+  const included = createDraftNotaTransaction(1);
   included.id = 'included';
   included.status = 'completed';
   included.completedAt = '2026-07-20T16:30:00.000Z';
-  included.lines = [{ id: 'l1', description: 'Jasa', quantity: 1, unit: 'pcs', unitPrice: 50000 }];
-  const excluded = createDraftNota(2);
+  included.pages[0]!.lines = [{ id: 'l1', description: 'Jasa', kind: 'Layanan', quantity: 1, unit: 'pcs', pcsPrice: 50000, lsnPrice: 600000 }];
+  const excluded = createDraftNotaTransaction(2);
   excluded.id = 'excluded';
   excluded.status = 'completed';
   excluded.completedAt = '2026-07-19T15:00:00.000Z';
-  excluded.lines = [{ id: 'l2', description: 'Jasa lama', quantity: 1, unit: 'pcs', unitPrice: 90000 }];
+  excluded.pages[0]!.lines = [{ id: 'l2', description: 'Jasa lama', kind: 'Layanan', quantity: 1, unit: 'pcs', pcsPrice: 90000, lsnPrice: 1080000 }];
   const report = buildRevenueReport(
-    { ...state, notas: [included, excluded] },
+    { ...state, notaTransactions: [included, excluded] },
     new Date('2026-07-21T12:00:00.000Z'),
     { from: '2026-07-21', to: '2026-07-21' },
   );

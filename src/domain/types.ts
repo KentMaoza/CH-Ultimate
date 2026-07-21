@@ -1,5 +1,6 @@
 export type PaymentKind = 'unclassified' | 'cash' | 'transfer' | 'credit';
-export type NotaStatus = 'draft' | 'completed' | 'reopened' | 'cancelled';
+export type NotaTransactionStatus = 'draft' | 'completed' | 'reopened' | 'cancelled';
+export type NotaPageStatus = 'active' | 'cancelled';
 export type Unit = 'pcs' | 'lsn';
 
 export interface Sku {
@@ -32,22 +33,33 @@ export interface NotaLine {
   id: string;
   skuId?: string;
   description: string;
+  kind: string;
   quantity: number;
   unit: Unit;
-  unitPrice: number;
+  pcsPrice: number;
+  lsnPrice: number;
 }
 
 export interface Nota {
   id: string;
-  number: string;
   suffix: string;
-  customerName: string;
-  transactionDate: string;
-  completedAt?: string;
-  payment: PaymentKind;
-  status: NotaStatus;
+  status: NotaPageStatus;
   lines: NotaLine[];
+}
+
+export interface NotaTransaction {
+  id: string;
+  baseNumber: string;
+  customerName: string;
+  customerPlace: string;
+  transactionDate: string;
+  payment: PaymentKind;
+  status: NotaTransactionStatus;
+  completedAt?: string;
+  nextNoteIndex: number;
+  pages: Nota[];
   postedLines: NotaLine[];
+  cancelledFromStatus?: 'draft' | 'completed' | 'reopened';
 }
 
 export interface LabelTemplate {
@@ -82,9 +94,8 @@ export interface WorkbookImportResult {
 export interface DemoState {
   skus: Sku[];
   adjustments: StockAdjustment[];
-  notas: Nota[];
+  notaTransactions: NotaTransaction[];
   labelTemplate: LabelTemplate;
   sourceLabel: string;
   importSummary?: Omit<WorkbookImportResult, 'skus'>;
 }
-

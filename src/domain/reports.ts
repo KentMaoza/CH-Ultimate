@@ -16,15 +16,16 @@ export function buildRevenueReport(
   let today = 0; let month = 0; let year = 0;
   const bySku = new Map<string, { skuId: string; name: string; units: number; revenue: number }>();
   const byDay = new Map<string, number>();
-  for (const nota of state.notas.filter((item) => item.status === 'completed' && item.completedAt)) {
-    const completed = dateParts(new Date(nota.completedAt!));
+  for (const transaction of state.notaTransactions.filter((item) => item.status === 'completed' && item.completedAt)) {
+    const completed = dateParts(new Date(transaction.completedAt!));
     if ((range.from && completed.key < range.from) || (range.to && completed.key > range.to)) continue;
-    const total = nota.lines.reduce((sum, line) => sum + lineTotal(line), 0);
+    const lines = transaction.pages.filter((page) => page.status === 'active').flatMap((page) => page.lines);
+    const total = lines.reduce((sum, line) => sum + lineTotal(line), 0);
     if (completed.year === now.year) year += total;
     if (completed.year === now.year && completed.month === now.month) month += total;
     if (completed.key === now.key) today += total;
     byDay.set(completed.key, (byDay.get(completed.key) ?? 0) + total);
-    for (const line of nota.lines) {
+    for (const line of lines) {
       if (!line.skuId) continue;
       const sku = state.skus.find((item) => item.id === line.skuId);
       if (!sku) continue;

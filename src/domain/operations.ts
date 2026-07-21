@@ -23,7 +23,7 @@ export function createInitialState(): DemoState {
       imageUrl: '', createdAt, archived: false,
     })),
     adjustments: [],
-    notas: [],
+    notaTransactions: [],
     labelTemplate: { medium: 'thermal', widthMm: 50, heightMm: 30, columns: 1, marginMm: 2, gapMm: 2, fontSize: 10, alignment: 'center', fields: ['qr', 'name', 'sku', 'price'] },
     sourceLabel: 'Fixture sintetis',
   };
@@ -31,7 +31,7 @@ export function createInitialState(): DemoState {
 
 export function reduceOperation(state: DemoState, operation: Operation): DemoState {
   if (operation.type === 'replace-skus') {
-    return { ...createInitialState(), skus: operation.skus, sourceLabel: operation.sourceLabel, importSummary: operation.importSummary, notas: [], adjustments: [] };
+    return { ...createInitialState(), skus: operation.skus, sourceLabel: operation.sourceLabel, importSummary: operation.importSummary, notaTransactions: [], adjustments: [] };
   }
   if (operation.type === 'add-sku') return { ...state, skus: [operation.sku, ...state.skus] };
   if (operation.type === 'archive-sku') {
@@ -60,4 +60,3 @@ export function skuNumberExists(skus: Sku[], value: string, exceptId?: string): 
   const key = value.trim().toLocaleLowerCase('id-ID');
   return skus.some((sku) => sku.id !== exceptId && [sku.skuNumber, ...sku.aliases].some((number) => number.toLocaleLowerCase('id-ID') === key));
 }
-

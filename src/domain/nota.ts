@@ -1,6 +1,12 @@
-import type { DemoState, Nota, NotaLine, Unit } from './types';
+import type { DemoState, Nota, NotaLine, NotaTransaction, Unit } from './types';
 
 const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+function witaDate(): string {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Makassar', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const value = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
+  return `${value('year')}-${value('month')}-${value('day')}`;
+}
 
 export function noteSuffixFromIndex(index: number): string {
   if (!Number.isInteger(index) || index < 0) throw new Error('Index nota tidak valid.');
@@ -11,27 +17,82 @@ export function noteSuffixFromIndex(index: number): string {
 }
 
 export function suggestedPrice(referencePrice: number, unit: Unit): number { return unit === 'lsn' ? referencePrice * 12 : referencePrice; }
-export function lineTotal(line: NotaLine): number { return Math.max(0, line.quantity) * Math.max(0, line.unitPrice); }
+export function selectedPrice(line: NotaLine): number { return line.unit === 'pcs' ? line.pcsPrice : line.lsnPrice; }
+export function lineTotal(line: NotaLine): number { return Math.max(0, line.quantity) * Math.max(0, selectedPrice(line)); }
 export function linePieces(line: NotaLine): number { return line.quantity * (line.unit === 'lsn' ? 12 : 1); }
 
-export function createDraftNota(sequence: number): Nota {
-  const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Makassar', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+function createPage(sequence: number, pageIndex: number): Nota {
+  const stamp = Date.now();
   return {
-    id: `nota-${Date.now()}-${sequence}`,
-    number: `CHU-${date.replaceAll('-', '')}-${String(sequence).padStart(4, '0')}`,
-    suffix: noteSuffixFromIndex(0), customerName: '', transactionDate: date, payment: 'unclassified', status: 'draft',
-    lines: Array.from({ length: 15 }, (_, index) => ({ id: `line-${Date.now()}-${sequence}-${index}`, description: '', quantity: 0, unit: 'pcs' as const, unitPrice: 0 })),
-    postedLines: [],
+    id: `nota-page-${stamp}-${sequence}-${pageIndex}`,
+    suffix: noteSuffixFromIndex(pageIndex),
+    status: 'active',
+    lines: Array.from({ length: 15 }, (_, lineIndex) => ({
+      id: `nota-line-${stamp}-${sequence}-${pageIndex}-${lineIndex}`,
+      description: '', kind: '', quantity: 0, unit: 'pcs' as const, pcsPrice: 0, lsnPrice: 0,
+    })),
   };
 }
 
+export function createDraftNotaTransaction(sequence: number): NotaTransaction {
+  const date = witaDate();
+  return {
+    id: `nota-transaction-${Date.now()}-${sequence}`,
+    baseNumber: `CHU-${date.replaceAll('-', '')}-${String(sequence).padStart(4, '0')}`,
+    customerName: '', customerPlace: '', transactionDate: date, payment: 'unclassified', status: 'draft',
+    nextNoteIndex: 1, pages: [createPage(sequence, 0)], postedLines: [],
+  };
+}
+
+export function addNotaPage(state: DemoState, transactionId: string): DemoState {
+  const transaction = state.notaTransactions.find((item) => item.id === transactionId);
+  if (!transaction || transaction.status !== 'draft') return state;
+  const page = createPage(transaction.nextNoteIndex, transaction.nextNoteIndex);
+  return {
+    ...state,
+    notaTransactions: state.notaTransactions.map((item) => item.id === transactionId
+      ? { ...item, pages: [...item.pages, page], nextNoteIndex: item.nextNoteIndex + 1 }
+      : item),
+  };
+}
+
+export function cancelNotaPage(state: DemoState, transactionId: string, pageId: string): DemoState {
+  const transaction = state.notaTransactions.find((item) => item.id === transactionId);
+  if (!transaction || transaction.status !== 'draft') return state;
+  return {
+    ...state,
+    notaTransactions: state.notaTransactions.map((item) => item.id === transactionId
+      ? { ...item, pages: item.pages.map((page) => page.id === pageId ? { ...page, status: 'cancelled' } : page) }
+      : item),
+  };
+}
+
+export function restoreNotaPage(state: DemoState, transactionId: string, pageId: string): DemoState {
+  const transaction = state.notaTransactions.find((item) => item.id === transactionId);
+  if (!transaction || transaction.status !== 'draft') return state;
+  return {
+    ...state,
+    notaTransactions: state.notaTransactions.map((item) => item.id === transactionId
+      ? { ...item, pages: item.pages.map((page) => page.id === pageId ? { ...page, status: 'active' } : page) }
+      : item),
+  };
+}
+
+function activeLines(transaction: NotaTransaction): NotaLine[] {
+  return transaction.pages.filter((page) => page.status === 'active').flatMap((page) => page.lines);
+}
+
+function populated(line: NotaLine): boolean {
+  return Boolean(line.skuId || line.description.trim() || line.kind.trim() || line.quantity || line.pcsPrice || line.lsnPrice);
+}
+
 function validateLines(lines: NotaLine[]): NotaLine[] {
-  const active = lines.filter((line) => line.description.trim() || line.skuId || line.quantity || line.unitPrice);
+  const active = lines.filter(populated);
   if (!active.length) throw new Error('Nota harus memiliki setidaknya satu baris.');
   for (const line of active) {
     if (!line.description.trim()) throw new Error('Nama barang wajib diisi.');
     if (!Number.isInteger(line.quantity) || line.quantity <= 0) throw new Error('Jumlah harus bilangan bulat positif.');
-    if (!Number.isInteger(line.unitPrice) || line.unitPrice < 0) throw new Error('Harga harus bilangan bulat nol atau lebih.');
+    if (!Number.isInteger(selectedPrice(line)) || selectedPrice(line) < 0) throw new Error('Harga harus bilangan bulat nol atau lebih.');
   }
   return active;
 }
@@ -45,47 +106,85 @@ function stockEffects(state: DemoState, lines: NotaLine[]): Map<string, number> 
   return effects;
 }
 
-function applyStockDelta(state: DemoState, notaId: string, delta: Map<string, number>, direction: -1 | 1): DemoState {
+function applyStockDelta(state: DemoState, transactionId: string, delta: Map<string, number>, direction: -1 | 1): DemoState {
   let skus = state.skus;
   let adjustments = state.adjustments;
   delta.forEach((pieces, skuId) => {
+    if (!pieces) return;
     const sku = skus.find((candidate) => candidate.id === skuId);
     if (!sku) return;
     const quantity = pieces * direction;
     const after = sku.stock + quantity;
     skus = skus.map((candidate) => candidate.id === skuId ? { ...candidate, stock: after } : candidate);
-    adjustments = [...adjustments, { id: `adj-${notaId}-${adjustments.length}`, skuId, quantity, before: sku.stock, after, createdAt: new Date().toISOString(), source: direction === -1 ? 'nota' : 'reversal' }];
+    adjustments = [...adjustments, {
+      id: `adj-${transactionId}-${adjustments.length}`, skuId, quantity, before: sku.stock, after,
+      createdAt: new Date().toISOString(), source: direction === -1 ? 'nota' : 'reversal',
+    }];
   });
   return { ...state, skus, adjustments };
 }
 
-export function completeNota(state: DemoState, notaId: string): DemoState {
-  const nota = state.notas.find((item) => item.id === notaId);
-  if (!nota || !['draft', 'reopened'].includes(nota.status)) return state;
-  const active = validateLines(nota.lines);
-  const current = stockEffects(state, active);
-  const previous = stockEffects(state, nota.postedLines);
+function difference(current: Map<string, number>, previous: Map<string, number>): Map<string, number> {
   const delta = new Map<string, number>();
   new Set([...current.keys(), ...previous.keys()]).forEach((skuId) => delta.set(skuId, (current.get(skuId) ?? 0) - (previous.get(skuId) ?? 0)));
-  let next = applyStockDelta(state, notaId, delta, -1);
-  next = { ...next, notas: next.notas.map((item) => item.id === notaId ? { ...item, status: 'completed', completedAt: new Date().toISOString(), lines: nota.lines, postedLines: active.map((line) => ({ ...line })) } : item) };
-  return next;
+  return delta;
 }
 
-export function reopenNota(state: DemoState, notaId: string): DemoState {
-  return { ...state, notas: state.notas.map((nota) => nota.id === notaId && nota.status === 'completed' ? { ...nota, status: 'reopened' } : nota) };
+export function completeNotaTransaction(state: DemoState, transactionId: string): DemoState {
+  const transaction = state.notaTransactions.find((item) => item.id === transactionId);
+  if (!transaction || !['draft', 'reopened'].includes(transaction.status)) return state;
+  const postedLines = validateLines(activeLines(transaction));
+  const delta = difference(stockEffects(state, postedLines), stockEffects(state, transaction.postedLines));
+  const next = applyStockDelta(state, transactionId, delta, -1);
+  return {
+    ...next,
+    notaTransactions: next.notaTransactions.map((item) => item.id === transactionId ? {
+      ...item, status: 'completed', completedAt: new Date().toISOString(),
+      postedLines: postedLines.map((line) => ({ ...line })), cancelledFromStatus: undefined,
+    } : item),
+  };
 }
 
-export function cancelNota(state: DemoState, notaId: string): DemoState {
-  const nota = state.notas.find((item) => item.id === notaId);
-  if (!nota || nota.status !== 'completed') return state;
-  const next = applyStockDelta(state, notaId, stockEffects(state, nota.postedLines), 1);
-  return { ...next, notas: next.notas.map((item) => item.id === notaId ? { ...item, status: 'cancelled' } : item) };
+export function reopenNotaTransaction(state: DemoState, transactionId: string): DemoState {
+  return {
+    ...state,
+    notaTransactions: state.notaTransactions.map((transaction) => transaction.id === transactionId && transaction.status === 'completed'
+      ? { ...transaction, status: 'reopened' }
+      : transaction),
+  };
 }
 
-export function restoreNota(state: DemoState, notaId: string): DemoState {
-  const nota = state.notas.find((item) => item.id === notaId);
-  if (!nota || nota.status !== 'cancelled') return state;
-  const next = applyStockDelta(state, notaId, stockEffects(state, nota.postedLines), -1);
-  return { ...next, notas: next.notas.map((item) => item.id === notaId ? { ...item, status: 'completed', completedAt: new Date().toISOString() } : item) };
+export function cancelNotaTransaction(state: DemoState, transactionId: string): DemoState {
+  const transaction = state.notaTransactions.find((item) => item.id === transactionId);
+  if (!transaction || transaction.status === 'cancelled') return state;
+  const cancelledFromStatus = transaction.status;
+  const next = transaction.status === 'draft'
+    ? state
+    : applyStockDelta(state, transactionId, stockEffects(state, transaction.postedLines), 1);
+  return {
+    ...next,
+    notaTransactions: next.notaTransactions.map((item) => item.id === transactionId ? {
+      ...item, status: 'cancelled', cancelledFromStatus,
+    } : item),
+  };
+}
+
+export function restoreNotaTransaction(state: DemoState, transactionId: string): DemoState {
+  const transaction = state.notaTransactions.find((item) => item.id === transactionId);
+  if (!transaction || transaction.status !== 'cancelled') return state;
+  if (transaction.cancelledFromStatus === 'draft') {
+    return {
+      ...state,
+      notaTransactions: state.notaTransactions.map((item) => item.id === transactionId
+        ? { ...item, status: 'draft', cancelledFromStatus: undefined }
+        : item),
+    };
+  }
+  const next = applyStockDelta(state, transactionId, stockEffects(state, transaction.postedLines), -1);
+  return {
+    ...next,
+    notaTransactions: next.notaTransactions.map((item) => item.id === transactionId
+      ? { ...item, status: 'completed', completedAt: new Date().toISOString(), cancelledFromStatus: undefined }
+      : item),
+  };
 }

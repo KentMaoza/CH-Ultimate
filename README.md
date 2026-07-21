@@ -1,11 +1,27 @@
 # CH Ultimate
 
-An Obsidian knowledge vault using a three-layer LLM wiki structure:
+Frontend-only Electron demo for Toko CH operational workflows.
 
-- `raw/` — immutable, curated source material
-- `wiki/` — maintained knowledge and synthesis
-- `AGENTS.md` — the operating schema for future Codex sessions
+## Run locally
 
-Start at [[wiki/index]]. To add material, place a source under `raw/` and ask Codex to ingest it.
+```bash
+npm install
+npm start
+```
 
-The vault structure is based on [Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).
+## Verify
+
+```bash
+npm run verify
+npm run test:e2e
+npm run package
+```
+
+## Demo boundaries
+
+- Data exists only for the current app session and resets on reload or exit.
+- Runtime XLSX imports are parsed in memory and are never copied into this repository.
+- Printing, final PDF export, NAS/database integration, mobile dashboards, and other CH apps are intentionally deferred.
+- `CHU` is temporary branding.
+
+The future NAS phase will replace the mock `OperationsGateway` implementation with an authoritative CH Core API.

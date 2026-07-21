@@ -1,0 +1,28 @@
+:root { font-family: "Segoe UI", Inter, system-ui, sans-serif; color: #111; background: #f4f4f0; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 1024px; min-height: 100vh; }
+button, input, select, textarea { font: inherit; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #111; outline-offset: 2px; }
+.app-shell { display: grid; grid-template-columns: 224px 1fr; min-height: 100vh; transition: grid-template-columns .18s ease; }
+.app-shell.rail-collapsed { grid-template-columns: 78px 1fr; }
+.app-rail { position: relative; display: flex; flex-direction: column; min-height: 100vh; padding: 20px 14px 14px; color: #fff; background: #111; }
+.brand-row { display: flex; align-items: center; gap: 11px; min-height: 44px; padding: 0 6px 25px; white-space: nowrap; overflow: hidden; }
+.brand-row strong { display: block; font-size: 15px; }
+.brand-row span { display: block; margin-top: 3px; font-size: 9px; letter-spacing: .16em; }
+.brand-mark { display: grid; flex: 0 0 42px; width: 42px; height: 42px; place-items: center; border: 2px solid #fff; font-weight: 800; letter-spacing: -.04em; }
+.rail-collapse { position: absolute; top: 78px; right: -13px; z-index: 2; width: 26px; height: 32px; border: 2px solid #111; color: #111; background: #fff; cursor: pointer; }
+.app-rail nav { display: grid; gap: 4px; }
+.app-rail nav button { display: flex; min-height: 42px; align-items: center; gap: 10px; width: 100%; padding: 10px 11px; border: 0; color: #fff; background: transparent; cursor: pointer; text-align: left; white-space: nowrap; }
+.app-rail nav button:hover { background: #292929; }
+.app-rail nav button.active { color: #111; background: #fff; font-weight: 750; }
+.nav-glyph { display: inline-grid; flex: 0 0 24px; width: 24px; place-items: center; font-size: 16px; }
+.demo-badge { margin-top: auto; padding: 10px 6px; border: 1px solid #fff; font-size: 9px; letter-spacing: .09em; text-align: center; white-space: nowrap; overflow: hidden; }
+.app-main { min-width: 0; padding: 28px 34px; }
+.page-header { display: flex; align-items: flex-start; justify-content: space-between; padding-bottom: 18px; border-bottom: 2px solid #111; }
+.eyebrow { font-size: 10px; letter-spacing: .14em; }
+h1 { margin: 5px 0 0; font-size: 30px; letter-spacing: -.04em; }
+.session-pill { padding: 7px 10px; border: 1px solid #111; background: #fff; font-size: 11px; }
+.page-placeholder { display: flex; align-items: center; gap: 22px; min-height: 360px; margin-top: 24px; padding: 32px; border: 2px dashed #888; background: #fafaf8; }
+.page-placeholder h2 { margin: 0 0 8px; font-size: 26px; }
+.page-placeholder p { margin: 0; color: #555; }
+.placeholder-number { font-size: 64px; font-weight: 900; color: #ddd; }

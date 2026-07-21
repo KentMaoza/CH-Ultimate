@@ -1,8 +1,9 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { App } from '../../src/renderer/App';
+import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 
-function openNota() {
-  render(<App />);
+function openNota(gateway?: MockOperationsGateway) {
+  render(<App gateway={gateway} />);
   fireEvent.click(screen.getByRole('button', { name: 'Nota' }));
 }
 
@@ -12,9 +13,13 @@ test('Nota opens as a dedicated workspace and back restores the CH Ultimate shel
   expect(screen.queryByRole('navigation', { name: 'Modul CH Ultimate' })).not.toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: 'Nota', level: 1 })).not.toBeInTheDocument();
 
+  fireEvent.change(screen.getByLabelText('Pelanggan'), { target: { value: 'Nadia' } });
   fireEvent.click(screen.getByRole('button', { name: 'Kembali ke CH Ultimate' }));
   expect(screen.getByRole('navigation', { name: 'Modul CH Ultimate' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'SKU Gudang', level: 1 })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Nota' }));
+  expect(screen.getByLabelText('Pelanggan')).toHaveValue('Nadia');
 });
 
 test('Nota grid has the required headers and fifteen A-page rows', () => {
@@ -27,12 +32,19 @@ test('Nota grid has the required headers and fifteen A-page rows', () => {
   expect(screen.getByText('15A')).toBeInTheDocument();
 });
 
-test('Nota shows seeded metadata and the total across active transaction pages', () => {
-  openNota();
+test('Nota totals seeded values across active transaction pages', async () => {
+  const gateway = new MockOperationsGateway();
+  const transaction = gateway.getSnapshot().notaTransactions[0]!;
+  const pageB = transaction.pages.find((page) => page.suffix === 'B')!;
+  await gateway.updateNotaLine(transaction.id, pageB.id, pageB.lines[0]!.id, {
+    description: 'Jasa kirim halaman B', quantity: 1, pcsPrice: 53_000,
+  });
+
+  openNota(gateway);
   expect(screen.getByText(/CHU-\d{8}-0001A/)).toBeInTheDocument();
   expect(screen.getByLabelText('Pelanggan')).toHaveValue('Amelia');
   expect(screen.getByLabelText('Pembayaran')).toHaveValue('unclassified');
-  expect(screen.getByTestId('nota-transaction-total')).toHaveTextContent('47.000');
+  expect(screen.getByTestId('nota-transaction-total')).toHaveTextContent('100.000');
 });
 
 test('basic fields, unit, and dual prices update the in-memory Nota total', () => {

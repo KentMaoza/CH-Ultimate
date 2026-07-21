@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { OperationsGateway } from '../gateway/operations-gateway';
 import { OperationsProvider } from './operations-context';
 import { InventoryPage } from './pages/InventoryPage';
 import { CreateSkuPage } from './pages/CreateSkuPage';
@@ -66,4 +67,4 @@ function AppLayout() {
   );
 }
 
-export function App() { return <OperationsProvider><AppLayout /></OperationsProvider>; }
+export function App({ gateway }: { gateway?: OperationsGateway }) { return <OperationsProvider gateway={gateway}><AppLayout /></OperationsProvider>; }

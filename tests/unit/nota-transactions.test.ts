@@ -78,6 +78,42 @@ test('draft page and draft transaction cancellation have no stock effect', () =>
   expect(state.skus.find((sku) => sku.id === 'sku-1')?.stock).toBe(24);
 });
 
+test('page lifecycle keeps one active page and allocates monotonically after cancellation', () => {
+  const transaction = createDraftNotaTransaction(1);
+  let state = { ...createInitialState(), notaTransactions: [transaction] };
+  const pageA = transaction.pages[0]!;
+  state = cancelNotaPage(state, transaction.id, pageA.id);
+  expect(state.notaTransactions[0]!.pages[0]!.status).toBe('active');
+
+  state = addNotaPage(state, transaction.id);
+  const pageB = state.notaTransactions[0]!.pages[1]!;
+  state = cancelNotaPage(state, transaction.id, pageB.id);
+  expect(state.notaTransactions[0]!.pages[1]!.status).toBe('cancelled');
+  state = addNotaPage(state, transaction.id);
+  expect(state.notaTransactions[0]!.pages.at(-1)?.suffix).toBe('C');
+  state = restoreNotaPage(state, transaction.id, pageB.id);
+  expect(state.notaTransactions[0]!.pages[1]!.status).toBe('active');
+});
+
+test('reopened transactions permit page lifecycle and restore to reopened with posted stock reapplied', () => {
+  const transaction = createDraftNotaTransaction(1);
+  transaction.pages[0]!.lines = [line('tracked', { skuId: 'sku-1', description: 'Beras', quantity: 2, pcsPrice: 42_000 })];
+  let state = completeNotaTransaction({ ...createInitialState(), notaTransactions: [transaction] }, transaction.id);
+  state = reopenNotaTransaction(state, transaction.id);
+  state = addNotaPage(state, transaction.id);
+  const pageB = state.notaTransactions[0]!.pages[1]!;
+  state = cancelNotaPage(state, transaction.id, pageB.id);
+  expect(state.notaTransactions[0]!.pages[1]!.status).toBe('cancelled');
+  state = restoreNotaPage(state, transaction.id, pageB.id);
+  expect(state.notaTransactions[0]!.pages[1]!.status).toBe('active');
+
+  state = cancelNotaTransaction(state, transaction.id);
+  expect(state.skus.find((sku) => sku.id === 'sku-1')?.stock).toBe(24);
+  state = restoreNotaTransaction(state, transaction.id);
+  expect(state.notaTransactions[0]!.status).toBe('reopened');
+  expect(state.skus.find((sku) => sku.id === 'sku-1')?.stock).toBe(22);
+});
+
 test('normal gateway seed is Amelia in Saibah with active A and B pages and unchanged stock', () => {
   const state = new MockOperationsGateway().getSnapshot();
   const transaction = state.notaTransactions[0]!;

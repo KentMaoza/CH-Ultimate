@@ -46,7 +46,7 @@ export function createDraftNotaTransaction(sequence: number): NotaTransaction {
 
 export function addNotaPage(state: DemoState, transactionId: string): DemoState {
   const transaction = state.notaTransactions.find((item) => item.id === transactionId);
-  if (!transaction || transaction.status !== 'draft') return state;
+  if (!transaction || !['draft', 'reopened'].includes(transaction.status)) return state;
   const page = createPage(transaction.nextNoteIndex, transaction.nextNoteIndex);
   return {
     ...state,
@@ -58,7 +58,8 @@ export function addNotaPage(state: DemoState, transactionId: string): DemoState 
 
 export function cancelNotaPage(state: DemoState, transactionId: string, pageId: string): DemoState {
   const transaction = state.notaTransactions.find((item) => item.id === transactionId);
-  if (!transaction || transaction.status !== 'draft') return state;
+  const page = transaction?.pages.find((item) => item.id === pageId);
+  if (!transaction || !['draft', 'reopened'].includes(transaction.status) || page?.status !== 'active' || transaction.pages.filter((item) => item.status === 'active').length < 2) return state;
   return {
     ...state,
     notaTransactions: state.notaTransactions.map((item) => item.id === transactionId
@@ -69,7 +70,8 @@ export function cancelNotaPage(state: DemoState, transactionId: string, pageId: 
 
 export function restoreNotaPage(state: DemoState, transactionId: string, pageId: string): DemoState {
   const transaction = state.notaTransactions.find((item) => item.id === transactionId);
-  if (!transaction || transaction.status !== 'draft') return state;
+  const page = transaction?.pages.find((item) => item.id === pageId);
+  if (!transaction || !['draft', 'reopened'].includes(transaction.status) || page?.status !== 'cancelled') return state;
   return {
     ...state,
     notaTransactions: state.notaTransactions.map((item) => item.id === transactionId
@@ -215,11 +217,13 @@ export function restoreNotaTransaction(state: DemoState, transactionId: string):
         : item),
     };
   }
+  const restoredStatus = transaction.cancelledFromStatus;
+  if (restoredStatus !== 'completed' && restoredStatus !== 'reopened') return state;
   const next = applyStockDelta(state, transactionId, effectsFromSnapshot(transaction.postedStockEffects), -1);
   return {
     ...next,
     notaTransactions: next.notaTransactions.map((item) => item.id === transactionId
-      ? { ...item, status: 'completed', completedAt: new Date().toISOString(), cancelledFromStatus: undefined }
+      ? { ...item, status: restoredStatus, completedAt: new Date().toISOString(), cancelledFromStatus: undefined }
       : item),
   };
 }

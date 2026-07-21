@@ -223,7 +223,7 @@ export function restoreNotaTransaction(state: DemoState, transactionId: string):
   return {
     ...next,
     notaTransactions: next.notaTransactions.map((item) => item.id === transactionId
-      ? { ...item, status: restoredStatus, completedAt: new Date().toISOString(), cancelledFromStatus: undefined }
+      ? { ...item, status: restoredStatus, cancelledFromStatus: undefined }
       : item),
   };
 }

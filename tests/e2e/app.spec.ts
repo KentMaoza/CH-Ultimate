@@ -57,6 +57,12 @@ test('Nota is a full-window workspace, stays horizontally contained, and returns
       await expect(window.getByRole('columnheader')).toHaveCount(10);
       await expect(window.getByTestId('nota-grid-row-1')).toContainText('1A');
       await expect(window.getByTestId('nota-grid-row-15')).toContainText('15A');
+      const row15 = await window.getByTestId('nota-grid-row-15').boundingBox();
+      const complete = await window.getByRole('button', { name: 'Selesaikan nota' }).boundingBox();
+      expect(row15).not.toBeNull();
+      expect(complete).not.toBeNull();
+      expect(row15!.y + row15!.height).toBeLessThanOrEqual(viewport.height);
+      expect(complete!.y + complete!.height).toBeLessThanOrEqual(viewport.height);
       expect(await window.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
       await window.screenshot({ path: testInfo.outputPath(`nota-${viewport.width}x${viewport.height}.png`) });
     }

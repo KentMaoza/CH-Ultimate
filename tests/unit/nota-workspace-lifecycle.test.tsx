@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { vi } from 'vitest';
 import { App } from '../../src/renderer/App';
 import { buildRevenueReport } from '../../src/domain/reports';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
@@ -93,6 +94,15 @@ test('search click opens the clicked result, exposes an active descendant, and E
   expect(listTrigger).toHaveFocus();
 });
 
+test('search stays expanded when a nonempty query renders an empty listbox', () => {
+  openNota();
+  const search = screen.getByRole('combobox', { name: 'Cari nota' });
+  fireEvent.change(search, { target: { value: 'tidak-ada-nota' } });
+
+  expect(search).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByRole('listbox')).toHaveTextContent('Tidak ada nota yang cocok.');
+});
+
 test('new transaction and drawer dialogs restore focus, close on Escape, and reset fields for a fresh open', () => {
   openNota();
   const newTrigger = screen.getByRole('button', { name: 'Transaksi Baru' });
@@ -172,6 +182,68 @@ test('cancelling a transaction opens Sampah directly', async () => {
   fireEvent.click(within(confirmation).getByRole('button', { name: 'Batalkan' }));
   await waitFor(() => expect(screen.getByRole('dialog', { name: 'Daftar Nota' })).toBeInTheDocument());
   expect(screen.getByRole('tab', { name: 'Sampah' })).toHaveAttribute('aria-selected', 'true');
+});
+
+test('a cancelled transaction found in search routes to Sampah', async () => {
+  openNota();
+  fireEvent.click(screen.getByRole('button', { name: 'Batalkan transaksi' }));
+  fireEvent.click(within(screen.getByRole('dialog', { name: /Batalkan transaksi/i })).getByRole('button', { name: 'Batalkan' }));
+  await waitFor(() => expect(screen.getByRole('dialog', { name: 'Daftar Nota' })).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button', { name: 'Tutup Daftar Nota' }));
+  const search = screen.getByRole('combobox', { name: 'Cari nota' });
+  fireEvent.change(search, { target: { value: 'Amelia' } });
+  fireEvent.click(screen.getAllByRole('option')[0]!);
+
+  expect(screen.getByRole('tab', { name: 'Sampah' })).toHaveAttribute('aria-selected', 'true');
+});
+
+test('transaction cancellation can be undone', async () => {
+  const gateway = openNota();
+  fireEvent.click(screen.getByRole('button', { name: 'Batalkan transaksi' }));
+  fireEvent.click(within(screen.getByRole('dialog', { name: /Batalkan transaksi/i })).getByRole('button', { name: 'Batalkan' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Urungkan' })).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button', { name: 'Urungkan' }));
+
+  await waitFor(() => expect(gateway.getSnapshot().notaTransactions[0]?.status).toBe('draft'));
+});
+
+test('undo expires at exactly ten seconds', async () => {
+  vi.useFakeTimers();
+  try {
+    openNota();
+    fireEvent.click(screen.getByRole('button', { name: 'Halaman B' }));
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Batalkan halaman B' })); });
+    expect(screen.getByRole('button', { name: 'Urungkan' })).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(9_999));
+    expect(screen.getByRole('button', { name: 'Urungkan' })).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.queryByRole('button', { name: 'Urungkan' })).not.toBeInTheDocument();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test('a replacement undo owns a fresh timer and unmount clears it', async () => {
+  vi.useFakeTimers();
+  try {
+    const view = render(<App gateway={new MockOperationsGateway()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Nota' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tambah Nota' }));
+    await act(async () => {});
+    fireEvent.click(screen.getByRole('button', { name: 'Batalkan halaman C' }));
+    await act(async () => {});
+    act(() => vi.advanceTimersByTime(5_000));
+    fireEvent.click(screen.getByRole('button', { name: 'Halaman B' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Batalkan halaman B' }));
+    await act(async () => {});
+    act(() => vi.advanceTimersByTime(5_000));
+    expect(screen.getByRole('button', { name: 'Urungkan' })).toBeInTheDocument();
+    expect(vi.getTimerCount()).toBe(1);
+    view.unmount();
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test('restoring a completed transaction returns to Arsip rather than the working selection', async () => {
@@ -276,9 +348,13 @@ test('delayed mutations disable mutation controls until the gateway settles', as
   const add = screen.getByRole('button', { name: 'Tambah Nota' });
   fireEvent.click(add);
   await waitFor(() => expect(add).toBeDisabled());
+  expect(screen.getByTestId('chu-nota-workspace')).toHaveAttribute('aria-busy', 'true');
+  expect(screen.getByRole('status', { name: 'Operasi nota sedang diproses' })).toHaveTextContent('Sedang memproses');
   expect(screen.getByRole('button', { name: 'Batalkan transaksi' })).toBeDisabled();
   gateway.release();
   await waitFor(() => expect(screen.getByRole('button', { name: 'Halaman C' })).toHaveAttribute('aria-pressed', 'true'));
+  expect(screen.getByTestId('chu-nota-workspace')).not.toHaveAttribute('aria-busy', 'true');
+  expect(screen.queryByRole('status', { name: 'Operasi nota sedang diproses' })).not.toBeInTheDocument();
 });
 
 test('a pending create disables Batal and ignores Escape and its backdrop', async () => {

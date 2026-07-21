@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { App } from '../../src/renderer/App';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 
@@ -123,6 +123,28 @@ test('numeric editing keeps invalid raw text, formats valid price on blur, and c
   expect(screen.getByText(/Perbaiki nilai angka/i)).toHaveTextContent(/bilangan bulat/i);
 });
 
+test('completion finds an invalid raw number on another active page and preserves it until corrected', async () => {
+  const gateway = new MockOperationsGateway();
+  openNota(gateway);
+  const quantityA = screen.getByLabelText('Jumlah baris 3');
+  fireEvent.change(quantityA, { target: { value: '1.5' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Halaman B' }));
+
+  fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
+
+  expect(screen.queryByRole('dialog', { name: 'Selesaikan nota?' })).not.toBeInTheDocument();
+  expect(gateway.getSnapshot().notaTransactions[0]?.status).toBe('draft');
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Halaman A' })).toHaveAttribute('aria-pressed', 'true'));
+  const restoredQuantity = screen.getByLabelText('Jumlah baris 3');
+  expect(restoredQuantity).toHaveValue('1.5');
+  expect(restoredQuantity).toHaveFocus();
+  expect(screen.getByText(/Perbaiki nilai angka/i)).toBeInTheDocument();
+
+  fireEvent.change(restoredQuantity, { target: { value: '2' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
+  expect(screen.getByRole('dialog', { name: 'Selesaikan nota?' })).toBeInTheDocument();
+});
+
 test('blurred grouped numeric values remain valid when completing without refocusing', () => {
   openNota();
   fireEvent.change(screen.getByLabelText('Nama barang baris 3'), { target: { value: 'Kopi' } });
@@ -214,6 +236,20 @@ test('grid keyboard traversal respects cell, row, and caret boundaries and Escap
   (name as HTMLInputElement).setSelectionRange(0, 0);
   fireEvent.keyDown(name, { key: 'ArrowLeft' });
   expect(name).toHaveFocus();
+});
+
+test.each([
+  ['unit', 'LSN baris 1'],
+  ['output', 'Total baris 1'],
+])('Ctrl or Cmd+K does not steal focus from a grid %s control', (_kind, label) => {
+  openNota();
+  const editable = screen.getByLabelText(label);
+  editable.focus();
+  fireEvent.keyDown(editable, { key: 'k', ctrlKey: true });
+  expect(editable).toHaveFocus();
+  fireEvent.keyDown(editable, { key: 'k', metaKey: true });
+  expect(editable).toHaveFocus();
+  expect(screen.getByRole('combobox', { name: 'Cari nota' })).not.toHaveFocus();
 });
 
 test('completion confirmation traps focus, closes with Escape, and restores the trigger', () => {

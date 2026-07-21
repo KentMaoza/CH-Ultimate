@@ -11,6 +11,7 @@ import {
   restoreNotaTransaction,
 } from '../../src/domain/nota';
 import { createInitialState } from '../../src/domain/operations';
+import { buildRevenueReport } from '../../src/domain/reports';
 
 function line(id: string, patch: Partial<ReturnType<typeof createDraftNotaTransaction>['pages'][number]['lines'][number]> = {}) {
   return { id, skuId: undefined, description: '', kind: '', quantity: 0, unit: 'pcs' as const, pcsPrice: 0, lsnPrice: 0, ...patch };
@@ -64,6 +65,25 @@ test('recompletion posts only the difference and transaction cancellation revers
   expect(state.skus.find((sku) => sku.id === 'sku-1')?.stock).toBe(24);
   state = restoreNotaTransaction(state, transaction.id);
   expect(state.skus.find((sku) => sku.id === 'sku-1')?.stock).toBe(19);
+});
+
+test('restoring a cancelled completed transaction preserves its completion bucket until recompletion', () => {
+  const transaction = createDraftNotaTransaction(1);
+  transaction.pages[0]!.lines = [line('sale', { description: 'Jasa', quantity: 1, pcsPrice: 42_000 })];
+  let state = completeNotaTransaction({ ...createInitialState(), notaTransactions: [transaction] }, transaction.id);
+  state = {
+    ...state,
+    notaTransactions: state.notaTransactions.map((item) => item.id === transaction.id ? { ...item, completedAt: '2026-07-19T16:30:00.000Z' } : item),
+  };
+  const originalCompletedAt = state.notaTransactions[0]!.completedAt;
+  state = cancelNotaTransaction(state, transaction.id);
+  state = restoreNotaTransaction(state, transaction.id);
+
+  expect(state.notaTransactions[0]).toMatchObject({ status: 'completed', completedAt: originalCompletedAt });
+  expect(buildRevenueReport(state, new Date('2026-07-21T12:00:00.000Z')).byDay).toEqual([{ date: '2026-07-20', revenue: 42_000 }]);
+
+  state = completeNotaTransaction(reopenNotaTransaction(state, transaction.id), transaction.id);
+  expect(state.notaTransactions[0]!.completedAt).not.toBe(originalCompletedAt);
 });
 
 test('draft page and draft transaction cancellation have no stock effect', () => {

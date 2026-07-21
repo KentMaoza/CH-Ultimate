@@ -12,6 +12,11 @@ export function useAccessibleModal<T extends HTMLElement = HTMLElement>(open: bo
     dialogRef.current?.querySelector<HTMLElement>('[data-modal-initial-focus]')?.focus();
   }, [open, restoreFocusTo]);
 
+  useEffect(() => {
+    const active = document.activeElement;
+    if (open && !canClose && active instanceof HTMLElement && dialogRef.current?.contains(active) && active.matches(':disabled')) dialogRef.current.focus();
+  }, [open, canClose]);
+
   const close = () => {
     if (!canClose) return;
     restoreRef.current?.focus();
@@ -28,7 +33,11 @@ export function useAccessibleModal<T extends HTMLElement = HTMLElement>(open: bo
     const items = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(focusable) ?? []);
     const first = items[0];
     const last = items.at(-1);
-    if (!first || !last) return;
+    if (!first || !last) {
+      event.preventDefault();
+      dialogRef.current?.focus();
+      return;
+    }
     if (event.shiftKey && document.activeElement === first) {
       event.preventDefault();
       last.focus();

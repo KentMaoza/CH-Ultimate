@@ -281,12 +281,21 @@ test('delayed mutations disable mutation controls until the gateway settles', as
 test('a pending create disables Batal and ignores Escape and its backdrop', async () => {
   const gateway = new DelayedCreateGateway();
   openNota(gateway);
+  const background = screen.getByRole('button', { name: 'Kembali ke CH Ultimate' });
   fireEvent.click(screen.getByRole('button', { name: 'Transaksi Baru' }));
   const dialog = screen.getByRole('dialog', { name: 'Transaksi Baru' });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Buat transaksi' }));
 
   const cancel = within(dialog).getByRole('button', { name: 'Batal' });
   await waitFor(() => expect(cancel).toBeDisabled());
+  expect(dialog).toHaveAttribute('tabindex', '-1');
+  expect(dialog).toHaveFocus();
+  expect(fireEvent.keyDown(dialog, { key: 'Tab' })).toBe(false);
+  expect(dialog).toHaveFocus();
+  expect(background).not.toHaveFocus();
+  expect(fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true })).toBe(false);
+  expect(dialog).toHaveFocus();
+  expect(background).not.toHaveFocus();
   fireEvent.keyDown(dialog, { key: 'Escape' });
   fireEvent.mouseDown(dialog.parentElement!);
   expect(screen.getByRole('dialog', { name: 'Transaksi Baru' })).toBeInTheDocument();
@@ -298,12 +307,21 @@ test('a pending create disables Batal and ignores Escape and its backdrop', asyn
 test('a pending confirmation disables Batal and ignores Escape and its backdrop', async () => {
   const gateway = new DelayedCompleteGateway();
   openNota(gateway);
+  const background = screen.getByRole('button', { name: 'Kembali ke CH Ultimate' });
   fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
   const dialog = screen.getByRole('dialog', { name: /Selesaikan nota/i });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Selesaikan' }));
 
   const cancel = within(dialog).getByRole('button', { name: 'Batal' });
   await waitFor(() => expect(cancel).toBeDisabled());
+  expect(dialog).toHaveAttribute('tabindex', '-1');
+  expect(dialog).toHaveFocus();
+  expect(fireEvent.keyDown(dialog, { key: 'Tab' })).toBe(false);
+  expect(dialog).toHaveFocus();
+  expect(background).not.toHaveFocus();
+  expect(fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true })).toBe(false);
+  expect(dialog).toHaveFocus();
+  expect(background).not.toHaveFocus();
   fireEvent.keyDown(dialog, { key: 'Escape' });
   fireEvent.mouseDown(dialog.parentElement!);
   expect(screen.getByRole('dialog', { name: /Selesaikan nota/i })).toBeInTheDocument();
@@ -315,12 +333,21 @@ test('a pending confirmation disables Batal and ignores Escape and its backdrop'
 test('a pending drawer mutation disables close and ignores Escape and its backdrop', async () => {
   const gateway = new DelayedAddGateway();
   openNota(gateway);
+  const background = screen.getByRole('button', { name: 'Kembali ke CH Ultimate' });
   fireEvent.click(screen.getByRole('button', { name: 'Nota Dikerjakan' }));
   const drawer = screen.getByRole('dialog', { name: 'Nota Dikerjakan' });
   fireEvent.click(within(drawer).getByRole('button', { name: 'Tambah Nota' }));
 
   const close = within(drawer).getByRole('button', { name: 'Tutup Nota Dikerjakan' });
   await waitFor(() => expect(close).toBeDisabled());
+  expect(drawer).toHaveAttribute('tabindex', '-1');
+  expect(drawer).toHaveFocus();
+  expect(fireEvent.keyDown(drawer, { key: 'Tab' })).toBe(false);
+  expect(drawer).toHaveFocus();
+  expect(background).not.toHaveFocus();
+  expect(fireEvent.keyDown(drawer, { key: 'Tab', shiftKey: true })).toBe(false);
+  expect(drawer).toHaveFocus();
+  expect(background).not.toHaveFocus();
   fireEvent.keyDown(drawer, { key: 'Escape' });
   fireEvent.mouseDown(drawer.parentElement!);
   expect(screen.getByRole('dialog', { name: 'Nota Dikerjakan' })).toBeInTheDocument();

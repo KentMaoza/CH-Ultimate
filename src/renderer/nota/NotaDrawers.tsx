@@ -7,7 +7,7 @@ type Selection = { transactionId: string; pageId: string };
 
 function Drawer({ label, onClose, children, restoreFocusTo, busy }: { label: string; onClose: () => void; children: React.ReactNode; restoreFocusTo: HTMLElement | null; busy: boolean }) {
   const modal = useAccessibleModal<HTMLElement>(true, onClose, restoreFocusTo, !busy);
-  return <div className="chu-nota-workspace__drawer-backdrop" onMouseDown={modal.onBackdropMouseDown}><aside ref={modal.dialogRef} className="chu-nota-workspace__drawer" role="dialog" aria-modal="true" aria-label={label} onKeyDown={modal.onKeyDown}><header><h2>{label}</h2><button data-modal-initial-focus disabled={busy} aria-label={`Tutup ${label}`} onClick={modal.close}>×</button></header>{children}</aside></div>;
+  return <div className="chu-nota-workspace__drawer-backdrop" onMouseDown={modal.onBackdropMouseDown}><aside ref={modal.dialogRef} tabIndex={-1} className="chu-nota-workspace__drawer" role="dialog" aria-modal="true" aria-label={label} onKeyDown={modal.onKeyDown}><header><h2>{label}</h2><button data-modal-initial-focus disabled={busy} aria-label={`Tutup ${label}`} onClick={modal.close}>×</button></header>{children}</aside></div>;
 }
 
 export function WorkingDrawer({ transactions, selected, onClose, onSelect, onAdd, onCancelPage, onCancelTransaction, restoreFocusTo, busy = false }: {

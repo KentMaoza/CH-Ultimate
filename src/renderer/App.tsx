@@ -4,6 +4,9 @@ import { InventoryPage } from './pages/InventoryPage';
 import { CreateSkuPage } from './pages/CreateSkuPage';
 import { LabelPage } from './pages/LabelPage';
 import { NotaPage } from './pages/NotaPage';
+import { RevenuePage } from './pages/RevenuePage';
+import { EmptyStockPage } from './pages/EmptyStockPage';
+import { SettingsPage } from './pages/SettingsPage';
 
 export type ModuleId = 'inventory' | 'create' | 'label' | 'nota' | 'revenue' | 'empty' | 'settings';
 
@@ -29,7 +32,7 @@ function AppLayout() {
           <div className="brand-mark">CHU</div>
           {!collapsed && <div><strong>CH Ultimate</strong><span>OPERATIONAL</span></div>}
         </div>
-        <button className="rail-collapse" aria-label="Kecilkan navigasi" onClick={() => setCollapsed((value) => !value)}>
+        <button className="rail-collapse" aria-label={collapsed ? 'Besarkan navigasi' : 'Kecilkan navigasi'} onClick={() => setCollapsed((value) => !value)}>
           {collapsed ? '›' : '‹'}
         </button>
         <nav aria-label="Modul CH Ultimate">
@@ -51,9 +54,9 @@ function AppLayout() {
       <main className="app-main">
         <header className="page-header">
           <div><span className="eyebrow">CH ULTIMATE / DEMO</span><h1>{current.label}</h1></div>
-          <div className="session-pill">Tidak tersimpan</div>
+          <div className="session-pill">Keluar / reload = data hilang</div>
         </header>
-        {active === 'inventory' ? <InventoryPage /> : active === 'create' ? <CreateSkuPage /> : active === 'label' ? <LabelPage /> : active === 'nota' ? <NotaPage /> : (
+        {active === 'inventory' ? <InventoryPage /> : active === 'create' ? <CreateSkuPage /> : active === 'label' ? <LabelPage /> : active === 'nota' ? <NotaPage /> : active === 'revenue' ? <RevenuePage /> : active === 'empty' ? <EmptyStockPage /> : active === 'settings' ? <SettingsPage /> : (
           <section className="page-placeholder"><span className="placeholder-number">0{modules.findIndex((module) => module.id === active) + 1}</span><div><h2>{current.label}</h2><p>Frontend operasional sedang aktif. Data hanya berlaku untuk sesi ini.</p></div></section>
         )}
       </main>

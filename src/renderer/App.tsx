@@ -3,7 +3,7 @@ import { OperationsProvider } from './operations-context';
 import { InventoryPage } from './pages/InventoryPage';
 import { CreateSkuPage } from './pages/CreateSkuPage';
 import { LabelPage } from './pages/LabelPage';
-import { NotaPage } from './pages/NotaPage';
+import { NotaWorkspace } from './nota/NotaWorkspace';
 import { RevenuePage } from './pages/RevenuePage';
 import { EmptyStockPage } from './pages/EmptyStockPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -24,6 +24,8 @@ function AppLayout() {
   const [active, setActive] = useState<ModuleId>('inventory');
   const [collapsed, setCollapsed] = useState(false);
   const current = modules.find((module) => module.id === active)!;
+
+  if (active === 'nota') return <NotaWorkspace onBack={() => setActive('inventory')} />;
 
   return (
     <div className={`app-shell${collapsed ? ' rail-collapsed' : ''}`}>
@@ -56,7 +58,7 @@ function AppLayout() {
           <div><span className="eyebrow">CH ULTIMATE / DEMO</span><h1>{current.label}</h1></div>
           <div className="session-pill">Keluar / reload = data hilang</div>
         </header>
-        {active === 'inventory' ? <InventoryPage /> : active === 'create' ? <CreateSkuPage /> : active === 'label' ? <LabelPage /> : active === 'nota' ? <NotaPage /> : active === 'revenue' ? <RevenuePage /> : active === 'empty' ? <EmptyStockPage /> : active === 'settings' ? <SettingsPage /> : (
+        {active === 'inventory' ? <InventoryPage /> : active === 'create' ? <CreateSkuPage /> : active === 'label' ? <LabelPage /> : active === 'revenue' ? <RevenuePage /> : active === 'empty' ? <EmptyStockPage /> : active === 'settings' ? <SettingsPage /> : (
           <section className="page-placeholder"><span className="placeholder-number">0{modules.findIndex((module) => module.id === active) + 1}</span><div><h2>{current.label}</h2><p>Frontend operasional sedang aktif. Data hanya berlaku untuk sesi ini.</p></div></section>
         )}
       </main>

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { OperationsProvider } from './operations-context';
 import { InventoryPage } from './pages/InventoryPage';
 import { CreateSkuPage } from './pages/CreateSkuPage';
+import { LabelPage } from './pages/LabelPage';
+import { NotaPage } from './pages/NotaPage';
 
 export type ModuleId = 'inventory' | 'create' | 'label' | 'nota' | 'revenue' | 'empty' | 'settings';
 
@@ -51,7 +53,7 @@ function AppLayout() {
           <div><span className="eyebrow">CH ULTIMATE / DEMO</span><h1>{current.label}</h1></div>
           <div className="session-pill">Tidak tersimpan</div>
         </header>
-        {active === 'inventory' ? <InventoryPage /> : active === 'create' ? <CreateSkuPage /> : (
+        {active === 'inventory' ? <InventoryPage /> : active === 'create' ? <CreateSkuPage /> : active === 'label' ? <LabelPage /> : active === 'nota' ? <NotaPage /> : (
           <section className="page-placeholder"><span className="placeholder-number">0{modules.findIndex((module) => module.id === active) + 1}</span><div><h2>{current.label}</h2><p>Frontend operasional sedang aktif. Data hanya berlaku untuk sesi ini.</p></div></section>
         )}
       </main>

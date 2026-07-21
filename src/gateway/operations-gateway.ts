@@ -1,5 +1,6 @@
 import { createInitialState, reduceOperation, skuNumberExists } from '../domain/operations';
-import type { DemoState, Sku, WorkbookImportResult } from '../domain/types';
+import { cancelNota, completeNota, createDraftNota, reopenNota, restoreNota } from '../domain/nota';
+import type { DemoState, LabelTemplate, Nota, NotaLine, Sku, WorkbookImportResult } from '../domain/types';
 
 export interface CreateSkuInput {
   skuNumber: string;
@@ -20,12 +21,20 @@ export interface OperationsGateway {
   setArchived(id: string, archived: boolean): Promise<void>;
   replaceFromWorkbook(result: WorkbookImportResult, sourceLabel: string): Promise<void>;
   reset(): Promise<void>;
+  setLabelTemplate(template: LabelTemplate): Promise<void>;
+  createNota(): Promise<Nota>;
+  updateNota(id: string, patch: Partial<Nota>): Promise<void>;
+  updateNotaLine(notaId: string, lineId: string, patch: Partial<NotaLine>): Promise<void>;
+  completeNota(id: string): Promise<void>;
+  reopenNota(id: string): Promise<void>;
+  cancelNota(id: string): Promise<void>;
+  restoreNota(id: string): Promise<void>;
 }
 
 let sequence = 100;
 
 export class MockOperationsGateway implements OperationsGateway {
-  private state = createInitialState();
+  private state = { ...createInitialState(), notas: [createDraftNota(1)] };
   private listeners = new Set<() => void>();
 
   getSnapshot = () => this.state;
@@ -63,6 +72,19 @@ export class MockOperationsGateway implements OperationsGateway {
   async replaceFromWorkbook(result: WorkbookImportResult, sourceLabel: string): Promise<void> {
     this.publish(reduceOperation(this.state, { type: 'replace-skus', skus: result.skus, sourceLabel, importSummary: { loaded: result.loaded, skipped: result.skipped, warnings: result.warnings } }));
   }
-  async reset(): Promise<void> { this.publish(createInitialState()); }
+  async reset(): Promise<void> { this.publish({ ...createInitialState(), notas: [createDraftNota(1)] }); }
+  async setLabelTemplate(template: LabelTemplate): Promise<void> { this.publish({ ...this.state, labelTemplate: template }); }
+  async createNota(): Promise<Nota> {
+    const nota = createDraftNota(this.state.notas.length + 1);
+    this.publish({ ...this.state, notas: [nota, ...this.state.notas] });
+    return nota;
+  }
+  async updateNota(id: string, patch: Partial<Nota>): Promise<void> { this.publish({ ...this.state, notas: this.state.notas.map((nota) => nota.id === id ? { ...nota, ...patch } : nota) }); }
+  async updateNotaLine(notaId: string, lineId: string, patch: Partial<NotaLine>): Promise<void> {
+    this.publish({ ...this.state, notas: this.state.notas.map((nota) => nota.id === notaId ? { ...nota, lines: nota.lines.map((line) => line.id === lineId ? { ...line, ...patch } : line) } : nota) });
+  }
+  async completeNota(id: string): Promise<void> { this.publish(completeNota(this.state, id)); }
+  async reopenNota(id: string): Promise<void> { this.publish(reopenNota(this.state, id)); }
+  async cancelNota(id: string): Promise<void> { this.publish(cancelNota(this.state, id)); }
+  async restoreNota(id: string): Promise<void> { this.publish(restoreNota(this.state, id)); }
 }
-

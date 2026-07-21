@@ -37,6 +37,18 @@ Reloading or closing the application discards the imported workbook, stock edits
 - SKU Gudang with runtime XLSX import, search, edit aliases, archive, and stock adjustment
 - Buat SKU with tracked/untracked stock
 - Thermal/A4 QR label builder and preview
-- Fifteen-row Nota workflow with pcs/lsn pricing and in-memory stock effects
+- Full-screen Nota workspace for session-only transactions
 - Laporan Omzet and selectable Barang Kosong A4 preview
 - Session data/status controls under Settings
+
+## Workspace Nota
+
+**Nota** opens as a full-screen workspace, without the CH Ultimate sidebar or generic page header. Each transaction starts at page **A** and can add pages through **Z**, **AA**, and beyond. A page keeps fifteen rows; the grid retains all ten columns and scrolls inside its own frame on narrower screens.
+
+- **Working, archive, and trash.** Draft and reopened transactions appear in *Nota Dikerjakan*. Completing a transaction moves it to *Arsip*. Cancelling a page or transaction moves it to *Sampah*, where it can be restored; page cancellation also offers a short-lived **Urungkan** action.
+- **Items and prices.** Select a SKU by name, number, or alias to link the line and seed both the PCS and LSN price. An ad-hoc item remains valid without a SKU. Prices and quantities are integer rupiah and integer units; a line can use either PCS or LSN.
+- **Stock and reports.** Completion posts the active pages as one transaction. Linked tracked SKU stock is updated, while ad-hoc and untracked items do not affect stock. Reopening, editing, and completing again applies only the stock delta. Cancelling reverses its posted stock, and restoring reapplies it. Laporan Omzet reflects completed transactions.
+- **Keyboard.** `Ctrl/Cmd+K` focuses Nota search; `Escape` clears it and returns focus. In the grid, `Enter` advances to the next field and arrow keys move between rows. Dialog and drawer focus stays contained; `Escape` closes a dismissible dialog or drawer and restores the triggering control.
+- **Session boundary.** Reloading or closing the app discards every Nota edit, import, transaction, archive, trash entry, and report, then restores the seeded Amelia A/B demo session.
+
+This port deliberately contains no CH Nota backend, IPC bridge, database/persistence, network API, production printing, or PDF service. The renderer continues to use the asynchronous `OperationsGateway` boundary, so a future authenticated NAS/CH Core implementation can replace the in-memory adapter without rewriting the screens.

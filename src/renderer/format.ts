@@ -8,15 +8,19 @@ export function formatDate(value: string): string {
   return new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Makassar' }).format(date);
 }
 
-export function capitalizeSentenceStarts(value: string): string {
-  let sentenceStart = true;
-  const characters = Array.from(value);
-  return characters.map((character, index) => {
-    if (sentenceStart && /\p{L}/u.test(character)) {
-      sentenceStart = false;
-      return character.toLocaleUpperCase('id-ID');
-    }
-    if ((character === '.' && (!characters[index + 1] || /\s/u.test(characters[index + 1]!))) || character === '?' || character === '!' || character === '\n') sentenceStart = true;
-    return character;
+export function formatTitleCaseWords(value: string): string {
+  return value.split(/(\s+)/u).map((token) => {
+    if (!/\p{L}/u.test(token)) return token;
+    if (/^ch\d+\p{P}*$/iu.test(token)) return token.toLocaleUpperCase('id-ID');
+    if (token === token.toLocaleUpperCase('id-ID')) return token;
+    const lower = token.toLocaleLowerCase('id-ID');
+    return lower.replace(/\p{L}/u, (letter) => letter.toLocaleUpperCase('id-ID'));
   }).join('');
+}
+
+export function formatTitleCaseInput(input: HTMLInputElement | HTMLTextAreaElement): string {
+  const start = input.selectionStart;
+  const end = input.selectionEnd;
+  if (start !== null) queueMicrotask(() => input.setSelectionRange(start, end ?? start));
+  return formatTitleCaseWords(input.value);
 }

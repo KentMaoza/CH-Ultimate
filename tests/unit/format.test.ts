@@ -1,12 +1,12 @@
-import { capitalizeSentenceStarts } from '../../src/renderer/format';
+import { formatTitleCaseWords } from '../../src/renderer/format';
 
-test('capitalizes sentence starts while preserving all other typed letters', () => {
-  expect(capitalizeSentenceStarts('amelia. tinggal di saipah? ya! selesai\nbaris baru')).toBe('Amelia. Tinggal di saipah? Ya! Selesai\nBaris baru');
-  expect(capitalizeSentenceStarts('aMELIA tetap')).toBe('AMELIA tetap');
-  expect(capitalizeSentenceStarts('harga 52.000 rupiah. selesai')).toBe('Harga 52.000 rupiah. Selesai');
+test('formats every typed word as title case', () => {
+  expect(formatTitleCaseWords('amelia pelanggan lama')).toBe('Amelia Pelanggan Lama');
+  expect(formatTitleCaseWords('baju hITAM ukuran besar')).toBe('Baju Hitam Ukuran Besar');
+  expect(formatTitleCaseWords('harga 52.000 rupiah\nbaris baru')).toBe('Harga 52.000 Rupiah\nBaris Baru');
 });
 
-test('preserves existing uppercase sentence starts', () => {
-  expect(capitalizeSentenceStarts('CH001')).toBe('CH001');
-  expect(capitalizeSentenceStarts('BRS-108-BLK')).toBe('BRS-108-BLK');
+test('preserves uppercase codes and normalizes CH supplier codes', () => {
+  expect(formatTitleCaseWords('kaos wanita ch001 XL')).toBe('Kaos Wanita CH001 XL');
+  expect(formatTitleCaseWords('BRS-108-BLK')).toBe('BRS-108-BLK');
 });

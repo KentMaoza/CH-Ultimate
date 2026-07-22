@@ -107,7 +107,7 @@ test('Nota keyboard essentials use the platform Ctrl/Cmd+K shortcut and retain f
   }
 });
 
-test('Nota pages support A/B switching and cancellation undo', async () => {
+test('Nota pages support A/B switching and cancellation recovery from Sampah', async () => {
   const { application, window } = await launch();
   try {
     await openNota(window);
@@ -118,13 +118,45 @@ test('Nota pages support A/B switching and cancellation undo', async () => {
     await window.getByRole('button', { name: 'Tambah Nota C' }).click();
     await expect(window.getByRole('button', { name: 'Halaman C', exact: true })).toHaveAttribute('aria-pressed', 'true');
     await window.getByRole('button', { name: 'Batalkan halaman C' }).click();
-    const notice = window.locator('.chu-nota-workspace__notice');
-    await expect(notice).toContainText('Halaman C dipindahkan ke Sampah.');
-    await notice.getByRole('button', { name: 'Urungkan' }).click();
+    await expect(window.getByRole('button', { name: 'Urungkan' })).toHaveCount(0);
+    await window.getByRole('button', { name: 'Kembali ke CH Ultimate' }).click();
+    await window.getByRole('button', { name: 'Arsip Nota' }).click();
+    await window.getByRole('tab', { name: 'Sampah' }).click();
+    await window.getByRole('button', { name: 'Pulihkan' }).click();
     await expect(window.getByRole('button', { name: 'Halaman C', exact: true })).toBeVisible();
     const price = window.getByLabel('Harga PCS baris 3', { exact: true });
     await price.pressSequentially('52000');
     await expect(price).toHaveValue('52.000');
+  } finally {
+    await application.close();
+  }
+});
+
+test('Nota title case and empty-stock restock planning stay frontend-only', async () => {
+  const { application, window } = await launch();
+  try {
+    await openNota(window);
+    await expect(window.getByRole('region', { name: 'SKU Gudang' })).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+    await window.getByLabel('Nama barang baris 3', { exact: true }).fill('kopi hITAM ch001 XL');
+    await window.getByLabel('Jenis baris 3', { exact: true }).fill('minuman grosir');
+    await expect(window.getByLabel('Nama barang baris 3', { exact: true })).toHaveValue('Kopi Hitam CH001 XL');
+    await expect(window.getByLabel('Jenis baris 3', { exact: true })).toHaveValue('Minuman Grosir');
+    await expect(window.getByRole('button', { name: 'Undo perubahan' })).toHaveCount(0);
+
+    await window.getByRole('button', { name: 'Kembali ke CH Ultimate' }).click();
+    await window.getByRole('button', { name: 'Barang Kosong' }).click();
+    const quantity = window.getByRole('textbox', { name: 'Jumlah restock ACC-204-SLV' });
+    await expect(quantity).toHaveValue('0');
+    await window.getByRole('button', { name: 'Tambah jumlah restock ACC-204-SLV' }).click();
+    await window.getByLabel('Pilih ACC-204-SLV').check();
+    await expect(window.getByTestId('empty-report-preview')).toContainText('LAPORAN BARANG KOSONG');
+    await expect(window.getByTestId('empty-report-preview')).toContainText('Jumlah: 1');
+    await window.getByLabel('Pilih ACC-204-SLV').uncheck();
+    await expect(quantity).toHaveValue('0');
+    await expect(window.getByTestId('empty-report-preview')).not.toContainText('ACC-204-SLV');
+
+    await window.getByRole('button', { name: 'SKU Gudang' }).click();
+    await expect(window.getByTestId('sku-stock-sku-3')).toHaveText('-3');
   } finally {
     await application.close();
   }

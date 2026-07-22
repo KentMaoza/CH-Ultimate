@@ -32,9 +32,10 @@ test('Nota opens as a dedicated workspace and back restores the CH Ultimate shel
   expect(screen.getByLabelText('Tempat').closest('label')).toHaveClass('chu-nota-workspace__customer');
 });
 
-test('SKU Gudang panel uses the approved translucent dark-green container', () => {
+test('SKU Gudang panel uses the original monochrome container', () => {
   openNota();
-  expect(screen.getByRole('region', { name: 'SKU Gudang' })).toHaveClass('chu-nota-workspace__warehouse--green');
+  expect(screen.getByRole('region', { name: 'SKU Gudang' })).toHaveClass('chu-nota-workspace__warehouse');
+  expect(screen.getByRole('region', { name: 'SKU Gudang' })).not.toHaveClass('chu-nota-workspace__warehouse--green');
 });
 
 test('Nota grid has the required headers and fifteen A-page rows', () => {
@@ -86,20 +87,25 @@ test('basic fields, unit, and dual prices update the in-memory Nota total', () =
   expect(screen.getByTestId('nota-transaction-total')).toHaveTextContent('347.000');
 });
 
-test('capitalizes natural-language Nota fields as the operator types', () => {
+test('title-cases natural-language Nota fields as the operator types', async () => {
   openNota();
-  fireEvent.change(screen.getByLabelText('Pelanggan'), { target: { value: 'amelia. pelanggan lama' } });
-  fireEvent.change(screen.getByLabelText('Tempat'), { target: { value: 'saipah. lorong dua' } });
-  fireEvent.change(screen.getByLabelText('Nama barang baris 3'), { target: { value: 'kopi bubuk. kemasan besar' } });
-  fireEvent.change(screen.getByLabelText('Jenis baris 3'), { target: { value: 'minuman. grosir' } });
+  const customer = screen.getByLabelText('Pelanggan') as HTMLInputElement;
+  fireEvent.change(customer, { target: { value: 'amelia pelanggan lama' } });
+  fireEvent.change(screen.getByLabelText('Tempat'), { target: { value: 'saipah lorong dua' } });
+  fireEvent.change(screen.getByLabelText('Nama barang baris 3'), { target: { value: 'kopi hITAM ch001 XL' } });
+  fireEvent.change(screen.getByLabelText('Jenis baris 3'), { target: { value: 'minuman grosir' } });
 
-  expect(screen.getByLabelText('Pelanggan')).toHaveValue('Amelia. Pelanggan lama');
-  expect(screen.getByLabelText('Tempat')).toHaveValue('Saipah. Lorong dua');
-  expect(screen.getByLabelText('Nama barang baris 3')).toHaveValue('Kopi bubuk. Kemasan besar');
-  expect(screen.getByLabelText('Jenis baris 3')).toHaveValue('Minuman. Grosir');
+  expect(customer).toHaveValue('Amelia Pelanggan Lama');
+  expect(screen.getByLabelText('Tempat')).toHaveValue('Saipah Lorong Dua');
+  expect(screen.getByLabelText('Nama barang baris 3')).toHaveValue('Kopi Hitam CH001 XL');
+  expect(screen.getByLabelText('Jenis baris 3')).toHaveValue('Minuman Grosir');
+
+  fireEvent.change(customer, { target: { value: 'amelia baru pelanggan lama', selectionStart: 12, selectionEnd: 12 } });
+  expect(customer).toHaveValue('Amelia Baru Pelanggan Lama');
+  await waitFor(() => expect(customer.selectionStart).toBe(12));
 });
 
-test('clears a fixed Nota row and restores the exact row with the Undo button', async () => {
+test('clears a fixed Nota row without exposing application undo controls', () => {
   openNota();
   const row1 = screen.getByTestId('nota-grid-row-1');
   const row2 = screen.getByTestId('nota-grid-row-2');
@@ -109,39 +115,17 @@ test('clears a fixed Nota row and restores the exact row with the Undo button', 
   expect(screen.getByLabelText('Nama barang baris 1')).toHaveValue('');
   expect(screen.getByLabelText('Harga PCS baris 1')).toHaveValue('');
   expect(screen.getByLabelText('Nama barang baris 2')).toHaveValue('Jasa bungkus');
-  const undo = screen.getByRole('button', { name: 'Undo perubahan' });
-  await waitFor(() => expect(undo).toBeEnabled());
-  fireEvent.click(undo);
-
-  await waitFor(() => expect(screen.getByLabelText('Nama barang baris 1')).toHaveValue('Beras Hitam Premium 1 kg'));
-  expect(screen.getByLabelText('Harga PCS baris 1')).toHaveValue('52.000');
-  expect(screen.getByLabelText('Nama barang baris 2')).toHaveValue('Jasa bungkus');
+  expect(screen.queryByRole('button', { name: 'Undo perubahan' })).not.toBeInTheDocument();
 });
 
-test('Ctrl or Cmd+Z undoes one coalesced typing sequence in the active transaction', async () => {
+test('Ctrl or Cmd+Z is left to the focused input instead of application history', async () => {
   openNota();
   const customer = screen.getByLabelText('Pelanggan');
-  fireEvent.change(customer, { target: { value: 'Amel' } });
-  fireEvent.change(customer, { target: { value: 'Ameli' } });
-  fireEvent.change(customer, { target: { value: 'Amelia baru' } });
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Undo perubahan' })).toBeEnabled());
+  fireEvent.change(customer, { target: { value: 'pelanggan baru' } });
 
-  fireEvent.keyDown(customer, { key: 'z', ctrlKey: true });
+  expect(fireEvent.keyDown(customer, { key: 'z', ctrlKey: true })).toBe(true);
 
-  await waitFor(() => expect(customer).toHaveValue('Amelia'));
-  expect(screen.getByRole('button', { name: 'Undo perubahan' })).toBeDisabled();
-});
-
-test('keeps edit history across Nota pages in the same transaction', async () => {
-  openNota();
-  fireEvent.click(screen.getByRole('button', { name: 'Halaman B' }));
-  fireEvent.change(screen.getByLabelText('Nama barang baris 1'), { target: { value: 'barang halaman b' } });
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Undo perubahan' })).toBeEnabled());
-  fireEvent.click(screen.getByRole('button', { name: 'Halaman A' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Undo perubahan' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Halaman B' }));
-
-  await waitFor(() => expect(screen.getByLabelText('Nama barang baris 1')).toHaveValue(''));
+  await waitFor(() => expect(customer).toHaveValue('Pelanggan Baru'));
 });
 
 test('SKU Gudang panel filters names, current and alias numbers without archived entries', async () => {
@@ -212,6 +196,19 @@ test('keyboard selection from SKU Gudang links the active row and manual edits u
   fireEvent.change(name, { target: { value: 'Beras eceran' } });
   row = gateway.getSnapshot().notaTransactions[0]!.pages[0]!.lines[2]!;
   expect(row.skuId).toBeUndefined();
+});
+
+test('keeps the stored warehouse SKU name unchanged until the operator edits it', async () => {
+  const gateway = new MockOperationsGateway();
+  await gateway.updateSku('sku-1', { name: 'beras hITAM ch001 XL' });
+  openNota(gateway);
+
+  chooseWarehouseSku(3, 'BRS-108-BLK');
+  expect(screen.getByLabelText('Nama barang baris 3')).toHaveValue('beras hITAM ch001 XL');
+
+  fireEvent.change(screen.getByLabelText('Nama barang baris 3'), { target: { value: 'beras hITAM ch001 XL revisi' } });
+  expect(screen.getByLabelText('Nama barang baris 3')).toHaveValue('Beras Hitam CH001 XL Revisi');
+  expect(gateway.getSnapshot().skus.find((sku) => sku.id === 'sku-1')?.name).toBe('beras hITAM ch001 XL');
 });
 
 test('tracked and untracked SKU choices both apply 1x and 12x reference prices', () => {

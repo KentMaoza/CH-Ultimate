@@ -56,7 +56,6 @@
 .chu-nota-workspace__list-item > button:first-child { flex: 1; padding: 0; border: 0; background: transparent; text-align: left; }
 .chu-nota-workspace__pagination { display: flex; align-items: center; gap: 7px; margin-top: 12px; font-size: calc(11px * var(--nota-font-scale)); }
 .chu-nota-workspace__warehouse { margin-top: 6px; border: 2px solid #111; background: #fff; }
-.chu-nota-workspace__warehouse--green { border-color: #0f4a30; background: rgba(15, 74, 48, .5); }
 .chu-nota-workspace__warehouse > header, .chu-nota-workspace__warehouse > footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; }
 .chu-nota-workspace__warehouse > header div { display: flex; align-items: baseline; gap: 10px; }
 .chu-nota-workspace__warehouse > header strong { font-size: calc(12px * var(--nota-font-scale)); letter-spacing: .06em; }

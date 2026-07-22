@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, us
 import { lineTotal } from '../../domain/nota';
 import type { NotaLine, Sku, Unit } from '../../domain/types';
 import type { NotaNumericField } from './useNotaValidation';
-import { capitalizeSentenceStarts } from '../format';
+import { formatTitleCaseInput } from '../format';
 import { WarehouseSkuPanel } from './WarehouseSkuPanel';
 
 const numberFormat = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 });
@@ -171,9 +171,9 @@ export const NotaGrid = forwardRef<NotaGridHandle, {
         const linkedSku = skus.find((sku) => sku.id === line.skuId);
         return <tr key={line.id} data-testid={`nota-grid-row-${number}`} className={targetRow === index ? 'chu-nota-workspace__row--target' : undefined} onFocusCapture={() => setSelectedRow(index)} onMouseDown={() => setSelectedRow(index)}>
           <td>{number}{suffix}</td>
-          <td className="chu-nota-workspace__sku-cell"><input aria-label={`Nama barang baris ${number}`} data-grid-editable data-row-index={index} data-field="description" disabled={!editable || busy} value={line.description} onChange={(event) => onUpdate(line, { description: capitalizeSentenceStarts(event.target.value), skuId: undefined })} />{linkedSku && <span className="chu-nota-workspace__linked-sku">{linkedSku.skuNumber}</span>}
+          <td className="chu-nota-workspace__sku-cell"><input aria-label={`Nama barang baris ${number}`} data-grid-editable data-row-index={index} data-field="description" disabled={!editable || busy} value={line.description} onChange={(event) => onUpdate(line, { description: formatTitleCaseInput(event.currentTarget), skuId: undefined })} />{linkedSku && <span className="chu-nota-workspace__linked-sku">{linkedSku.skuNumber}</span>}
           </td>
-          <td><input aria-label={`Jenis baris ${number}`} data-grid-editable data-row-index={index} data-field="kind" disabled={!editable || busy} value={line.kind} onChange={(event) => onUpdate(line, { kind: capitalizeSentenceStarts(event.target.value) })} /></td>
+          <td><input aria-label={`Jenis baris ${number}`} data-grid-editable data-row-index={index} data-field="kind" disabled={!editable || busy} value={line.kind} onChange={(event) => onUpdate(line, { kind: formatTitleCaseInput(event.currentTarget) })} /></td>
           <td><input aria-label={`Jumlah baris ${number}`} inputMode="numeric" data-grid-editable data-line-id={line.id} data-row-index={index} data-field="quantity" disabled={!editable || busy} value={fieldValue(line, 'quantity')} aria-invalid={!numericValid(line, 'quantity') || undefined} onFocus={() => numericFocus(line, 'quantity')} onBlur={() => numericBlur(line, 'quantity')} onChange={(event) => numericChange(line, 'quantity', event.target.value)} /></td>
           <td><button className={line.unit === 'pcs' ? 'chu-nota-workspace__unit--selected' : undefined} aria-label={`PCS baris ${number}`} aria-pressed={line.unit === 'pcs'} data-grid-editable data-row-index={index} data-field="pcs" disabled={!editable || busy} onClick={() => onUpdate(line, { unit: 'pcs' as Unit })} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); onUpdate(line, { unit: 'pcs' as Unit }); } }}>PCS</button></td>
           <td><button className={line.unit === 'lsn' ? 'chu-nota-workspace__unit--selected' : undefined} aria-label={`LSN baris ${number}`} aria-pressed={line.unit === 'lsn'} data-grid-editable data-row-index={index} data-field="lsn" disabled={!editable || busy} onClick={() => onUpdate(line, { unit: 'lsn' as Unit })} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); onUpdate(line, { unit: 'lsn' as Unit }); } }}>LSN</button></td>

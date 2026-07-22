@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { capitalizeSentenceStarts } from '../format';
+import { formatTitleCaseInput } from '../format';
 import { useAccessibleModal } from './useAccessibleModal';
 
 function todayWita() {
@@ -22,5 +22,5 @@ export function NewTransactionDialog({ open, onClose, onCreate, restoreFocusTo, 
   }, [open]);
 
   if (!open) return null;
-  return <div className="chu-nota-workspace__dialog-backdrop" onMouseDown={modal.onBackdropMouseDown}><form ref={modal.dialogRef} tabIndex={-1} className="chu-nota-workspace__dialog" role="dialog" aria-modal="true" aria-label="Transaksi Baru" onKeyDown={modal.onKeyDown} onSubmit={(event) => { event.preventDefault(); onCreate({ customerName, customerPlace, transactionDate }); }}><h2>Transaksi Baru</h2><label><span>Pelanggan</span><input data-modal-initial-focus disabled={busy} value={customerName} onChange={(event) => setCustomerName(capitalizeSentenceStarts(event.target.value))} /></label><label><span>Tempat</span><input disabled={busy} value={customerPlace} onChange={(event) => setCustomerPlace(capitalizeSentenceStarts(event.target.value))} /></label><label><span>Tanggal</span><input disabled={busy} type="date" value={transactionDate} onChange={(event) => setTransactionDate(event.target.value)} /></label><p>Pembayaran awal: Belum diklasifikasi.</p><div><button type="button" disabled={busy} onClick={modal.close}>Batal</button><button disabled={busy} className="chu-nota-workspace__complete">Buat transaksi</button></div></form></div>;
+  return <div className="chu-nota-workspace__dialog-backdrop" onMouseDown={modal.onBackdropMouseDown}><form ref={modal.dialogRef} tabIndex={-1} className="chu-nota-workspace__dialog" role="dialog" aria-modal="true" aria-label="Transaksi Baru" onKeyDown={modal.onKeyDown} onSubmit={(event) => { event.preventDefault(); onCreate({ customerName, customerPlace, transactionDate }); }}><h2>Transaksi Baru</h2><label><span>Pelanggan</span><input data-modal-initial-focus disabled={busy} value={customerName} onChange={(event) => setCustomerName(formatTitleCaseInput(event.currentTarget))} /></label><label><span>Tempat</span><input disabled={busy} value={customerPlace} onChange={(event) => setCustomerPlace(formatTitleCaseInput(event.currentTarget))} /></label><label><span>Tanggal</span><input disabled={busy} type="date" value={transactionDate} onChange={(event) => setTransactionDate(event.target.value)} /></label><p>Pembayaran awal: Belum diklasifikasi.</p><div><button type="button" disabled={busy} onClick={modal.close}>Batal</button><button disabled={busy} className="chu-nota-workspace__complete">Buat transaksi</button></div></form></div>;
 }

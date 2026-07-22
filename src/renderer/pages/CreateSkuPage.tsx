@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useOperations } from '../operations-context';
-import { capitalizeSentenceStarts } from '../format';
+import { formatTitleCaseInput } from '../format';
 
 export function CreateSkuPage() {
   const { gateway } = useOperations();
@@ -25,11 +25,11 @@ export function CreateSkuPage() {
         {message && <div className="notice" role="status">{message}</div>}
         <div className="form-grid">
           <label><span>Nomor SKU</span><input required name="skuNumber" /></label>
-          <label><span>Nama SKU</span><input required name="name" onChange={(event) => { event.currentTarget.value = capitalizeSentenceStarts(event.currentTarget.value); }} /></label>
+          <label><span>Nama SKU</span><input required name="name" onChange={(event) => { event.currentTarget.value = formatTitleCaseInput(event.currentTarget); }} /></label>
           <label><span>Harga Referensi</span><input required min="0" name="price" type="number" /></label>
           <label><span>Stok Awal</span><input required min="0" step="1" defaultValue="0" name="stock" type="number" /></label>
           <label className="full"><span>Tautan gambar (opsional)</span><input name="image" type="url" /></label>
-          <label className="full"><span>Catatan SKU Gudang</span><textarea name="note" rows={3} onChange={(event) => { event.currentTarget.value = capitalizeSentenceStarts(event.currentTarget.value); }} /></label>
+          <label className="full"><span>Catatan SKU Gudang</span><textarea name="note" rows={3} /></label>
           <label className="check-field full"><input defaultChecked name="tracked" type="checkbox" /><span>SKU ini dilacak stoknya</span></label>
         </div>
         <div className="form-actions"><button className="button primary" type="submit">Simpan SKU</button></div>

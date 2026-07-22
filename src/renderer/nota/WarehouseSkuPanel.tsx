@@ -53,7 +53,7 @@ export function WarehouseSkuPanel({ skus, targetLabel, disabled, onSelect }: {
     }
   }
 
-  return <section className="chu-nota-workspace__warehouse chu-nota-workspace__warehouse--green" role="region" aria-label="SKU Gudang">
+  return <section className="chu-nota-workspace__warehouse" role="region" aria-label="SKU Gudang">
     <header>
       <div><strong>SKU GUDANG</strong><span>Target baris {targetLabel}</span></div>
       <button type="button" aria-label={open ? 'Lipat SKU Gudang' : 'Buka SKU Gudang'} onClick={() => setOpen((value) => !value)}>{open ? 'Lipat' : 'Buka'}</button>

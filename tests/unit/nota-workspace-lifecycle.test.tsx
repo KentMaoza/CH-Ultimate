@@ -1,5 +1,4 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { vi } from 'vitest';
 import { App } from '../../src/renderer/App';
 import { buildRevenueReport } from '../../src/domain/reports';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
@@ -26,7 +25,7 @@ test('selects Amelia A and B pages, adds C, and restores a cancelled page from S
   await waitFor(() => expect(screen.getByRole('button', { name: 'Halaman C' })).toHaveAttribute('aria-pressed', 'true'));
 
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Batalkan halaman C' })); });
-  expect(screen.getByText(/Halaman C dipindahkan ke Sampah/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Urungkan' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Kembali ke CH Ultimate' }));
   fireEvent.click(screen.getByRole('button', { name: 'Arsip Nota' }));
   fireEvent.click(screen.getByRole('tab', { name: 'Sampah' }));
@@ -147,14 +146,6 @@ test('new transaction selects its A page and global search opens from Ctrl or Cm
   expect(screen.getByLabelText('Pelanggan')).toHaveValue('Budi');
 });
 
-test('page cancellation offers an undo action that restores the page', async () => {
-  openNota();
-  fireEvent.click(screen.getByRole('button', { name: 'Halaman B' }));
-  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Batalkan halaman B' })); });
-  fireEvent.click(screen.getByRole('button', { name: 'Urungkan' }));
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Halaman B' })).toBeInTheDocument());
-});
-
 test('search click opens the clicked result, exposes an active descendant, and Escape restores its prior focus', () => {
   openNota();
   const listTrigger = screen.getByRole('button', { name: 'Nota Dikerjakan' });
@@ -273,55 +264,6 @@ test('a cancelled transaction is excluded from workspace search', async () => {
   expect(screen.getByRole('listbox', { name: 'Hasil pencarian nota' })).toHaveTextContent('Tidak ada nota yang cocok.');
 });
 
-test('transaction cancellation can be undone', async () => {
-  const gateway = openNota();
-  fireEvent.click(screen.getByRole('button', { name: 'Batalkan transaksi' }));
-  fireEvent.click(within(screen.getByRole('dialog', { name: /Batalkan transaksi/i })).getByRole('button', { name: 'Batalkan' }));
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Urungkan' })).toBeInTheDocument());
-  fireEvent.click(screen.getByRole('button', { name: 'Urungkan' }));
-
-  await waitFor(() => expect(gateway.getSnapshot().notaTransactions[0]?.status).toBe('draft'));
-});
-
-test('undo expires at exactly ten seconds', async () => {
-  vi.useFakeTimers();
-  try {
-    openNota();
-    fireEvent.click(screen.getByRole('button', { name: 'Halaman B' }));
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Batalkan halaman B' })); });
-    expect(screen.getByRole('button', { name: 'Urungkan' })).toBeInTheDocument();
-    act(() => vi.advanceTimersByTime(9_999));
-    expect(screen.getByRole('button', { name: 'Urungkan' })).toBeInTheDocument();
-    act(() => vi.advanceTimersByTime(1));
-    expect(screen.queryByRole('button', { name: 'Urungkan' })).not.toBeInTheDocument();
-  } finally {
-    vi.useRealTimers();
-  }
-});
-
-test('a replacement undo owns a fresh timer and unmount clears it', async () => {
-  vi.useFakeTimers();
-  try {
-    const view = render(<App gateway={new MockOperationsGateway()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Nota' }));
-    fireEvent.click(screen.getByRole('button', { name: /Tambah Nota [A-Z]+/ }));
-    await act(async () => {});
-    fireEvent.click(screen.getByRole('button', { name: 'Batalkan halaman C' }));
-    await act(async () => {});
-    act(() => vi.advanceTimersByTime(5_000));
-    fireEvent.click(screen.getByRole('button', { name: 'Halaman B' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Batalkan halaman B' }));
-    await act(async () => {});
-    act(() => vi.advanceTimersByTime(5_000));
-    expect(screen.getByRole('button', { name: 'Urungkan' })).toBeInTheDocument();
-    expect(vi.getTimerCount()).toBe(1);
-    view.unmount();
-    expect(vi.getTimerCount()).toBe(0);
-  } finally {
-    vi.useRealTimers();
-  }
-});
-
 test('restoring a completed transaction returns to Arsip rather than the working selection', async () => {
   const gateway = new MockOperationsGateway();
   const transaction = gateway.getSnapshot().notaTransactions[0]!;
@@ -375,7 +317,7 @@ class RejectingPageGateway extends MockOperationsGateway {
   override async cancelNotaPage(): Promise<void> { throw new Error('Koneksi demo ditolak.'); }
 }
 
-test('a rejected mutation reports an error and never offers undo', async () => {
+test('a rejected mutation reports an error and never offers a restore action', async () => {
   openNota(new RejectingPageGateway());
   fireEvent.click(screen.getByRole('button', { name: 'Halaman B' }));
   fireEvent.click(screen.getByRole('button', { name: 'Batalkan halaman B' }));

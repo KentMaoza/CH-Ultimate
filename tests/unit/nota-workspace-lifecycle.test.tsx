@@ -76,8 +76,13 @@ test('archive module opens completed nota as inline read-only preview without ch
 
   expect(screen.getByText('SELESAI · HANYA LIHAT')).toBeInTheDocument();
   expect(screen.getByRole('region', { name: 'Preview arsip nota' })).toBeInTheDocument();
+  const archiveCard = screen.getByRole('button', { name: /Amelia.*Saibah/ });
+  expect(within(archiveCard).queryByText(transaction.baseNumber)).not.toBeInTheDocument();
+  expect(within(archiveCard).getByText('Amelia')).toHaveClass('archive-nota__customer-name');
+  expect(within(archiveCard).getByText('Saibah')).toHaveClass('archive-nota__customer-place');
   fireEvent.click(screen.getByRole('button', { name: 'Preview halaman B' }));
-  expect(screen.getByRole('heading', { name: `${transaction.baseNumber}B` })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: `${transaction.baseNumber}B` })).not.toBeInTheDocument();
+  expect(screen.getByText(`${transaction.baseNumber}B`)).toHaveClass('archive-nota__preview-number');
   expect(screen.queryByRole('region', { name: 'SKU Gudang' })).not.toBeInTheDocument();
   expect(gateway.getSnapshot().skus.map((sku) => sku.stock)).toEqual(stockBefore);
   expect(buildRevenueReport(gateway.getSnapshot()).today).toBe(revenueBefore);

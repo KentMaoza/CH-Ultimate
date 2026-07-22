@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { parseSkuWorkbook } from '../../domain/workbook';
 import type { Sku } from '../../domain/types';
 import { useOperations } from '../operations-context';
-import { formatDate, formatRupiah } from '../format';
+import { capitalizeSentenceStarts, formatDate, formatRupiah } from '../format';
 
 function SkuImage({ sku }: { sku: Sku }) {
   const [failed, setFailed] = useState(false);
@@ -19,6 +19,7 @@ export function InventoryPage() {
   const [editing, setEditing] = useState<Sku | null>(null);
   const [editNumber, setEditNumber] = useState('');
   const [editName, setEditName] = useState('');
+  const [editNote, setEditNote] = useState('');
   const [quantity, setQuantity] = useState('');
   const [message, setMessage] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
@@ -50,10 +51,10 @@ export function InventoryPage() {
     setAdjusting(null); setQuantity('');
   }
 
-  function openEdit(sku: Sku) { setEditing(sku); setEditNumber(sku.skuNumber); setEditName(sku.name); }
+  function openEdit(sku: Sku) { setEditing(sku); setEditNumber(sku.skuNumber); setEditName(sku.name); setEditNote(sku.note); }
   async function saveEdit() {
     if (!editing) return;
-    try { await gateway.updateSku(editing.id, { skuNumber: editNumber, name: editName }); setEditing(null); }
+    try { await gateway.updateSku(editing.id, { skuNumber: editNumber, name: editName, note: editNote }); setEditing(null); }
     catch (error) { setMessage(error instanceof Error ? error.message : 'Perubahan gagal disimpan.'); }
   }
 
@@ -85,7 +86,7 @@ export function InventoryPage() {
       </div>
       <div className="table-footer">Menampilkan {Math.min(filtered.length, 50)} dari {filtered.length.toLocaleString('id-ID')}</div>
       {adjusting && <div className="dialog-backdrop"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="adjust-title"><h2 id="adjust-title">Atur stok</h2><p><strong>{adjusting.skuNumber}</strong> · stok saat ini {adjusting.stock}</p><label><span>Perubahan stok</span><input autoFocus type="number" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></label><div className="dialog-actions"><button className="button secondary" onClick={() => setAdjusting(null)}>Batal</button><button className="button primary" disabled={!quantity || !Number.isInteger(Number(quantity))} onClick={() => void applyAdjustment()}>Terapkan perubahan</button></div></section></div>}
-      {editing && <div className="dialog-backdrop"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="edit-title"><h2 id="edit-title">Edit SKU</h2><p>Nomor lama akan tetap menjadi alias pencarian.</p><div className="stack-fields"><label><span>Edit nomor SKU</span><input autoFocus value={editNumber} onChange={(event) => setEditNumber(event.target.value)} /></label><label><span>Edit nama SKU</span><input value={editName} onChange={(event) => setEditName(event.target.value)} /></label></div><div className="dialog-actions"><button className="button secondary" onClick={() => setEditing(null)}>Batal</button><button className="button primary" onClick={() => void saveEdit()}>Simpan perubahan SKU</button></div></section></div>}
+      {editing && <div className="dialog-backdrop"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="edit-title"><h2 id="edit-title">Edit SKU</h2><p>Nomor lama akan tetap menjadi alias pencarian.</p><div className="stack-fields"><label><span>Edit nomor SKU</span><input autoFocus value={editNumber} onChange={(event) => setEditNumber(event.target.value)} /></label><label><span>Edit nama SKU</span><input value={editName} onChange={(event) => setEditName(capitalizeSentenceStarts(event.target.value))} /></label><label><span>Edit catatan SKU</span><textarea value={editNote} onChange={(event) => setEditNote(capitalizeSentenceStarts(event.target.value))} /></label></div><div className="dialog-actions"><button className="button secondary" onClick={() => setEditing(null)}>Batal</button><button className="button primary" onClick={() => void saveEdit()}>Simpan perubahan SKU</button></div></section></div>}
     </div>
   );
 }

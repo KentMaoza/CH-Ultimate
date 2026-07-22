@@ -143,7 +143,7 @@ td small { display: block; margin-top: 3px; color: #777; font-size: 9px; }
 .settings-card dt, .settings-card dd { margin: 0; font-size: 12px; }
 .settings-card hr { margin: 28px 0; border: 0; border-top: 1px solid #555; }
 @media (max-width: 1150px) { .report-grid, .empty-layout { grid-template-columns: 1fr; } .metric-grid { grid-template-columns: 1fr; } }
-.archive-nota { display: grid; grid-template-columns: minmax(320px, .42fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.archive-nota { display: grid; grid-template-columns: minmax(380px, .46fr) minmax(0, 1fr); gap: 14px; align-items: start; }
 .archive-nota__filters { display: grid; gap: 10px; padding: 14px; border: 2px solid #111; background: #fff; }
 .archive-nota__filters [role='tablist'] { display: grid; grid-template-columns: 1fr 1fr; }
 .archive-nota__filters [role='tab'][aria-selected='true'] { color: #fff; background: #111; }
@@ -155,13 +155,19 @@ td small { display: block; margin-top: 3px; color: #777; font-size: 9px; }
 .archive-nota__list article.active { box-shadow: inset 4px 0 0 #111; }
 .archive-nota__list article > div { display: flex; gap: 5px; }
 .archive-nota__list article > div > span, .archive-nota__transaction span, .archive-nota__transaction small { display: block; }
-.archive-nota__transaction { width: 100%; border: 0; background: transparent; text-align: left; }
+.archive-nota__transaction { width: 100%; min-height: 88px; padding: 12px 14px; border: 0; background: transparent; text-align: left; }
 .archive-nota__transaction strong, .archive-nota__transaction span, .archive-nota__transaction small { display: block; }
+.archive-nota__customer-name { font-size: 20px; line-height: 1.1; }
+.archive-nota__customer-place { margin-top: 5px; font-size: 15px; font-weight: 750; }
+.archive-nota__transaction small { margin-top: 7px; color: #555; }
 .archive-nota__pagination { display: flex; align-items: center; justify-content: space-between; }
 .archive-nota__preview { min-height: 540px; padding: 14px; overflow: auto; border: 2px solid #111; background: #fff; }
 .archive-nota__preview > header { display: flex; align-items: start; justify-content: space-between; gap: 12px; border-bottom: 2px solid #111; }
-.archive-nota__preview h2 { margin: 3px 0; }
-.archive-nota__preview p { margin: 4px 0 12px; }
+.archive-nota__preview > header > div > * { display: block; }
+.archive-nota__preview-customer { margin-top: 5px; font-size: 28px; line-height: 1; }
+.archive-nota__preview-place { margin-top: 6px; font-size: 18px; }
+.archive-nota__preview-number, .archive-nota__preview-date { margin-top: 5px; color: #555; font-size: 11px; font-weight: 700; }
+.archive-nota__preview-date { margin-bottom: 12px; }
 .archive-nota__page-total { padding: 10px 0; text-align: right; }
 .archive-nota__preview .chu-nota-workspace { min-height: 0; padding: 0; background: #fff; }
 @media (max-width: 1050px) { .archive-nota { grid-template-columns: 1fr; } }

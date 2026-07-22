@@ -83,6 +83,7 @@
 .chu-nota-workspace__grid-frame td:nth-child(10) { width: 58px; }
 .chu-nota-workspace__grid-frame input { width: 100%; min-height: 21px; padding: 1px 4px; font-size: calc(10px * var(--nota-font-scale)); }
 .chu-nota-workspace__grid-frame button { min-height: 21px; padding: 1px 4px; font-size: calc(9px * var(--nota-font-scale)); }
+.chu-nota-workspace__grid-frame .chu-nota-workspace__unit--selected { color: #fff; background: #111; }
 .chu-nota-workspace__grid-frame output { display: block; min-height: 21px; padding: 3px; outline-offset: -2px; }
 .chu-nota-workspace__sku-cell { position: relative; }
 .chu-nota-workspace__linked-sku { display: block; margin-top: 1px; font-size: calc(8px * var(--nota-font-scale)); font-weight: 800; }

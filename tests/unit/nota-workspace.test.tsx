@@ -359,6 +359,20 @@ test('grid arrows always traverse data cells, including unit buttons and row wra
   expect(name).toHaveFocus();
 });
 
+test('click and Enter give the selected LSN or PCS unit a black selection block', () => {
+  openNota();
+  const lsn = screen.getByRole('button', { name: 'LSN baris 3' });
+  const pcs = screen.getByRole('button', { name: 'PCS baris 3' });
+
+  fireEvent.keyDown(lsn, { key: 'Enter' });
+  expect(lsn).toHaveClass('chu-nota-workspace__unit--selected');
+  expect(pcs).not.toHaveClass('chu-nota-workspace__unit--selected');
+
+  fireEvent.click(pcs);
+  expect(pcs).toHaveClass('chu-nota-workspace__unit--selected');
+  expect(lsn).not.toHaveClass('chu-nota-workspace__unit--selected');
+});
+
 test.each([
   ['unit', 'LSN baris 1'],
   ['output', 'Total baris 1'],

@@ -87,6 +87,44 @@ test('SKU Gudang panel filters names, current and alias numbers without archived
   expect(screen.queryByRole('option', { name: /Minuman Serbuk Cokelat/ })).not.toBeInTheDocument();
 });
 
+test('SKU Gudang paginates 3.140 imports by fifty and keeps zero, negative, and untracked SKU selectable', async () => {
+  const gateway = new MockOperationsGateway();
+  const skus = Array.from({ length: 3_140 }, (_, index) => ({
+    id: `bulk-${index}`,
+    skuNumber: `BULK-${String(index).padStart(4, '0')}`,
+    aliases: index === 1 ? ['NEGATIF-LAMA'] : [],
+    name: `Barang Bulk ${index}`,
+    referencePrice: 10_000 + index,
+    stock: index === 0 ? 0 : index === 1 ? -4 : index,
+    tracked: index !== 2,
+    note: '',
+    imageUrl: index === 0 ? 'https://invalid.test/broken.jpg' : '',
+    createdAt: '2026-07-21T00:00:00.000Z',
+    archived: index === 3,
+  }));
+  await gateway.replaceFromWorkbook({ skus, loaded: skus.length, skipped: 0, warnings: [] }, 'Fixture 3.140 SKU');
+  await gateway.createNotaTransaction();
+  openNota(gateway);
+
+  expect(screen.getByText('3.139 SKU aktif')).toBeInTheDocument();
+  expect(within(screen.getByRole('listbox', { name: 'Hasil SKU Gudang' })).getAllByRole('option')).toHaveLength(50);
+  fireEvent.click(screen.getByRole('button', { name: 'SKU berikutnya' }));
+  expect(screen.getByText('2/63')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'SKU sebelumnya' }));
+
+  const search = screen.getByRole('searchbox', { name: 'Cari SKU Gudang' });
+  fireEvent.change(search, { target: { value: 'BULK-0000' } });
+  const zero = screen.getByRole('option', { name: /BULK-0000.*Stok 0/ });
+  fireEvent.error(zero.querySelector('img')!);
+  expect(within(zero).getByText('CHU')).toBeInTheDocument();
+  fireEvent.change(search, { target: { value: 'NEGATIF-LAMA' } });
+  expect(screen.getByRole('option', { name: /BULK-0001.*Stok -4/ })).toBeEnabled();
+  fireEvent.change(search, { target: { value: 'BULK-0002' } });
+  expect(screen.getByRole('option', { name: /Stok tidak dilacak/ })).toBeEnabled();
+  fireEvent.change(search, { target: { value: 'BULK-0003' } });
+  expect(within(screen.getByRole('listbox', { name: 'Hasil SKU Gudang' })).queryByRole('option')).not.toBeInTheDocument();
+});
+
 test('keyboard selection from SKU Gudang links the active row and manual edits unlink it', () => {
   const gateway = new MockOperationsGateway();
   openNota(gateway);

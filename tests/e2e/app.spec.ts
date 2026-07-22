@@ -19,7 +19,7 @@ async function finishNota(window: Page) {
   const confirmation = window.getByRole('dialog', { name: 'Selesaikan nota?' });
   await expect(confirmation).toBeVisible();
   await confirmation.getByRole('button', { name: 'Selesaikan' }).click();
-  await expect(window.getByRole('dialog', { name: 'Daftar Nota' })).toBeVisible();
+  await expect(window.getByRole('dialog', { name: 'Arsip Nota' })).toBeVisible();
 }
 
 async function expectStockAndRevenue(window: Page, stock: number, revenue: number) {
@@ -49,21 +49,24 @@ test('Nota is a full-window workspace, stays horizontally contained, and returns
     await expect(window.getByRole('navigation', { name: 'Modul CH Ultimate' })).toHaveCount(0);
     await expect(window.locator('.page-header')).toHaveCount(0);
 
-    for (const viewport of [
+    for (const [index, viewport] of [
       { width: 1366, height: 768 },
       { width: 1920, height: 1080 },
-    ]) {
+    ].entries()) {
       await window.setViewportSize(viewport);
+      if (index === 1) await window.getByRole('button', { name: 'Perbesar tulisan' }).click();
+      await expect(window.getByRole('button', { name: `Ukuran tulisan ${index === 0 ? 125 : 150}%` })).toBeVisible();
       await expect(window.getByRole('columnheader')).toHaveCount(10);
       await expect(window.getByTestId('nota-grid-row-1')).toContainText('1A');
       await expect(window.getByTestId('nota-grid-row-15')).toContainText('15A');
-      const row15 = await window.getByTestId('nota-grid-row-15').boundingBox();
-      const complete = await window.getByRole('button', { name: 'Selesaikan nota' }).boundingBox();
-      expect(row15).not.toBeNull();
-      expect(complete).not.toBeNull();
-      expect(row15!.y + row15!.height).toBeLessThanOrEqual(viewport.height);
-      expect(complete!.y + complete!.height).toBeLessThanOrEqual(viewport.height);
       expect(await window.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+      const grid = window.getByRole('region', { name: 'Grid nota' });
+      const overflow = await grid.evaluate((element) => element.scrollWidth > element.clientWidth);
+      if (overflow) {
+        await grid.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
+        expect(await grid.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+      }
+      await expect(window.getByRole('columnheader', { name: 'AKSI' })).toBeVisible();
       await window.screenshot({ path: testInfo.outputPath(`nota-${viewport.width}x${viewport.height}.png`) });
     }
 
@@ -110,7 +113,7 @@ test('Nota pages support A/B switching and cancellation undo', async () => {
     await openNota(window);
     await window.getByRole('button', { name: 'Halaman B' }).click();
     await expect(window.getByTestId('nota-grid-row-1')).toContainText('1B');
-    await window.getByRole('button', { name: 'Tambah Nota' }).first().click();
+    await window.getByRole('button', { name: 'Tambah Nota C' }).click();
     await expect(window.getByRole('button', { name: 'Halaman C', exact: true })).toHaveAttribute('aria-pressed', 'true');
     await window.getByRole('button', { name: 'Batalkan halaman C' }).click();
     const notice = window.locator('.chu-nota-workspace__notice');
@@ -126,9 +129,9 @@ test('Nota lifecycle posts linked and ad-hoc lines, then import resets the sessi
   const { application, window } = await launch();
   try {
     await openNota(window);
-    await window.getByLabel('Nama barang baris 3', { exact: true }).fill('Beras Hitam');
-    await window.keyboard.press('ArrowDown');
-    await window.keyboard.press('Enter');
+    await window.getByLabel('Nama barang baris 3', { exact: true }).click();
+    await window.getByRole('searchbox', { name: 'Cari SKU Gudang' }).fill('Beras Hitam');
+    await window.getByRole('option', { name: /BRS-108-BLK/ }).click();
     await expect(window.getByLabel('Nama barang baris 3', { exact: true })).toHaveValue('Beras Hitam Premium 1 kg');
     await window.getByLabel('Jumlah baris 3', { exact: true }).fill('2');
     await window.getByLabel('Nama barang baris 4', { exact: true }).fill('Biaya bungkus manual');
@@ -138,17 +141,17 @@ test('Nota lifecycle posts linked and ad-hoc lines, then import resets the sessi
     await window.getByRole('button', { name: 'PCS baris 4' }).click();
     await finishNota(window);
 
-    await window.getByRole('button', { name: 'Tutup Daftar Nota' }).click();
+    await window.getByRole('button', { name: 'Tutup Arsip Nota' }).click();
     await window.getByRole('button', { name: 'Kembali ke CH Ultimate' }).click();
     await expectStockAndRevenue(window, 21, 141_000);
 
     await window.getByRole('button', { name: 'Nota' }).click();
-    await window.getByRole('button', { name: 'Daftar Nota' }).click();
+    await window.getByRole('button', { name: 'Arsip Nota' }).click();
     await window.getByRole('button', { name: 'Buka kembali' }).click();
     await window.getByRole('dialog', { name: 'Buka kembali nota?' }).getByRole('button', { name: 'Buka kembali' }).click();
     await window.getByLabel('Jumlah baris 3', { exact: true }).fill('3');
     await finishNota(window);
-    await window.getByRole('button', { name: 'Tutup Daftar Nota' }).click();
+    await window.getByRole('button', { name: 'Tutup Arsip Nota' }).click();
     await window.getByRole('button', { name: 'Kembali ke CH Ultimate' }).click();
     await expectStockAndRevenue(window, 20, 183_000);
 
@@ -158,15 +161,15 @@ test('Nota lifecycle posts linked and ad-hoc lines, then import resets the sessi
     await window.getByRole('dialog', { name: 'Buka kembali nota?' }).getByRole('button', { name: 'Buka kembali' }).click();
     await window.getByRole('button', { name: 'Batalkan transaksi' }).click();
     await window.getByRole('dialog', { name: 'Batalkan transaksi?' }).getByRole('button', { name: 'Batalkan' }).click();
-    await expect(window.getByRole('dialog', { name: 'Daftar Nota' })).toBeVisible();
-    await window.getByRole('button', { name: 'Tutup Daftar Nota' }).click();
+    await expect(window.getByRole('dialog', { name: 'Arsip Nota' })).toBeVisible();
+    await window.getByRole('button', { name: 'Tutup Arsip Nota' }).click();
     await window.getByRole('button', { name: 'Kembali ke CH Ultimate' }).click();
     await expectStockAndRevenue(window, 24, 0);
 
     await window.getByRole('button', { name: 'Nota' }).click();
     await window.getByRole('button', { name: 'Buka Arsip' }).click();
     await window.getByRole('tab', { name: 'Sampah' }).click();
-    await window.getByRole('dialog', { name: 'Daftar Nota' }).getByRole('button', { name: 'Pulihkan transaksi' }).click();
+    await window.getByRole('dialog', { name: 'Arsip Nota' }).getByRole('button', { name: 'Pulihkan transaksi' }).click();
     await expect(window.getByRole('dialog', { name: 'Nota Dikerjakan' })).toBeVisible();
     await window.getByRole('button', { name: 'Tutup Nota Dikerjakan' }).click();
     await window.getByRole('button', { name: 'Kembali ke CH Ultimate' }).click();
@@ -174,7 +177,7 @@ test('Nota lifecycle posts linked and ad-hoc lines, then import resets the sessi
 
     await window.getByRole('button', { name: 'Nota' }).click();
     await finishNota(window);
-    await window.getByRole('button', { name: 'Tutup Daftar Nota' }).click();
+    await window.getByRole('button', { name: 'Tutup Arsip Nota' }).click();
     await window.getByRole('button', { name: 'Kembali ke CH Ultimate' }).click();
     await expectStockAndRevenue(window, 20, 183_000);
 

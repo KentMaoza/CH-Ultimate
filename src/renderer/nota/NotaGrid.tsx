@@ -128,6 +128,7 @@ export const NotaGrid = forwardRef<NotaGridHandle, {
     const row = Number(cell.dataset.rowIndex);
     const field = cell.dataset.field ?? '';
     const index = fields.indexOf(field);
+    if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.key === 'Enter') {
       if (field === 'lsn' || field === 'pcs') return;
       event.preventDefault();

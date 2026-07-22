@@ -386,6 +386,26 @@ test('grid arrows always traverse data cells, including unit buttons and row wra
   expect(name).toHaveFocus();
 });
 
+test('Shift+Arrow keeps native text selection and Nota text remains selectable for copy', () => {
+  openNota();
+  const price = screen.getByLabelText('Harga PCS baris 1') as HTMLInputElement;
+  fireEvent.focus(price);
+  price.setSelectionRange(0, 2);
+
+  expect(fireEvent.mouseDown(price)).toBe(true);
+  expect(fireEvent.keyDown(price, { key: 'ArrowRight', shiftKey: true })).toBe(true);
+  expect(fireEvent.keyDown(price, { key: 'c', ctrlKey: true })).toBe(true);
+  expect(fireEvent.copy(price)).toBe(true);
+});
+
+test.each(['ctrlKey', 'metaKey'] as const)('%s+P requests demo print without opening production print', (modifier) => {
+  openNota();
+  const event = { key: 'p', [modifier]: true };
+  expect(fireEvent.keyDown(window, event)).toBe(false);
+  expect(screen.getByText(/Print Nota belum aktif/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Print Nota' })).toBeDisabled();
+});
+
 test('click and Enter give the selected LSN or PCS unit a black selection block', () => {
   openNota();
   const lsn = screen.getByRole('button', { name: 'LSN baris 3' });

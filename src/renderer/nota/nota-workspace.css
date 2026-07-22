@@ -1,6 +1,7 @@
 .chu-nota-workspace { --nota-font-scale: 1.25; min-height: 100vh; padding: 8px; color: #111; background: #eeeee9; }
 .chu-nota-workspace, .chu-nota-workspace * { box-sizing: border-box; }
 .chu-nota-workspace button, .chu-nota-workspace input, .chu-nota-workspace select { min-height: 26px; border: 1px solid #111; border-radius: 0; color: #111; background: #fff; font: inherit; }
+.chu-nota-workspace input, .chu-nota-workspace output, .chu-nota-workspace td, .chu-nota-workspace__number, .chu-nota-workspace__meta-total, .chu-nota-workspace__footer strong { -webkit-user-select: text; user-select: text; }
 .chu-nota-workspace button { padding: 4px 8px; cursor: pointer; font-size: calc(11px * var(--nota-font-scale)); font-weight: 750; }
 .chu-nota-workspace button:disabled, .chu-nota-workspace input:disabled, .chu-nota-workspace select:disabled { cursor: not-allowed; opacity: .52; }
 .chu-nota-workspace button:focus-visible, .chu-nota-workspace input:focus-visible, .chu-nota-workspace select:focus-visible, .chu-nota-workspace output:focus-visible, .chu-nota-workspace [role='option']:focus-visible { outline: 3px solid #111; outline-offset: 2px; }

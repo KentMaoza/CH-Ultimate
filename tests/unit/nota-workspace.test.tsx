@@ -33,7 +33,7 @@ test('Nota opens as a dedicated workspace and back restores the CH Ultimate shel
 test('Nota grid has the required headers and fifteen A-page rows', () => {
   openNota();
   expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
-    'NO', 'NAMA BARANG', 'JENIS', 'JUMLAH', 'LSN', 'PCS', 'HARGA LSN', 'HARGA PCS', 'TOTAL', 'AKSI',
+    'NO', 'NAMA BARANG', 'JENIS', 'JUMLAH', 'PCS', 'LSN', 'HARGA PCS', 'HARGA LSN', 'TOTAL', 'AKSI',
   ]);
   expect(within(screen.getByTestId('nota-grid-body')).getAllByRole('row')).toHaveLength(15);
   expect(screen.getByText('1A')).toBeInTheDocument();
@@ -189,6 +189,22 @@ test('price fields stay grouped while focused and completion focuses the first i
   expect(screen.getByText(/Perbaiki nilai angka/i)).toHaveTextContent(/bilangan bulat/i);
 });
 
+test('typing and pasting Indonesian price separators never leaves 5.2000 behind', () => {
+  openNota();
+  const pcsPrice = screen.getByLabelText('Harga PCS baris 3');
+  fireEvent.focus(pcsPrice);
+  for (const value of ['5', '52', '520', '5.200', '5.2000']) {
+    fireEvent.change(pcsPrice, { target: { value, selectionStart: value.length } });
+  }
+  expect(pcsPrice).toHaveValue('52.000');
+
+  const lsnPrice = screen.getByLabelText('Harga LSN baris 3');
+  fireEvent.change(lsnPrice, { target: { value: '52.000', selectionStart: 6 } });
+  expect(lsnPrice).toHaveValue('52.000');
+  fireEvent.change(lsnPrice, { target: { value: '52.00', selectionStart: 5 } });
+  expect(lsnPrice).toHaveValue('5.200');
+});
+
 test('completion finds an invalid raw number on another active page and preserves it until corrected', async () => {
   const gateway = new MockOperationsGateway();
   openNota(gateway);
@@ -330,10 +346,10 @@ test('grid arrows always traverse data cells, including unit buttons and row wra
   fireEvent.keyDown(screen.getByLabelText('Jumlah baris 2'), { key: 'ArrowUp' });
   expect(screen.getByLabelText('Jumlah baris 1')).toHaveFocus();
 
-  const lsn = screen.getByRole('button', { name: 'LSN baris 1' });
-  act(() => lsn.focus());
-  fireEvent.keyDown(lsn, { key: 'ArrowRight' });
-  expect(screen.getByRole('button', { name: 'PCS baris 1' })).toHaveFocus();
+  const pcs = screen.getByRole('button', { name: 'PCS baris 1' });
+  act(() => pcs.focus());
+  fireEvent.keyDown(pcs, { key: 'ArrowRight' });
+  expect(screen.getByRole('button', { name: 'LSN baris 1' })).toHaveFocus();
 
   const total = screen.getByLabelText('Total baris 1');
   act(() => total.focus());
@@ -349,10 +365,10 @@ test('grid arrows always traverse data cells, including unit buttons and row wra
   fireEvent.keyDown(screen.getByLabelText('Jenis baris 1'), { key: 'ArrowUp' });
   expect(screen.getByLabelText('Jenis baris 1')).toHaveFocus();
 
-  act(() => lsn.focus());
-  fireEvent.keyDown(lsn, { key: 'Enter' });
-  expect(lsn).toHaveFocus();
-  expect(lsn).toHaveAttribute('aria-pressed', 'true');
+  act(() => pcs.focus());
+  fireEvent.keyDown(pcs, { key: 'Enter' });
+  expect(pcs).toHaveFocus();
+  expect(pcs).toHaveAttribute('aria-pressed', 'true');
 
   act(() => name.focus());
   fireEvent.keyDown(name, { key: 'ArrowLeft' });

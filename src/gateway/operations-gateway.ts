@@ -10,7 +10,7 @@ import {
   restoreNotaPage,
   restoreNotaTransaction,
 } from '../domain/nota';
-import type { DemoState, LabelTemplate, Nota, NotaLine, NotaTransaction, Sku, WorkbookImportResult } from '../domain/types';
+import type { DemoState, InvoiceTemplate, LabelTemplate, Nota, NotaLine, NotaTransaction, Sku, WorkbookImportResult } from '../domain/types';
 
 export interface CreateSkuInput {
   skuNumber: string;
@@ -32,6 +32,7 @@ export interface OperationsGateway {
   replaceFromWorkbook(result: WorkbookImportResult, sourceLabel: string): Promise<void>;
   reset(): Promise<void>;
   setLabelTemplate(template: LabelTemplate): Promise<void>;
+  setInvoiceTemplate(template: InvoiceTemplate): Promise<void>;
   createNotaTransaction(): Promise<NotaTransaction>;
   addNotaPage(transactionId: string): Promise<Nota | undefined>;
   cancelNotaPage(transactionId: string, pageId: string): Promise<void>;
@@ -102,6 +103,7 @@ export class MockOperationsGateway implements OperationsGateway {
   }
   async reset(): Promise<void> { this.publish(this.seedState()); }
   async setLabelTemplate(template: LabelTemplate): Promise<void> { this.publish({ ...this.state, labelTemplate: template }); }
+  async setInvoiceTemplate(template: InvoiceTemplate): Promise<void> { this.publish({ ...this.state, invoiceTemplate: template }); }
   async createNotaTransaction(): Promise<NotaTransaction> {
     const transaction = createDraftNotaTransaction(this.state.notaTransactions.length + 1);
     this.publish({ ...this.state, notaTransactions: [transaction, ...this.state.notaTransactions] });

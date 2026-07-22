@@ -3,17 +3,20 @@ import { QRCodeSVG } from 'qrcode.react';
 import type { LabelTemplate } from '../../domain/types';
 import { formatRupiah } from '../format';
 import { useOperations } from '../operations-context';
+import { InvoiceTemplateBuilder } from './InvoiceTemplateBuilder';
 
 export function LabelPage() {
   const { state, gateway } = useOperations();
+  const [mode, setMode] = useState<'label' | 'invoice'>('label');
   const [skuId, setSkuId] = useState(state.skus[0]?.id ?? '');
   const [quantity, setQuantity] = useState(1);
   const sku = state.skus.find((item) => item.id === skuId) ?? state.skus[0];
   const template = state.labelTemplate;
   const update = (patch: Partial<LabelTemplate>) => void gateway.setLabelTemplate({ ...template, ...patch });
   const toggleField = (field: LabelTemplate['fields'][number]) => update({ fields: template.fields.includes(field) ? template.fields.filter((item) => item !== field) : [...template.fields, field] });
+  if (mode === 'invoice') return <><div className="template-tabs" role="tablist" aria-label="Jenis template"><button role="tab" aria-selected={false} onClick={() => setMode('label')}>Label</button><button role="tab" aria-selected>Invoice</button></div><InvoiceTemplateBuilder /></>;
   return (
-    <div className="feature-page label-layout">
+    <><div className="template-tabs" role="tablist" aria-label="Jenis template"><button role="tab" aria-selected onClick={() => setMode('label')}>Label</button><button role="tab" aria-selected={false} onClick={() => setMode('invoice')}>Invoice</button></div><div className="feature-page label-layout">
       <section className="builder-panel">
         <div className="section-heading"><span>GUIDED BUILDER</span><h2>Template label</h2><p>Atur media, ukuran, dan isi. Output produksi belum aktif.</p></div>
         <div className="form-grid compact">
@@ -40,7 +43,6 @@ export function LabelPage() {
           </div>)}
         </div>
       </section>
-    </div>
+    </div></>
   );
 }
-

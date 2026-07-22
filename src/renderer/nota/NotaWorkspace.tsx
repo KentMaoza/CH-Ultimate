@@ -18,6 +18,12 @@ type Confirmation = { kind: ConfirmKind; transactionId: string; pageId?: string;
 type DrawerKind = 'working' | null;
 type TransactionPatch = Partial<Pick<NotaTransaction, 'customerName' | 'customerPlace' | 'transactionDate' | 'payment'>>;
 const paymentLabel = (payment: PaymentKind) => ({ unclassified: 'Belum diklasifikasi', cash: 'Kas', transfer: 'Transfer', credit: 'Piutang' })[payment];
+const fontScales = [100, 125, 150, 175] as const;
+
+function stepFontScale(value: number, direction: -1 | 1) {
+  const index = fontScales.indexOf(value as typeof fontScales[number]);
+  return fontScales[Math.max(0, Math.min(fontScales.length - 1, index + direction))] ?? 150;
+}
 
 function focusTarget(target: EventTarget | null) {
   return target instanceof HTMLElement ? target : null;
@@ -26,7 +32,7 @@ function focusTarget(target: EventTarget | null) {
 export function NotaWorkspace({ onBack, initialSelection }: { onBack: () => void; initialSelection?: Selection }) {
   const { state, gateway } = useOperations();
   const [selected, setSelected] = useState<Selection>(initialSelection ?? { transactionId: '', pageId: '' });
-  const [fontScale, setFontScale] = useState(125);
+  const [fontScale, setFontScale] = useState(150);
   const [message, setMessage] = useState('');
   const [drawer, setDrawer] = useState<DrawerKind>(null);
   const [drawerRestoreFocus, setDrawerRestoreFocus] = useState<HTMLElement | null>(null);
@@ -66,7 +72,7 @@ export function NotaWorkspace({ onBack, initialSelection }: { onBack: () => void
       }
       if ((event.ctrlKey || event.metaKey) && ['+', '=', '-', '0'].includes(event.key)) {
         event.preventDefault();
-        setFontScale((value) => event.key === '+' || event.key === '=' ? value === 100 ? 125 : 150 : event.key === '-' ? value === 150 ? 125 : 100 : 125);
+        setFontScale((value) => event.key === '+' || event.key === '=' ? stepFontScale(value, 1) : event.key === '-' ? stepFontScale(value, -1) : 150);
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'p') {
         event.preventDefault();
@@ -207,7 +213,8 @@ export function NotaWorkspace({ onBack, initialSelection }: { onBack: () => void
     }
     setConfirm(null);
   };
-  const total = selectedTransaction ? selectedTransaction.pages.filter((item) => item.status === 'active').flatMap((item) => item.lines).reduce((sum, line) => sum + lineTotal(line), 0) : 0;
+  const activePages = selectedTransaction?.pages.filter((item) => item.status === 'active') ?? [];
+  const total = activePages.flatMap((item) => item.lines).reduce((sum, line) => sum + lineTotal(line), 0);
   const editable = Boolean(selectedTransaction && ['draft', 'reopened'].includes(selectedTransaction.status));
   const pageIndex = selectedTransaction && page ? selectedTransaction.pages.findIndex((item) => item.id === page.id) : 0;
   const pageTheme = notaPageTheme(pageIndex);
@@ -220,7 +227,7 @@ export function NotaWorkspace({ onBack, initialSelection }: { onBack: () => void
       <strong className="chu-nota-workspace__wordmark">CHU</strong>
       <button className="chu-nota-workspace__section" onClick={(event) => openDrawer('working', event.currentTarget)}>Nota Dikerjakan</button>
       <div className="chu-nota-workspace__search"><input ref={searchInput} aria-label="Cari nota" role="combobox" aria-expanded={Boolean(query)} aria-controls="nota-search-results" aria-activedescendant={query && results[highlight] ? `nota-search-result-${results[highlight]!.transaction.id}-${results[highlight]!.page.id}` : undefined} value={query} placeholder="Cari nota" onChange={(event) => { setQuery(event.target.value); setHighlight(0); }} onKeyDown={(event) => { if (event.key === 'ArrowDown') { event.preventDefault(); setHighlight((value) => Math.min(Math.max(0, results.length - 1), value + 1)); } else if (event.key === 'ArrowUp') { event.preventDefault(); setHighlight((value) => Math.max(0, value - 1)); } else if (event.key === 'Enter') { event.preventDefault(); const result = results[highlight]; if (result) openSearchResult(result); } else if (event.key === 'Escape') { event.preventDefault(); clearSearch(true); } }} />{query && <div id="nota-search-results" role="listbox" aria-label="Hasil pencarian nota">{results.map((result, index) => <div id={`nota-search-result-${result.transaction.id}-${result.page.id}`} role="option" aria-selected={highlight === index} key={`${result.transaction.id}-${result.page.id}`} onMouseDown={(event) => event.preventDefault()} onClick={() => openSearchResult(result)}>{result.label}</div>)}{!results.length && <span>Tidak ada nota yang cocok.</span>}</div>}</div>
-      <div className="chu-nota-workspace__zoom" aria-label="Ukuran tulisan"><button aria-label="Perkecil tulisan" disabled={fontScale === 100} onClick={() => setFontScale((value) => value === 150 ? 125 : 100)}>−</button><button aria-label={`Ukuran tulisan ${fontScale}%`} onClick={() => setFontScale(125)}>{fontScale}%</button><button aria-label="Perbesar tulisan" disabled={fontScale === 150} onClick={() => setFontScale((value) => value === 100 ? 125 : 150)}>+</button></div>
+      <div className="chu-nota-workspace__zoom" aria-label="Ukuran tulisan"><button aria-label="Perkecil tulisan" disabled={fontScale === 100} onClick={() => setFontScale((value) => stepFontScale(value, -1))}>−</button><button aria-label={`Ukuran tulisan ${fontScale}%`} onClick={() => setFontScale(150)}>{fontScale}%</button><button aria-label="Perbesar tulisan" disabled={fontScale === 175} onClick={() => setFontScale((value) => stepFontScale(value, 1))}>+</button></div>
       <span className="chu-nota-workspace__demo">DEMO DATA · SESSION ONLY</span>
       <button disabled={busy} className="chu-nota-workspace__new" onClick={(event) => openNew(event.currentTarget)}>Transaksi Baru</button>
     </header>
@@ -228,9 +235,10 @@ export function NotaWorkspace({ onBack, initialSelection }: { onBack: () => void
     {message && <p className="chu-nota-workspace__notice" role="status">{message}</p>}
     {selectedTransaction && page ? <>
       <section className="chu-nota-workspace__page-tabs" aria-label="Halaman aktif">
-        {selectedTransaction.pages.filter((item) => item.status === 'active').map((item) => { const theme = notaPageTheme(selectedTransaction.pages.findIndex((candidate) => candidate.id === item.id)); return <button style={{ '--nota-page-color': theme.background, '--nota-page-text': theme.foreground } as CSSProperties} disabled={busy} key={item.id} aria-label={`Halaman ${item.suffix}`} aria-pressed={item.id === page.id} onClick={() => selectPage({ transactionId: selectedTransaction.id, pageId: item.id })}>Nota {item.suffix}</button>; })}
+        {activePages.map((item) => { const theme = notaPageTheme(selectedTransaction.pages.findIndex((candidate) => candidate.id === item.id)); return <button style={{ '--nota-page-color': theme.background, '--nota-page-text': theme.foreground } as CSSProperties} disabled={busy} key={item.id} aria-label={`Halaman ${item.suffix}`} aria-pressed={item.id === page.id} onClick={() => selectPage({ transactionId: selectedTransaction.id, pageId: item.id })}>Nota {item.suffix}</button>; })}
         {editable && <><button aria-label={`Tambah Nota ${noteSuffixFromIndex(selectedTransaction.nextNoteIndex)}`} disabled={busy} onClick={() => void addPage(selectedTransaction.id)}>+ Tambah Nota {noteSuffixFromIndex(selectedTransaction.nextNoteIndex)}</button><button aria-label={`Batalkan halaman ${page.suffix}`} disabled={busy || selectedTransaction.pages.filter((item) => item.status === 'active').length < 2} title={selectedTransaction.pages.filter((item) => item.status === 'active').length < 2 ? 'Minimal satu halaman aktif harus tersisa.' : undefined} onClick={() => void cancelPage({ transactionId: selectedTransaction.id, pageId: page.id })}>Batalkan halaman</button></>}
       </section>
+      <section className="chu-nota-workspace__page-totals" aria-label="Total per nota">{activePages.map((item) => { const theme = notaPageTheme(selectedTransaction.pages.findIndex((candidate) => candidate.id === item.id)); return <div key={item.id} data-testid={`nota-page-total-${item.suffix}`} aria-current={item.id === page.id ? 'true' : undefined} style={{ '--nota-page-color': theme.background } as CSSProperties}><span>Total Nota {item.suffix}</span><strong>{formatRupiah(item.lines.reduce((sum, line) => sum + lineTotal(line), 0))}</strong></div>; })}</section>
       <section className="chu-nota-workspace__meta" aria-label="Metadata nota"><div className="chu-nota-workspace__number" style={themeStyle}><span>NOTA DIBUAT</span><strong>{page.suffix}</strong><b>{selectedTransaction.baseNumber}{page.suffix}</b></div><label className="chu-nota-workspace__customer"><span>Pelanggan</span><input disabled={!editable || busy} value={selectedTransaction.customerName} onChange={(event) => updateTransaction(selectedTransaction.id, { customerName: formatTitleCaseInput(event.currentTarget) })} /></label><label className="chu-nota-workspace__customer"><span>Tempat</span><input disabled={!editable || busy} value={selectedTransaction.customerPlace} onChange={(event) => updateTransaction(selectedTransaction.id, { customerPlace: formatTitleCaseInput(event.currentTarget) })} /></label><label><span>Tanggal</span><input disabled={!editable || busy} type="date" value={selectedTransaction.transactionDate} onChange={(event) => updateTransaction(selectedTransaction.id, { transactionDate: event.target.value })} /></label><label><span>Pembayaran</span><select disabled={!editable || busy} value={selectedTransaction.payment} onChange={(event) => updateTransaction(selectedTransaction.id, { payment: event.target.value as PaymentKind })}><option value="unclassified">Belum diklasifikasi</option><option value="cash">Kas</option><option value="transfer">Transfer</option><option value="credit">Piutang</option></select></label><div className="chu-nota-workspace__meta-total"><span>TOTAL SEMUA HALAMAN AKTIF</span><strong data-testid="nota-transaction-total">{formatRupiah(total)}</strong><small>{paymentLabel(selectedTransaction.payment)}</small></div></section>
       <NotaGrid ref={grid} lines={page.lines} suffix={page.suffix} skus={state.skus} editable={editable} busy={busy} invalidValues={validation.valuesForPage(selectedTransaction.id, page.id)} onInvalidChange={(lineId, field, rawValue) => validation.report({ transactionId: selectedTransaction.id, pageId: page.id, lineId, field }, rawValue)} onUpdate={(line, patch) => updateLine(selectedTransaction.id, page.id, line.id, patch)} onDelete={(line) => deleteLine(selectedTransaction.id, page.id, line.id)} />
       <footer className="chu-nota-workspace__footer"><div><span>TOTAL TRANSAKSI</span><strong>{formatRupiah(total)}</strong></div><label><span>Ruang cetak</span><select disabled><option>Semua halaman aktif (segera hadir)</option></select></label><p>Printing produksi belum tersedia. Shortcut Ctrl/Cmd+P sudah disiapkan.</p><button disabled aria-label="Print Nota">Print Nota</button>{editable && <div className="chu-nota-workspace__lifecycle"><button disabled={busy} onClick={(event) => requestConfirm('cancel', selectedTransaction.id, event.currentTarget, page.id)}>Batalkan transaksi</button><button disabled={busy} className="chu-nota-workspace__complete" aria-label="Selesaikan nota" onClick={(event) => requestComplete(event.currentTarget)}>Selesaikan nota</button></div>}</footer>

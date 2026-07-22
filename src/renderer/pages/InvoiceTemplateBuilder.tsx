@@ -1,0 +1,58 @@
+import { lineTotal } from '../../domain/nota';
+import type { InvoiceElementId, InvoiceTemplate } from '../../domain/types';
+import { formatRupiah } from '../format';
+import { useOperations } from '../operations-context';
+
+const elementLabels: Record<InvoiceElementId, string> = {
+  logo: 'Logo', address: 'Alamat', phone: 'No. Telp', bank: 'No. rekening',
+};
+
+export function InvoiceTemplateBuilder() {
+  const { state, gateway } = useOperations();
+  const template = state.invoiceTemplate;
+  const transaction = state.notaTransactions[0];
+  const lines = transaction?.pages.find((page) => page.status === 'active')?.lines.filter((line) => line.description) ?? [];
+  const total = lines.reduce((sum, line) => sum + lineTotal(line), 0);
+  const update = (patch: Partial<InvoiceTemplate>) => void gateway.setInvoiceTemplate({ ...template, ...patch });
+  const updateElement = (id: InvoiceElementId, visible: boolean) => update({ elements: template.elements.map((element) => element.id === id ? { ...element, visible } : element) });
+  const moveElement = (id: InvoiceElementId, direction: -1 | 1) => {
+    const index = template.elements.findIndex((element) => element.id === id);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= template.elements.length) return;
+    const elements = [...template.elements];
+    [elements[index], elements[target]] = [elements[target]!, elements[index]!];
+    update({ elements });
+  };
+  const renderElement = (id: InvoiceElementId) => {
+    if (id === 'logo') return <div className="invoice-logo">{template.logoUrl && <img key={template.logoUrl} src={template.logoUrl} alt="Logo invoice" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}<strong>CHU</strong></div>;
+    if (id === 'address') return <p>{template.address}</p>;
+    if (id === 'phone') return <p>{template.phone}</p>;
+    return <p>{template.bankAccount}</p>;
+  };
+
+  return <div className="label-layout">
+    <section className="builder-panel">
+      <div className="section-heading"><span>INVOICE BUILDER</span><h2>Template invoice</h2><p>Atur ukuran serta identitas toko. Gunakan tombol naik/turun untuk memindahkan elemen.</p></div>
+      <div className="form-grid compact">
+        <label><span>Lebar invoice (mm)</span><input type="number" min="80" max="297" value={template.widthMm} onChange={(event) => update({ widthMm: Number(event.target.value) })} /></label>
+        <label><span>Tinggi invoice (mm)</span><input type="number" min="80" max="420" value={template.heightMm} onChange={(event) => update({ heightMm: Number(event.target.value) })} /></label>
+        <label><span>Ukuran font invoice</span><input type="number" min="8" max="24" value={template.fontSize} onChange={(event) => update({ fontSize: Number(event.target.value) })} /></label>
+        <label className="full"><span>URL logo</span><input type="url" value={template.logoUrl} onChange={(event) => update({ logoUrl: event.target.value })} placeholder="Kosongkan untuk CHU" /></label>
+        <label className="full"><span>No. rekening</span><input value={template.bankAccount} onChange={(event) => update({ bankAccount: event.target.value })} /></label>
+        <label className="full"><span>Alamat</span><textarea rows={2} value={template.address} onChange={(event) => update({ address: event.target.value })} /></label>
+        <label className="full"><span>No. Telp</span><input value={template.phone} onChange={(event) => update({ phone: event.target.value })} /></label>
+      </div>
+      <fieldset className="invoice-elements"><legend>Urutan elemen invoice</legend>{template.elements.map((element, index) => <div key={element.id}><label className="check-field"><input type="checkbox" checked={element.visible} onChange={(event) => updateElement(element.id, event.target.checked)} /><span>{elementLabels[element.id]}</span></label><button type="button" aria-label={`Naikkan ${elementLabels[element.id]}`} disabled={index === 0} onClick={() => moveElement(element.id, -1)}>↑</button><button type="button" aria-label={`Turunkan ${elementLabels[element.id]}`} disabled={index === template.elements.length - 1} onClick={() => moveElement(element.id, 1)}>↓</button></div>)}</fieldset>
+      <div className="form-actions"><button className="button secondary" disabled aria-label="Export PDF invoice">Export PDF</button><button className="button primary" disabled aria-label="Print invoice">Print</button></div>
+    </section>
+    <section className="preview-panel invoice-preview-wrap">
+      <div className="preview-title"><strong>Preview invoice</strong><span>Session-only · output produksi belum aktif</span></div>
+      <article className="invoice-paper" data-testid="invoice-preview" style={{ width: `${template.widthMm}mm`, minHeight: `${template.heightMm}mm`, fontSize: `${template.fontSize}px` }}>
+        <header>{template.elements.filter((element) => element.visible).map((element) => <div key={element.id} data-testid={`invoice-element-${element.id}`}>{renderElement(element.id)}</div>)}</header>
+        <div className="invoice-heading"><div><b>INVOICE</b><span>{transaction?.baseNumber ?? 'CHU-DEMO-0001'}A</span></div><div><span>Pelanggan</span><strong>{transaction?.customerName || 'Pelanggan Demo'}</strong></div></div>
+        <table><thead><tr><th>Barang</th><th>Jumlah</th><th>Total</th></tr></thead><tbody>{lines.slice(0, 4).map((line) => <tr key={line.id}><td>{line.description}</td><td>{line.quantity} {line.unit}</td><td>{formatRupiah(lineTotal(line))}</td></tr>)}</tbody></table>
+        <footer><span>Total invoice</span><strong>{formatRupiah(total)}</strong></footer>
+      </article>
+    </section>
+  </div>;
+}

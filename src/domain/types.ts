@@ -76,6 +76,19 @@ export interface LabelTemplate {
   fields: Array<'qr' | 'name' | 'sku' | 'price' | 'chu'>;
 }
 
+export type InvoiceElementId = 'logo' | 'address' | 'phone' | 'bank';
+
+export interface InvoiceTemplate {
+  widthMm: number;
+  heightMm: number;
+  fontSize: number;
+  logoUrl: string;
+  bankAccount: string;
+  address: string;
+  phone: string;
+  elements: Array<{ id: InvoiceElementId; visible: boolean }>;
+}
+
 export interface RevenueReport {
   today: number;
   month: number;
@@ -98,6 +111,7 @@ export interface DemoState {
   adjustments: StockAdjustment[];
   notaTransactions: NotaTransaction[];
   labelTemplate: LabelTemplate;
+  invoiceTemplate: InvoiceTemplate;
   sourceLabel: string;
   importSummary?: Omit<WorkbookImportResult, 'skus'>;
 }

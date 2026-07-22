@@ -1,4 +1,4 @@
-.chu-nota-workspace { --nota-font-scale: 1.25; min-height: 100vh; padding: 8px; color: #111; background: #eeeee9; }
+.chu-nota-workspace { --nota-font-scale: 1.5; min-height: 100vh; padding: 8px; color: #111; background: #eeeee9; }
 .chu-nota-workspace, .chu-nota-workspace * { box-sizing: border-box; }
 .chu-nota-workspace button, .chu-nota-workspace input, .chu-nota-workspace select { min-height: 26px; border: 1px solid #111; border-radius: 0; color: #111; background: #fff; font: inherit; }
 .chu-nota-workspace input, .chu-nota-workspace output, .chu-nota-workspace td, .chu-nota-workspace__number, .chu-nota-workspace__meta-total, .chu-nota-workspace__footer strong { -webkit-user-select: text; user-select: text; }
@@ -34,6 +34,12 @@
 .chu-nota-workspace__page-tabs { display: flex; align-items: center; gap: 6px; margin-top: 6px; padding: 4px 7px; border: 2px solid #111; background: #fff; }
 .chu-nota-workspace__page-tabs button[aria-label^='Halaman'] { padding: 6px 10px; border-color: var(--nota-page-color); box-shadow: inset 0 -3px 0 var(--nota-page-color); font-size: calc(12px * var(--nota-font-scale)); }
 .chu-nota-workspace__page-tabs button[aria-label^='Halaman'][aria-pressed='true'] { color: var(--nota-page-text); background: var(--nota-page-color); box-shadow: none; }
+.chu-nota-workspace__page-totals { display: flex; gap: 6px; margin-top: 6px; overflow-x: auto; }
+.chu-nota-workspace__page-totals > div { min-width: 150px; padding: 5px 8px; border: 1px solid #111; border-left: 7px solid var(--nota-page-color); background: #fff; }
+.chu-nota-workspace__page-totals > div[aria-current='true'] { box-shadow: inset 0 0 0 2px var(--nota-page-color); }
+.chu-nota-workspace__page-totals span, .chu-nota-workspace__page-totals strong { display: block; }
+.chu-nota-workspace__page-totals span { font-size: calc(9px * var(--nota-font-scale)); font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
+.chu-nota-workspace__page-totals strong { margin-top: 2px; font-size: calc(12px * var(--nota-font-scale)); }
 .chu-nota-workspace__search { position: relative; min-width: 190px; }
 .chu-nota-workspace__search input { width: 100%; }
 .chu-nota-workspace__search [role='listbox'] { position: absolute; z-index: 10; top: calc(100% + 4px); left: 0; right: 0; border: 1px solid #111; background: #fff; }

@@ -36,7 +36,7 @@ Reloading or closing the application discards the imported workbook, stock edits
 
 - SKU Gudang with runtime XLSX import, search, edit aliases, archive, and stock adjustment
 - Buat SKU with tracked/untracked stock
-- Thermal/A4 QR label builder and preview
+- Thermal/A4 QR label builder plus configurable invoice template preview
 - Full-screen Nota workspace for session-only draft/reopened transactions
 - Dedicated Arsip Nota master-detail module with collapsible read-only previews and Sampah restore
 - Laporan Omzet and selectable low-stock/Barang Kosong A4 preview
@@ -50,11 +50,16 @@ Reloading or closing the application discards the imported workbook, stock edits
 - **Items and prices.** Choose a target row, then select a SKU from the collapsible **SKU Gudang** panel above the grid. Search supports the current number, old aliases, and name; archived SKU is excluded while zero, negative, and untracked stock stays selectable. An ad-hoc item remains valid without a SKU. The grid orders PCS before LSN, keeps the active unit as a black block, and normalizes Indonesian thousands separators while typing (for example `52000`, `52.000`, and transient `5.2000` all resolve to `52.000`).
 - **Typed text.** Pelanggan, Tempat, Nama Barang, Jenis, and Nama SKU use Title Case as the operator types. Existing uppercase codes such as `XL` stay intact and supplier codes such as `ch001` become `CH001`; selecting an existing warehouse SKU never rewrites its stored name.
 - **Stock and reports.** Completion posts the active pages as one transaction. Linked tracked SKU stock is updated, while ad-hoc and untracked items do not affect stock. Reopening, editing, and completing again applies only the stock delta. Cancelling reverses its posted stock, and restoring reapplies it. Laporan Omzet reflects completed transactions.
-- **Keyboard, copy, and text size.** `Ctrl/Cmd+K` focuses Nota search; `Escape` clears it and returns focus. Arrow keys move across every non-destructive grid cell, while `Shift+Arrow` keeps native text selection so names and formatted prices can be copied with `Ctrl/Cmd+C`; **Hapus** remains Tab-only. `Ctrl/Cmd+P` is connected to the demo print intent, but production printing remains disabled. `Ctrl/Cmd` with `+`, `-`, or `0` switches the session-only 100%, 125%, and 150% text presets.
+- **Keyboard, copy, and text size.** `Ctrl/Cmd+K` focuses Nota search; `Escape` clears it and returns focus. Arrow keys move across every non-destructive grid cell, while `Shift+Arrow` keeps native text selection so names and formatted prices can be copied with `Ctrl/Cmd+C`; **Hapus** remains Tab-only. `Ctrl/Cmd+P` is connected to the demo print intent, but production printing remains disabled. Nota starts at 150%; `Ctrl/Cmd` with `+`, `-`, or `0` switches the session-only 100%, 125%, 150%, and 175% text presets.
+- **Totals per page.** A compact summary strip shows `Total Nota A`, `Total Nota B`, and every later active suffix independently while the existing transaction total continues to aggregate all active pages.
 - **Session boundary.** Reloading or closing the app discards every Nota edit, import, transaction, archive, trash entry, and report, then restores the seeded Amelia A/B demo session.
 
 ## Barang Kosong
 
 Barang Kosong can show zero/negative stock, exactly one piece, exactly two pieces, or every tracked SKU at two pieces or below. It can also be searched by SKU name or number and filtered by a supplier code found only at the end of the name (`CH` followed by digits). Codes keep their exact zero padding, so `CH02` and `CH002` are separate suppliers. **Pilih semua hasil filter** adds the current result to the report selection without dropping items chosen through another filter. After a SKU is selected, its session-only planned restock quantity from `0` to `9.999` is edited directly in the **Laporan Barang Kosong** preview; it never changes warehouse stock.
+
+## Template Label & Invoice
+
+The template module keeps the existing thermal/A4 label builder and adds an **Invoice** tab. Invoice width, height, font size, logo URL, bank account, address, and phone number are configurable in memory. Logo, address, phone, and bank elements can be shown/hidden and moved with explicit up/down controls. The preview uses current demo Nota data; print and PDF actions remain disabled.
 
 This port deliberately contains no CH Nota backend, IPC bridge, database/persistence, network API, production printing, or PDF service. The renderer continues to use the asynchronous `OperationsGateway` boundary, so a future authenticated NAS/CH Core implementation can replace the in-memory adapter without rewriting the screens.

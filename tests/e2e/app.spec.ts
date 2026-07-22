@@ -55,7 +55,7 @@ test('Nota is a full-window workspace, stays horizontally contained, and returns
     ].entries()) {
       await window.setViewportSize(viewport);
       if (index === 1) await window.getByRole('button', { name: 'Perbesar tulisan' }).click();
-      await expect(window.getByRole('button', { name: `Ukuran tulisan ${index === 0 ? 125 : 150}%` })).toBeVisible();
+      await expect(window.getByRole('button', { name: `Ukuran tulisan ${index === 0 ? 150 : 175}%` })).toBeVisible();
       await expect(window.getByRole('columnheader')).toHaveCount(10);
       await expect(window.getByTestId('nota-grid-row-1')).toContainText('1A');
       await expect(window.getByTestId('nota-grid-row-15')).toContainText('15A');
@@ -159,6 +159,33 @@ test('Nota title case and empty-stock restock planning stay frontend-only', asyn
 
     await window.getByRole('button', { name: 'SKU Gudang' }).click();
     await expect(window.getByTestId('sku-stock-sku-3')).toHaveText('-3');
+  } finally {
+    await application.close();
+  }
+});
+
+test('Template Label and Invoice configures a movable session-only invoice preview', async () => {
+  const { application, window } = await launch();
+  try {
+    await window.getByRole('button', { name: 'Template Label & Invoice' }).click();
+    await expect(window.getByTestId('label-qr')).toBeVisible();
+    await window.getByRole('tab', { name: 'Invoice' }).click();
+    await window.getByLabel('Lebar invoice (mm)').fill('190');
+    await window.getByLabel('Tinggi invoice (mm)').fill('120');
+    await window.getByLabel('Ukuran font invoice').fill('16');
+    await window.getByRole('textbox', { name: 'Alamat' }).fill('Jl. Pasar Baru No. 10');
+    await window.getByRole('textbox', { name: 'No. Telp' }).fill('0812-3456-7890');
+    await window.getByRole('textbox', { name: 'No. rekening' }).fill('BCA 1234567890');
+    const preview = window.getByTestId('invoice-preview');
+    await expect(preview).toContainText('Jl. Pasar Baru No. 10');
+    await expect(preview).toContainText('0812-3456-7890');
+    await expect(preview).toHaveAttribute('style', /width: 190mm; min-height: 120mm; font-size: 16px/);
+    await window.getByRole('button', { name: 'Naikkan No. rekening' }).click();
+    await expect(preview.locator('[data-testid^="invoice-element-"]')).toHaveCount(4);
+    expect(await preview.locator('[data-testid^="invoice-element-"]').evaluateAll((elements) => elements.map((element) => element.getAttribute('data-testid')))).toEqual([
+      'invoice-element-logo', 'invoice-element-address', 'invoice-element-bank', 'invoice-element-phone',
+    ]);
+    await expect(window.getByRole('button', { name: 'Print invoice' })).toBeDisabled();
   } finally {
     await application.close();
   }

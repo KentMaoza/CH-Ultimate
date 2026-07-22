@@ -25,6 +25,14 @@ export function createInitialState(): DemoState {
     adjustments: [],
     notaTransactions: [],
     labelTemplate: { medium: 'thermal', widthMm: 50, heightMm: 30, columns: 1, marginMm: 2, gapMm: 2, fontSize: 10, alignment: 'center', fields: ['qr', 'name', 'sku', 'price'] },
+    invoiceTemplate: {
+      widthMm: 210, heightMm: 148, fontSize: 12, logoUrl: '', bankAccount: 'BCA 1234567890',
+      address: 'Alamat toko belum diatur', phone: 'No. Telp belum diatur',
+      elements: [
+        { id: 'logo', visible: true }, { id: 'address', visible: true },
+        { id: 'phone', visible: true }, { id: 'bank', visible: true },
+      ],
+    },
     sourceLabel: 'Fixture sintetis',
   };
 }

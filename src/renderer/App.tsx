@@ -15,7 +15,7 @@ export type ModuleId = 'inventory' | 'create' | 'label' | 'nota' | 'notaArchive'
 const modules: Array<{ id: ModuleId; label: string; glyph: string }> = [
   { id: 'inventory', label: 'SKU Gudang', glyph: '▦' },
   { id: 'create', label: 'Buat SKU', glyph: '+' },
-  { id: 'label', label: 'Label', glyph: '▣' },
+  { id: 'label', label: 'Template Label & Invoice', glyph: '▣' },
   { id: 'nota', label: 'Nota', glyph: '▤' },
   { id: 'notaArchive', label: 'Arsip Nota', glyph: '▥' },
   { id: 'revenue', label: 'Laporan Omzet', glyph: '↗' },

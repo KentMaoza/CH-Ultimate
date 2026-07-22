@@ -372,21 +372,39 @@ test('SKU Gudang uses the first blank row by default and preserves operator fiel
   await waitFor(() => expect(screen.getByLabelText('Jumlah baris 3')).toHaveFocus());
 });
 
-test('Nota starts at large text and exposes session-only font presets and explicit next-page label', () => {
+test('Nota starts at 150 percent and exposes the 175 percent session-only font preset', () => {
   openNota();
   const workspace = screen.getByTestId('chu-nota-workspace');
-  expect(workspace).toHaveStyle({ '--nota-font-scale': '1.25' });
+  expect(workspace).toHaveStyle({ '--nota-font-scale': '1.5' });
   expect(workspace.style.zoom).toBe('');
   expect(screen.getByRole('button', { name: 'Halaman A' })).toHaveTextContent('Nota A');
   expect(screen.getByRole('button', { name: 'Halaman B' })).toHaveTextContent('Nota B');
   expect(screen.getByRole('button', { name: 'Tambah Nota C' })).toHaveTextContent('+ Tambah Nota C');
 
   fireEvent.click(screen.getByRole('button', { name: 'Perbesar tulisan' }));
-  expect(workspace).toHaveStyle({ '--nota-font-scale': '1.5' });
+  expect(workspace).toHaveStyle({ '--nota-font-scale': '1.75' });
+  expect(screen.getByRole('button', { name: 'Perbesar tulisan' })).toBeDisabled();
   fireEvent.keyDown(window, { key: '0', ctrlKey: true });
-  expect(workspace).toHaveStyle({ '--nota-font-scale': '1.25' });
+  expect(workspace).toHaveStyle({ '--nota-font-scale': '1.5' });
   fireEvent.click(screen.getByRole('button', { name: 'Perkecil tulisan' }));
-  expect(workspace).toHaveStyle({ '--nota-font-scale': '1' });
+  expect(workspace).toHaveStyle({ '--nota-font-scale': '1.25' });
+});
+
+test('shows a separate live total for every active Nota page', async () => {
+  openNota();
+  expect(screen.getByTestId('nota-page-total-A')).toHaveTextContent(/Total Nota A.*Rp\s*47\.000/);
+  expect(screen.getByTestId('nota-page-total-B')).toHaveTextContent(/Total Nota B.*Rp\s*0/);
+
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Halaman B' })); });
+  await act(async () => {
+    fireEvent.change(screen.getByLabelText('Jumlah baris 1'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('Harga PCS baris 1'), { target: { value: '12000' } });
+  });
+  expect(screen.getByTestId('nota-page-total-A')).toHaveTextContent(/Rp\s*47\.000/);
+  expect(screen.getByTestId('nota-page-total-B')).toHaveTextContent(/Rp\s*24\.000/);
+
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Tambah Nota C' })); });
+  expect(screen.getByTestId('nota-page-total-C')).toHaveTextContent(/Total Nota C.*Rp\s*0/);
 });
 
 test('unit buttons preserve dual overrides while the active unit controls total', () => {

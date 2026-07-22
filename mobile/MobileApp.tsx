@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { OperationsGateway } from '../src/gateway/operations-gateway';
 import type { Sku } from '../src/domain/types';
 import { findSkuByScanCode } from '../src/domain/mobile-demo-state';
@@ -30,12 +30,23 @@ export function MobileApp({ gateway, scanner, notifications }: {
   const [readChangeIds, setReadChangeIds] = useState<Set<string>>(() => new Set());
   const [unreadFeedIds, setUnreadFeedIds] = useState<string[]>([]);
   const [simulationStatus, setSimulationStatus] = useState('');
+  const mainContentRef = useRef<HTMLElement>(null);
+  const scanRequestToken = useRef(0);
   const selectedSku = snapshot.skus.find((sku) => sku.id === selectedSkuId) ?? null;
   const sortedChanges = [...snapshot.priceChanges].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
   const unreadCount = snapshot.priceChanges.filter((change) => !readChangeIds.has(change.id)).length;
   const visiblePriceChanges = priceMode === 'all'
     ? sortedChanges
     : sortedChanges.filter((change) => unreadFeedIds.includes(change.id));
+
+  useEffect(() => {
+    const focusTarget = view === 'skus' && !selectedSkuId && !scanOpen
+      ? mainContentRef.current?.querySelector<HTMLElement>('[role="searchbox"]')
+      : scanOpen
+        ? mainContentRef.current?.querySelector<HTMLElement>('#manual-scan-code')
+        : mainContentRef.current?.querySelector<HTMLElement>('[data-page-heading]');
+    focusTarget?.focus();
+  }, [priceMode, scanOpen, selectedSkuId, view]);
 
   useEffect(() => {
     if (view !== 'prices' || priceMode !== 'unread' || unreadFeedIds.length === 0) return;
@@ -51,6 +62,7 @@ export function MobileApp({ gateway, scanner, notifications }: {
     let removeListener: (() => Promise<void>) | undefined;
     void notifications.listenForPriceChangeActions((skuId) => {
       if (!gateway.getSnapshot().skus.some((sku) => sku.id === skuId)) return;
+      scanRequestToken.current += 1;
       setView('skus');
       setScanOpen(false);
       setSelectedSkuId(skuId);
@@ -65,6 +77,7 @@ export function MobileApp({ gateway, scanner, notifications }: {
   }, [gateway, notifications]);
 
   function navigate(next: MainView, shouldFocusSearch = false) {
+    scanRequestToken.current += 1;
     setSelectedSkuId(null);
     setScanOpen(false);
     setFocusSearch(shouldFocusSearch);
@@ -73,6 +86,7 @@ export function MobileApp({ gateway, scanner, notifications }: {
   }
 
   function openUnreadPrices() {
+    scanRequestToken.current += 1;
     setSelectedSkuId(null);
     setScanOpen(false);
     setPriceMode('unread');
@@ -81,15 +95,18 @@ export function MobileApp({ gateway, scanner, notifications }: {
   }
 
   function openSku(sku: Sku) {
+    scanRequestToken.current += 1;
     setScanOpen(false);
     setSelectedSkuId(sku.id);
   }
 
   async function beginScan() {
+    const requestToken = ++scanRequestToken.current;
     setScanCode('');
     setScanError('');
     try {
       const result = await scanner.scan();
+      if (requestToken !== scanRequestToken.current) return;
       if (!result) {
         setScanOpen(true);
         setSelectedSkuId(null);
@@ -105,10 +122,24 @@ export function MobileApp({ gateway, scanner, notifications }: {
       setSelectedSkuId(null);
       setScanOpen(true);
     } catch {
+      if (requestToken !== scanRequestToken.current) return;
       setScanError('Pemindai tidak tersedia. Masukkan kode secara manual.');
       setSelectedSkuId(null);
       setScanOpen(true);
     }
+  }
+
+  function closeSkuDetail() {
+    scanRequestToken.current += 1;
+    setSelectedSkuId(null);
+  }
+
+  function openManualScan() {
+    scanRequestToken.current += 1;
+    setSelectedSkuId(null);
+    setScanOpen(true);
+    setScanCode('');
+    setScanError('');
   }
 
   function manualLookup(code: string) {
@@ -137,8 +168,8 @@ export function MobileApp({ gateway, scanner, notifications }: {
   }
 
   return <div className="mobile-app">
-    <main className="mobile-content">
-      {selectedSku ? <SkuDetail changes={snapshot.priceChanges} onBack={() => setSelectedSkuId(null)} onScanAgain={() => { setSelectedSkuId(null); setScanOpen(true); setScanCode(''); setScanError(''); }} sku={selectedSku} /> : scanOpen ? <ScanSurface error={scanError} initialCode={scanCode} key={scanCode} onManualLookup={manualLookup} onRetry={() => void beginScan()} /> : view === 'home' ? <DashboardView
+    <main className="mobile-content" ref={mainContentRef}>
+      {selectedSku ? <SkuDetail changes={snapshot.priceChanges} onBack={closeSkuDetail} onScanAgain={openManualScan} sku={selectedSku} /> : scanOpen ? <ScanSurface error={scanError} initialCode={scanCode} key={scanCode} onManualLookup={manualLookup} onRetry={() => void beginScan()} /> : view === 'home' ? <DashboardView
         snapshot={snapshot}
         unreadCount={unreadCount}
         onOpenPrices={() => navigate('prices')}

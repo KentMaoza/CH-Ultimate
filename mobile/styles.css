@@ -36,7 +36,9 @@ button {
 }
 
 button:focus-visible,
-input:focus-visible {
+input:focus-visible,
+[data-page-heading]:focus,
+[data-page-heading]:focus-visible {
   outline: 3px solid #0a0a0a;
   outline-offset: 3px;
 }
@@ -50,7 +52,7 @@ input:focus-visible {
 }
 
 .mobile-content {
-  padding: calc(env(safe-area-inset-top, 0px) + 24px) 16px calc(env(safe-area-inset-bottom, 0px) + 100px);
+  padding: calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 24px) 16px calc(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + 100px);
 }
 
 .mobile-header {
@@ -90,7 +92,7 @@ input:focus-visible {
   right: 2px;
   display: grid;
   min-width: 20px;
-  height: 20px;
+  min-height: 20px;
   padding: 0 5px;
   place-items: center;
   border: 2px solid #fff;
@@ -99,6 +101,7 @@ input:focus-visible {
   background: #050505;
   font-size: 0.69rem;
   font-weight: 760;
+  line-height: 1.2;
 }
 
 .demo-banner {
@@ -526,6 +529,12 @@ input:focus-visible {
   font-weight: 650;
 }
 
+.scan-error {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .secondary-action,
 .primary-action {
   width: 100%;
@@ -576,9 +585,9 @@ input:focus-visible {
   left: 0;
   display: grid;
   width: min(100%, 480px);
-  min-height: calc(72px + env(safe-area-inset-bottom, 0px));
+  min-height: calc(72px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   margin: 0 auto;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
   grid-template-columns: repeat(3, minmax(0, 1fr));
   border-top: 1px solid #cfcfcf;
   background: rgb(255 255 255 / 96%);

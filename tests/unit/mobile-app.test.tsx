@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MobileApp } from '../../mobile/MobileApp';
+import { ProductImage } from '../../mobile/components/ProductImage';
 import type { BarcodeScannerPort, LocalNotificationPort } from '../../mobile/ports';
 import { createMobileDemoState } from '../../src/domain/mobile-demo-state';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
@@ -23,6 +24,16 @@ function renderMobile(overrides: Partial<ReturnType<typeof createPorts>> = {}) {
   const ports = { ...createPorts(), ...overrides };
   render(<MobileApp gateway={gateway} scanner={ports.scanner} notifications={ports.notifications} />);
   return { gateway, ...ports };
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, reject, resolve };
 }
 
 test('dashboard renders fixture counts and the two newest price changes', () => {
@@ -54,6 +65,22 @@ test('bottom navigation has exactly three destinations and changes view', () => 
   expect(screen.getByRole('heading', { name: 'SKU Gudang' })).toBeInTheDocument();
   fireEvent.click(within(navigation).getByRole('button', { name: 'Perubahan Harga' }));
   expect(screen.getByRole('heading', { name: 'Perubahan Harga' })).toBeInTheDocument();
+});
+
+test('new pages and SKU detail transitions move focus into the routed content', () => {
+  renderMobile();
+
+  fireEvent.click(screen.getByRole('button', { name: 'SKU Gudang' }));
+  expect(screen.getByRole('searchbox', { name: 'Cari SKU' })).toHaveFocus();
+
+  fireEvent.click(screen.getByRole('button', { name: /Beras Hitam Premium 1 kg/ }));
+  expect(screen.getByRole('heading', { name: 'Beras Hitam Premium 1 kg' })).toHaveFocus();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Kembali' }));
+  expect(screen.getByRole('searchbox', { name: 'Cari SKU' })).toHaveFocus();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Perubahan Harga' }));
+  expect(screen.getByRole('heading', { name: 'Perubahan Harga' })).toHaveFocus();
 });
 
 test('SKU list excludes archived products and searches partial name, current number, and alias', () => {
@@ -118,6 +145,52 @@ test('scanner opens active SKU detail for a canonical code', async () => {
 
   expect(await screen.findByRole('heading', { name: 'Kemeja Linen Putih' })).toBeInTheDocument();
   expect(scanner.scan).toHaveBeenCalledOnce();
+});
+
+test('late scanner result cannot replace detail opened from a notification action', async () => {
+  const deferredScan = createDeferred<Awaited<ReturnType<BarcodeScannerPort['scan']>>>();
+  const scanner: BarcodeScannerPort = { scan: vi.fn(() => deferredScan.promise) };
+  let actionListener: ((skuId: string) => void) | undefined;
+  const notifications: LocalNotificationPort = {
+    ensurePermission: async () => 'granted',
+    notifyPriceChange: async () => undefined,
+    listenForPriceChangeActions: async (listener) => {
+      actionListener = listener;
+      return async () => undefined;
+    },
+  };
+  renderMobile({ notifications, scanner });
+  await waitFor(() => expect(actionListener).toBeTypeOf('function'));
+
+  fireEvent.click(screen.getByRole('button', { name: 'Scan Barcode' }));
+  act(() => actionListener!('sku-2'));
+  expect(screen.getByRole('heading', { name: 'Kemeja Linen Putih' })).toBeInTheDocument();
+
+  await act(async () => {
+    deferredScan.resolve({ rawValue: 'BRS-108', format: 'QR_CODE' });
+    await deferredScan.promise;
+  });
+
+  expect(screen.getByRole('heading', { name: 'Kemeja Linen Putih' })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Beras Hitam Premium 1 kg' })).not.toBeInTheDocument();
+});
+
+test('late scanner error cannot replace a page opened through navigation', async () => {
+  const deferredScan = createDeferred<Awaited<ReturnType<BarcodeScannerPort['scan']>>>();
+  const scanner: BarcodeScannerPort = { scan: vi.fn(() => deferredScan.promise) };
+  renderMobile({ scanner });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Scan Barcode' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Perubahan Harga' }));
+  expect(screen.getByRole('heading', { name: 'Perubahan Harga' })).toBeInTheDocument();
+
+  await act(async () => {
+    deferredScan.reject(new Error('camera stopped late'));
+    await Promise.resolve();
+  });
+
+  expect(screen.getByRole('heading', { name: 'Perubahan Harga' })).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
 test('manual scan accepts aliases and archived codes with an explicit warning', async () => {
@@ -185,6 +258,20 @@ test('product image switches to a local fallback when loading fails', () => {
   fireEvent.error(image!);
 
   expect(screen.getByTestId('image-fallback-sku-1')).toBeInTheDocument();
+});
+
+test.each([
+  ['SKU changes', { ...createMobileDemoState().skus[0]!, id: 'sku-replacement' }],
+  ['image source changes', { ...createMobileDemoState().skus[0]!, imageUrl: '/assets/mobile/replacement.svg' }],
+])('product image retries after %s', async (_label, nextSku) => {
+  const initialSku = createMobileDemoState().skus[0]!;
+  const { container, rerender } = render(<ProductImage sku={initialSku} />);
+  fireEvent.error(container.querySelector('img')!);
+  expect(screen.getByTestId(`image-fallback-${initialSku.id}`)).toBeInTheDocument();
+
+  rerender(<ProductImage sku={nextSku} />);
+
+  await waitFor(() => expect(container.querySelector('img')).toHaveAttribute('src', nextSku.imageUrl));
 });
 
 test('bell opens only unread changes and marks displayed rows read after render', async () => {

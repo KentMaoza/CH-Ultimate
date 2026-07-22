@@ -9,7 +9,7 @@ export function ScanSurface({ initialCode, error, onManualLookup, onRetry }: {
 }) {
   const [code, setCode] = useState(initialCode);
   return <section className="page-view scan-view">
-    <h1>Scan Barcode</h1>
+    <h1 data-page-heading tabIndex={-1}>Scan Barcode</h1>
     <p>Gunakan kamera perangkat atau masukkan nomor SKU maupun alias secara manual.</p>
     {error ? <p className="scan-error" role="alert">{error}</p> : null}
     <button className="primary-action" onClick={onRetry}><ScanIcon />Coba scan lagi</button>

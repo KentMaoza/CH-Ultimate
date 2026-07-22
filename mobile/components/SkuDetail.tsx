@@ -15,7 +15,7 @@ export function SkuDetail({ sku, changes, onBack, onScanAgain }: {
   return <article className="page-view sku-detail">
     <button className="back-button" onClick={onBack}><BackIcon />Kembali</button>
     {sku.archived ? <p className="archived-warning" role="alert">SKU ini telah diarsipkan dan tidak tampil di daftar SKU aktif.</p> : null}
-    <div className="detail-hero"><ProductImage sku={sku} /><div><h1>{sku.name}</h1><p>{sku.skuNumber}</p><strong>{formatRupiah(sku.referencePrice)}</strong><span>{sku.tracked ? `Stok ${sku.stock}` : 'Stok tidak dilacak'}</span></div></div>
+    <div className="detail-hero"><ProductImage sku={sku} /><div><h1 data-page-heading tabIndex={-1}>{sku.name}</h1><p>{sku.skuNumber}</p><strong>{formatRupiah(sku.referencePrice)}</strong><span>{sku.tracked ? `Stok ${sku.stock}` : 'Stok tidak dilacak'}</span></div></div>
     <section className="detail-section">
       <h2>Alias SKU</h2>
       {sku.aliases.length > 0 ? <ul className="alias-list">{sku.aliases.map((alias) => <li key={alias}>{alias}</li>)}</ul> : <p>Belum ada alias.</p>}

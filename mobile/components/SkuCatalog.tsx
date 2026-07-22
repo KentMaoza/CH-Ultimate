@@ -9,7 +9,7 @@ export function SkuCatalog({ skus, onOpenSku, focusSearch }: { skus: Sku[]; onOp
   const [query, setQuery] = useState('');
   const results = searchMobileSkus(skus, query);
   return <section className="page-view">
-    <h1>SKU Gudang</h1>
+    <h1 data-page-heading tabIndex={-1}>SKU Gudang</h1>
     <label className="search-field"><SearchIcon /><span className="sr-only">Cari SKU</span><input aria-label="Cari SKU" autoFocus={focusSearch} role="searchbox" placeholder="Cari nama, nomor, atau alias" value={query} onChange={(event) => setQuery(event.currentTarget.value)} /></label>
     <p className="result-count">{results.length} SKU aktif</p>
     <div className="sku-list">

@@ -25,7 +25,7 @@ export function DashboardView({
 
   return <>
     <header className="mobile-header">
-      <h1>CHU Companion Mobile</h1>
+      <h1 data-page-heading tabIndex={-1}>CHU Companion Mobile</h1>
       <button aria-label={`Notifikasi harga, ${unreadCount} belum dibaca`} className="icon-button bell-button" onClick={onOpenUnread}>
         <BellIcon />
         {unreadCount > 0 ? <span className="unread-badge">{unreadCount}</span> : null}

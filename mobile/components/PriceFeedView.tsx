@@ -17,7 +17,7 @@ export function PriceFeedView({
   onSimulate: () => void;
 }) {
   return <section aria-label={unreadOnly ? 'Perubahan harga belum dibaca' : 'Semua perubahan harga'} className="page-view price-feed-view">
-    <h1>{unreadOnly ? 'Notifikasi Harga' : 'Perubahan Harga'}</h1>
+    <h1 data-page-heading tabIndex={-1}>{unreadOnly ? 'Notifikasi Harga' : 'Perubahan Harga'}</h1>
     <p>{unreadOnly ? 'Perubahan harga yang belum Anda buka.' : 'Riwayat perubahan harga terbaru untuk semua SKU.'}</p>
     {!unreadOnly ? <button className="primary-action simulate-button" onClick={onSimulate}>Simulasikan perubahan harga</button> : null}
     {status && !unreadOnly ? <p className="action-status" role="status">{status}</p> : null}

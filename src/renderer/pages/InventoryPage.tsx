@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { parseSkuWorkbook } from '../../domain/workbook';
 import type { Sku } from '../../domain/types';
 import { useOperations } from '../operations-context';
@@ -17,6 +18,8 @@ export function InventoryPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [adjusting, setAdjusting] = useState<{ sku: Sku; direction: 1 | -1 } | null>(null);
   const [editing, setEditing] = useState<Sku | null>(null);
+  const [printing, setPrinting] = useState<Sku | null>(null);
+  const [printQuantity, setPrintQuantity] = useState(1);
   const [editNumber, setEditNumber] = useState('');
   const [editName, setEditName] = useState('');
   const [editNote, setEditNote] = useState('');
@@ -53,6 +56,7 @@ export function InventoryPage() {
   }
 
   function openAdjustment(sku: Sku, direction: 1 | -1) { setAdjusting({ sku, direction }); setQuantity(''); }
+  function openBarcodePrint(sku: Sku) { setPrinting(sku); setPrintQuantity(1); }
   function openEdit(sku: Sku) { setEditing(sku); setEditNumber(sku.skuNumber); setEditName(sku.name); setEditNote(sku.note); setEditPrice(String(sku.referencePrice)); }
   async function saveEdit() {
     if (!editing) return;
@@ -81,13 +85,14 @@ export function InventoryPage() {
           <tr key={sku.id}>
             <td><SkuImage sku={sku} /></td><td className="sku-number" title={sku.skuNumber}>{sku.skuNumber}</td><td>{sku.name}<small>{sku.tracked ? 'Stok dilacak' : 'Tanpa stok'}</small></td>
             <td>{formatRupiah(sku.referencePrice)}</td><td data-testid={`sku-stock-${sku.id}`} className={`stock-value ${sku.stock < 0 ? 'negative' : ''}`}>{sku.tracked ? sku.stock : '—'}</td><td>{sku.note || '—'}</td><td>{formatDate(sku.createdAt)}</td>
-            <td><div className="row-actions">{!sku.archived && <button aria-label={`Edit ${sku.skuNumber}`} onClick={() => openEdit(sku)}>Edit</button>}{sku.tracked && !sku.archived && <><button aria-label={`Tambah stok ${sku.skuNumber}`} onClick={() => openAdjustment(sku, 1)}>+ Stok</button><button aria-label={`Kurangi stok ${sku.skuNumber}`} onClick={() => openAdjustment(sku, -1)}>− Stok</button></>}<button onClick={() => void gateway.setArchived(sku.id, !sku.archived)}>{sku.archived ? 'Pulihkan' : 'Arsip'}</button></div></td>
+            <td><div className="row-actions">{!sku.archived && <><button aria-label={`Edit ${sku.skuNumber}`} onClick={() => openEdit(sku)}>Edit</button><button aria-label={`Print barcode ${sku.skuNumber}`} onClick={() => openBarcodePrint(sku)}>Barcode</button></>}{sku.tracked && !sku.archived && <><button aria-label={`Tambah stok ${sku.skuNumber}`} onClick={() => openAdjustment(sku, 1)}>+ Stok</button><button aria-label={`Kurangi stok ${sku.skuNumber}`} onClick={() => openAdjustment(sku, -1)}>− Stok</button></>}<button onClick={() => void gateway.setArchived(sku.id, !sku.archived)}>{sku.archived ? 'Pulihkan' : 'Arsip'}</button></div></td>
           </tr>
         ))}</tbody></table>
         {!filtered.length && <div className="empty-state">Tidak ada SKU yang cocok.</div>}
       </div>
       <div className="table-footer">Menampilkan {Math.min(filtered.length, 50)} dari {filtered.length.toLocaleString('id-ID')}</div>
       {adjusting && <div className="dialog-backdrop"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="adjust-title"><h2 id="adjust-title">{adjusting.direction === 1 ? 'Tambah stok' : 'Kurangi stok'}</h2><p><strong>{adjusting.sku.skuNumber}</strong> · stok saat ini {adjusting.sku.stock}</p><label><span>{adjusting.direction === 1 ? 'Jumlah stok ditambah' : 'Jumlah stok dikurangi'}</span><input autoFocus min="1" step="1" type="number" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></label><div className="dialog-actions"><button className="button secondary" onClick={() => setAdjusting(null)}>Batal</button><button className="button primary" disabled={!quantity || !Number.isInteger(Number(quantity)) || Number(quantity) <= 0} onClick={() => void applyAdjustment()}>{adjusting.direction === 1 ? 'Tambah stok' : 'Kurangi stok'}</button></div></section></div>}
+      {printing && <div className="dialog-backdrop barcode-print-dialog"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="barcode-print-title"><h2 id="barcode-print-title">Print barcode produk</h2><p><strong>{printing.skuNumber}</strong> · {printing.name}</p><label><span>Jumlah barcode</span><input autoFocus min="1" max="10000" step="1" type="number" value={printQuantity} onChange={(event) => setPrintQuantity(Math.min(10000, Math.max(1, Math.round(Number(event.target.value) || 1))))} /></label><div className="barcode-print-sheet" aria-label="Preview barcode produk">{Array.from({ length: printQuantity }, (_, index) => <div className="barcode-print-item" data-testid="barcode-print-item" key={index}><QRCodeSVG data-testid="barcode-product-qr" data-value={printing.skuNumber} value={printing.skuNumber} size={88} marginSize={0} /><strong>{printing.name}</strong><span>{printing.skuNumber}</span></div>)}</div><div className="dialog-actions"><button className="button secondary" aria-label="Tutup print barcode" onClick={() => setPrinting(null)}>Batal</button><button className="button primary" onClick={() => window.print()}>Print barcode sekarang</button></div></section></div>}
       {editing && <div className="dialog-backdrop"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="edit-title"><h2 id="edit-title">Edit SKU</h2><p>Nomor lama akan tetap menjadi alias pencarian.</p><div className="stack-fields"><label><span>Edit nomor SKU</span><input autoFocus value={editNumber} onChange={(event) => setEditNumber(event.target.value)} /></label><label><span>Edit nama SKU</span><input value={editName} onChange={(event) => setEditName(formatTitleCaseInput(event.currentTarget))} /></label><label><span>Edit harga referensi</span><input min="0" step="1" type="number" value={editPrice} onChange={(event) => setEditPrice(event.target.value)} /></label><label><span>Edit catatan SKU</span><textarea value={editNote} onChange={(event) => setEditNote(event.target.value)} /></label></div><div className="dialog-actions"><button className="button secondary" onClick={() => setEditing(null)}>Batal</button><button className="button primary" disabled={!editPrice || Number(editPrice) < 0} onClick={() => void saveEdit()}>Simpan perubahan SKU</button></div></section></div>}
     </div>
   );

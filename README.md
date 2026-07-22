@@ -21,7 +21,7 @@ npm run package
 
 - Data exists only for the current app session and resets on reload or exit.
 - Runtime XLSX imports are parsed in memory and are never copied into this repository.
-- Printing, final PDF export, NAS/database integration, mobile dashboards, and other CH apps are intentionally deferred.
+- Printing Nota/template label/invoice, final PDF export, NAS/database integration, mobile dashboards, and other CH apps are intentionally deferred. SKU Gudang barcode can use the operating system print dialog.
 - `CHU` is temporary branding.
 
 The future NAS phase will replace the mock `OperationsGateway` implementation with an authoritative CH Core API.
@@ -34,7 +34,7 @@ Reloading or closing the application discards the imported workbook, stock edits
 
 ## Current demo modules
 
-- SKU Gudang with runtime XLSX import, search, edit aliases/prices, archive, and explicit add/subtract stock actions
+- SKU Gudang with runtime XLSX import, search, edit aliases/prices, archive, explicit add/subtract stock actions, and quantity-controlled QR barcode printing
 - Perubahan SKU with date-filtered price/quantity history and CSV price export
 - Buat SKU with tracked/untracked stock
 - Thermal/A4 QR label builder plus configurable invoice template preview

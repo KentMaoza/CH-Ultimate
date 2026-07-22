@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { App } from '../../src/renderer/App';
+import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 
 test('adjusts a tracked SKU into a negative balance in the current session', async () => {
   render(<App />);
@@ -26,7 +27,9 @@ test('uses explicit add and subtract stock actions without requiring signed inpu
 });
 
 test('lists filtered price and quantity changes and exposes price export', async () => {
-  render(<App />);
+  const gateway = new MockOperationsGateway();
+  await gateway.updateSku('sku-1', { imageUrl: 'https://example.test/beras.jpg' });
+  render(<App gateway={gateway} />);
   const row = screen.getByRole('row', { name: /BRS-108-BLK/ });
   fireEvent.click(within(row).getByRole('button', { name: 'Edit BRS-108-BLK' }));
   fireEvent.change(screen.getByLabelText('Edit harga referensi'), { target: { value: '52000' } });
@@ -41,6 +44,7 @@ test('lists filtered price and quantity changes and exposes price export', async
   expect(screen.getByRole('tab', { name: 'Perubahan harga' })).toHaveAttribute('aria-selected', 'true');
   const priceRow = screen.getByRole('row', { name: /BRS-108-BLK.*Rp\s*42\.000.*Rp\s*52\.000/i });
   expect(priceRow).toBeInTheDocument();
+  expect(within(priceRow).getByRole('img', { name: 'Gambar BRS-108-BLK' })).toHaveAttribute('src', 'https://example.test/beras.jpg');
   const createObjectURL = vi.fn(() => 'blob:price-history');
   const revokeObjectURL = vi.fn();
   Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
@@ -53,9 +57,25 @@ test('lists filtered price and quantity changes and exposes price export', async
   click.mockRestore();
 
   fireEvent.click(screen.getByRole('tab', { name: 'Perubahan jumlah' }));
-  expect(screen.getByRole('row', { name: /BRS-108-BLK.*24.*\+3.*27/ })).toBeInTheDocument();
+  const quantityRow = screen.getByRole('row', { name: /BRS-108-BLK.*24.*\+3.*27/ });
+  expect(within(quantityRow).getByRole('img', { name: 'Gambar BRS-108-BLK' })).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Sampai tanggal perubahan'), { target: { value: '2000-01-01' } });
   expect(screen.getByText('Belum ada perubahan jumlah pada rentang tanggal ini.')).toBeInTheDocument();
+});
+
+test('prints a chosen quantity of warehouse SKU barcodes', () => {
+  const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+  render(<App />);
+  const row = screen.getByRole('row', { name: /BRS-108-BLK/ });
+  fireEvent.click(within(row).getByRole('button', { name: 'Print barcode BRS-108-BLK' }));
+  const dialog = screen.getByRole('dialog', { name: 'Print barcode produk' });
+  expect(within(dialog).getByLabelText('Jumlah barcode')).toHaveValue(1);
+  fireEvent.change(within(dialog).getByLabelText('Jumlah barcode'), { target: { value: '3' } });
+  expect(screen.getAllByTestId('barcode-print-item')).toHaveLength(3);
+  expect(screen.getAllByTestId('barcode-product-qr')[0]).toHaveAttribute('data-value', 'BRS-108-BLK');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Print barcode sekarang' }));
+  expect(print).toHaveBeenCalledOnce();
+  print.mockRestore();
 });
 
 test('creates a SKU and shows it in the warehouse list', async () => {

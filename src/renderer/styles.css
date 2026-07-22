@@ -3,7 +3,7 @@
 body { margin: 0; min-width: 1024px; min-height: 100vh; }
 button, input, select, textarea { font: inherit; }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #111; outline-offset: 2px; }
-.app-shell { display: grid; grid-template-columns: 224px 1fr; min-height: 100vh; transition: grid-template-columns .18s ease; }
+.app-shell { display: grid; grid-template-columns: 288px 1fr; min-height: 100vh; transition: grid-template-columns .18s ease; }
 .app-shell.rail-collapsed { grid-template-columns: 78px 1fr; }
 .app-rail { position: relative; display: flex; flex-direction: column; min-height: 100vh; padding: 20px 14px 14px; color: #fff; background: #111; }
 .brand-row { display: flex; align-items: center; gap: 11px; min-height: 44px; padding: 0 6px 25px; white-space: nowrap; overflow: hidden; }
@@ -209,4 +209,10 @@ td small { display: block; margin-top: 3px; color: #777; font-size: 9px; }
 .change-table { max-height: calc(100vh - 280px); }
 .change-positive { font-weight: 900; }
 .change-negative { font-weight: 900; text-decoration: underline; }
+.barcode-print-dialog .dialog { width: min(720px, 100%); }
+.barcode-print-sheet { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; max-height: 330px; margin-top: 16px; padding: 10px; overflow: auto; border: 1px solid #111; }
+.barcode-print-item { display: grid; justify-items: center; gap: 3px; padding: 8px; border: 1px solid #111; text-align: center; break-inside: avoid; }
+.barcode-print-item strong { font-size: 10px; }
+.barcode-print-item span { font-size: 9px; }
 @media (max-width: 1050px) { .archive-nota { grid-template-columns: 1fr; } }
+@media print { body * { visibility: hidden !important; } .barcode-print-sheet, .barcode-print-sheet * { visibility: visible !important; } .barcode-print-sheet { position: absolute; inset: 0 auto auto 0; width: 100%; max-height: none; margin: 0; padding: 0; overflow: visible; border: 0; } }

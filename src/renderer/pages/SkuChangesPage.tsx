@@ -38,6 +38,12 @@ function priceChangesCsv(changes: SkuPriceChange[], skus: Sku[]): string {
 
 const adjustmentSource: Record<StockAdjustment['source'], string> = { manual: 'Manual', nota: 'Nota', reversal: 'Pembalikan Nota' };
 
+function ChangeSkuImage({ sku }: { sku?: Sku }) {
+  const [failed, setFailed] = useState(false);
+  if (!sku?.imageUrl || failed) return <div className="image-placeholder" aria-label={`Gambar ${sku?.skuNumber ?? 'SKU'}`}>CHU</div>;
+  return <img className="sku-image" src={sku.imageUrl} alt={`Gambar ${sku.skuNumber}`} onError={() => setFailed(true)} />;
+}
+
 export function SkuChangesPage() {
   const { state } = useOperations();
   const [tab, setTab] = useState<ChangeTab>('price');
@@ -73,12 +79,12 @@ export function SkuChangesPage() {
       <label><span>Sampai tanggal</span><input type="date" aria-label="Sampai tanggal perubahan" value={to} onChange={(event) => setTo(event.target.value)} /></label>
     </div>
     <div className="table-frame change-table">
-      {tab === 'price' ? <table><thead><tr><th>Tanggal WITA</th><th>Nomor SKU</th><th>Nama SKU</th><th>Harga Sebelumnya</th><th>Harga Sesudahnya</th></tr></thead><tbody>{prices.map((change) => {
+      {tab === 'price' ? <table><thead><tr><th>Gambar</th><th>Tanggal WITA</th><th>Nomor SKU</th><th>Nama SKU</th><th>Harga Sebelumnya</th><th>Harga Sesudahnya</th></tr></thead><tbody>{prices.map((change) => {
         const sku = skuById.get(change.skuId);
-        return <tr key={change.id}><td>{formatWita(change.createdAt)}</td><td className="sku-number">{sku?.skuNumber ?? change.skuId}</td><td>{sku?.name ?? 'SKU tidak ditemukan'}</td><td>{formatRupiah(change.before)}</td><td><strong>{formatRupiah(change.after)}</strong></td></tr>;
-      })}</tbody></table> : <table><thead><tr><th>Tanggal WITA</th><th>Nomor SKU</th><th>Nama SKU</th><th>Sumber</th><th>Sebelum</th><th>Perubahan</th><th>Sesudah</th></tr></thead><tbody>{quantities.map((change) => {
+        return <tr key={change.id}><td><ChangeSkuImage sku={sku} /></td><td>{formatWita(change.createdAt)}</td><td className="sku-number">{sku?.skuNumber ?? change.skuId}</td><td>{sku?.name ?? 'SKU tidak ditemukan'}</td><td>{formatRupiah(change.before)}</td><td><strong>{formatRupiah(change.after)}</strong></td></tr>;
+      })}</tbody></table> : <table><thead><tr><th>Gambar</th><th>Tanggal WITA</th><th>Nomor SKU</th><th>Nama SKU</th><th>Sumber</th><th>Sebelum</th><th>Perubahan</th><th>Sesudah</th></tr></thead><tbody>{quantities.map((change) => {
         const sku = skuById.get(change.skuId);
-        return <tr key={change.id}><td>{formatWita(change.createdAt)}</td><td className="sku-number">{sku?.skuNumber ?? change.skuId}</td><td>{sku?.name ?? 'SKU tidak ditemukan'}</td><td>{adjustmentSource[change.source]}</td><td>{change.before}</td><td className={change.quantity < 0 ? 'change-negative' : 'change-positive'}>{change.quantity > 0 ? '+' : ''}{change.quantity}</td><td><strong>{change.after}</strong></td></tr>;
+        return <tr key={change.id}><td><ChangeSkuImage sku={sku} /></td><td>{formatWita(change.createdAt)}</td><td className="sku-number">{sku?.skuNumber ?? change.skuId}</td><td>{sku?.name ?? 'SKU tidak ditemukan'}</td><td>{adjustmentSource[change.source]}</td><td>{change.before}</td><td className={change.quantity < 0 ? 'change-negative' : 'change-positive'}>{change.quantity > 0 ? '+' : ''}{change.quantity}</td><td><strong>{change.after}</strong></td></tr>;
       })}</tbody></table>}
       {tab === 'price' && !prices.length && <div className="empty-state">Belum ada perubahan harga pada rentang tanggal ini.</div>}
       {tab === 'quantity' && !quantities.length && <div className="empty-state">Belum ada perubahan jumlah pada rentang tanggal ini.</div>}

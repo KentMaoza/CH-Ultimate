@@ -74,6 +74,10 @@ test('Nota is a full-window workspace, stays horizontally contained, and returns
     await expect(window.getByRole('heading', { name: 'SKU Gudang', level: 1 })).toBeVisible();
     await expect(window.getByRole('navigation', { name: 'Modul CH Ultimate' })).toBeVisible();
     await expect(window.locator('.nav-glyph svg')).toHaveCount(9);
+    const rail = await window.locator('.app-rail').boundingBox();
+    const templateLabel = await window.getByRole('button', { name: 'Template Label & Invoice' }).locator('span').last().boundingBox();
+    expect(rail?.width).toBeGreaterThanOrEqual(288);
+    expect(templateLabel!.x + templateLabel!.width).toBeLessThanOrEqual(rail!.x + rail!.width);
   } finally {
     await application.close();
   }
@@ -83,6 +87,18 @@ test('SKU changes record price and quantity history and export filtered prices',
   const { application, window } = await launch();
   try {
     const skuRow = window.getByRole('row', { name: /BRS-108-BLK/ });
+    await window.evaluate(() => {
+      const target = globalThis as typeof globalThis & { barcodePrintRequested?: boolean; print: () => void };
+      target.barcodePrintRequested = false;
+      target.print = () => { target.barcodePrintRequested = true; };
+    });
+    await skuRow.getByRole('button', { name: 'Print barcode BRS-108-BLK' }).click();
+    await window.getByLabel('Jumlah barcode').fill('2');
+    await expect(window.getByTestId('barcode-print-item')).toHaveCount(2);
+    await window.getByRole('button', { name: 'Print barcode sekarang' }).click();
+    expect(await window.evaluate(() => (globalThis as typeof globalThis & { barcodePrintRequested?: boolean }).barcodePrintRequested)).toBe(true);
+    await window.getByRole('button', { name: 'Tutup print barcode' }).click();
+
     await skuRow.getByRole('button', { name: 'Edit BRS-108-BLK' }).click();
     await window.getByLabel('Edit harga referensi').fill('52000');
     await window.getByRole('button', { name: 'Simpan perubahan SKU' }).click();

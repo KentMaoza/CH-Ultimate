@@ -46,8 +46,20 @@ android {
 }
 
 gradle.taskGraph.whenReady { graph ->
-    def releaseTaskRequested = graph.allTasks.any { it.name.contains('Release') }
-    if (releaseTaskRequested && !missingReleaseSigningVariables.isEmpty()) {
+    def releaseArtifactTaskNames = [
+        'assembleRelease',
+        'bundleRelease',
+        'packageRelease',
+        'packageReleaseBundle',
+        'packageReleaseUniversalApk',
+        'signRelease',
+        'signReleaseBundle',
+        'publishRelease',
+    ]
+    def releaseArtifactRequested = graph.allTasks.any { task ->
+        task.project == project && releaseArtifactTaskNames.contains(task.name)
+    }
+    if (releaseArtifactRequested && !missingReleaseSigningVariables.isEmpty()) {
         throw new GradleException("Missing required Android release signing environment variables: ${missingReleaseSigningVariables.join(', ')}")
     }
 }

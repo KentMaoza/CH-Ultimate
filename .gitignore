@@ -4,5 +4,16 @@ out/
 playwright-report/
 test-results/
 coverage/
+.superpowers/
+dist-mobile/
+android/.gradle/
+android/local.properties
+android/**/build/
+android/signing.properties
+android/key.properties
+android/app/signing.properties
+android/app/key.properties
+*.jks
+*.keystore
+*.p12
 .DS_Store
-

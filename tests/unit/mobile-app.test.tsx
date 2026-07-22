@@ -13,6 +13,7 @@ function createPorts(): {
     notifications: {
       ensurePermission: async () => 'denied',
       notifyPriceChange: async () => undefined,
+      listenForPriceChangeActions: async () => async () => undefined,
     },
   };
 }
@@ -219,6 +220,7 @@ test('price simulation updates an active SKU and sends a notification when grant
   const notifications: LocalNotificationPort = {
     ensurePermission: vi.fn(async () => 'granted' as const),
     notifyPriceChange,
+    listenForPriceChangeActions: async () => async () => undefined,
   };
   const { gateway } = renderMobile({ notifications });
   fireEvent.click(screen.getByRole('button', { name: 'Perubahan Harga' }));
@@ -241,6 +243,7 @@ test('notification denial does not block the in-app price update', async () => {
   const notifications: LocalNotificationPort = {
     ensurePermission: vi.fn(async () => 'denied' as const),
     notifyPriceChange,
+    listenForPriceChangeActions: async () => async () => undefined,
   };
   const { gateway } = renderMobile({ notifications });
   fireEvent.click(screen.getByRole('button', { name: 'Perubahan Harga' }));
@@ -251,4 +254,25 @@ test('notification denial does not block the in-app price update', async () => {
   expect(gateway.getSnapshot().skus.find((sku) => sku.id === 'sku-1')?.referencePrice).toBe(43_000);
   expect(notifications.ensurePermission).toHaveBeenCalledOnce();
   expect(notifyPriceChange).not.toHaveBeenCalled();
+});
+
+test('tapping a price notification opens the current SKU detail', async () => {
+  let actionListener: ((skuId: string) => void) | undefined;
+  const notifications: LocalNotificationPort = {
+    ensurePermission: async () => 'granted',
+    notifyPriceChange: async () => undefined,
+    listenForPriceChangeActions: async (listener) => {
+      actionListener = listener;
+      return async () => undefined;
+    },
+  };
+  const { gateway } = renderMobile({ notifications });
+  await waitFor(() => expect(actionListener).toBeTypeOf('function'));
+
+  await act(async () => {
+    await gateway.updateSku('sku-2', { name: 'Kemeja Linen Putih Terbaru' });
+    actionListener!('sku-2');
+  });
+
+  expect(screen.getByRole('heading', { name: 'Kemeja Linen Putih Terbaru' })).toBeInTheDocument();
 });

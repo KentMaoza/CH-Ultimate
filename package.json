@@ -11,15 +11,24 @@
     "package": "electron-forge package",
     "make:windows": "electron-forge make --platform=win32 --arch=x64",
     "test": "vitest run",
-    "test:mobile": "vitest run tests/unit/mobile-demo-state.test.ts tests/unit/mobile-app.test.tsx",
+    "test:mobile": "vitest run tests/unit/mobile-demo-state.test.ts tests/unit/mobile-app.test.tsx tests/unit/mobile-native-adapters.test.ts tests/unit/mobile-bootstrap.test.ts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "verify": "npm run typecheck && npm test",
     "mobile:dev": "vite --config vite.mobile.config.ts",
-    "mobile:build": "vite build --config vite.mobile.config.ts"
+    "mobile:build": "vite build --config vite.mobile.config.ts",
+    "android:sync": "npm run mobile:build && cap sync android",
+    "android:test": "cd android && ./gradlew test",
+    "android:lint": "cd android && ./gradlew lint",
+    "android:release": "npm run android:sync && cd android && ./gradlew assembleRelease && cd .. && node scripts/copy-android-release.mjs"
   },
   "dependencies": {
+    "@capacitor/android": "8.4.2",
+    "@capacitor/barcode-scanner": "3.1.0",
+    "@capacitor/core": "8.4.2",
+    "@capacitor/haptics": "8.0.2",
+    "@capacitor/local-notifications": "8.2.1",
     "electron-squirrel-startup": "1.0.1",
     "exceljs": "4.4.0",
     "qrcode.react": "4.2.0",
@@ -28,6 +37,7 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@capacitor/cli": "8.4.2",
     "@electron-forge/cli": "7.11.2",
     "@electron-forge/maker-squirrel": "7.11.2",
     "@electron-forge/maker-zip": "7.11.2",
@@ -41,7 +51,7 @@
     "@vitejs/plugin-react": "4.7.0",
     "electron": "41.10.2",
     "jsdom": "29.1.1",
-    "typescript": "7.0.2",
+    "typescript": "5.9.3",
     "vite": "5.4.21",
     "vitest": "2.1.9"
   }

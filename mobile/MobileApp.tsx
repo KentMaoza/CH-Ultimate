@@ -46,6 +46,24 @@ export function MobileApp({ gateway, scanner, notifications }: {
     });
   }, [priceMode, unreadFeedIds, view]);
 
+  useEffect(() => {
+    let active = true;
+    let removeListener: (() => Promise<void>) | undefined;
+    void notifications.listenForPriceChangeActions((skuId) => {
+      if (!gateway.getSnapshot().skus.some((sku) => sku.id === skuId)) return;
+      setView('skus');
+      setScanOpen(false);
+      setSelectedSkuId(skuId);
+    }).then((remove) => {
+      if (active) removeListener = remove;
+      else void remove();
+    }).catch(() => undefined);
+    return () => {
+      active = false;
+      void removeListener?.();
+    };
+  }, [gateway, notifications]);
+
   function navigate(next: MainView, shouldFocusSearch = false) {
     setSelectedSkuId(null);
     setScanOpen(false);

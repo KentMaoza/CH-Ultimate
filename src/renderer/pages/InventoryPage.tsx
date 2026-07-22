@@ -15,11 +15,12 @@ export function InventoryPage() {
   const [query, setQuery] = useState('');
   const [stockFilter, setStockFilter] = useState('all');
   const [showArchived, setShowArchived] = useState(false);
-  const [adjusting, setAdjusting] = useState<Sku | null>(null);
+  const [adjusting, setAdjusting] = useState<{ sku: Sku; direction: 1 | -1 } | null>(null);
   const [editing, setEditing] = useState<Sku | null>(null);
   const [editNumber, setEditNumber] = useState('');
   const [editName, setEditName] = useState('');
   const [editNote, setEditNote] = useState('');
+  const [editPrice, setEditPrice] = useState('');
   const [quantity, setQuantity] = useState('');
   const [message, setMessage] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
@@ -47,14 +48,15 @@ export function InventoryPage() {
 
   async function applyAdjustment() {
     if (!adjusting) return;
-    await gateway.adjustStock(adjusting.id, Number(quantity));
+    await gateway.adjustStock(adjusting.sku.id, Number(quantity) * adjusting.direction);
     setAdjusting(null); setQuantity('');
   }
 
-  function openEdit(sku: Sku) { setEditing(sku); setEditNumber(sku.skuNumber); setEditName(sku.name); setEditNote(sku.note); }
+  function openAdjustment(sku: Sku, direction: 1 | -1) { setAdjusting({ sku, direction }); setQuantity(''); }
+  function openEdit(sku: Sku) { setEditing(sku); setEditNumber(sku.skuNumber); setEditName(sku.name); setEditNote(sku.note); setEditPrice(String(sku.referencePrice)); }
   async function saveEdit() {
     if (!editing) return;
-    try { await gateway.updateSku(editing.id, { skuNumber: editNumber, name: editName, note: editNote }); setEditing(null); }
+    try { await gateway.updateSku(editing.id, { skuNumber: editNumber, name: editName, note: editNote, referencePrice: Number(editPrice) }); setEditing(null); }
     catch (error) { setMessage(error instanceof Error ? error.message : 'Perubahan gagal disimpan.'); }
   }
 
@@ -79,14 +81,14 @@ export function InventoryPage() {
           <tr key={sku.id}>
             <td><SkuImage sku={sku} /></td><td className="sku-number" title={sku.skuNumber}>{sku.skuNumber}</td><td>{sku.name}<small>{sku.tracked ? 'Stok dilacak' : 'Tanpa stok'}</small></td>
             <td>{formatRupiah(sku.referencePrice)}</td><td data-testid={`sku-stock-${sku.id}`} className={`stock-value ${sku.stock < 0 ? 'negative' : ''}`}>{sku.tracked ? sku.stock : '—'}</td><td>{sku.note || '—'}</td><td>{formatDate(sku.createdAt)}</td>
-            <td><div className="row-actions">{!sku.archived && <button aria-label={`Edit ${sku.skuNumber}`} onClick={() => openEdit(sku)}>Edit</button>}{sku.tracked && !sku.archived && <button aria-label={`Atur stok ${sku.skuNumber}`} onClick={() => setAdjusting(sku)}>±</button>}<button onClick={() => void gateway.setArchived(sku.id, !sku.archived)}>{sku.archived ? 'Pulihkan' : 'Arsip'}</button></div></td>
+            <td><div className="row-actions">{!sku.archived && <button aria-label={`Edit ${sku.skuNumber}`} onClick={() => openEdit(sku)}>Edit</button>}{sku.tracked && !sku.archived && <><button aria-label={`Tambah stok ${sku.skuNumber}`} onClick={() => openAdjustment(sku, 1)}>+ Stok</button><button aria-label={`Kurangi stok ${sku.skuNumber}`} onClick={() => openAdjustment(sku, -1)}>− Stok</button></>}<button onClick={() => void gateway.setArchived(sku.id, !sku.archived)}>{sku.archived ? 'Pulihkan' : 'Arsip'}</button></div></td>
           </tr>
         ))}</tbody></table>
         {!filtered.length && <div className="empty-state">Tidak ada SKU yang cocok.</div>}
       </div>
       <div className="table-footer">Menampilkan {Math.min(filtered.length, 50)} dari {filtered.length.toLocaleString('id-ID')}</div>
-      {adjusting && <div className="dialog-backdrop"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="adjust-title"><h2 id="adjust-title">Atur stok</h2><p><strong>{adjusting.skuNumber}</strong> · stok saat ini {adjusting.stock}</p><label><span>Perubahan stok</span><input autoFocus type="number" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></label><div className="dialog-actions"><button className="button secondary" onClick={() => setAdjusting(null)}>Batal</button><button className="button primary" disabled={!quantity || !Number.isInteger(Number(quantity))} onClick={() => void applyAdjustment()}>Terapkan perubahan</button></div></section></div>}
-      {editing && <div className="dialog-backdrop"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="edit-title"><h2 id="edit-title">Edit SKU</h2><p>Nomor lama akan tetap menjadi alias pencarian.</p><div className="stack-fields"><label><span>Edit nomor SKU</span><input autoFocus value={editNumber} onChange={(event) => setEditNumber(event.target.value)} /></label><label><span>Edit nama SKU</span><input value={editName} onChange={(event) => setEditName(formatTitleCaseInput(event.currentTarget))} /></label><label><span>Edit catatan SKU</span><textarea value={editNote} onChange={(event) => setEditNote(event.target.value)} /></label></div><div className="dialog-actions"><button className="button secondary" onClick={() => setEditing(null)}>Batal</button><button className="button primary" onClick={() => void saveEdit()}>Simpan perubahan SKU</button></div></section></div>}
+      {adjusting && <div className="dialog-backdrop"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="adjust-title"><h2 id="adjust-title">{adjusting.direction === 1 ? 'Tambah stok' : 'Kurangi stok'}</h2><p><strong>{adjusting.sku.skuNumber}</strong> · stok saat ini {adjusting.sku.stock}</p><label><span>{adjusting.direction === 1 ? 'Jumlah stok ditambah' : 'Jumlah stok dikurangi'}</span><input autoFocus min="1" step="1" type="number" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></label><div className="dialog-actions"><button className="button secondary" onClick={() => setAdjusting(null)}>Batal</button><button className="button primary" disabled={!quantity || !Number.isInteger(Number(quantity)) || Number(quantity) <= 0} onClick={() => void applyAdjustment()}>{adjusting.direction === 1 ? 'Tambah stok' : 'Kurangi stok'}</button></div></section></div>}
+      {editing && <div className="dialog-backdrop"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="edit-title"><h2 id="edit-title">Edit SKU</h2><p>Nomor lama akan tetap menjadi alias pencarian.</p><div className="stack-fields"><label><span>Edit nomor SKU</span><input autoFocus value={editNumber} onChange={(event) => setEditNumber(event.target.value)} /></label><label><span>Edit nama SKU</span><input value={editName} onChange={(event) => setEditName(formatTitleCaseInput(event.currentTarget))} /></label><label><span>Edit harga referensi</span><input min="0" step="1" type="number" value={editPrice} onChange={(event) => setEditPrice(event.target.value)} /></label><label><span>Edit catatan SKU</span><textarea value={editNote} onChange={(event) => setEditNote(event.target.value)} /></label></div><div className="dialog-actions"><button className="button secondary" onClick={() => setEditing(null)}>Batal</button><button className="button primary" disabled={!editPrice || Number(editPrice) < 0} onClick={() => void saveEdit()}>Simpan perubahan SKU</button></div></section></div>}
     </div>
   );
 }

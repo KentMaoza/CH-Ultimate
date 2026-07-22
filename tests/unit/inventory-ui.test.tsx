@@ -1,14 +1,61 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { App } from '../../src/renderer/App';
 
 test('adjusts a tracked SKU into a negative balance in the current session', async () => {
   render(<App />);
   expect(screen.getByTestId('sku-stock-sku-1')).toHaveTextContent('24');
   const row = screen.getByRole('row', { name: /BRS-108-BLK/ });
-  fireEvent.click(within(row).getByRole('button', { name: 'Atur stok BRS-108-BLK' }));
-  fireEvent.change(screen.getByLabelText('Perubahan stok'), { target: { value: '-30' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Terapkan perubahan' }));
+  fireEvent.click(within(row).getByRole('button', { name: 'Kurangi stok BRS-108-BLK' }));
+  fireEvent.change(screen.getByLabelText('Jumlah stok dikurangi'), { target: { value: '30' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Kurangi stok' }));
   expect(await screen.findByTestId('sku-stock-sku-1')).toHaveTextContent('-6');
+});
+
+test('uses explicit add and subtract stock actions without requiring signed input', async () => {
+  render(<App />);
+  const row = screen.getByRole('row', { name: /BRS-108-BLK/ });
+  fireEvent.click(within(row).getByRole('button', { name: 'Tambah stok BRS-108-BLK' }));
+  fireEvent.change(screen.getByLabelText('Jumlah stok ditambah'), { target: { value: '5' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Tambah stok' }));
+  expect(await screen.findByTestId('sku-stock-sku-1')).toHaveTextContent('29');
+
+  fireEvent.click(within(row).getByRole('button', { name: 'Kurangi stok BRS-108-BLK' }));
+  fireEvent.change(screen.getByLabelText('Jumlah stok dikurangi'), { target: { value: '7' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Kurangi stok' }));
+  expect(await screen.findByTestId('sku-stock-sku-1')).toHaveTextContent('22');
+});
+
+test('lists filtered price and quantity changes and exposes price export', async () => {
+  render(<App />);
+  const row = screen.getByRole('row', { name: /BRS-108-BLK/ });
+  fireEvent.click(within(row).getByRole('button', { name: 'Edit BRS-108-BLK' }));
+  fireEvent.change(screen.getByLabelText('Edit harga referensi'), { target: { value: '52000' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Simpan perubahan SKU' }));
+
+  fireEvent.click(within(row).getByRole('button', { name: 'Tambah stok BRS-108-BLK' }));
+  fireEvent.change(screen.getByLabelText('Jumlah stok ditambah'), { target: { value: '3' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Tambah stok' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Perubahan SKU' }));
+
+  expect(screen.getByRole('heading', { name: 'Perubahan SKU', level: 1 })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'Perubahan harga' })).toHaveAttribute('aria-selected', 'true');
+  const priceRow = screen.getByRole('row', { name: /BRS-108-BLK.*Rp\s*42\.000.*Rp\s*52\.000/i });
+  expect(priceRow).toBeInTheDocument();
+  const createObjectURL = vi.fn(() => 'blob:price-history');
+  const revokeObjectURL = vi.fn();
+  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
+  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  fireEvent.click(screen.getByRole('button', { name: 'Ekspor perubahan harga CSV' }));
+  expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+  expect(click).toHaveBeenCalledOnce();
+  await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:price-history'));
+  click.mockRestore();
+
+  fireEvent.click(screen.getByRole('tab', { name: 'Perubahan jumlah' }));
+  expect(screen.getByRole('row', { name: /BRS-108-BLK.*24.*\+3.*27/ })).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Sampai tanggal perubahan'), { target: { value: '2000-01-01' } });
+  expect(screen.getByText('Belum ada perubahan jumlah pada rentang tanggal ini.')).toBeInTheDocument();
 });
 
 test('creates a SKU and shows it in the warehouse list', async () => {

@@ -23,6 +23,7 @@ export function createInitialState(): DemoState {
       imageUrl: '', createdAt, archived: false,
     })),
     adjustments: [],
+    priceChanges: [],
     notaTransactions: [],
     labelTemplate: { medium: 'thermal', widthMm: 50, heightMm: 30, columns: 1, marginMm: 2, gapMm: 2, fontSize: 10, alignment: 'center', fields: ['qr', 'name', 'sku', 'price'] },
     invoiceTemplate: {
@@ -39,7 +40,7 @@ export function createInitialState(): DemoState {
 
 export function reduceOperation(state: DemoState, operation: Operation): DemoState {
   if (operation.type === 'replace-skus') {
-    return { ...createInitialState(), skus: operation.skus, sourceLabel: operation.sourceLabel, importSummary: operation.importSummary, notaTransactions: [], adjustments: [] };
+    return { ...createInitialState(), skus: operation.skus, sourceLabel: operation.sourceLabel, importSummary: operation.importSummary, notaTransactions: [], adjustments: [], priceChanges: [] };
   }
   if (operation.type === 'add-sku') return { ...state, skus: [operation.sku, ...state.skus] };
   if (operation.type === 'archive-sku') {
@@ -61,7 +62,15 @@ export function reduceOperation(state: DemoState, operation: Operation): DemoSta
   const aliases = nextNumber && nextNumber !== current.skuNumber && !current.aliases.includes(current.skuNumber)
     ? [...current.aliases, current.skuNumber]
     : current.aliases;
-  return { ...state, skus: state.skus.map((sku) => sku.id === current.id ? { ...sku, ...operation.patch, skuNumber: nextNumber || current.skuNumber, aliases } : sku) };
+  const priceChanged = operation.patch.referencePrice !== undefined && operation.patch.referencePrice !== current.referencePrice;
+  return {
+    ...state,
+    skus: state.skus.map((sku) => sku.id === current.id ? { ...sku, ...operation.patch, skuNumber: nextNumber || current.skuNumber, aliases } : sku),
+    priceChanges: priceChanged ? [...state.priceChanges, {
+      id: `price-${Date.now()}-${state.priceChanges.length}`, skuId: current.id,
+      before: current.referencePrice, after: operation.patch.referencePrice!, createdAt: new Date().toISOString(),
+    }] : state.priceChanges,
+  };
 }
 
 export function skuNumberExists(skus: Sku[], value: string, exceptId?: string): boolean {

@@ -34,7 +34,8 @@ Reloading or closing the application discards the imported workbook, stock edits
 
 ## Current demo modules
 
-- SKU Gudang with runtime XLSX import, search, edit aliases, archive, and stock adjustment
+- SKU Gudang with runtime XLSX import, search, edit aliases/prices, archive, and explicit add/subtract stock actions
+- Perubahan SKU with date-filtered price/quantity history and CSV price export
 - Buat SKU with tracked/untracked stock
 - Thermal/A4 QR label builder plus configurable invoice template preview
 - Full-screen Nota workspace for session-only draft/reopened transactions

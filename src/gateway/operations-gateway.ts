@@ -94,7 +94,9 @@ export class MockOperationsGateway implements OperationsGateway {
 
   async updateSku(id: string, patch: Partial<Sku>): Promise<void> {
     if (patch.skuNumber && skuNumberExists(this.state.skus, patch.skuNumber, id)) throw new Error('Nomor SKU atau alias sudah digunakan.');
-    this.publish(reduceOperation(this.state, { type: 'update-sku', id, patch }));
+    if (patch.referencePrice !== undefined && (!Number.isFinite(patch.referencePrice) || patch.referencePrice < 0)) throw new Error('Harga referensi harus nol atau lebih.');
+    const normalized = patch.referencePrice === undefined ? patch : { ...patch, referencePrice: Math.round(patch.referencePrice) };
+    this.publish(reduceOperation(this.state, { type: 'update-sku', id, patch: normalized }));
   }
   async adjustStock(id: string, quantity: number): Promise<void> { this.publish(reduceOperation(this.state, { type: 'adjust-stock', id, quantity })); }
   async setArchived(id: string, archived: boolean): Promise<void> { this.publish(reduceOperation(this.state, { type: 'archive-sku', id, archived })); }

@@ -18,6 +18,17 @@ test('tracked stock adjustments allow a negative balance', () => {
   expect(next.adjustments.at(-1)?.after).toBe(-4);
 });
 
+test('SKU price edits record the previous and next reference price once', () => {
+  const initial = createInitialState();
+  const sku = initial.skus[0]!;
+  const changed = reduceOperation(initial, { type: 'update-sku', id: sku.id, patch: { referencePrice: 52_000 } });
+  const unchanged = reduceOperation(changed, { type: 'update-sku', id: sku.id, patch: { referencePrice: 52_000, note: 'Rak baru' } });
+
+  expect(unchanged.priceChanges).toHaveLength(1);
+  expect(unchanged.priceChanges[0]).toMatchObject({ skuId: sku.id, before: 42_000, after: 52_000 });
+  expect(unchanged.priceChanges[0]?.createdAt).toBeTruthy();
+});
+
 test('workbook mapping uses Modal Referensi and preserves long SKU numbers', async () => {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('SKU');

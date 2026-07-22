@@ -29,6 +29,14 @@ export interface StockAdjustment {
   source: 'manual' | 'nota' | 'reversal';
 }
 
+export interface SkuPriceChange {
+  id: string;
+  skuId: string;
+  before: number;
+  after: number;
+  createdAt: string;
+}
+
 export interface NotaLine {
   id: string;
   skuId?: string;
@@ -109,6 +117,7 @@ export interface WorkbookImportResult {
 export interface DemoState {
   skus: Sku[];
   adjustments: StockAdjustment[];
+  priceChanges: SkuPriceChange[];
   notaTransactions: NotaTransaction[];
   labelTemplate: LabelTemplate;
   invoiceTemplate: InvoiceTemplate;

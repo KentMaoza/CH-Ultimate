@@ -49,8 +49,12 @@ export interface OperationsGateway {
 let sequence = 100;
 
 export class MockOperationsGateway implements OperationsGateway {
-  private state = this.seedState();
+  private state: DemoState;
   private listeners = new Set<() => void>();
+
+  constructor(private readonly seedFactory: () => DemoState = () => this.seedState()) {
+    this.state = this.seedFactory();
+  }
 
   private seedState(): DemoState {
     const transaction = createDraftNotaTransaction(1);
@@ -103,7 +107,7 @@ export class MockOperationsGateway implements OperationsGateway {
   async replaceFromWorkbook(result: WorkbookImportResult, sourceLabel: string): Promise<void> {
     this.publish(reduceOperation(this.state, { type: 'replace-skus', skus: result.skus, sourceLabel, importSummary: { loaded: result.loaded, skipped: result.skipped, warnings: result.warnings } }));
   }
-  async reset(): Promise<void> { this.publish(this.seedState()); }
+  async reset(): Promise<void> { this.publish(this.seedFactory()); }
   async setLabelTemplate(template: LabelTemplate): Promise<void> { this.publish({ ...this.state, labelTemplate: template }); }
   async setInvoiceTemplate(template: InvoiceTemplate): Promise<void> { this.publish({ ...this.state, invoiceTemplate: template }); }
   async createNotaTransaction(): Promise<NotaTransaction> {

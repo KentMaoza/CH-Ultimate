@@ -16,7 +16,7 @@ test('selects Amelia A and B pages, adds C, and restores a cancelled page from S
 
   fireEvent.click(screen.getByRole('button', { name: 'Halaman B' }));
   expect(screen.getByRole('button', { name: 'Halaman B' })).toHaveAttribute('aria-pressed', 'true');
-  fireEvent.click(screen.getByRole('button', { name: 'Tambah Nota' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Tambah Nota C' }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Halaman C' })).toHaveAttribute('aria-pressed', 'true'));
 
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Batalkan halaman C' })); });
@@ -100,7 +100,7 @@ test('search stays expanded when a nonempty query renders an empty listbox', () 
   fireEvent.change(search, { target: { value: 'tidak-ada-nota' } });
 
   expect(search).toHaveAttribute('aria-expanded', 'true');
-  expect(screen.getByRole('listbox')).toHaveTextContent('Tidak ada nota yang cocok.');
+  expect(screen.getByRole('listbox', { name: 'Hasil pencarian nota' })).toHaveTextContent('Tidak ada nota yang cocok.');
 });
 
 test('new transaction and drawer dialogs restore focus, close on Escape, and reset fields for a fresh open', () => {
@@ -228,7 +228,7 @@ test('a replacement undo owns a fresh timer and unmount clears it', async () => 
   try {
     const view = render(<App gateway={new MockOperationsGateway()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Nota' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Tambah Nota' }));
+    fireEvent.click(screen.getByRole('button', { name: /Tambah Nota [A-Z]+/ }));
     await act(async () => {});
     fireEvent.click(screen.getByRole('button', { name: 'Batalkan halaman C' }));
     await act(async () => {});
@@ -345,7 +345,7 @@ class DelayedCompleteGateway extends MockOperationsGateway {
 test('delayed mutations disable mutation controls until the gateway settles', async () => {
   const gateway = new DelayedAddGateway();
   openNota(gateway);
-  const add = screen.getByRole('button', { name: 'Tambah Nota' });
+  const add = screen.getByRole('button', { name: 'Tambah Nota C' });
   fireEvent.click(add);
   await waitFor(() => expect(add).toBeDisabled());
   expect(screen.getByTestId('chu-nota-workspace')).toHaveAttribute('aria-busy', 'true');

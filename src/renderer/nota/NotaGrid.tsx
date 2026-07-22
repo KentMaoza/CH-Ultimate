@@ -1,12 +1,17 @@
-import { forwardRef, useImperativeHandle, useState, type KeyboardEvent } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { lineTotal } from '../../domain/nota';
 import type { NotaLine, Sku, Unit } from '../../domain/types';
 import type { NotaNumericField } from './useNotaValidation';
+import { WarehouseSkuPanel } from './WarehouseSkuPanel';
 
 const numberFormat = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 });
 const fields = ['description', 'kind', 'quantity', 'lsn', 'pcs', 'lsnPrice', 'pcsPrice', 'total'];
 
 function format(value: number) { return numberFormat.format(value); }
+function normalizePrice(value: string) {
+  if (/^\d*$/.test(value)) return value;
+  return /^\d{1,3}(\.\d{3})+$/.test(value) ? value.replaceAll('.', '') : null;
+}
 function validInteger(value: string, positive: boolean) {
   if (!value) return true;
   if (!/^\d+$/.test(value)) return false;
@@ -14,11 +19,6 @@ function validInteger(value: string, positive: boolean) {
   return Number.isSafeInteger(number) && (positive ? number > 0 : number >= 0);
 }
 function blank(line: NotaLine) { return !line.skuId && !line.description && !line.kind && !line.quantity && !line.pcsPrice && !line.lsnPrice; }
-function matchesSku(sku: Sku, query: string) {
-  const search = query.toLocaleLowerCase('id-ID');
-  return [sku.name, sku.skuNumber, ...sku.aliases].some((value) => value.toLocaleLowerCase('id-ID').includes(search));
-}
-
 export interface NotaGridHandle { focusField(lineId: string, field: NotaNumericField): void; }
 
 export const NotaGrid = forwardRef<NotaGridHandle, {
@@ -34,9 +34,29 @@ export const NotaGrid = forwardRef<NotaGridHandle, {
 }>(function NotaGrid({ lines, suffix, skus, editable, busy, invalidValues, onInvalidChange, onUpdate, onDelete }, ref) {
   const [raw, setRaw] = useState<Record<string, string>>({});
   const [focusedNumericField, setFocusedNumericField] = useState<string | null>(null);
-  const [openRow, setOpenRow] = useState<number | null>(null);
-  const [highlight, setHighlight] = useState(0);
-  const activeSuggestions = openRow === null ? [] : skus.filter((sku) => !sku.archived && matchesSku(sku, lines[openRow]?.description ?? ''));
+  const [selectedRow, setSelectedRow] = useState<number | null>(null);
+  const [panelMessage, setPanelMessage] = useState('');
+  const pendingCaret = useRef<{ key: string; digits: number } | null>(null);
+  const firstBlankRow = lines.findIndex(blank);
+  const targetRow = selectedRow ?? firstBlankRow;
+
+  useEffect(() => { setSelectedRow(null); setPanelMessage(''); }, [suffix]);
+
+  useLayoutEffect(() => {
+    const pending = pendingCaret.current;
+    if (!pending) return;
+    pendingCaret.current = null;
+    const [lineId, field] = pending.key.split(':');
+    const input = document.querySelector<HTMLInputElement>(`.chu-nota-workspace [data-line-id="${lineId}"][data-field="${field}"]`);
+    if (!input) return;
+    let digits = 0;
+    let position = 0;
+    while (position < input.value.length && digits < pending.digits) {
+      if (/\d/.test(input.value[position]!)) digits += 1;
+      position += 1;
+    }
+    input.setSelectionRange(position, position);
+  });
 
   useImperativeHandle(ref, () => ({
     focusField(lineId, field) {
@@ -47,19 +67,26 @@ export const NotaGrid = forwardRef<NotaGridHandle, {
   function fieldValue(line: NotaLine, field: NotaNumericField) {
     const key = `${line.id}:${field}`;
     const value = raw[key] ?? invalidValues[key] ?? (line[field] ? String(line[field]) : '');
-    return focusedNumericField === key || !validInteger(value, field === 'quantity') ? value : value ? format(Number(value)) : '';
+    if (field === 'quantity') return focusedNumericField === key || !validInteger(value, true) ? value : value ? String(Number(value)) : '';
+    return validInteger(value, false) ? value ? format(Number(value)) : '' : value;
   }
   function numericValid(line: NotaLine, field: NotaNumericField) {
     const key = `${line.id}:${field}`;
     const rawValue = raw[key] ?? invalidValues[key] ?? (line[field] ? String(line[field]) : '');
     return validInteger(rawValue, field === 'quantity');
   }
-  function numericChange(line: NotaLine, field: NotaNumericField, value: string) {
+  function numericChange(line: NotaLine, field: NotaNumericField, value: string, caret?: number | null) {
     const positive = field === 'quantity';
-    setRaw((current) => ({ ...current, [`${line.id}:${field}`]: value }));
-    const valid = validInteger(value, positive);
+    const normalized = positive ? value : normalizePrice(value);
+    const nextValue = normalized ?? value;
+    const key = `${line.id}:${field}`;
+    if (!positive && normalized !== null && caret !== null && caret !== undefined) {
+      pendingCaret.current = { key, digits: value.slice(0, caret).replace(/\D/g, '').length };
+    }
+    setRaw((current) => ({ ...current, [key]: nextValue }));
+    const valid = normalized !== null && validInteger(nextValue, positive);
     onInvalidChange(line.id, field, valid ? null : value);
-    if (valid) onUpdate(line, { [field]: value ? Number(value) : 0 });
+    if (valid) onUpdate(line, { [field]: nextValue ? Number(nextValue) : 0 });
   }
   function numericFocus(line: NotaLine, field: NotaNumericField) {
     const key = `${line.id}:${field}`;
@@ -79,7 +106,17 @@ export const NotaGrid = forwardRef<NotaGridHandle, {
     onInvalidChange(line.id, 'pcsPrice', null);
     onInvalidChange(line.id, 'lsnPrice', null);
     onUpdate(line, { skuId: sku.id, description: sku.name, pcsPrice: sku.referencePrice, lsnPrice: sku.referencePrice * 12, unit: line.unit ?? 'pcs' });
-    setOpenRow(null);
+  }
+  function selectWarehouseSku(sku: Sku) {
+    const line = lines[targetRow];
+    if (!line) {
+      setPanelMessage('Semua 15 baris terisi. Pilih baris yang akan diganti atau tambah Nota berikutnya.');
+      return;
+    }
+    setPanelMessage('');
+    setSelectedRow(targetRow);
+    selectSku(line, sku);
+    window.setTimeout(() => focusCell(targetRow, 'quantity'), 0);
   }
   function focusCell(row: number, field: string) {
     document.querySelector<HTMLElement>(`.chu-nota-workspace [data-row-index="${row}"][data-field="${field}"]`)?.focus();
@@ -100,42 +137,37 @@ export const NotaGrid = forwardRef<NotaGridHandle, {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault(); focusCell(Math.max(0, Math.min(lines.length - 1, row + (event.key === 'ArrowDown' ? 1 : -1))), field);
     }
-    if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && target instanceof HTMLInputElement) {
-      const atBoundary = event.key === 'ArrowLeft' ? target.selectionStart === 0 : target.selectionStart === target.value.length;
-      if (atBoundary) {
-        const next = index + (event.key === 'ArrowLeft' ? -1 : 1);
-        if (next >= 0 && next < fields.length) { event.preventDefault(); focusCell(row, fields[next]!); }
-      }
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      event.preventDefault();
+      const current = row * fields.length + index;
+      const next = Math.max(0, Math.min(lines.length * fields.length - 1, current + (event.key === 'ArrowLeft' ? -1 : 1)));
+      focusCell(Math.floor(next / fields.length), fields[next % fields.length]!);
     }
   }
 
-  return <section className="chu-nota-workspace__grid-frame" aria-label="Grid nota" onKeyDown={gridKeyDown}>
+  return <>
+    {editable && <WarehouseSkuPanel key={suffix} skus={skus} targetLabel={targetRow >= 0 ? `${targetRow + 1}${suffix}` : '—'} disabled={busy} onSelect={selectWarehouseSku} />}
+    {panelMessage && <p className="chu-nota-workspace__notice" role="status">{panelMessage}</p>}
+    <section className="chu-nota-workspace__grid-frame" aria-label="Grid nota" onKeyDown={gridKeyDown}>
     <table><thead><tr><th>NO</th><th>NAMA BARANG</th><th>JENIS</th><th>JUMLAH</th><th>LSN</th><th>PCS</th><th>HARGA LSN</th><th>HARGA PCS</th><th>TOTAL</th><th>AKSI</th></tr></thead>
       <tbody data-testid="nota-grid-body">{lines.slice(0, 15).map((line, index) => {
-        const suggestions = openRow === index ? activeSuggestions : [];
         const number = index + 1;
         const linkedSku = skus.find((sku) => sku.id === line.skuId);
-        const activeOptionId = suggestions[highlight] ? `sku-option-${line.id}-${suggestions[highlight]!.id}` : undefined;
-        return <tr key={line.id} data-testid={`nota-grid-row-${number}`}>
+        return <tr key={line.id} data-testid={`nota-grid-row-${number}`} className={targetRow === index ? 'chu-nota-workspace__row--target' : undefined} onFocusCapture={() => setSelectedRow(index)} onMouseDown={() => setSelectedRow(index)}>
           <td>{number}{suffix}</td>
-          <td className="chu-nota-workspace__sku-cell"><input role="combobox" aria-label={`Nama barang baris ${number}`} aria-expanded={openRow === index} aria-controls={`sku-options-${line.id}`} aria-activedescendant={activeOptionId} aria-autocomplete="list" data-grid-editable data-row-index={index} data-field="description" disabled={!editable || busy} value={line.description} onFocus={() => { setOpenRow(index); setHighlight(0); }} onChange={(event) => { onUpdate(line, { description: event.target.value, skuId: undefined }); setOpenRow(index); setHighlight(0); }} onKeyDown={(event) => {
-            if (event.key === 'Escape') { setOpenRow(null); event.stopPropagation(); }
-            if (event.key === 'ArrowDown' && suggestions.length) { event.preventDefault(); event.stopPropagation(); setHighlight((value) => Math.min(suggestions.length - 1, value + 1)); }
-            if (event.key === 'ArrowUp' && suggestions.length) { event.preventDefault(); event.stopPropagation(); setHighlight((value) => Math.max(0, value - 1)); }
-            if (event.key === 'Enter' && suggestions[highlight]) { event.preventDefault(); event.stopPropagation(); selectSku(line, suggestions[highlight]!); }
-          }} />{linkedSku && <span className="chu-nota-workspace__linked-sku">{linkedSku.skuNumber}</span>}
-            {openRow === index && suggestions.length > 0 && <ul id={`sku-options-${line.id}`} role="listbox" className="chu-nota-workspace__suggestions">{suggestions.map((sku, suggestionIndex) => <li key={sku.id} id={`sku-option-${line.id}-${sku.id}`} role="option" aria-selected={suggestionIndex === highlight} onMouseDown={(event) => event.preventDefault()} onClick={() => selectSku(line, sku)}>{sku.name} · {sku.skuNumber}{sku.aliases.length ? ` · ${sku.aliases.join(', ')}` : ''}</li>)}</ul>}
+          <td className="chu-nota-workspace__sku-cell"><input aria-label={`Nama barang baris ${number}`} data-grid-editable data-row-index={index} data-field="description" disabled={!editable || busy} value={line.description} onChange={(event) => onUpdate(line, { description: event.target.value, skuId: undefined })} />{linkedSku && <span className="chu-nota-workspace__linked-sku">{linkedSku.skuNumber}</span>}
           </td>
           <td><input aria-label={`Jenis baris ${number}`} data-grid-editable data-row-index={index} data-field="kind" disabled={!editable || busy} value={line.kind} onChange={(event) => onUpdate(line, { kind: event.target.value })} /></td>
           <td><input aria-label={`Jumlah baris ${number}`} inputMode="numeric" data-grid-editable data-line-id={line.id} data-row-index={index} data-field="quantity" disabled={!editable || busy} value={fieldValue(line, 'quantity')} aria-invalid={!numericValid(line, 'quantity') || undefined} onFocus={() => numericFocus(line, 'quantity')} onBlur={() => numericBlur(line, 'quantity')} onChange={(event) => numericChange(line, 'quantity', event.target.value)} /></td>
           <td><button aria-label={`LSN baris ${number}`} aria-pressed={line.unit === 'lsn'} data-grid-editable data-row-index={index} data-field="lsn" disabled={!editable || busy} onClick={() => onUpdate(line, { unit: 'lsn' as Unit })} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); onUpdate(line, { unit: 'lsn' as Unit }); } }}>LSN</button></td>
           <td><button aria-label={`PCS baris ${number}`} aria-pressed={line.unit === 'pcs'} data-grid-editable data-row-index={index} data-field="pcs" disabled={!editable || busy} onClick={() => onUpdate(line, { unit: 'pcs' as Unit })} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); onUpdate(line, { unit: 'pcs' as Unit }); } }}>PCS</button></td>
-          <td><input aria-label={`Harga LSN baris ${number}`} inputMode="numeric" data-grid-editable data-line-id={line.id} data-row-index={index} data-field="lsnPrice" disabled={!editable || busy} value={fieldValue(line, 'lsnPrice')} aria-invalid={!numericValid(line, 'lsnPrice') || undefined} onFocus={() => numericFocus(line, 'lsnPrice')} onBlur={() => numericBlur(line, 'lsnPrice')} onChange={(event) => numericChange(line, 'lsnPrice', event.target.value)} /></td>
-          <td><input aria-label={`Harga PCS baris ${number}`} inputMode="numeric" data-grid-editable data-line-id={line.id} data-row-index={index} data-field="pcsPrice" disabled={!editable || busy} value={fieldValue(line, 'pcsPrice')} aria-invalid={!numericValid(line, 'pcsPrice') || undefined} onFocus={() => numericFocus(line, 'pcsPrice')} onBlur={() => numericBlur(line, 'pcsPrice')} onChange={(event) => numericChange(line, 'pcsPrice', event.target.value)} /></td>
+          <td><input aria-label={`Harga LSN baris ${number}`} inputMode="numeric" data-grid-editable data-line-id={line.id} data-row-index={index} data-field="lsnPrice" disabled={!editable || busy} value={fieldValue(line, 'lsnPrice')} aria-invalid={!numericValid(line, 'lsnPrice') || undefined} onFocus={() => numericFocus(line, 'lsnPrice')} onBlur={() => numericBlur(line, 'lsnPrice')} onChange={(event) => numericChange(line, 'lsnPrice', event.target.value, event.target.selectionStart)} /></td>
+          <td><input aria-label={`Harga PCS baris ${number}`} inputMode="numeric" data-grid-editable data-line-id={line.id} data-row-index={index} data-field="pcsPrice" disabled={!editable || busy} value={fieldValue(line, 'pcsPrice')} aria-invalid={!numericValid(line, 'pcsPrice') || undefined} onFocus={() => numericFocus(line, 'pcsPrice')} onBlur={() => numericBlur(line, 'pcsPrice')} onChange={(event) => numericChange(line, 'pcsPrice', event.target.value, event.target.selectionStart)} /></td>
           <td><output tabIndex={0} aria-label={`Total baris ${number}`} data-grid-editable data-row-index={index} data-field="total">{format(lineTotal(line))}</output></td>
           <td><button disabled={!editable || busy || blank(line)} onClick={() => onDelete(line)}>Hapus</button></td>
         </tr>;
       })}</tbody>
     </table>
-  </section>;
+    </section>
+  </>;
 });

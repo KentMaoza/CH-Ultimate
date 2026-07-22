@@ -7,6 +7,14 @@ function openNota(gateway?: MockOperationsGateway) {
   fireEvent.click(screen.getByRole('button', { name: 'Nota' }));
 }
 
+function chooseWarehouseSku(row: number, query: string) {
+  fireEvent.focus(screen.getByRole('textbox', { name: `Nama barang baris ${row}` }));
+  const search = screen.getByRole('searchbox', { name: 'Cari SKU Gudang' });
+  fireEvent.change(search, { target: { value: query } });
+  fireEvent.keyDown(search, { key: 'ArrowDown' });
+  fireEvent.keyDown(search, { key: 'Enter' });
+}
+
 test('Nota opens as a dedicated workspace and back restores the CH Ultimate shell', () => {
   openNota();
   expect(screen.getByTestId('chu-nota-workspace')).toBeInTheDocument();
@@ -60,29 +68,30 @@ test('basic fields, unit, and dual prices update the in-memory Nota total', () =
   expect(screen.getByTestId('nota-transaction-total')).toHaveTextContent('347.000');
 });
 
-test('SKU combobox filters names, current and alias numbers without archived entries and preserves a long SKU', async () => {
+test('SKU Gudang panel filters names, current and alias numbers without archived entries', async () => {
   const gateway = new MockOperationsGateway();
   const longSku = '899123456789012345678901234567890123456789012345';
   await gateway.updateSku('sku-1', { skuNumber: longSku });
   await gateway.setArchived('sku-4', true);
   openNota(gateway);
 
-  const name = screen.getByRole('combobox', { name: 'Nama barang baris 3' });
-  fireEvent.change(name, { target: { value: longSku.slice(0, 22) } });
+  const name = screen.getByRole('textbox', { name: 'Nama barang baris 3' });
+  expect(name).not.toHaveAttribute('role', 'combobox');
+  expect(screen.getByRole('region', { name: 'SKU Gudang' })).toBeInTheDocument();
+  const search = screen.getByRole('searchbox', { name: 'Cari SKU Gudang' });
+  fireEvent.change(search, { target: { value: longSku.slice(0, 22) } });
   expect(screen.getByRole('option', { name: new RegExp(longSku) })).toBeInTheDocument();
-  fireEvent.change(name, { target: { value: 'BRS-108-BLK' } });
+  fireEvent.change(search, { target: { value: 'BRS-108-BLK' } });
   expect(screen.getByRole('option', { name: new RegExp(longSku) })).toBeInTheDocument();
-  fireEvent.change(name, { target: { value: 'Minuman' } });
+  fireEvent.change(search, { target: { value: 'Minuman' } });
   expect(screen.queryByRole('option', { name: /Minuman Serbuk Cokelat/ })).not.toBeInTheDocument();
 });
 
-test('keyboard SKU selection links snapshot, applies independent prices, and manual edits unlink it', () => {
+test('keyboard selection from SKU Gudang links the active row and manual edits unlink it', () => {
   const gateway = new MockOperationsGateway();
   openNota(gateway);
-  const name = screen.getByRole('combobox', { name: 'Nama barang baris 3' });
-  fireEvent.change(name, { target: { value: 'Beras' } });
-  fireEvent.keyDown(name, { key: 'ArrowDown' });
-  fireEvent.keyDown(name, { key: 'Enter' });
+  const name = screen.getByRole('textbox', { name: 'Nama barang baris 3' });
+  chooseWarehouseSku(3, 'Beras');
 
   let row = gateway.getSnapshot().notaTransactions[0]!.pages[0]!.lines[2]!;
   expect(row).toMatchObject({ skuId: 'sku-1', description: 'Beras Hitam Premium 1 kg', pcsPrice: 42_000, lsnPrice: 504_000, unit: 'pcs' });
@@ -94,14 +103,8 @@ test('keyboard SKU selection links snapshot, applies independent prices, and man
 test('tracked and untracked SKU choices both apply 1x and 12x reference prices', () => {
   const gateway = new MockOperationsGateway();
   openNota(gateway);
-  const choose = (row: number, value: string) => {
-    const input = screen.getByRole('combobox', { name: `Nama barang baris ${row}` });
-    fireEvent.change(input, { target: { value } });
-    fireEvent.keyDown(input, { key: 'ArrowDown' });
-    fireEvent.keyDown(input, { key: 'Enter' });
-  };
-  choose(3, 'Beras');
-  choose(4, 'Kemeja');
+  chooseWarehouseSku(3, 'Beras');
+  chooseWarehouseSku(4, 'Kemeja');
   const lines = gateway.getSnapshot().notaTransactions[0]!.pages[0]!.lines;
   expect(lines[2]).toMatchObject({ skuId: 'sku-1', pcsPrice: 42_000, lsnPrice: 504_000 });
   expect(lines[3]).toMatchObject({ skuId: 'sku-2', pcsPrice: 185_000, lsnPrice: 2_220_000 });
@@ -116,10 +119,7 @@ test('SKU selection clears replaced price validation without clearing another in
   fireEvent.change(lsnPrice, { target: { value: '500.5' } });
   fireEvent.change(pcsPrice, { target: { value: '-1' } });
 
-  const name = screen.getByRole('combobox', { name: 'Nama barang baris 3' });
-  fireEvent.change(name, { target: { value: 'Beras' } });
-  fireEvent.keyDown(name, { key: 'ArrowDown' });
-  fireEvent.keyDown(name, { key: 'Enter' });
+  chooseWarehouseSku(3, 'Beras');
 
   expect(lsnPrice).toHaveValue('504.000');
   expect(pcsPrice).toHaveValue('42.000');
@@ -133,14 +133,16 @@ test('SKU selection clears replaced price validation without clearing another in
   expect(screen.getByRole('dialog', { name: 'Selesaikan nota?' })).toBeInTheDocument();
 });
 
-test('numeric editing keeps invalid raw text, formats valid price on blur, and completion focuses first invalid value', () => {
+test('price fields stay grouped while focused and completion focuses the first invalid value', () => {
   openNota();
   const price = screen.getByLabelText('Harga PCS baris 3');
+  fireEvent.focus(price);
   fireEvent.change(price, { target: { value: '125000' } });
+  expect(price).toHaveValue('125.000');
   fireEvent.blur(price);
   expect(price).toHaveValue('125.000');
   fireEvent.focus(price);
-  expect(price).toHaveValue('125000');
+  expect(price).toHaveValue('125.000');
   const quantity = screen.getByLabelText('Jumlah baris 3');
   fireEvent.change(quantity, { target: { value: '1.5' } });
   expect(quantity).toHaveAttribute('aria-invalid', 'true');
@@ -188,10 +190,8 @@ test('blurred grouped numeric values remain valid when completing without refocu
 test('linked SKU number appears in the grid and disappears with a manual edit', () => {
   const gateway = new MockOperationsGateway();
   openNota(gateway);
-  const name = screen.getByRole('combobox', { name: 'Nama barang baris 3' });
-  fireEvent.change(name, { target: { value: 'Beras' } });
-  fireEvent.keyDown(name, { key: 'ArrowDown' });
-  fireEvent.keyDown(name, { key: 'Enter' });
+  const name = screen.getByRole('textbox', { name: 'Nama barang baris 3' });
+  chooseWarehouseSku(3, 'Beras');
 
   expect(screen.getByTestId('nota-grid-row-3')).toHaveTextContent('BRS-108-BLK');
   expect(gateway.getSnapshot().notaTransactions[0]!.pages[0]!.lines[2]).toMatchObject({ skuId: 'sku-1' });
@@ -200,27 +200,66 @@ test('linked SKU number appears in the grid and disappears with a manual edit', 
   expect(gateway.getSnapshot().notaTransactions[0]!.pages[0]!.lines[2]?.skuId).toBeUndefined();
 });
 
-test('SKU combobox exposes its passive highlighted option to assistive technology', () => {
+test('SKU Gudang exposes keyboard-highlighted options and can be collapsed', () => {
   openNota();
-  const name = screen.getByRole('combobox', { name: 'Nama barang baris 3' });
-  fireEvent.change(name, { target: { value: 'Beras' } });
+  const search = screen.getByRole('searchbox', { name: 'Cari SKU Gudang' });
+  fireEvent.change(search, { target: { value: 'Beras' } });
+  fireEvent.keyDown(search, { key: 'ArrowDown' });
 
   const option = screen.getByRole('option', { name: /Beras Hitam Premium 1 kg/ });
-  expect(option.tagName).toBe('LI');
   expect(option).toHaveAttribute('id');
   expect(option).toHaveAttribute('aria-selected', 'true');
-  expect(name).toHaveAttribute('aria-activedescendant', option.id);
+  expect(search).toHaveAttribute('aria-activedescendant', option.id);
   const listbox = screen.getByRole('listbox');
   const optionIds = within(listbox).getAllByRole('option').map((item) => item.id);
   expect(new Set(optionIds).size).toBe(optionIds.length);
-  expect(within(listbox).queryByRole('button')).not.toBeInTheDocument();
 
-  fireEvent.keyDown(name, { key: 'Enter' });
-  expect(name).toHaveValue('Beras Hitam Premium 1 kg');
-  fireEvent.change(name, { target: { value: 'Beras' } });
-  fireEvent.mouseDown(screen.getByRole('option', { name: /Beras Hitam Premium 1 kg/ }));
-  fireEvent.click(screen.getByRole('option', { name: /Beras Hitam Premium 1 kg/ }));
-  expect(name).toHaveValue('Beras Hitam Premium 1 kg');
+  fireEvent.click(screen.getByRole('button', { name: 'Lipat SKU Gudang' }));
+  expect(screen.queryByRole('searchbox', { name: 'Cari SKU Gudang' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Buka SKU Gudang' }));
+  expect(screen.getByRole('searchbox', { name: 'Cari SKU Gudang' })).toBeInTheDocument();
+});
+
+test('SKU Gudang uses the first blank row by default and preserves operator fields when replacing a row', async () => {
+  const gateway = new MockOperationsGateway();
+  openNota(gateway);
+
+  expect(screen.getByTestId('nota-grid-row-3')).toHaveClass('chu-nota-workspace__row--target');
+  const search = screen.getByRole('searchbox', { name: 'Cari SKU Gudang' });
+  fireEvent.change(search, { target: { value: 'Beras' } });
+  fireEvent.keyDown(search, { key: 'ArrowDown' });
+  fireEvent.keyDown(search, { key: 'Enter' });
+  expect(gateway.getSnapshot().notaTransactions[0]!.pages[0]!.lines[2]).toMatchObject({ skuId: 'sku-1' });
+
+  fireEvent.change(screen.getByLabelText('Jenis baris 3'), { target: { value: 'Grosir' } });
+  fireEvent.change(screen.getByLabelText('Jumlah baris 3'), { target: { value: '4' } });
+  fireEvent.click(screen.getByRole('button', { name: 'LSN baris 3' }));
+  fireEvent.focus(screen.getByLabelText('Jenis baris 3'));
+  fireEvent.change(search, { target: { value: 'Kemeja' } });
+  fireEvent.keyDown(search, { key: 'ArrowDown' });
+  fireEvent.keyDown(search, { key: 'Enter' });
+
+  expect(gateway.getSnapshot().notaTransactions[0]!.pages[0]!.lines[2]).toMatchObject({
+    skuId: 'sku-2', description: 'Kemeja Linen Putih', kind: 'Grosir', quantity: 4, unit: 'lsn', pcsPrice: 185_000, lsnPrice: 2_220_000,
+  });
+  await waitFor(() => expect(screen.getByLabelText('Jumlah baris 3')).toHaveFocus());
+});
+
+test('Nota starts at large text and exposes session-only font presets and explicit next-page label', () => {
+  openNota();
+  const workspace = screen.getByTestId('chu-nota-workspace');
+  expect(workspace).toHaveStyle({ '--nota-font-scale': '1.25' });
+  expect(workspace.style.zoom).toBe('');
+  expect(screen.getByRole('button', { name: 'Halaman A' })).toHaveTextContent('Nota A');
+  expect(screen.getByRole('button', { name: 'Halaman B' })).toHaveTextContent('Nota B');
+  expect(screen.getByRole('button', { name: 'Tambah Nota C' })).toHaveTextContent('+ Tambah Nota C');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Perbesar tulisan' }));
+  expect(workspace).toHaveStyle({ '--nota-font-scale': '1.5' });
+  fireEvent.keyDown(window, { key: '0', ctrlKey: true });
+  expect(workspace).toHaveStyle({ '--nota-font-scale': '1.25' });
+  fireEvent.click(screen.getByRole('button', { name: 'Perkecil tulisan' }));
+  expect(workspace).toHaveStyle({ '--nota-font-scale': '1' });
 });
 
 test('unit buttons preserve dual overrides while the active unit controls total', () => {
@@ -238,28 +277,46 @@ test('unit buttons preserve dual overrides while the active unit controls total'
   expect(screen.getByLabelText('Harga PCS baris 3')).toHaveValue('12.000');
 });
 
-test('grid keyboard traversal respects cell, row, and caret boundaries and Escape dismisses suggestions', () => {
+test('grid arrows always traverse data cells, including unit buttons and row wrapping', () => {
   openNota();
-  const name = screen.getByRole('combobox', { name: 'Nama barang baris 1' });
-  fireEvent.change(name, { target: { value: 'Beras' } });
-  expect(screen.getByRole('listbox')).toBeInTheDocument();
-  fireEvent.keyDown(name, { key: 'Escape' });
-  expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
-  fireEvent.keyDown(name, { key: 'Enter' });
-  expect(screen.getByLabelText('Jenis baris 1')).toHaveFocus();
+  const name = screen.getByRole('textbox', { name: 'Nama barang baris 1' });
+  const kind = screen.getByLabelText('Jenis baris 1');
+  fireEvent.change(kind, { target: { value: 'Pangan' } });
+  act(() => kind.focus());
+  (kind as HTMLInputElement).setSelectionRange(3, 3);
+  fireEvent.keyDown(kind, { key: 'ArrowRight' });
+  expect(screen.getByLabelText('Jumlah baris 1')).toHaveFocus();
+
+  fireEvent.keyDown(screen.getByLabelText('Jumlah baris 1'), { key: 'ArrowDown' });
+  expect(screen.getByLabelText('Jumlah baris 2')).toHaveFocus();
+  fireEvent.keyDown(screen.getByLabelText('Jumlah baris 2'), { key: 'ArrowUp' });
+  expect(screen.getByLabelText('Jumlah baris 1')).toHaveFocus();
+
+  const lsn = screen.getByRole('button', { name: 'LSN baris 1' });
+  act(() => lsn.focus());
+  fireEvent.keyDown(lsn, { key: 'ArrowRight' });
+  expect(screen.getByRole('button', { name: 'PCS baris 1' })).toHaveFocus();
+
+  const total = screen.getByLabelText('Total baris 1');
+  act(() => total.focus());
+  fireEvent.keyDown(total, { key: 'ArrowRight' });
+  expect(screen.getByLabelText('Nama barang baris 2')).toHaveFocus();
+  fireEvent.keyDown(screen.getByLabelText('Nama barang baris 2'), { key: 'ArrowLeft' });
+  expect(total).toHaveFocus();
+
   fireEvent.keyDown(screen.getByLabelText('Jenis baris 1'), { key: 'ArrowDown' });
   expect(screen.getByLabelText('Jenis baris 2')).toHaveFocus();
   fireEvent.keyDown(screen.getByLabelText('Jenis baris 2'), { key: 'ArrowUp' });
   expect(screen.getByLabelText('Jenis baris 1')).toHaveFocus();
   fireEvent.keyDown(screen.getByLabelText('Jenis baris 1'), { key: 'ArrowUp' });
   expect(screen.getByLabelText('Jenis baris 1')).toHaveFocus();
-  const lsn = screen.getByRole('button', { name: 'LSN baris 1' });
-  lsn.focus();
+
+  act(() => lsn.focus());
   fireEvent.keyDown(lsn, { key: 'Enter' });
   expect(lsn).toHaveFocus();
   expect(lsn).toHaveAttribute('aria-pressed', 'true');
+
   act(() => name.focus());
-  (name as HTMLInputElement).setSelectionRange(0, 0);
   fireEvent.keyDown(name, { key: 'ArrowLeft' });
   expect(name).toHaveFocus();
 });
@@ -270,7 +327,7 @@ test.each([
 ])('Ctrl or Cmd+K does not steal focus from a grid %s control', (_kind, label) => {
   openNota();
   const editable = screen.getByLabelText(label);
-  editable.focus();
+  act(() => editable.focus());
   fireEvent.keyDown(editable, { key: 'k', ctrlKey: true });
   expect(editable).toHaveFocus();
   fireEvent.keyDown(editable, { key: 'k', metaKey: true });

@@ -276,3 +276,55 @@ test('tapping a price notification opens the current SKU detail', async () => {
 
   expect(screen.getByRole('heading', { name: 'Kemeja Linen Putih Terbaru' })).toBeInTheDocument();
 });
+
+test('listener removal rejection during unmount remains non-fatal', async () => {
+  const rejectedRemoval = Promise.reject(new Error('remove failed'));
+  void rejectedRemoval.catch(() => undefined);
+  const catchRejection = vi.spyOn(rejectedRemoval, 'catch');
+  const remove = vi.fn(() => rejectedRemoval);
+  const listenForPriceChangeActions = vi.fn(async () => remove);
+  const notifications: LocalNotificationPort = {
+    ensurePermission: async () => 'granted',
+    notifyPriceChange: async () => undefined,
+    listenForPriceChangeActions,
+  };
+  const gateway = new MockOperationsGateway(createMobileDemoState);
+  const { unmount } = render(<MobileApp gateway={gateway} scanner={createPorts().scanner} notifications={notifications} />);
+  await waitFor(() => expect(listenForPriceChangeActions).toHaveBeenCalledOnce());
+
+  unmount();
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  expect(remove).toHaveBeenCalledOnce();
+  expect(catchRejection).toHaveBeenCalledOnce();
+});
+
+test('late listener removal rejection after unmount remains non-fatal', async () => {
+  let resolveListener: ((remove: () => Promise<void>) => void) | undefined;
+  const rejectedRemoval = Promise.reject(new Error('late remove failed'));
+  void rejectedRemoval.catch(() => undefined);
+  const catchRejection = vi.spyOn(rejectedRemoval, 'catch');
+  const remove = vi.fn(() => rejectedRemoval);
+  const listenForPriceChangeActions = vi.fn(() => new Promise<() => Promise<void>>((resolve) => {
+    resolveListener = resolve;
+  }));
+  const notifications: LocalNotificationPort = {
+    ensurePermission: async () => 'granted',
+    notifyPriceChange: async () => undefined,
+    listenForPriceChangeActions,
+  };
+  const gateway = new MockOperationsGateway(createMobileDemoState);
+  const { unmount } = render(<MobileApp gateway={gateway} scanner={createPorts().scanner} notifications={notifications} />);
+  await waitFor(() => expect(resolveListener).toBeTypeOf('function'));
+  unmount();
+
+  await act(async () => {
+    resolveListener!(remove);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  expect(remove).toHaveBeenCalledOnce();
+  expect(catchRejection).toHaveBeenCalledOnce();
+});

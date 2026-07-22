@@ -56,11 +56,11 @@ export function MobileApp({ gateway, scanner, notifications }: {
       setSelectedSkuId(skuId);
     }).then((remove) => {
       if (active) removeListener = remove;
-      else void remove();
+      else void remove().catch(() => undefined);
     }).catch(() => undefined);
     return () => {
       active = false;
-      void removeListener?.();
+      if (removeListener) void removeListener().catch(() => undefined);
     };
   }, [gateway, notifications]);
 

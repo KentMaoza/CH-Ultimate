@@ -25,6 +25,14 @@ test('mobile demo state keeps the six synthetic SKUs with deterministic mobile d
   ]);
 });
 
+test('mobile demo state creates independent SKU alias collections', () => {
+  const firstState = createMobileDemoState();
+  firstState.skus.find((sku) => sku.id === 'sku-1')!.aliases.push('ALIAS-BOCOR');
+
+  expect(createMobileDemoState().skus.find((sku) => sku.id === 'sku-1')!.aliases)
+    .toEqual(['BRS-108', 'BERAS-HITAM-1KG']);
+});
+
 test('scan lookup normalizes text and prefers a current SKU number over an alias', () => {
   const state = createMobileDemoState();
   const longCode = `SKU-${'X'.repeat(120)}`;

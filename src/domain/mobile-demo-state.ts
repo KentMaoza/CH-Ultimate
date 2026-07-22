@@ -29,7 +29,7 @@ export function createMobileDemoState(): DemoState {
     ...initial,
     skus: initial.skus.map((sku) => ({
       ...sku,
-      aliases: mobileAliases[sku.id] ?? [],
+      aliases: [...(mobileAliases[sku.id] ?? [])],
       imageUrl: mobileImagePaths[sku.id] ?? '',
       createdAt: '2026-07-22T08:00:00+08:00',
       archived: sku.id === 'sku-4',

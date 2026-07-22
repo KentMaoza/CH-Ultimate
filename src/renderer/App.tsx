@@ -11,17 +11,32 @@ import { SettingsPage } from './pages/SettingsPage';
 import { ArchiveNotaPage, initialArchiveNotaView, type ArchiveNotaViewState } from './pages/ArchiveNotaPage';
 
 export type ModuleId = 'inventory' | 'create' | 'label' | 'nota' | 'notaArchive' | 'revenue' | 'empty' | 'settings';
+type NavIconName = 'warehouse' | 'add' | 'template' | 'nota' | 'archive' | 'revenue' | 'empty' | 'settings';
 
-const modules: Array<{ id: ModuleId; label: string; glyph: string }> = [
-  { id: 'inventory', label: 'SKU Gudang', glyph: '▦' },
-  { id: 'create', label: 'Buat SKU', glyph: '+' },
-  { id: 'label', label: 'Template Label & Invoice', glyph: '▣' },
-  { id: 'nota', label: 'Nota', glyph: '▤' },
-  { id: 'notaArchive', label: 'Arsip Nota', glyph: '▥' },
-  { id: 'revenue', label: 'Laporan Omzet', glyph: '↗' },
-  { id: 'empty', label: 'Barang Kosong', glyph: '□' },
-  { id: 'settings', label: 'Settings', glyph: '⚙' },
+const modules: Array<{ id: ModuleId; label: string; icon: NavIconName }> = [
+  { id: 'inventory', label: 'SKU Gudang', icon: 'warehouse' },
+  { id: 'create', label: 'Buat SKU', icon: 'add' },
+  { id: 'label', label: 'Template Label & Invoice', icon: 'template' },
+  { id: 'nota', label: 'Nota', icon: 'nota' },
+  { id: 'notaArchive', label: 'Arsip Nota', icon: 'archive' },
+  { id: 'revenue', label: 'Laporan Omzet', icon: 'revenue' },
+  { id: 'empty', label: 'Barang Kosong', icon: 'empty' },
+  { id: 'settings', label: 'Settings', icon: 'settings' },
 ];
+
+function NavIcon({ name }: { name: NavIconName }) {
+  const common = { fill: 'none', stroke: 'currentColor', strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, strokeWidth: 1.8 };
+  return <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" {...common}>
+    {name === 'warehouse' && <><path d="M3 10 12 4l9 6v10H3Z" /><path d="M7 20v-7h10v7M7 16h10" /></>}
+    {name === 'add' && <><rect x="4" y="4" width="16" height="16" rx="1" /><path d="M12 8v8M8 12h8" /></>}
+    {name === 'template' && <><path d="M5 3h11l3 3v15H5Z" /><path d="M15 3v4h4M8 11h8M8 15h5" /></>}
+    {name === 'nota' && <><path d="M6 3h12v18l-3-2-3 2-3-2-3 2Z" /><path d="M9 8h6M9 12h6M9 16h4" /></>}
+    {name === 'archive' && <><path d="M4 7h16v13H4Z" /><path d="M3 4h18v4H3ZM9 12h6" /></>}
+    {name === 'revenue' && <><path d="M4 19V5M4 19h16" /><path d="m7 15 4-4 3 2 5-6M15 7h4v4" /></>}
+    {name === 'empty' && <><path d="m4 7 8-4 8 4-8 4Z" /><path d="M4 7v10l8 4 8-4V7M12 11v10" /></>}
+    {name === 'settings' && <><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1" /></>}
+  </svg>;
+}
 
 function AppLayout() {
   const [active, setActive] = useState<ModuleId>('inventory');
@@ -58,7 +73,7 @@ function AppLayout() {
               className={active === module.id ? 'active' : ''}
               onClick={() => selectModule(module.id)}
             >
-              <span className="nav-glyph">{module.glyph}</span>
+              <span className="nav-glyph"><NavIcon name={module.icon} /></span>
               {!collapsed && <span>{module.label}</span>}
             </button>
           ))}

@@ -15,7 +15,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .app-rail nav button { display: flex; min-height: 42px; align-items: center; gap: 10px; width: 100%; padding: 10px 11px; border: 0; color: #fff; background: transparent; cursor: pointer; text-align: left; white-space: nowrap; }
 .app-rail nav button:hover { background: #292929; }
 .app-rail nav button.active { color: #111; background: #fff; font-weight: 750; }
-.nav-glyph { display: inline-grid; flex: 0 0 24px; width: 24px; place-items: center; font-size: 16px; }
+.nav-glyph { display: inline-grid; flex: 0 0 24px; width: 24px; place-items: center; }
+.nav-glyph svg { width: 21px; height: 21px; }
 .demo-badge { margin-top: auto; padding: 10px 6px; border: 1px solid #fff; font-size: 9px; letter-spacing: .09em; text-align: center; white-space: nowrap; overflow: hidden; }
 .app-main { min-width: 0; padding: 28px 34px; }
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; padding-bottom: 18px; border-bottom: 2px solid #111; }
@@ -186,6 +187,9 @@ td small { display: block; margin-top: 3px; color: #777; font-size: 9px; }
 .archive-nota__customer-name { font-size: 20px; line-height: 1.1; }
 .archive-nota__customer-place { margin-top: 5px; font-size: 15px; font-weight: 750; }
 .archive-nota__transaction small { margin-top: 7px; color: #555; }
+.archive-nota__pages { display: flex; align-items: center; gap: 7px; margin: 0 14px 10px; padding-top: 8px; border-top: 1px solid #bbb; }
+.archive-nota__pages button { min-width: 42px; min-height: 36px; padding: 5px 10px; border: 2px solid var(--nota-page-color); color: #111; background: #fff; box-shadow: inset 0 -4px 0 var(--nota-page-color); font-weight: 900; cursor: pointer; }
+.archive-nota__pages button[aria-pressed='true'] { color: var(--nota-page-text); background: var(--nota-page-color); box-shadow: none; }
 .archive-nota__pagination { display: flex; align-items: center; justify-content: space-between; }
 .archive-nota__preview-toggle { justify-self: stretch; }
 .archive-nota__preview { min-height: 540px; padding: 14px; overflow: auto; border: 2px solid #111; background: #fff; }

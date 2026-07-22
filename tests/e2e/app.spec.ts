@@ -73,6 +73,7 @@ test('Nota is a full-window workspace, stays horizontally contained, and returns
     await window.getByRole('button', { name: 'Kembali ke CH Ultimate' }).click();
     await expect(window.getByRole('heading', { name: 'SKU Gudang', level: 1 })).toBeVisible();
     await expect(window.getByRole('navigation', { name: 'Modul CH Ultimate' })).toBeVisible();
+    await expect(window.locator('.nav-glyph svg')).toHaveCount(8);
   } finally {
     await application.close();
   }
@@ -213,6 +214,15 @@ test('Nota lifecycle posts linked and ad-hoc lines, then import resets the sessi
 
     await window.getByRole('button', { name: 'Arsip Nota' }).click();
     await expect(window.getByText('SELESAI · HANYA LIHAT')).toBeVisible();
+    const archivePageA = window.getByRole('button', { name: 'Preview halaman A' });
+    const archivePageB = window.getByRole('button', { name: 'Preview halaman B' });
+    await expect(archivePageA).toHaveCSS('border-color', 'rgb(211, 47, 47)');
+    await expect(archivePageA).toHaveCSS('background-color', 'rgb(211, 47, 47)');
+    await expect(archivePageB).toHaveCSS('border-color', 'rgb(21, 101, 192)');
+    await archivePageB.click();
+    await expect(archivePageB).toHaveCSS('background-color', 'rgb(21, 101, 192)');
+    await archivePageA.click();
+    await expect(archivePageA).toHaveCSS('background-color', 'rgb(211, 47, 47)');
     await window.getByRole('button', { name: 'Lipat preview nota' }).click();
     await expect(window.getByRole('region', { name: 'Preview arsip nota' })).toHaveCount(0);
     await window.getByRole('button', { name: 'Buka preview nota' }).click();

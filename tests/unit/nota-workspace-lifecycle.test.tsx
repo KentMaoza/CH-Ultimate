@@ -87,7 +87,16 @@ test('archive module opens completed nota as inline read-only preview without ch
   expect(within(archiveCard).queryByText(transaction.baseNumber)).not.toBeInTheDocument();
   expect(within(archiveCard).getByText('Amelia')).toHaveClass('archive-nota__customer-name');
   expect(within(archiveCard).getByText('Saibah')).toHaveClass('archive-nota__customer-place');
-  fireEvent.click(screen.getByRole('button', { name: 'Preview halaman B' }));
+  const pageRow = archiveCard.nextElementSibling as HTMLElement;
+  expect(pageRow).toHaveClass('archive-nota__pages');
+  expect(pageRow).toHaveAttribute('aria-label', 'Halaman Amelia');
+  const pageA = within(pageRow).getByRole('button', { name: 'Preview halaman A' });
+  const pageB = within(pageRow).getByRole('button', { name: 'Preview halaman B' });
+  expect(pageA).toHaveStyle({ '--nota-page-color': '#D32F2F', '--nota-page-text': '#FFFFFF' });
+  expect(pageB).toHaveStyle({ '--nota-page-color': '#1565C0', '--nota-page-text': '#FFFFFF' });
+  expect(pageA).toHaveAttribute('aria-pressed', 'true');
+  fireEvent.click(pageB);
+  expect(pageB).toHaveAttribute('aria-pressed', 'true');
   expect(screen.queryByRole('heading', { name: `${transaction.baseNumber}B` })).not.toBeInTheDocument();
   expect(screen.getByText(`${transaction.baseNumber}B`)).toHaveClass('archive-nota__preview-number');
   expect(screen.queryByRole('region', { name: 'SKU Gudang' })).not.toBeInTheDocument();

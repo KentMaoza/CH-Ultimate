@@ -1,6 +1,6 @@
 import { completeNotaTransaction, createDraftNotaTransaction } from '../../src/domain/nota';
 import { createInitialState } from '../../src/domain/operations';
-import { archivePage, searchNota, workingPage } from '../../src/renderer/nota/nota-workspace-utils';
+import { archivePage, searchNota, trashPage, workingPage } from '../../src/renderer/nota/nota-workspace-utils';
 
 function completed(sequence: number, customerName: string, customerPlace: string) {
   const transaction = createDraftNotaTransaction(sequence);
@@ -20,16 +20,29 @@ test('global nota search matches CHU fields, lines, current SKU, and aliases acr
 
 test('archive filters completed transactions and paginates in groups of fifty', () => {
   const transactions = Array.from({ length: 51 }, (_, index) => completed(index + 1, index === 50 ? 'Budi' : 'Amelia', index === 50 ? 'Makassar' : 'Saibah'));
-  const unfilteredFirst = archivePage(transactions, { customer: '', place: '', from: '', to: '' });
-  const unfilteredSecond = archivePage(transactions, { customer: '', place: '', from: '', to: '' }, 1);
+  const unfilteredFirst = archivePage(transactions, { query: '', place: '', from: '', to: '' });
+  const unfilteredSecond = archivePage(transactions, { query: '', place: '', from: '', to: '' }, 1);
   expect(unfilteredFirst).toMatchObject({ total: 51, pages: 2 });
   expect(unfilteredFirst.items).toHaveLength(50);
   expect(unfilteredSecond.items).toHaveLength(1);
-  const first = archivePage(transactions, { customer: 'Amelia', place: 'Saibah', from: '', to: '' });
+  const first = archivePage(transactions, { query: 'Amelia', place: 'Saibah', from: '', to: '' });
   expect(first).toMatchObject({ total: 50, pages: 1 });
   expect(first.items).toHaveLength(50);
-  const budi = archivePage(transactions, { customer: 'Budi', place: 'Makassar', from: '', to: '' });
+  const budi = archivePage(transactions, { query: 'Budi', place: 'Makassar', from: '', to: '' });
   expect(budi.items.map((item) => item.customerName)).toEqual(['Budi']);
+  expect(archivePage(transactions, { query: transactions[0]!.baseNumber, place: '', from: '', to: '' }).items).toHaveLength(1);
+});
+
+test('trash search includes cancelled transactions and cancelled pages with pagination', () => {
+  const cancelled = createDraftNotaTransaction(80);
+  cancelled.customerName = 'Budi';
+  cancelled.status = 'cancelled';
+  cancelled.cancelledFromStatus = 'draft';
+  const withPage = createDraftNotaTransaction(81);
+  withPage.pages[0]!.status = 'cancelled';
+  const result = trashPage([cancelled, withPage], { query: 'CHU-', place: '', from: '', to: '' });
+  expect(result.total).toBe(2);
+  expect(result.items.map((item) => item.kind)).toEqual(['page', 'transaction']);
 });
 
 test('working notes filter inclusively, sort newest first, and paginate fifty per page', () => {

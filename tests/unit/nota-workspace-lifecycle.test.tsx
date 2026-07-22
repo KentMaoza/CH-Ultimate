@@ -10,6 +10,12 @@ function openNota(gateway = new MockOperationsGateway()) {
   return gateway;
 }
 
+function openArchive(gateway = new MockOperationsGateway()) {
+  render(<App gateway={gateway} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Arsip Nota' }));
+  return gateway;
+}
+
 test('selects Amelia A and B pages, adds C, and restores a cancelled page from Sampah', async () => {
   openNota();
   expect(screen.getByRole('button', { name: 'Halaman A' })).toHaveAttribute('aria-pressed', 'true');
@@ -21,9 +27,10 @@ test('selects Amelia A and B pages, adds C, and restores a cancelled page from S
 
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Batalkan halaman C' })); });
   expect(screen.getByText(/Halaman C dipindahkan ke Sampah/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Kembali ke CH Ultimate' }));
   fireEvent.click(screen.getByRole('button', { name: 'Arsip Nota' }));
   fireEvent.click(screen.getByRole('tab', { name: 'Sampah' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Pulihkan halaman C' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Pulihkan' }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Halaman C' })).toHaveAttribute('aria-pressed', 'true'));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Arsip Nota' })).not.toBeInTheDocument());
 });
@@ -59,23 +66,19 @@ test('working drawer filters session drafts by customer and inclusive nota date'
   expect(within(drawer).getByText('Tidak ada nota yang sedang dikerjakan.')).toBeInTheDocument();
 });
 
-test('archive opens completed nota as read-only preview without changing stock or revenue', async () => {
+test('archive module opens completed nota as inline read-only preview without changing stock or revenue', async () => {
   const gateway = new MockOperationsGateway();
   const transaction = gateway.getSnapshot().notaTransactions[0]!;
   await gateway.completeNotaTransaction(transaction.id);
   const stockBefore = gateway.getSnapshot().skus.map((sku) => sku.stock);
   const revenueBefore = buildRevenueReport(gateway.getSnapshot()).today;
-  openNota(gateway);
+  openArchive(gateway);
 
-  fireEvent.click(screen.getByRole('button', { name: 'Arsip Nota' }));
-  const archive = screen.getByRole('dialog', { name: 'Arsip Nota' });
-  fireEvent.click(within(archive).getByRole('button', { name: new RegExp(transaction.baseNumber) }));
-
-  expect(screen.queryByRole('dialog', { name: /Buka kembali nota/i })).not.toBeInTheDocument();
   expect(screen.getByText('SELESAI · HANYA LIHAT')).toBeInTheDocument();
+  expect(screen.getByRole('region', { name: 'Preview arsip nota' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Preview halaman B' }));
+  expect(screen.getByRole('heading', { name: `${transaction.baseNumber}B` })).toBeInTheDocument();
   expect(screen.queryByRole('region', { name: 'SKU Gudang' })).not.toBeInTheDocument();
-  expect(screen.getByLabelText('Pelanggan')).toBeDisabled();
-  expect(screen.getByRole('button', { name: 'Kembali ke Arsip' })).toBeInTheDocument();
   expect(gateway.getSnapshot().skus.map((sku) => sku.stock)).toEqual(stockBefore);
   expect(buildRevenueReport(gateway.getSnapshot()).today).toBe(revenueBefore);
   expect(gateway.getSnapshot().notaTransactions[0]?.status).toBe('completed');
@@ -85,7 +88,28 @@ test('archive opens completed nota as read-only preview without changing stock o
   expect(gateway.getSnapshot().notaTransactions[0]?.status).toBe('completed');
 });
 
-test('global search previews a completed nota without reopening it', async () => {
+test('reopen returns to Nota and back preserves archive query, place, dates, and tab', async () => {
+  const gateway = new MockOperationsGateway();
+  const transaction = gateway.getSnapshot().notaTransactions[0]!;
+  await gateway.completeNotaTransaction(transaction.id);
+  openArchive(gateway);
+  fireEvent.change(screen.getByLabelText('Cari arsip nota'), { target: { value: 'Amelia' } });
+  fireEvent.change(screen.getByLabelText('Filter tempat arsip'), { target: { value: 'Saibah' } });
+  fireEvent.change(screen.getByLabelText('Dari tanggal arsip'), { target: { value: transaction.transactionDate } });
+  fireEvent.change(screen.getByLabelText('Sampai tanggal arsip'), { target: { value: transaction.transactionDate } });
+  fireEvent.click(screen.getByRole('button', { name: 'Buka kembali untuk edit' }));
+  fireEvent.click(within(screen.getByRole('dialog', { name: /Buka kembali nota/i })).getByRole('button', { name: 'Buka kembali' }));
+  await waitFor(() => expect(screen.getByTestId('chu-nota-workspace')).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button', { name: 'Kembali ke CH Ultimate' }));
+  expect(screen.getByRole('heading', { name: 'Arsip Nota' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'Arsip' })).toHaveAttribute('aria-selected', 'true');
+  expect(screen.getByLabelText('Cari arsip nota')).toHaveValue('Amelia');
+  expect(screen.getByLabelText('Filter tempat arsip')).toHaveValue('Saibah');
+  expect(screen.getByLabelText('Dari tanggal arsip')).toHaveValue(transaction.transactionDate);
+  expect(screen.getByLabelText('Sampai tanggal arsip')).toHaveValue(transaction.transactionDate);
+});
+
+test('workspace search excludes completed nota', async () => {
   const gateway = new MockOperationsGateway();
   const transaction = gateway.getSnapshot().notaTransactions[0]!;
   await gateway.completeNotaTransaction(transaction.id);
@@ -93,10 +117,7 @@ test('global search previews a completed nota without reopening it', async () =>
 
   const search = screen.getByRole('combobox', { name: 'Cari nota' });
   fireEvent.change(search, { target: { value: transaction.baseNumber } });
-  fireEvent.keyDown(search, { key: 'Enter' });
-
-  expect(screen.getByText('SELESAI · HANYA LIHAT')).toBeInTheDocument();
-  expect(screen.queryByRole('dialog', { name: /Buka kembali nota/i })).not.toBeInTheDocument();
+  expect(screen.getByRole('listbox', { name: 'Hasil pencarian nota' })).toHaveTextContent('Tidak ada nota yang cocok.');
   expect(gateway.getSnapshot().notaTransactions[0]?.status).toBe('completed');
 });
 
@@ -131,7 +152,7 @@ test('page cancellation offers an undo action that restores the page', async () 
 
 test('search click opens the clicked result, exposes an active descendant, and Escape restores its prior focus', () => {
   openNota();
-  const listTrigger = screen.getByRole('button', { name: 'Arsip Nota' });
+  const listTrigger = screen.getByRole('button', { name: 'Nota Dikerjakan' });
   listTrigger.focus();
   fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
   const search = screen.getByRole('combobox', { name: 'Cari nota' });
@@ -215,44 +236,36 @@ test('a nested cancellation confirmation keeps focus inside Nota Dikerjakan and 
   expect(workingTrigger).not.toHaveFocus();
 });
 
-test('Escape from a nested reopening confirmation restores the clicked control inside Arsip Nota', async () => {
+test('Escape closes archive reopen confirmation without changing status', async () => {
   const gateway = new MockOperationsGateway();
   await gateway.completeNotaTransaction(gateway.getSnapshot().notaTransactions[0]!.id);
-  openNota(gateway);
-  const listTrigger = screen.getByRole('button', { name: 'Arsip Nota' });
-  fireEvent.click(listTrigger);
-  const drawer = screen.getByRole('dialog', { name: 'Arsip Nota' });
-  const reopen = within(drawer).getByRole('button', { name: 'Buka kembali' });
+  openArchive(gateway);
+  const reopen = screen.getByRole('button', { name: 'Buka kembali untuk edit' });
   fireEvent.click(reopen);
 
   const confirmation = screen.getByRole('dialog', { name: /Buka kembali nota/i });
   fireEvent.keyDown(confirmation, { key: 'Escape' });
 
-  expect(screen.getByRole('dialog', { name: 'Arsip Nota' })).toBeInTheDocument();
-  expect(reopen).toHaveFocus();
-  expect(listTrigger).not.toHaveFocus();
+  expect(screen.getByRole('heading', { name: 'Arsip Nota' })).toBeInTheDocument();
+  expect(gateway.getSnapshot().notaTransactions[0]?.status).toBe('completed');
 });
 
-test('cancelling a transaction opens Sampah directly', async () => {
+test('cancelling a transaction stays in Nota workspace', async () => {
   openNota();
   fireEvent.click(screen.getByRole('button', { name: 'Batalkan transaksi' }));
   const confirmation = screen.getByRole('dialog', { name: /Batalkan transaksi/i });
   fireEvent.click(within(confirmation).getByRole('button', { name: 'Batalkan' }));
-  await waitFor(() => expect(screen.getByRole('dialog', { name: 'Arsip Nota' })).toBeInTheDocument());
-  expect(screen.getByRole('tab', { name: 'Sampah' })).toHaveAttribute('aria-selected', 'true');
+  await waitFor(() => expect(screen.getByText('Belum ada nota yang sedang dikerjakan pada sesi ini.')).toBeInTheDocument());
+  expect(screen.queryByRole('tab', { name: 'Sampah' })).not.toBeInTheDocument();
 });
 
-test('a cancelled transaction found in search routes to Sampah', async () => {
+test('a cancelled transaction is excluded from workspace search', async () => {
   openNota();
   fireEvent.click(screen.getByRole('button', { name: 'Batalkan transaksi' }));
-  fireEvent.click(within(screen.getByRole('dialog', { name: /Batalkan transaksi/i })).getByRole('button', { name: 'Batalkan' }));
-  await waitFor(() => expect(screen.getByRole('dialog', { name: 'Arsip Nota' })).toBeInTheDocument());
-  fireEvent.click(screen.getByRole('button', { name: 'Tutup Arsip Nota' }));
+  await act(async () => { fireEvent.click(within(screen.getByRole('dialog', { name: /Batalkan transaksi/i })).getByRole('button', { name: 'Batalkan' })); });
   const search = screen.getByRole('combobox', { name: 'Cari nota' });
   fireEvent.change(search, { target: { value: 'Amelia' } });
-  fireEvent.click(screen.getAllByRole('option')[0]!);
-
-  expect(screen.getByRole('tab', { name: 'Sampah' })).toHaveAttribute('aria-selected', 'true');
+  expect(screen.getByRole('listbox', { name: 'Hasil pencarian nota' })).toHaveTextContent('Tidak ada nota yang cocok.');
 });
 
 test('transaction cancellation can be undone', async () => {
@@ -309,12 +322,11 @@ test('restoring a completed transaction returns to Arsip rather than the working
   const transaction = gateway.getSnapshot().notaTransactions[0]!;
   await gateway.completeNotaTransaction(transaction.id);
   await gateway.cancelNotaTransaction(transaction.id);
-  openNota(gateway);
-  fireEvent.click(screen.getByRole('button', { name: 'Buka Arsip' }));
+  openArchive(gateway);
   fireEvent.click(screen.getByRole('tab', { name: 'Sampah' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Pulihkan transaksi' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Pulihkan' }));
   await waitFor(() => expect(screen.getByRole('tab', { name: 'Arsip' })).toHaveAttribute('aria-selected', 'true'));
-  expect(screen.getByRole('button', { name: new RegExp(transaction.baseNumber) })).toBeInTheDocument();
+  expect(screen.getByText('SELESAI · HANYA LIHAT')).toBeInTheDocument();
 });
 
 test.each(['draft', 'reopened'] as const)('restoring a cancelled %s transaction selects its working page', async (status) => {
@@ -325,11 +337,10 @@ test.each(['draft', 'reopened'] as const)('restoring a cancelled %s transaction 
     await gateway.reopenNotaTransaction(transaction.id);
   }
   await gateway.cancelNotaTransaction(transaction.id);
-  openNota(gateway);
-  fireEvent.click(screen.getByRole('button', { name: 'Buka Arsip' }));
+  openArchive(gateway);
   fireEvent.click(screen.getByRole('tab', { name: 'Sampah' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Pulihkan transaksi' }));
-  await waitFor(() => expect(screen.getByRole('dialog', { name: 'Nota Dikerjakan' })).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button', { name: 'Pulihkan' }));
+  await waitFor(() => expect(screen.getByTestId('chu-nota-workspace')).toBeInTheDocument());
   expect(within(screen.getByLabelText('Halaman aktif')).getByRole('button', { name: 'Halaman A' })).toHaveAttribute('aria-pressed', 'true');
   expect(gateway.getSnapshot().notaTransactions[0]?.status).toBe(status);
 });
@@ -502,9 +513,8 @@ test('multi-page completion posts aggregate revenue once, archive confirmation r
   expect(gateway.getSnapshot().skus.find((sku) => sku.id === 'sku-1')?.stock).toBe(21);
   expect(buildRevenueReport(gateway.getSnapshot()).today).toBe(131_000);
 
-  openNota(gateway);
-  fireEvent.click(screen.getByRole('button', { name: 'Buka Arsip' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Buka kembali' }));
+  openArchive(gateway);
+  fireEvent.click(screen.getByRole('button', { name: 'Buka kembali untuk edit' }));
   const confirmation = screen.getByRole('dialog', { name: /Buka kembali nota/i });
   fireEvent.click(within(confirmation).getByRole('button', { name: 'Buka kembali' }));
   await waitFor(() => expect(gateway.getSnapshot().notaTransactions[0]?.status).toBe('reopened'));

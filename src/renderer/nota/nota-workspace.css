@@ -4,7 +4,7 @@
 .chu-nota-workspace button { padding: 4px 8px; cursor: pointer; font-size: calc(11px * var(--nota-font-scale)); font-weight: 750; }
 .chu-nota-workspace button:disabled, .chu-nota-workspace input:disabled, .chu-nota-workspace select:disabled { cursor: not-allowed; opacity: .52; }
 .chu-nota-workspace button:focus-visible, .chu-nota-workspace input:focus-visible, .chu-nota-workspace select:focus-visible, .chu-nota-workspace output:focus-visible, .chu-nota-workspace [role='option']:focus-visible { outline: 3px solid #111; outline-offset: 2px; }
-.chu-nota-workspace__toolbar { display: grid; grid-template-columns: max-content 42px max-content max-content minmax(170px, 1fr) max-content max-content max-content; gap: 6px; align-items: center; min-height: 40px; padding: 4px; border: 2px solid #111; background: #fff; }
+.chu-nota-workspace__toolbar { display: grid; grid-template-columns: max-content 42px max-content minmax(170px, 1fr) max-content max-content max-content; gap: 6px; align-items: center; min-height: 40px; padding: 4px; border: 2px solid #111; background: #fff; }
 .chu-nota-workspace__back { color: #fff !important; background: #111 !important; }
 .chu-nota-workspace__wordmark { display: grid; width: 42px; height: 28px; place-items: center; color: #fff; background: #111; letter-spacing: -.08em; }
 .chu-nota-workspace__section { font-size: calc(12px * var(--nota-font-scale)); font-weight: 900; white-space: nowrap; }

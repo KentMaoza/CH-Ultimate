@@ -19,7 +19,7 @@ test('completes a lsn nota from the CH Nota workspace and deducts twelve pieces'
   fireEvent.change(screen.getByLabelText('Harga LSN baris 1'), { target: { value: '504000' } });
   fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
   fireEvent.click(screen.getByRole('button', { name: 'Selesaikan' }));
-  expect(await screen.findByRole('button', { name: 'Buka kembali' })).toBeInTheDocument();
+  expect(await screen.findByText('Nota selesai dan stok demo diperbarui.')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Kembali ke CH Ultimate' }));
   expect(screen.getByRole('row', { name: /BRS-108-BLK/ })).toHaveTextContent('0');
 });

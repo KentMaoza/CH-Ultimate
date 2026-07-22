@@ -4,7 +4,7 @@ import type { PaymentKind } from '../../domain/types';
 import { formatRupiah } from '../format';
 import { useOperations } from '../operations-context';
 import { ConfirmDialog } from './ConfirmDialog';
-import { ListDrawer, WorkingDrawer } from './NotaDrawers';
+import { WorkingDrawer } from './NotaDrawers';
 import { NewTransactionDialog } from './NewTransactionDialog';
 import { NotaGrid, type NotaGridHandle } from './NotaGrid';
 import { notaPageTheme } from './nota-page-colors';
@@ -13,24 +13,22 @@ import { useNotaValidation, type InvalidNotaField } from './useNotaValidation';
 import './nota-workspace.css';
 
 type Selection = { transactionId: string; pageId: string };
-type ConfirmKind = 'complete' | 'reopen' | 'cancel';
+type ConfirmKind = 'complete' | 'cancel';
 type Confirmation = { kind: ConfirmKind; transactionId: string; pageId?: string; restoreFocusTo: HTMLElement | null };
-type DrawerKind = 'working' | 'list' | null;
+type DrawerKind = 'working' | null;
 const paymentLabel = (payment: PaymentKind) => ({ unclassified: 'Belum diklasifikasi', cash: 'Kas', transfer: 'Transfer', credit: 'Piutang' })[payment];
 
 function focusTarget(target: EventTarget | null) {
   return target instanceof HTMLElement ? target : null;
 }
 
-export function NotaWorkspace({ onBack }: { onBack: () => void }) {
+export function NotaWorkspace({ onBack, initialSelection }: { onBack: () => void; initialSelection?: Selection }) {
   const { state, gateway } = useOperations();
-  const [selected, setSelected] = useState<Selection>({ transactionId: '', pageId: '' });
-  const [archivePreview, setArchivePreview] = useState<Selection | null>(null);
+  const [selected, setSelected] = useState<Selection>(initialSelection ?? { transactionId: '', pageId: '' });
   const [fontScale, setFontScale] = useState(125);
   const [message, setMessage] = useState('');
   const [drawer, setDrawer] = useState<DrawerKind>(null);
   const [drawerRestoreFocus, setDrawerRestoreFocus] = useState<HTMLElement | null>(null);
-  const [listTab, setListTab] = useState<'archive' | 'trash'>('archive');
   const [newOpen, setNewOpen] = useState(false);
   const [newRestoreFocus, setNewRestoreFocus] = useState<HTMLElement | null>(null);
   const [confirm, setConfirm] = useState<Confirmation | null>(null);
@@ -45,21 +43,15 @@ export function NotaWorkspace({ onBack }: { onBack: () => void }) {
   const grid = useRef<NotaGridHandle>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const working = useMemo(() => workingTransactions(state.notaTransactions), [state.notaTransactions]);
-  const previewTransaction = archivePreview ? state.notaTransactions.find((item) => item.id === archivePreview.transactionId && item.status === 'completed') : undefined;
-  const selectedTransaction = previewTransaction ?? working.find((item) => item.id === selected.transactionId) ?? working[0];
+  const selectedTransaction = working.find((item) => item.id === selected.transactionId) ?? working[0];
   const page = selectedTransaction && activePage(selectedTransaction, selectedTransaction.id === selected.transactionId ? selected.pageId : undefined);
-  const results = useMemo(() => searchNota(state, query), [state, query]);
+  const results = useMemo(() => searchNota({ ...state, notaTransactions: working }, query), [state, working, query]);
   const validation = useNotaValidation(state.notaTransactions);
 
   useEffect(() => {
-    if (archivePreview) {
-      if (!previewTransaction || !page) setArchivePreview(null);
-      else if (selected.transactionId !== previewTransaction.id || selected.pageId !== page.id) setSelected({ transactionId: previewTransaction.id, pageId: page.id });
-      return;
-    }
     if (selectedTransaction && page && (selected.transactionId !== selectedTransaction.id || selected.pageId !== page.id)) setSelected({ transactionId: selectedTransaction.id, pageId: page.id });
     if (!selectedTransaction && (selected.transactionId || selected.pageId)) setSelected({ transactionId: '', pageId: '' });
-  }, [archivePreview, page, previewTransaction, selected, selectedTransaction]);
+  }, [page, selected, selectedTransaction]);
   useEffect(() => () => { if (undoTimer.current) clearTimeout(undoTimer.current); }, []);
   useEffect(() => {
     if (!invalidFocus || page?.id !== invalidFocus.pageId) return;
@@ -114,12 +106,10 @@ export function NotaWorkspace({ onBack }: { onBack: () => void }) {
       }
     }
   };
-  const choose = (choice: Selection) => { setArchivePreview(null); setSelected(choice); setDrawer(null); setQuery(''); setHighlight(0); };
-  const previewArchive = (choice: Selection) => { setArchivePreview(choice); setSelected(choice); setDrawer(null); setQuery(''); setHighlight(0); };
-  const selectPage = (choice: Selection) => archivePreview ? setSelected(choice) : choose(choice);
-  const openDrawer = (kind: Exclude<DrawerKind, null>, target: EventTarget | null, tab: 'archive' | 'trash' = 'archive') => {
+  const choose = (choice: Selection) => { setSelected(choice); setDrawer(null); setQuery(''); setHighlight(0); };
+  const selectPage = (choice: Selection) => choose(choice);
+  const openDrawer = (kind: Exclude<DrawerKind, null>, target: EventTarget | null) => {
     setDrawerRestoreFocus(focusTarget(target));
-    setListTab(tab);
     setDrawer(kind);
   };
   const openNew = (target: EventTarget | null) => { setNewRestoreFocus(focusTarget(target)); setNewOpen(true); };
@@ -184,48 +174,12 @@ export function NotaWorkspace({ onBack }: { onBack: () => void }) {
       return false;
     }
     setMessage('Nota selesai dan stok demo diperbarui.');
-    openDrawer('list', null, 'archive');
     return true;
-  };
-  const restorePage = async (choice: Selection) => {
-    const result = await run(() => gateway.restoreNotaPage(choice.transactionId, choice.pageId), 'Halaman nota tidak dapat dipulihkan.');
-    const restored = gateway.getSnapshot().notaTransactions.find((item) => item.id === choice.transactionId)?.pages.find((item) => item.id === choice.pageId);
-    if (!result.ok || restored?.status !== 'active') {
-      if (result.ok) setMessage('Halaman nota tidak dapat dipulihkan.');
-      return;
-    }
-    choose(choice);
-  };
-  const restoreTransaction = async (transactionId: string) => {
-    const result = await run(() => gateway.restoreNotaTransaction(transactionId), 'Transaksi tidak dapat dipulihkan.');
-    const restored = gateway.getSnapshot().notaTransactions.find((item) => item.id === transactionId);
-    if (!result.ok || !restored || restored.status === 'cancelled') {
-      if (result.ok) setMessage('Transaksi tidak dapat dipulihkan.');
-      return;
-    }
-    if (restored.status === 'completed') {
-      setListTab('archive');
-      setDrawer('list');
-      return;
-    }
-    const restoredPage = activePage(restored);
-    if (!restoredPage) { setMessage('Halaman aktif transaksi tidak tersedia.'); return; }
-    choose({ transactionId, pageId: restoredPage.id });
-    setDrawer('working');
   };
   const updateTransaction = (transactionId: string, patch: Parameters<typeof gateway.updateNotaTransaction>[1]) => { void run(() => gateway.updateNotaTransaction(transactionId, patch)); };
   const updateLine = (transactionId: string, pageId: string, lineId: string, patch: Parameters<typeof gateway.updateNotaLine>[3]) => { void run(() => gateway.updateNotaLine(transactionId, pageId, lineId, patch)); };
   const deleteLine = (transactionId: string, pageId: string, lineId: string) => { void run(() => gateway.deleteNotaLine(transactionId, pageId, lineId)); };
   const openSearchResult = (result: NotaSearchResult) => {
-    if (result.transaction.status === 'cancelled' || result.page.status === 'cancelled') {
-      setQuery('');
-      openDrawer('list', searchRestoreFocus.current, 'trash');
-      return;
-    }
-    if (result.transaction.status === 'completed') {
-      previewArchive({ transactionId: result.transaction.id, pageId: result.page.id });
-      return;
-    }
     choose({ transactionId: result.transaction.id, pageId: result.page.id });
   };
   const clearSearch = (restoreFocus = false) => {
@@ -243,19 +197,11 @@ export function NotaWorkspace({ onBack }: { onBack: () => void }) {
       return;
     }
     if (pending.kind === 'complete') await complete(pending.transactionId);
-    if (pending.kind === 'reopen') {
-      const result = await run(() => gateway.reopenNotaTransaction(pending.transactionId), 'Nota tidak dapat dibuka kembali.');
-      const reopened = gateway.getSnapshot().notaTransactions.find((item) => item.id === pending.transactionId);
-      if (result.ok && reopened && ['draft', 'reopened'].includes(reopened.status)) choose({ transactionId: reopened.id, pageId: pending.pageId && reopened.pages.some((item) => item.id === pending.pageId && item.status === 'active') ? pending.pageId : activePage(reopened)?.id ?? '' });
-      else if (result.ok) setMessage('Nota tidak dapat dibuka kembali.');
-    }
     if (pending.kind === 'cancel') {
       const result = await run(() => gateway.cancelNotaTransaction(pending.transactionId), 'Transaksi tidak dapat dibatalkan.');
       const cancelled = gateway.getSnapshot().notaTransactions.find((item) => item.id === pending.transactionId);
       if (result.ok && cancelled?.status === 'cancelled') {
         showUndo('Transaksi dipindahkan ke Sampah.', () => gateway.restoreNotaTransaction(pending.transactionId));
-        setListTab('trash');
-        setDrawer('list');
       } else if (result.ok) setMessage('Transaksi tidak dapat dibatalkan.');
     }
     setConfirm(null);
@@ -265,14 +211,13 @@ export function NotaWorkspace({ onBack }: { onBack: () => void }) {
   const pageIndex = selectedTransaction && page ? selectedTransaction.pages.findIndex((item) => item.id === page.id) : 0;
   const pageTheme = notaPageTheme(pageIndex);
   const themeStyle = { '--nota-page-color': pageTheme.background, '--nota-page-text': pageTheme.foreground } as CSSProperties;
-  const confirmTitle = confirm?.kind === 'complete' ? 'Selesaikan nota?' : confirm?.kind === 'reopen' ? 'Buka kembali nota?' : 'Batalkan transaksi?';
+  const confirmTitle = confirm?.kind === 'complete' ? 'Selesaikan nota?' : 'Batalkan transaksi?';
 
   return <main className="chu-nota-workspace" data-testid="chu-nota-workspace" aria-busy={busy || undefined} style={{ '--nota-font-scale': fontScale / 100 } as CSSProperties}>
     <header className="chu-nota-workspace__toolbar">
       <button className="chu-nota-workspace__back" onClick={onBack}>Kembali ke CH Ultimate</button>
       <strong className="chu-nota-workspace__wordmark">CHU</strong>
       <button className="chu-nota-workspace__section" onClick={(event) => openDrawer('working', event.currentTarget)}>Nota Dikerjakan</button>
-      <button onClick={(event) => openDrawer('list', event.currentTarget)}>Arsip Nota</button>
       <div className="chu-nota-workspace__search"><input ref={searchInput} aria-label="Cari nota" role="combobox" aria-expanded={Boolean(query)} aria-controls="nota-search-results" aria-activedescendant={query && results[highlight] ? `nota-search-result-${results[highlight]!.transaction.id}-${results[highlight]!.page.id}` : undefined} value={query} placeholder="Cari nota" onChange={(event) => { setQuery(event.target.value); setHighlight(0); }} onKeyDown={(event) => { if (event.key === 'ArrowDown') { event.preventDefault(); setHighlight((value) => Math.min(Math.max(0, results.length - 1), value + 1)); } else if (event.key === 'ArrowUp') { event.preventDefault(); setHighlight((value) => Math.max(0, value - 1)); } else if (event.key === 'Enter') { event.preventDefault(); const result = results[highlight]; if (result) openSearchResult(result); } else if (event.key === 'Escape') { event.preventDefault(); clearSearch(true); } }} />{query && <div id="nota-search-results" role="listbox" aria-label="Hasil pencarian nota">{results.map((result, index) => <div id={`nota-search-result-${result.transaction.id}-${result.page.id}`} role="option" aria-selected={highlight === index} key={`${result.transaction.id}-${result.page.id}`} onMouseDown={(event) => event.preventDefault()} onClick={() => openSearchResult(result)}>{result.label}</div>)}{!results.length && <span>Tidak ada nota yang cocok.</span>}</div>}</div>
       <div className="chu-nota-workspace__zoom" aria-label="Ukuran tulisan"><button aria-label="Perkecil tulisan" disabled={fontScale === 100} onClick={() => setFontScale((value) => value === 150 ? 125 : 100)}>−</button><button aria-label={`Ukuran tulisan ${fontScale}%`} onClick={() => setFontScale(125)}>{fontScale}%</button><button aria-label="Perbesar tulisan" disabled={fontScale === 150} onClick={() => setFontScale((value) => value === 100 ? 125 : 150)}>+</button></div>
       <span className="chu-nota-workspace__demo">DEMO DATA · SESSION ONLY</span>
@@ -282,7 +227,6 @@ export function NotaWorkspace({ onBack }: { onBack: () => void }) {
     {undo && <p className="chu-nota-workspace__notice" role="status">{undo.label} <button disabled={busy} onClick={() => void restoreUndo()}>Urungkan</button></p>}
     {message && <p className="chu-nota-workspace__notice" role="status">{message}</p>}
     {selectedTransaction && page ? <>
-      {archivePreview && <section className="chu-nota-workspace__archive-preview" aria-label="Preview arsip"><strong>SELESAI · HANYA LIHAT</strong><span>Membuka preview tidak mengubah stok atau omzet.</span><button onClick={(event) => { setArchivePreview(null); openDrawer('list', event.currentTarget); }}>Kembali ke Arsip</button><button className="chu-nota-workspace__complete" onClick={(event) => requestConfirm('reopen', selectedTransaction.id, event.currentTarget, page.id)}>Buka kembali untuk edit</button></section>}
       <section className="chu-nota-workspace__page-tabs" aria-label="Halaman aktif">
         {selectedTransaction.pages.filter((item) => item.status === 'active').map((item) => { const theme = notaPageTheme(selectedTransaction.pages.findIndex((candidate) => candidate.id === item.id)); return <button style={{ '--nota-page-color': theme.background, '--nota-page-text': theme.foreground } as CSSProperties} disabled={busy} key={item.id} aria-label={`Halaman ${item.suffix}`} aria-pressed={item.id === page.id} onClick={() => selectPage({ transactionId: selectedTransaction.id, pageId: item.id })}>Nota {item.suffix}</button>; })}
         {editable && <><button aria-label={`Tambah Nota ${noteSuffixFromIndex(selectedTransaction.nextNoteIndex)}`} disabled={busy} onClick={() => void addPage(selectedTransaction.id)}>+ Tambah Nota {noteSuffixFromIndex(selectedTransaction.nextNoteIndex)}</button><button aria-label={`Batalkan halaman ${page.suffix}`} disabled={busy || selectedTransaction.pages.filter((item) => item.status === 'active').length < 2} title={selectedTransaction.pages.filter((item) => item.status === 'active').length < 2 ? 'Minimal satu halaman aktif harus tersisa.' : undefined} onClick={() => void cancelPage({ transactionId: selectedTransaction.id, pageId: page.id })}>Batalkan halaman</button></>}
@@ -290,10 +234,9 @@ export function NotaWorkspace({ onBack }: { onBack: () => void }) {
       <section className="chu-nota-workspace__meta" aria-label="Metadata nota"><div className="chu-nota-workspace__number" style={themeStyle}><span>NOTA DIBUAT</span><strong>{page.suffix}</strong><b>{selectedTransaction.baseNumber}{page.suffix}</b></div><label><span>Pelanggan</span><input disabled={!editable || busy} value={selectedTransaction.customerName} onChange={(event) => updateTransaction(selectedTransaction.id, { customerName: event.target.value })} /></label><label><span>Tempat</span><input disabled={!editable || busy} value={selectedTransaction.customerPlace} onChange={(event) => updateTransaction(selectedTransaction.id, { customerPlace: event.target.value })} /></label><label><span>Tanggal</span><input disabled={!editable || busy} type="date" value={selectedTransaction.transactionDate} onChange={(event) => updateTransaction(selectedTransaction.id, { transactionDate: event.target.value })} /></label><label><span>Pembayaran</span><select disabled={!editable || busy} value={selectedTransaction.payment} onChange={(event) => updateTransaction(selectedTransaction.id, { payment: event.target.value as PaymentKind })}><option value="unclassified">Belum diklasifikasi</option><option value="cash">Kas</option><option value="transfer">Transfer</option><option value="credit">Piutang</option></select></label><div className="chu-nota-workspace__meta-total"><span>TOTAL SEMUA HALAMAN AKTIF</span><strong data-testid="nota-transaction-total">{formatRupiah(total)}</strong><small>{paymentLabel(selectedTransaction.payment)}</small></div></section>
       <NotaGrid ref={grid} lines={page.lines} suffix={page.suffix} skus={state.skus} editable={editable} busy={busy} invalidValues={validation.valuesForPage(selectedTransaction.id, page.id)} onInvalidChange={(lineId, field, rawValue) => validation.report({ transactionId: selectedTransaction.id, pageId: page.id, lineId, field }, rawValue)} onUpdate={(line, patch) => updateLine(selectedTransaction.id, page.id, line.id, patch)} onDelete={(line) => deleteLine(selectedTransaction.id, page.id, line.id)} />
       <footer className="chu-nota-workspace__footer"><div><span>TOTAL TRANSAKSI</span><strong>{formatRupiah(total)}</strong></div><label><span>Ruang cetak</span><select disabled><option>Semua halaman aktif (segera hadir)</option></select></label><p>Printing produksi belum tersedia pada demo sesi ini.</p><button disabled aria-label="Print Nota">Print Nota</button>{editable && <div className="chu-nota-workspace__lifecycle"><button disabled={busy} onClick={(event) => requestConfirm('cancel', selectedTransaction.id, event.currentTarget, page.id)}>Batalkan transaksi</button><button disabled={busy} className="chu-nota-workspace__complete" aria-label="Selesaikan nota" onClick={(event) => requestComplete(event.currentTarget)}>Selesaikan nota</button></div>}</footer>
-    </> : <section className="chu-nota-workspace__empty"><p>Belum ada nota yang sedang dikerjakan pada sesi ini.</p><button onClick={(event) => openNew(event.currentTarget)}>Transaksi Baru</button><button onClick={(event) => openDrawer('list', event.currentTarget)}>Buka Arsip</button></section>}
+    </> : <section className="chu-nota-workspace__empty"><p>Belum ada nota yang sedang dikerjakan pada sesi ini.</p><button onClick={(event) => openNew(event.currentTarget)}>Transaksi Baru</button></section>}
     {drawer === 'working' && <WorkingDrawer transactions={state.notaTransactions} selected={selected} onClose={() => setDrawer(null)} onSelect={choose} onAdd={(id) => void addPage(id)} onCancelPage={(choice) => void cancelPage(choice)} onCancelTransaction={(id, target) => requestConfirm('cancel', id, target)} restoreFocusTo={drawerRestoreFocus} busy={busy} />}
-    {drawer === 'list' && <ListDrawer transactions={state.notaTransactions} initialTab={listTab} onTabChange={setListTab} onClose={() => setDrawer(null)} onPreviewArchive={(id, pageId) => previewArchive({ transactionId: id, pageId })} onReopenArchive={(id, pageId, target) => requestConfirm('reopen', id, target, pageId)} onRestoreTransaction={(id) => void restoreTransaction(id)} onRestorePage={(choice) => void restorePage(choice)} restoreFocusTo={drawerRestoreFocus} busy={busy} />}
     <NewTransactionDialog open={newOpen} onClose={() => setNewOpen(false)} onCreate={(input) => void create(input)} restoreFocusTo={newRestoreFocus} busy={busy} />
-    <ConfirmDialog open={confirm !== null} title={confirmTitle} confirmLabel={confirm?.kind === 'complete' ? 'Selesaikan' : confirm?.kind === 'reopen' ? 'Buka kembali' : 'Batalkan'} onCancel={() => setConfirm(null)} onConfirm={() => void confirmAction()} restoreFocusTo={confirm?.restoreFocusTo ?? null} busy={busy}>{confirm?.kind === 'complete' ? 'Stok demo akan diperbarui berdasarkan baris SKU yang terlacak.' : confirm?.kind === 'reopen' ? 'Nota akan kembali ke Nota Dikerjakan untuk diedit.' : 'Transaksi akan dipindahkan ke Sampah.'}</ConfirmDialog>
+    <ConfirmDialog open={confirm !== null} title={confirmTitle} confirmLabel={confirm?.kind === 'complete' ? 'Selesaikan' : 'Batalkan'} onCancel={() => setConfirm(null)} onConfirm={() => void confirmAction()} restoreFocusTo={confirm?.restoreFocusTo ?? null} busy={busy}>{confirm?.kind === 'complete' ? 'Stok demo akan diperbarui berdasarkan baris SKU yang terlacak.' : 'Transaksi akan dipindahkan ke Sampah.'}</ConfirmDialog>
   </main>;
 }

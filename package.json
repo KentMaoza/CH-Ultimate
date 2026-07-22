@@ -11,10 +11,13 @@
     "package": "electron-forge package",
     "make:windows": "electron-forge make --platform=win32 --arch=x64",
     "test": "vitest run",
+    "test:mobile": "vitest run tests/unit/mobile-demo-state.test.ts tests/unit/mobile-app.test.tsx",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run typecheck && npm test"
+    "verify": "npm run typecheck && npm test",
+    "mobile:dev": "vite --config vite.mobile.config.ts",
+    "mobile:build": "vite build --config vite.mobile.config.ts"
   },
   "dependencies": {
     "electron-squirrel-startup": "1.0.1",
@@ -43,4 +46,3 @@
     "vitest": "2.1.9"
   }
 }
-

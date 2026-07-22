@@ -1,0 +1,26 @@
+import type { Sku, SkuPriceChange } from '../../src/domain/types';
+import { PriceChangeList } from './PriceChangeList';
+
+export function PriceFeedView({
+  changes,
+  skus,
+  unreadOnly,
+  status,
+  onOpenSku,
+  onSimulate,
+}: {
+  changes: SkuPriceChange[];
+  skus: Sku[];
+  unreadOnly: boolean;
+  status: string;
+  onOpenSku: (sku: Sku) => void;
+  onSimulate: () => void;
+}) {
+  return <section aria-label={unreadOnly ? 'Perubahan harga belum dibaca' : 'Semua perubahan harga'} className="page-view price-feed-view">
+    <h1>{unreadOnly ? 'Notifikasi Harga' : 'Perubahan Harga'}</h1>
+    <p>{unreadOnly ? 'Perubahan harga yang belum Anda buka.' : 'Riwayat perubahan harga terbaru untuk semua SKU.'}</p>
+    {!unreadOnly ? <button className="primary-action simulate-button" onClick={onSimulate}>Simulasikan perubahan harga</button> : null}
+    {status && !unreadOnly ? <p className="action-status" role="status">{status}</p> : null}
+    {changes.length > 0 ? <PriceChangeList changes={changes} onOpenSku={onOpenSku} skus={skus} /> : <p className="empty-state">Tidak ada perubahan harga yang belum dibaca.</p>}
+  </section>;
+}

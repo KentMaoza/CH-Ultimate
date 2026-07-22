@@ -10,6 +10,5 @@
     "types": ["node", "vitest/globals", "@testing-library/jest-dom"],
     "noEmit": true
   },
-  "include": ["src", "tests", "*.ts"]
+  "include": ["src", "mobile", "tests", "*.ts"]
 }
-

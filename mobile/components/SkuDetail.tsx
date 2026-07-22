@@ -22,7 +22,11 @@ export function SkuDetail({ sku, changes, onBack, onScanAgain }: {
     </section>
     <section aria-label="Riwayat harga SKU" className="detail-section">
       <h2>Riwayat harga</h2>
-      {history.length > 0 ? <div className="detail-history">{history.map((change) => <div key={change.id}><span><s>{formatRupiah(change.before)}</s><b>→</b><strong>{formatRupiah(change.after)}</strong></span><time>{formatWita(change.createdAt)}</time></div>)}</div> : <p>Belum ada perubahan harga pada sesi ini.</p>}
+      {history.length > 0 ? <div className="detail-history">{history.map((change) => {
+        const direction = change.after > change.before ? 'naik' : change.after < change.before ? 'turun' : 'tetap';
+        const priceDescription = `Harga ${direction}. Harga lama ${formatRupiah(change.before)}. Harga baru ${formatRupiah(change.after)}.`;
+        return <div key={change.id}><span aria-label={priceDescription} role="group"><s aria-hidden="true">{formatRupiah(change.before)}</s><b aria-hidden="true">→</b><strong aria-hidden="true">{formatRupiah(change.after)}</strong></span><time>{formatWita(change.createdAt)}</time></div>;
+      })}</div> : <p>Belum ada perubahan harga pada sesi ini.</p>}
     </section>
     <button className="secondary-action" onClick={onScanAgain}><ScanIcon />Scan kode lain</button>
   </article>;

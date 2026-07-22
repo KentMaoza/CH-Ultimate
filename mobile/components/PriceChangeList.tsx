@@ -19,12 +19,16 @@ export function PriceChangeList({
     {changes.map((change) => {
       const sku = skuMap.get(change.skuId);
       if (!sku) return null;
-      return <button className="price-row" key={change.id} onClick={() => onOpenSku(sku)}>
+      const direction = change.after > change.before ? 'naik' : change.after < change.before ? 'turun' : 'tetap';
+      const priceDescription = `Harga ${direction}. Harga lama ${formatRupiah(change.before)}. Harga baru ${formatRupiah(change.after)}.`;
+      const descriptionId = `price-change-${change.id}-description`;
+      return <button aria-describedby={descriptionId} className="price-row" key={change.id} onClick={() => onOpenSku(sku)}>
         <ProductImage sku={sku} />
         <span className="price-row-copy">
           <strong>{sku.name}</strong>
           <span className="sku-code">SKU: {sku.skuNumber}</span>
-          <span className="price-pair"><s>{formatRupiah(change.before)}</s><span aria-hidden="true">→</span><b>{formatRupiah(change.after)}</b></span>
+          <span aria-hidden="true" className="price-pair"><s>{formatRupiah(change.before)}</s><span>→</span><b>{formatRupiah(change.after)}</b></span>
+          <span className="sr-only" id={descriptionId}>{priceDescription}</span>
         </span>
         <span className="price-row-time">{formatWita(change.createdAt)}</span>
         <ChevronIcon className="row-chevron" />

@@ -96,6 +96,19 @@ test('SKU detail shows aliases and per-SKU price history', () => {
   expect(history).toHaveTextContent('WITA');
 });
 
+test('open SKU detail follows the current gateway snapshot', async () => {
+  const { gateway } = renderMobile();
+  fireEvent.click(screen.getByRole('button', { name: 'SKU Gudang' }));
+  fireEvent.click(screen.getByRole('button', { name: /Beras Hitam Premium 1 kg/ }));
+
+  await act(async () => {
+    await gateway.updateSku('sku-1', { name: 'Beras Hitam Organik 1 kg', referencePrice: 43_000 });
+  });
+
+  expect(screen.getByRole('heading', { name: 'Beras Hitam Organik 1 kg' })).toBeInTheDocument();
+  expect(screen.getByText('Rp43.000', { selector: '.detail-hero strong' })).toBeInTheDocument();
+});
+
 test('scanner opens active SKU detail for a canonical code', async () => {
   const scanner: BarcodeScannerPort = { scan: vi.fn(async () => ({ rawValue: 'FSH-LINEN-WHT', format: 'QR_CODE' })) };
   renderMobile({ scanner });
@@ -145,6 +158,23 @@ test('normal price navigation shows the global newest-first history', () => {
   expect(rows[1]).toHaveTextContent('Beras Hitam Premium 1 kg');
 });
 
+test('price feed and SKU detail expose direction plus old and new price labels', async () => {
+  const { gateway } = renderMobile();
+  await act(async () => {
+    await gateway.updateSku('sku-1', { referencePrice: 40_000 });
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Perubahan Harga' }));
+
+  const row = screen.getAllByRole('button', { name: /Beras Hitam Premium 1 kg/ })[0]!;
+  expect(row).toHaveAccessibleDescription('Harga turun. Harga lama Rp42.000. Harga baru Rp40.000.');
+
+  fireEvent.click(row);
+  const history = screen.getByRole('region', { name: 'Riwayat harga SKU' });
+  expect(within(history).getByRole('group', {
+    name: 'Harga turun. Harga lama Rp42.000. Harga baru Rp40.000.',
+  })).toBeInTheDocument();
+});
+
 test('product image switches to a local fallback when loading fails', () => {
   renderMobile();
   fireEvent.click(screen.getByRole('button', { name: 'SKU Gudang' }));
@@ -171,6 +201,19 @@ test('bell opens only unread changes and marks displayed rows read after render'
   expect(screen.getAllByRole('button', { name: /SKU:/ })).toHaveLength(2);
 });
 
+test('empty price feed distinguishes normal history from unread notifications', () => {
+  const gateway = new MockOperationsGateway(() => ({ ...createMobileDemoState(), priceChanges: [] }));
+  const ports = createPorts();
+  render(<MobileApp gateway={gateway} scanner={ports.scanner} notifications={ports.notifications} />);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Perubahan Harga' }));
+  expect(screen.getByText('Belum ada riwayat perubahan harga pada sesi ini.')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Beranda' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Notifikasi harga, 0 belum dibaca' }));
+  expect(screen.getByText('Tidak ada perubahan harga yang belum dibaca.')).toBeInTheDocument();
+});
+
 test('price simulation updates an active SKU and sends a notification when granted', async () => {
   const notifyPriceChange = vi.fn(async () => undefined);
   const notifications: LocalNotificationPort = {
@@ -182,11 +225,11 @@ test('price simulation updates an active SKU and sends a notification when grant
 
   fireEvent.click(screen.getByRole('button', { name: 'Simulasikan perubahan harga' }));
 
-  await waitFor(() => expect(gateway.getSnapshot().priceChanges).toHaveLength(3));
+  const status = await screen.findByRole('status');
+  expect(status).toHaveTextContent('Harga Beras Hitam Premium 1 kg diperbarui menjadi Rp43.000');
   expect(gateway.getSnapshot().skus.find((sku) => sku.id === 'sku-1')?.referencePrice).toBe(43_000);
   expect(notifications.ensurePermission).toHaveBeenCalledOnce();
   expect(notifyPriceChange).toHaveBeenCalledOnce();
-  expect(screen.getByRole('status')).toHaveTextContent('Harga Beras Hitam Premium 1 kg diperbarui menjadi Rp43.000');
 
   fireEvent.click(screen.getByRole('button', { name: 'Beranda' }));
   fireEvent.click(screen.getByRole('button', { name: 'Notifikasi harga, 3 belum dibaca' }));

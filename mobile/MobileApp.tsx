@@ -22,7 +22,7 @@ export function MobileApp({ gateway, scanner, notifications }: {
   const snapshot = useSyncExternalStore(gateway.subscribe, gateway.getSnapshot, gateway.getSnapshot);
   const [view, setView] = useState<MainView>('home');
   const [focusSearch, setFocusSearch] = useState(false);
-  const [selectedSku, setSelectedSku] = useState<Sku | null>(null);
+  const [selectedSkuId, setSelectedSkuId] = useState<string | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
   const [scanCode, setScanCode] = useState('');
   const [scanError, setScanError] = useState('');
@@ -30,6 +30,7 @@ export function MobileApp({ gateway, scanner, notifications }: {
   const [readChangeIds, setReadChangeIds] = useState<Set<string>>(() => new Set());
   const [unreadFeedIds, setUnreadFeedIds] = useState<string[]>([]);
   const [simulationStatus, setSimulationStatus] = useState('');
+  const selectedSku = snapshot.skus.find((sku) => sku.id === selectedSkuId) ?? null;
   const sortedChanges = [...snapshot.priceChanges].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
   const unreadCount = snapshot.priceChanges.filter((change) => !readChangeIds.has(change.id)).length;
   const visiblePriceChanges = priceMode === 'all'
@@ -46,7 +47,7 @@ export function MobileApp({ gateway, scanner, notifications }: {
   }, [priceMode, unreadFeedIds, view]);
 
   function navigate(next: MainView, shouldFocusSearch = false) {
-    setSelectedSku(null);
+    setSelectedSkuId(null);
     setScanOpen(false);
     setFocusSearch(shouldFocusSearch);
     if (next === 'prices') setPriceMode('all');
@@ -54,7 +55,7 @@ export function MobileApp({ gateway, scanner, notifications }: {
   }
 
   function openUnreadPrices() {
-    setSelectedSku(null);
+    setSelectedSkuId(null);
     setScanOpen(false);
     setPriceMode('unread');
     setUnreadFeedIds(sortedChanges.filter((change) => !readChangeIds.has(change.id)).map((change) => change.id));
@@ -63,7 +64,7 @@ export function MobileApp({ gateway, scanner, notifications }: {
 
   function openSku(sku: Sku) {
     setScanOpen(false);
-    setSelectedSku(sku);
+    setSelectedSkuId(sku.id);
   }
 
   async function beginScan() {
@@ -73,7 +74,7 @@ export function MobileApp({ gateway, scanner, notifications }: {
       const result = await scanner.scan();
       if (!result) {
         setScanOpen(true);
-        setSelectedSku(null);
+        setSelectedSkuId(null);
         return;
       }
       const sku = findSkuByScanCode(snapshot.skus, result.rawValue);
@@ -83,11 +84,11 @@ export function MobileApp({ gateway, scanner, notifications }: {
       }
       setScanCode(result.rawValue);
       setScanError(`Kode tidak ditemukan: ${result.rawValue}. Coba lagi atau periksa kode manual.`);
-      setSelectedSku(null);
+      setSelectedSkuId(null);
       setScanOpen(true);
     } catch {
       setScanError('Pemindai tidak tersedia. Masukkan kode secara manual.');
-      setSelectedSku(null);
+      setSelectedSkuId(null);
       setScanOpen(true);
     }
   }
@@ -119,7 +120,7 @@ export function MobileApp({ gateway, scanner, notifications }: {
 
   return <div className="mobile-app">
     <main className="mobile-content">
-      {selectedSku ? <SkuDetail changes={snapshot.priceChanges} onBack={() => setSelectedSku(null)} onScanAgain={() => { setSelectedSku(null); setScanOpen(true); setScanCode(''); setScanError(''); }} sku={selectedSku} /> : scanOpen ? <ScanSurface error={scanError} initialCode={scanCode} key={scanCode} onManualLookup={manualLookup} onRetry={() => void beginScan()} /> : view === 'home' ? <DashboardView
+      {selectedSku ? <SkuDetail changes={snapshot.priceChanges} onBack={() => setSelectedSkuId(null)} onScanAgain={() => { setSelectedSkuId(null); setScanOpen(true); setScanCode(''); setScanError(''); }} sku={selectedSku} /> : scanOpen ? <ScanSurface error={scanError} initialCode={scanCode} key={scanCode} onManualLookup={manualLookup} onRetry={() => void beginScan()} /> : view === 'home' ? <DashboardView
         snapshot={snapshot}
         unreadCount={unreadCount}
         onOpenPrices={() => navigate('prices')}

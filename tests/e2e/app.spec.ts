@@ -145,14 +145,16 @@ test('Nota title case and empty-stock restock planning stay frontend-only', asyn
 
     await window.getByRole('button', { name: 'Kembali ke CH Ultimate' }).click();
     await window.getByRole('button', { name: 'Barang Kosong' }).click();
+    await expect(window.getByLabel('Kondisi stok')).toHaveValue('empty');
+    await expect(window.getByRole('textbox', { name: 'Jumlah restock ACC-204-SLV' })).toHaveCount(0);
+    await window.getByLabel('Pilih ACC-204-SLV').check();
     const quantity = window.getByRole('textbox', { name: 'Jumlah restock ACC-204-SLV' });
     await expect(quantity).toHaveValue('0');
     await window.getByRole('button', { name: 'Tambah jumlah restock ACC-204-SLV' }).click();
-    await window.getByLabel('Pilih ACC-204-SLV').check();
     await expect(window.getByTestId('empty-report-preview')).toContainText('LAPORAN BARANG KOSONG');
     await expect(window.getByTestId('empty-report-preview')).toContainText('Jumlah: 1');
     await window.getByLabel('Pilih ACC-204-SLV').uncheck();
-    await expect(quantity).toHaveValue('0');
+    await expect(quantity).toHaveCount(0);
     await expect(window.getByTestId('empty-report-preview')).not.toContainText('ACC-204-SLV');
 
     await window.getByRole('button', { name: 'SKU Gudang' }).click();
@@ -183,6 +185,10 @@ test('Nota lifecycle posts linked and ad-hoc lines, then import resets the sessi
     await expectStockAndRevenue(window, 21, 141_000);
 
     await window.getByRole('button', { name: 'Arsip Nota' }).click();
+    await expect(window.getByText('SELESAI · HANYA LIHAT')).toBeVisible();
+    await window.getByRole('button', { name: 'Lipat preview nota' }).click();
+    await expect(window.getByRole('region', { name: 'Preview arsip nota' })).toHaveCount(0);
+    await window.getByRole('button', { name: 'Buka preview nota' }).click();
     await expect(window.getByText('SELESAI · HANYA LIHAT')).toBeVisible();
     await window.getByRole('button', { name: 'Buka kembali untuk edit' }).click();
     await window.getByRole('dialog', { name: 'Buka kembali nota?' }).getByRole('button', { name: 'Buka kembali' }).click();

@@ -75,6 +75,14 @@ test('archive module opens completed nota as inline read-only preview without ch
 
   expect(screen.getByText('SELESAI · HANYA LIHAT')).toBeInTheDocument();
   expect(screen.getByRole('region', { name: 'Preview arsip nota' })).toBeInTheDocument();
+  const collapsePreview = screen.getByRole('button', { name: 'Lipat preview nota' });
+  expect(collapsePreview).toHaveAttribute('aria-expanded', 'true');
+  fireEvent.click(collapsePreview);
+  expect(screen.queryByRole('region', { name: 'Preview arsip nota' })).not.toBeInTheDocument();
+  const openPreview = screen.getByRole('button', { name: 'Buka preview nota' });
+  expect(openPreview).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(openPreview);
+  expect(screen.getByRole('region', { name: 'Preview arsip nota' })).toBeInTheDocument();
   const archiveCard = screen.getByRole('button', { name: /Amelia.*Saibah/ });
   expect(within(archiveCard).queryByText(transaction.baseNumber)).not.toBeInTheDocument();
   expect(within(archiveCard).getByText('Amelia')).toHaveClass('archive-nota__customer-name');

@@ -4,16 +4,24 @@ import { useOperations } from '../operations-context';
 import { addFilteredSelection, filterEmptyStockItems, NO_SUPPLIER, supplierCodeFromName } from './empty-stock-utils';
 
 const MAX_RESTOCK_QUANTITY = 9_999;
+type StockCondition = 'empty' | 'one' | 'two' | 'low';
 
 export function EmptyStockPage() {
   const { state } = useOperations();
-  const items = useMemo(() => buildEmptyStockItems(state), [state]);
+  const items = useMemo(() => buildEmptyStockItems(state, 2), [state]);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [query, setQuery] = useState('');
   const [supplier, setSupplier] = useState('');
+  const [stockCondition, setStockCondition] = useState<StockCondition>('empty');
   const supplierCodes = useMemo(() => [...new Set(items.map(({ sku }) => supplierCodeFromName(sku.name)).filter((code): code is string => Boolean(code)))].sort((a, b) => a.localeCompare(b, 'id-ID', { numeric: true })), [items]);
-  const filtered = useMemo(() => filterEmptyStockItems(items, query, supplier), [items, query, supplier]);
+  const stockFiltered = useMemo(() => items.filter(({ sku }) => {
+    if (stockCondition === 'one') return sku.stock === 1;
+    if (stockCondition === 'two') return sku.stock === 2;
+    if (stockCondition === 'low') return true;
+    return sku.stock <= 0;
+  }), [items, stockCondition]);
+  const filtered = useMemo(() => filterEmptyStockItems(stockFiltered, query, supplier), [stockFiltered, query, supplier]);
   const chosen = items.filter((item) => selected.has(item.sku.id));
 
   useEffect(() => {
@@ -58,20 +66,21 @@ export function EmptyStockPage() {
 
   return <div className="feature-page empty-layout">
     <section className="empty-list">
-      <div className="card-heading"><div><span>TRACKED STOCK ≤ 0</span><h2>Daftar barang kosong</h2></div><button className="button secondary" onClick={() => setSelected((current) => addFilteredSelection(current, filtered))}>Pilih semua hasil filter</button></div>
-      <div className="empty-filters"><label><span>Cari nama / nomor SKU</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari barang kosong" /></label><label><span>Supplier</span><select value={supplier} onChange={(event) => setSupplier(event.target.value)}><option value="">Semua supplier</option>{supplierCodes.map((code) => <option key={code} value={code}>{code}</option>)}<option value={NO_SUPPLIER}>Tanpa kode supplier</option></select></label></div>
-      <p className="empty-filter-count">{filtered.length} dari {items.length} barang</p>
+      <div className="card-heading"><div><span>TRACKED STOCK ≤ 2</span><h2>Daftar stok menipis</h2></div><button className="button secondary" onClick={() => setSelected((current) => addFilteredSelection(current, filtered))}>Pilih semua hasil filter</button></div>
+      <div className="empty-filters"><label><span>Cari nama / nomor SKU</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari barang" /></label><label><span>Supplier</span><select value={supplier} onChange={(event) => setSupplier(event.target.value)}><option value="">Semua supplier</option>{supplierCodes.map((code) => <option key={code} value={code}>{code}</option>)}<option value={NO_SUPPLIER}>Tanpa kode supplier</option></select></label><label><span>Kondisi stok</span><select value={stockCondition} onChange={(event) => setStockCondition(event.target.value as StockCondition)}><option value="empty">Kosong / negatif</option><option value="one">Sisa 1 pcs</option><option value="two">Sisa 2 pcs</option><option value="low">Semua ≤ 2 pcs</option></select></label></div>
+      <p className="empty-filter-count">{filtered.length} dari {stockFiltered.length} barang pada kondisi ini</p>
       <div className="empty-groups">{filtered.map(({ sku }) => {
-        const quantity = quantities[sku.id] ?? 0;
         return <div key={sku.id} className="empty-row">
           <input aria-label={`Pilih ${sku.skuNumber}`} type="checkbox" checked={selected.has(sku.id)} onChange={(event) => toggle(sku.id, event.currentTarget.checked)} />
           <div className="image-placeholder">CHU</div>
           <div><strong>{sku.skuNumber}</strong><span>{sku.name}</span></div>
-          <div className="empty-restock"><span>Jumlah restock</span><div><button type="button" aria-label={`Kurangi jumlah restock ${sku.skuNumber}`} disabled={quantity === 0} onClick={() => setRestockQuantity(sku.id, quantity - 1)}>−</button><input aria-label={`Jumlah restock ${sku.skuNumber}`} inputMode="numeric" value={quantity} onChange={(event) => setRestockQuantity(sku.id, event.target.value)} /><button type="button" aria-label={`Tambah jumlah restock ${sku.skuNumber}`} disabled={quantity === MAX_RESTOCK_QUANTITY} onClick={() => setRestockQuantity(sku.id, quantity + 1)}>+</button></div></div>
           <b className="empty-balance">{sku.stock}</b>
         </div>;
       })}{!filtered.length && <p className="empty-state">Tidak ada barang yang cocok dengan filter.</p>}</div>
     </section>
-    <section className="a4-preview" data-testid="empty-report-preview"><header><div className="brand-mark dark">CHU</div><div><strong>LAPORAN BARANG KOSONG</strong><span>{new Intl.DateTimeFormat('id-ID', { dateStyle: 'long', timeZone: 'Asia/Makassar' }).format(new Date())}</span></div></header>{chosen.length ? chosen.map(({ sku }) => <div className="report-item" key={sku.id}><div className="image-placeholder">CHU</div><div><strong>{sku.skuNumber}</strong><span>{sku.name}</span></div><b>Jumlah: {quantities[sku.id] ?? 0}</b></div>) : <p className="preview-empty">Pilih SKU untuk menampilkan preview laporan.</p>}<footer>CH Ultimate · Demo preview · Export PDF belum aktif</footer></section>
+    <section className="a4-preview" data-testid="empty-report-preview"><header><div className="brand-mark dark">CHU</div><div><strong>LAPORAN BARANG KOSONG</strong><span>{new Intl.DateTimeFormat('id-ID', { dateStyle: 'long', timeZone: 'Asia/Makassar' }).format(new Date())}</span></div></header>{chosen.length ? chosen.map(({ sku }) => {
+      const quantity = quantities[sku.id] ?? 0;
+      return <div className="report-item" key={sku.id}><div className="image-placeholder">CHU</div><div><strong>{sku.skuNumber}</strong><span>{sku.name}</span><small>Stok saat ini: {sku.stock}</small></div><div className="report-restock"><b>Jumlah: {quantity}</b><div><button type="button" aria-label={`Kurangi jumlah restock ${sku.skuNumber}`} disabled={quantity === 0} onClick={() => setRestockQuantity(sku.id, quantity - 1)}>−</button><input aria-label={`Jumlah restock ${sku.skuNumber}`} inputMode="numeric" value={quantity} onChange={(event) => setRestockQuantity(sku.id, event.target.value)} /><button type="button" aria-label={`Tambah jumlah restock ${sku.skuNumber}`} disabled={quantity === MAX_RESTOCK_QUANTITY} onClick={() => setRestockQuantity(sku.id, quantity + 1)}>+</button></div></div></div>;
+    }) : <p className="preview-empty">Pilih SKU untuk menampilkan preview laporan.</p>}<footer>CH Ultimate · Demo preview · Export PDF belum aktif</footer></section>
   </div>;
 }

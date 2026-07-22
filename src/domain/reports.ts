@@ -36,6 +36,6 @@ export function buildRevenueReport(
   return { today, month, year, bySku: [...bySku.values()].sort((a, b) => b.revenue - a.revenue), byDay: [...byDay].sort(([a], [b]) => a.localeCompare(b)).map(([date, revenue]) => ({ date, revenue })) };
 }
 
-export function buildEmptyStockItems(state: DemoState): EmptyStockItem[] {
-  return state.skus.filter((sku) => sku.tracked && !sku.archived && sku.stock <= 0).sort((a, b) => a.stock - b.stock || a.skuNumber.localeCompare(b.skuNumber)).map((sku) => ({ sku, selected: false }));
+export function buildEmptyStockItems(state: DemoState, maximumStock = 0): EmptyStockItem[] {
+  return state.skus.filter((sku) => sku.tracked && !sku.archived && sku.stock <= maximumStock).sort((a, b) => a.stock - b.stock || a.skuNumber.localeCompare(b.skuNumber)).map((sku) => ({ sku, selected: false }));
 }

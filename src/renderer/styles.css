@@ -120,27 +120,27 @@ td small { display: block; margin-top: 3px; color: #777; font-size: 9px; }
 .compact-empty { min-height: 220px; padding: 55px 10px; }
 .empty-layout { display: grid; grid-template-columns: minmax(440px, .8fr) minmax(430px, 1.2fr); gap: 16px; align-items: start; }
 .empty-groups { display: grid; gap: 7px; max-height: 590px; overflow: auto; }
-.empty-filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, .45fr); gap: 10px; margin: 14px 0 8px; }
+.empty-filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(145px, .4fr) minmax(145px, .4fr); gap: 10px; margin: 14px 0 8px; }
 .empty-filters label { display: grid; gap: 5px; font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
 .empty-filters input, .empty-filters select { width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid #111; border-radius: 0; background: #fff; font: inherit; }
 .empty-filter-count { margin: 0 0 8px; color: #666; font-size: 11px; }
-.empty-row { display: grid; grid-template-columns: 18px 40px minmax(140px, 1fr) minmax(150px, auto) 44px; align-items: center; gap: 10px; padding: 9px; border: 1px solid #bbb; }
+.empty-row { display: grid; grid-template-columns: 18px 40px minmax(140px, 1fr) 44px; align-items: center; gap: 10px; padding: 9px; border: 1px solid #bbb; }
 .empty-row input { width: 17px; min-height: 17px; }
 .empty-row strong, .empty-row span { display: block; }
 .empty-row span { margin-top: 2px; color: #666; font-size: 10px; }
-.empty-restock > span { margin: 0 0 4px; font-size: 9px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
-.empty-restock > div { display: grid; grid-template-columns: 32px 58px 32px; }
-.empty-restock button, .empty-restock input { min-height: 30px; border: 1px solid #111; border-radius: 0; background: #fff; font: inherit; text-align: center; }
-.empty-restock button + input, .empty-restock input + button { border-left: 0; }
-.empty-restock input { width: 58px; padding: 4px; }
-.empty-restock button:disabled { color: #999; border-color: #999; }
 .empty-balance { font-size: 20px; text-align: right; }
 .a4-preview { position: relative; min-height: 650px; padding: 28px; border: 1px solid #aaa; background: #fff; box-shadow: 0 5px 18px #ccc; }
 .a4-preview header { display: flex; gap: 12px; align-items: center; padding-bottom: 16px; border-bottom: 3px solid #111; }
 .brand-mark.dark { color: #fff; background: #111; }
 .a4-preview header span { display: block; margin-top: 3px; color: #555; font-size: 10px; }
 .report-item { display: grid; grid-template-columns: 42px 1fr auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid #bbb; }
-.report-item span { display: block; margin-top: 3px; color: #555; font-size: 11px; }
+.report-item span, .report-item small { display: block; margin-top: 3px; color: #555; font-size: 11px; }
+.report-restock { display: grid; justify-items: end; gap: 5px; }
+.report-restock > div { display: grid; grid-template-columns: 32px 58px 32px; }
+.report-restock button, .report-restock input { min-height: 30px; border: 1px solid #111; border-radius: 0; background: #fff; font: inherit; text-align: center; }
+.report-restock button + input, .report-restock input + button { border-left: 0; }
+.report-restock input { width: 58px; padding: 4px; }
+.report-restock button:disabled { color: #999; border-color: #999; }
 .preview-empty { padding: 100px 0; color: #888; text-align: center; }
 .a4-preview footer { position: absolute; right: 28px; bottom: 24px; left: 28px; padding-top: 8px; border-top: 1px solid #aaa; color: #777; font-size: 9px; }
 .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
@@ -150,6 +150,7 @@ td small { display: block; margin-top: 3px; color: #777; font-size: 9px; }
 .settings-card hr { margin: 28px 0; border: 0; border-top: 1px solid #555; }
 @media (max-width: 1150px) { .report-grid, .empty-layout { grid-template-columns: 1fr; } .metric-grid { grid-template-columns: 1fr; } }
 .archive-nota { display: grid; grid-template-columns: minmax(380px, .46fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.archive-nota--preview-collapsed { grid-template-columns: 1fr; }
 .archive-nota__filters { display: grid; gap: 10px; padding: 14px; border: 2px solid #111; background: #fff; }
 .archive-nota__filters [role='tablist'] { display: grid; grid-template-columns: 1fr 1fr; }
 .archive-nota__filters [role='tab'][aria-selected='true'] { color: #fff; background: #111; }
@@ -167,6 +168,7 @@ td small { display: block; margin-top: 3px; color: #777; font-size: 9px; }
 .archive-nota__customer-place { margin-top: 5px; font-size: 15px; font-weight: 750; }
 .archive-nota__transaction small { margin-top: 7px; color: #555; }
 .archive-nota__pagination { display: flex; align-items: center; justify-content: space-between; }
+.archive-nota__preview-toggle { justify-self: stretch; }
 .archive-nota__preview { min-height: 540px; padding: 14px; overflow: auto; border: 2px solid #111; background: #fff; }
 .archive-nota__preview > header { display: flex; align-items: start; justify-content: space-between; gap: 12px; border-bottom: 2px solid #111; }
 .archive-nota__preview > header > div > * { display: block; }

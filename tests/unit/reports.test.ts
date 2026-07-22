@@ -48,3 +48,13 @@ test('empty-stock report includes only tracked zero and negative balances', () =
   const items = buildEmptyStockItems(createInitialState());
   expect(items.map((item) => item.sku.skuNumber)).toEqual(['ACC-204-SLV', 'SNK-044']);
 });
+
+test('low-stock report can include tracked balances up to a requested threshold', () => {
+  const state = createInitialState();
+  const adjusted = {
+    ...state,
+    skus: state.skus.map((sku) => sku.id === 'sku-1' ? { ...sku, stock: 1 } : sku.id === 'sku-4' ? { ...sku, stock: 2 } : sku),
+  };
+  const items = buildEmptyStockItems(adjusted, 2);
+  expect(items.map((item) => item.sku.skuNumber)).toEqual(['ACC-204-SLV', 'SNK-044', 'BRS-108-BLK', 'MNM-002']);
+});

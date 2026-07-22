@@ -120,6 +120,10 @@ td small { display: block; margin-top: 3px; color: #777; font-size: 9px; }
 .compact-empty { min-height: 220px; padding: 55px 10px; }
 .empty-layout { display: grid; grid-template-columns: minmax(440px, .8fr) minmax(430px, 1.2fr); gap: 16px; align-items: start; }
 .empty-groups { display: grid; gap: 7px; max-height: 590px; overflow: auto; }
+.empty-filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, .45fr); gap: 10px; margin: 14px 0 8px; }
+.empty-filters label { display: grid; gap: 5px; font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.empty-filters input, .empty-filters select { width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid #111; border-radius: 0; background: #fff; font: inherit; }
+.empty-filter-count { margin: 0 0 8px; color: #666; font-size: 11px; }
 .empty-row { display: grid; grid-template-columns: 18px 40px 1fr 44px; align-items: center; gap: 10px; padding: 9px; border: 1px solid #bbb; cursor: pointer; }
 .empty-row input { width: 17px; min-height: 17px; }
 .empty-row strong, .empty-row span { display: block; }

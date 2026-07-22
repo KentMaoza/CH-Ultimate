@@ -40,6 +40,17 @@ test('Nota grid has the required headers and fifteen A-page rows', () => {
   expect(screen.getByText('15A')).toBeInTheDocument();
 });
 
+test('page tabs and the large suffix use stable A and B colors', () => {
+  openNota();
+  const pageA = screen.getByRole('button', { name: 'Halaman A' });
+  const pageB = screen.getByRole('button', { name: 'Halaman B' });
+  expect(pageA).toHaveStyle({ '--nota-page-color': '#D32F2F' });
+  expect(pageB).toHaveStyle({ '--nota-page-color': '#1565C0' });
+  expect(screen.getByText('NOTA DIBUAT').parentElement).toHaveStyle({ '--nota-page-color': '#D32F2F' });
+  fireEvent.click(pageB);
+  expect(screen.getByText('NOTA DIBUAT').parentElement).toHaveStyle({ '--nota-page-color': '#1565C0' });
+});
+
 test('Nota totals seeded values across active transaction pages', async () => {
   const gateway = new MockOperationsGateway();
   const transaction = gateway.getSnapshot().notaTransactions[0]!;

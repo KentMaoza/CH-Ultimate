@@ -25,6 +25,9 @@
 .chu-nota-workspace__meta-total small { color: #555; font-size: calc(10px * var(--nota-font-scale)); }
 .chu-nota-workspace__notice { margin: 8px 0 0; padding: 8px 10px; border: 1px solid #111; background: #fff; font-size: calc(11px * var(--nota-font-scale)); }
 .chu-nota-workspace__notice button { margin-left: 8px; }
+.chu-nota-workspace__archive-preview { display: flex; align-items: center; gap: 8px; margin-top: 6px; padding: 7px 9px; border: 2px solid #111; background: #fff; font-size: calc(11px * var(--nota-font-scale)); }
+.chu-nota-workspace__archive-preview strong { padding: 5px 7px; color: #fff; background: #111; letter-spacing: .06em; }
+.chu-nota-workspace__archive-preview span { flex: 1; color: #555; }
 .chu-nota-workspace__page-tabs { display: flex; align-items: center; gap: 6px; margin-top: 6px; padding: 4px 7px; border: 2px solid #111; background: #fff; }
 .chu-nota-workspace__page-tabs button { padding: 6px 10px; font-size: calc(12px * var(--nota-font-scale)); }
 .chu-nota-workspace__page-tabs button[aria-pressed='true'] { color: #fff; background: #111; }

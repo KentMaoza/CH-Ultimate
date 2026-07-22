@@ -17,6 +17,20 @@ export function workingTransactions(transactions: NotaTransaction[]): NotaTransa
   return transactions.filter((transaction) => transaction.status === 'draft' || transaction.status === 'reopened');
 }
 
+function paginate(items: NotaTransaction[], page: number, size: number) {
+  return { items: items.slice(page * size, page * size + size), total: items.length, pages: Math.max(1, Math.ceil(items.length / size)) };
+}
+
+export function workingPage(transactions: NotaTransaction[], filters: { customer: string; from: string; to: string }, page = 0, size = 50) {
+  const needleCustomer = normalized(filters.customer);
+  const items = workingTransactions(transactions)
+    .filter((transaction) => !needleCustomer || normalized(transaction.customerName).includes(needleCustomer))
+    .filter((transaction) => !filters.from || transaction.transactionDate >= filters.from)
+    .filter((transaction) => !filters.to || transaction.transactionDate <= filters.to)
+    .sort((left, right) => right.transactionDate.localeCompare(left.transactionDate) || right.baseNumber.localeCompare(left.baseNumber));
+  return paginate(items, page, size);
+}
+
 export function searchNota(state: DemoState, query: string): NotaSearchResult[] {
   const needle = normalized(query);
   if (!needle) return [];
@@ -42,6 +56,7 @@ export function archivePage(transactions: NotaTransaction[], filters: { customer
     .filter((transaction) => !needleCustomer || normalized(transaction.customerName).includes(needleCustomer))
     .filter((transaction) => !needlePlace || normalized(transaction.customerPlace).includes(needlePlace))
     .filter((transaction) => !filters.from || transaction.transactionDate >= filters.from)
-    .filter((transaction) => !filters.to || transaction.transactionDate <= filters.to);
-  return { items: items.slice(page * size, page * size + size), total: items.length, pages: Math.max(1, Math.ceil(items.length / size)) };
+    .filter((transaction) => !filters.to || transaction.transactionDate <= filters.to)
+    .sort((left, right) => right.transactionDate.localeCompare(left.transactionDate) || (right.completedAt ?? '').localeCompare(left.completedAt ?? ''));
+  return paginate(items, page, size);
 }

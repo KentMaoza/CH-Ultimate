@@ -1,6 +1,6 @@
 import { completeNotaTransaction, createDraftNotaTransaction } from '../../src/domain/nota';
 import { createInitialState } from '../../src/domain/operations';
-import { archivePage, searchNota } from '../../src/renderer/nota/nota-workspace-utils';
+import { archivePage, searchNota, workingPage } from '../../src/renderer/nota/nota-workspace-utils';
 
 function completed(sequence: number, customerName: string, customerPlace: string) {
   const transaction = createDraftNotaTransaction(sequence);
@@ -30,4 +30,20 @@ test('archive filters completed transactions and paginates in groups of fifty', 
   expect(first.items).toHaveLength(50);
   const budi = archivePage(transactions, { customer: 'Budi', place: 'Makassar', from: '', to: '' });
   expect(budi.items.map((item) => item.customerName)).toEqual(['Budi']);
+});
+
+test('working notes filter inclusively, sort newest first, and paginate fifty per page', () => {
+  const transactions = Array.from({ length: 51 }, (_, index) => {
+    const transaction = createDraftNotaTransaction(index + 1);
+    transaction.transactionDate = `2026-07-${String((index % 28) + 1).padStart(2, '0')}`;
+    transaction.customerName = index === 50 ? 'Budi' : 'Amelia';
+    return transaction;
+  });
+
+  const all = workingPage(transactions, { customer: '', from: '', to: '' });
+  expect(all).toMatchObject({ total: 51, pages: 2 });
+  expect(all.items).toHaveLength(50);
+  expect(all.items[0]!.transactionDate >= all.items[1]!.transactionDate).toBe(true);
+  expect(workingPage(transactions, { customer: 'Budi', from: '2026-07-20', to: '2026-07-23' }).items).toHaveLength(1);
+  expect(workingPage(transactions, { customer: 'Amelia', from: '2026-07-20', to: '2026-07-20' }).items.every((item) => item.transactionDate === '2026-07-20')).toBe(true);
 });

@@ -37,7 +37,8 @@ Reloading or closing the application discards the imported workbook, stock edits
 - SKU Gudang with runtime XLSX import, search, edit aliases, archive, and stock adjustment
 - Buat SKU with tracked/untracked stock
 - Thermal/A4 QR label builder and preview
-- Full-screen Nota workspace for session-only transactions
+- Full-screen Nota workspace for session-only draft/reopened transactions
+- Dedicated Arsip Nota master-detail module with read-only completed previews and Sampah restore
 - Laporan Omzet and selectable Barang Kosong A4 preview
 - Session data/status controls under Settings
 
@@ -45,10 +46,14 @@ Reloading or closing the application discards the imported workbook, stock edits
 
 **Nota** opens as a full-screen workspace, without the CH Ultimate sidebar or generic page header. Each transaction starts at page **A** and can add pages through **Z**, **AA**, and beyond. A page keeps fifteen rows; the grid retains all ten columns and scrolls inside its own frame on narrower screens.
 
-- **Working, archive, and trash.** Draft and reopened transactions appear in *Nota Dikerjakan*, with customer/date filters and 50-item pagination. Completing a transaction moves it to *Arsip Nota*, which has customer/place/date filters. Opening an archived transaction is read-only and never changes stock or omzet; **Buka kembali untuk edit** is a separate confirmed action. Cancelling a page or transaction moves it to *Sampah*, where it can be restored; page cancellation also offers a short-lived **Urungkan** action.
-- **Items and prices.** Choose a target row, then select a SKU from the collapsible **SKU Gudang** panel above the grid. Search supports the current number, old aliases, and name; archived SKU is excluded while zero, negative, and untracked stock stays selectable. An ad-hoc item remains valid without a SKU. PCS and LSN prices are seeded independently and display Indonesian thousands separators while typing.
+- **Working, archive, and trash.** Draft and reopened transactions appear in *Nota Dikerjakan*, with customer/date filters and 50-item pagination. Completed transactions live in the dedicated sidebar module **Arsip Nota**, which uses a searchable master-detail layout with place/date filters and read-only A/B/C previews. **Buka kembali untuk edit** is a separate confirmed action. Cancelling a page or transaction moves it to the Arsip module's *Sampah* tab, where it can be restored; page cancellation also offers a short-lived **Urungkan** action.
+- **Items and prices.** Choose a target row, then select a SKU from the collapsible **SKU Gudang** panel above the grid. Search supports the current number, old aliases, and name; archived SKU is excluded while zero, negative, and untracked stock stays selectable. An ad-hoc item remains valid without a SKU. The grid orders PCS before LSN, keeps the active unit as a black block, and normalizes Indonesian thousands separators while typing (for example `52000`, `52.000`, and transient `5.2000` all resolve to `52.000`).
 - **Stock and reports.** Completion posts the active pages as one transaction. Linked tracked SKU stock is updated, while ad-hoc and untracked items do not affect stock. Reopening, editing, and completing again applies only the stock delta. Cancelling reverses its posted stock, and restoring reapplies it. Laporan Omzet reflects completed transactions.
 - **Keyboard and text size.** `Ctrl/Cmd+K` focuses Nota search; `Escape` clears it and returns focus. Arrow keys move across every non-destructive grid cell, including wrapping from Total to the next row; **Hapus** remains Tab-only. `Ctrl/Cmd` with `+`, `-`, or `0` switches the session-only 100%, 125%, and 150% text presets. Dialog and drawer focus stays contained; `Escape` closes a dismissible dialog or drawer and restores the triggering control.
 - **Session boundary.** Reloading or closing the app discards every Nota edit, import, transaction, archive, trash entry, and report, then restores the seeded Amelia A/B demo session.
+
+## Barang Kosong
+
+Barang Kosong can be searched by SKU name or number and filtered by a supplier code found only at the end of the name (`CH` followed by digits). Codes keep their exact zero padding, so `CH02` and `CH002` are separate suppliers. **Pilih semua hasil filter** adds the current result to the report selection without dropping items chosen through another filter.
 
 This port deliberately contains no CH Nota backend, IPC bridge, database/persistence, network API, production printing, or PDF service. The renderer continues to use the asynchronous `OperationsGateway` boundary, so a future authenticated NAS/CH Core implementation can replace the in-memory adapter without rewriting the screens.

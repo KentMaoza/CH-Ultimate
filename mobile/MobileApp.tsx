@@ -2,22 +2,24 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { OperationsGateway } from '../src/gateway/operations-gateway';
 import type { Sku } from '../src/domain/types';
 import { findSkuByScanCode } from '../src/domain/mobile-demo-state';
-import type { BarcodeScannerPort, LocalNotificationPort } from './ports';
+import type { BarcodeScannerPort, LocalNotificationPort, SkuSharePort } from './ports';
 import { BoxIcon, ClockIcon, HomeIcon } from './components/Icons';
 import { DashboardView } from './components/DashboardView';
 import { SkuCatalog } from './components/SkuCatalog';
 import { ScanSurface } from './components/ScanSurface';
 import { SkuDetail } from './components/SkuDetail';
 import { PriceFeedView } from './components/PriceFeedView';
+import { ShareRecommendationsView } from './components/ShareRecommendationsView';
 import { formatRupiah } from './format';
 
-type MainView = 'home' | 'skus' | 'prices';
+type MainView = 'home' | 'skus' | 'prices' | 'recommendations';
 type PriceMode = 'all' | 'unread';
 
-export function MobileApp({ gateway, scanner, notifications }: {
+export function MobileApp({ gateway, scanner, notifications, share }: {
   gateway: OperationsGateway;
   scanner: BarcodeScannerPort;
   notifications: LocalNotificationPort;
+  share: SkuSharePort;
 }) {
   const snapshot = useSyncExternalStore(gateway.subscribe, gateway.getSnapshot, gateway.getSnapshot);
   const [view, setView] = useState<MainView>('home');
@@ -175,14 +177,21 @@ export function MobileApp({ gateway, scanner, notifications }: {
         onOpenPrices={() => navigate('prices')}
         onOpenSku={openSku}
         onOpenUnread={openUnreadPrices}
+        onOpenRecommendations={() => navigate('recommendations')}
         onScan={() => void beginScan()}
         onSearch={() => navigate('skus', true)}
       /> : null}
       {view === 'skus' && !scanOpen && !selectedSku ? <SkuCatalog focusSearch={focusSearch} onOpenSku={openSku} skus={snapshot.skus} /> : null}
       {view === 'prices' && !scanOpen && !selectedSku ? <PriceFeedView changes={visiblePriceChanges} onOpenSku={openSku} onSimulate={() => void simulatePriceChange()} skus={snapshot.skus} status={simulationStatus} unreadOnly={priceMode === 'unread'} /> : null}
+      {view === 'recommendations' && !scanOpen && !selectedSku ? <ShareRecommendationsView
+        onBack={() => navigate('home')}
+        onOpenSku={openSku}
+        onShareSku={share.shareSku}
+        snapshot={snapshot}
+      /> : null}
     </main>
     <nav aria-label="Navigasi utama" className="bottom-nav">
-      <button aria-current={view === 'home' ? 'page' : undefined} onClick={() => navigate('home')}><HomeIcon />Beranda</button>
+      <button aria-current={view === 'home' || view === 'recommendations' ? 'page' : undefined} onClick={() => navigate('home')}><HomeIcon />Beranda</button>
       <button aria-current={view === 'skus' ? 'page' : undefined} onClick={() => navigate('skus')}><BoxIcon />SKU Gudang</button>
       <button aria-current={view === 'prices' ? 'page' : undefined} onClick={() => navigate('prices')}><ClockIcon />Perubahan Harga</button>
     </nav>

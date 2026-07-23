@@ -1,13 +1,15 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MobileApp } from '../../mobile/MobileApp';
 import { ProductImage } from '../../mobile/components/ProductImage';
-import type { BarcodeScannerPort, LocalNotificationPort } from '../../mobile/ports';
+import type { BarcodeScannerPort, LocalNotificationPort, SkuSharePort } from '../../mobile/ports';
 import { createMobileDemoState } from '../../src/domain/mobile-demo-state';
+import type { DemoState } from '../../src/domain/types';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 
 function createPorts(): {
   scanner: BarcodeScannerPort;
   notifications: LocalNotificationPort;
+  share: SkuSharePort;
 } {
   return {
     scanner: { scan: async () => null },
@@ -16,14 +18,32 @@ function createPorts(): {
       notifyPriceChange: async () => undefined,
       listenForPriceChangeActions: async () => async () => undefined,
     },
+    share: { shareSku: async () => undefined },
   };
 }
 
-function renderMobile(overrides: Partial<ReturnType<typeof createPorts>> = {}) {
-  const gateway = new MockOperationsGateway(createMobileDemoState);
+function renderMobile(
+  overrides: Partial<ReturnType<typeof createPorts>> = {},
+  seedFactory: () => DemoState = createMobileDemoState,
+) {
+  const gateway = new MockOperationsGateway(seedFactory);
   const ports = { ...createPorts(), ...overrides };
-  render(<MobileApp gateway={gateway} scanner={ports.scanner} notifications={ports.notifications} />);
+  render(<MobileApp gateway={gateway} scanner={ports.scanner} notifications={ports.notifications} share={ports.share} />);
   return { gateway, ...ports };
+}
+
+function createRecommendationState(): DemoState {
+  const state = createMobileDemoState();
+  return {
+    ...state,
+    skus: state.skus.map((sku) => {
+      if (sku.id === 'sku-1') return { ...sku, name: 'Beras Lama CH009', stock: 4, createdAt: '2025-01-10T00:00:00.000Z' };
+      if (sku.id === 'sku-2') return { ...sku, name: 'Kemeja Lama CH009', stock: 2, createdAt: '2025-06-10T00:00:00.000Z' };
+      if (sku.id === 'sku-3') return { ...sku, name: 'Aksesori Baru CH010', stock: 8, createdAt: '2026-06-10T00:00:00.000Z' };
+      return { ...sku, stock: 0 };
+    }),
+    notaTransactions: [],
+  };
 }
 
 function createDeferred<T>() {
@@ -108,6 +128,82 @@ test('dashboard search action opens the searchable SKU list', () => {
 
   expect(screen.getByRole('heading', { name: 'SKU Gudang' })).toBeInTheDocument();
   expect(screen.getByRole('searchbox', { name: 'Cari SKU' })).toHaveFocus();
+});
+
+test('dashboard opens mobile share recommendations while keeping three bottom destinations', () => {
+  renderMobile({}, createRecommendationState);
+
+  const quickActions = screen.getByRole('region', { name: 'Aksi cepat' });
+  fireEvent.click(within(quickActions).getByRole('button', { name: 'Rekomendasi Share' }));
+  fireEvent.change(screen.getByLabelText('Tanggal rekomendasi'), { target: { value: '2026-07-23' } });
+
+  expect(screen.getByRole('heading', { name: 'Rekomendasi Share' })).toHaveFocus();
+  expect(screen.getByLabelText('Tanggal rekomendasi')).toHaveValue('2026-07-23');
+  expect(within(screen.getByRole('navigation', { name: 'Navigasi utama' })).getAllByRole('button')).toHaveLength(3);
+});
+
+test('share recommendations use the Windows daily and urgent grouping rules', () => {
+  renderMobile({}, createRecommendationState);
+  fireEvent.click(screen.getByRole('button', { name: 'Rekomendasi Share' }));
+  fireEvent.change(screen.getByLabelText('Tanggal rekomendasi'), { target: { value: '2026-07-23' } });
+
+  expect(screen.getByRole('tab', { name: 'Rekomendasi Harian' })).toHaveAttribute('aria-selected', 'true');
+  expect(screen.getByText('3 dari 3 SKU dipilih')).toBeInTheDocument();
+  const ch009 = screen.getByRole('region', { name: 'Grup supplier CH009' });
+  expect(within(ch009).getByText('Beras Lama CH009')).toBeInTheDocument();
+  expect(within(ch009).getByText('Kemeja Lama CH009')).toBeInTheDocument();
+  expect(screen.getByRole('region', { name: 'Grup supplier CH010' })).toHaveTextContent('Aksesori Baru CH010');
+
+  fireEvent.click(screen.getByRole('tab', { name: 'SKU Urgent' }));
+  expect(screen.getByText('2 SKU tidak keluar lebih dari 8 bulan')).toBeInTheDocument();
+  expect(screen.getByText('Beras Lama CH009')).toBeInTheDocument();
+  expect(screen.getByText('Kemeja Lama CH009')).toBeInTheDocument();
+  expect(screen.queryByText('Aksesori Baru CH010')).not.toBeInTheDocument();
+});
+
+test('each recommendation invokes the share port for exactly one selected SKU', async () => {
+  const shareSku = vi.fn(async () => undefined);
+  renderMobile({ share: { shareSku } }, createRecommendationState);
+  fireEvent.click(screen.getByRole('button', { name: 'Rekomendasi Share' }));
+  fireEvent.change(screen.getByLabelText('Tanggal rekomendasi'), { target: { value: '2026-07-23' } });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Bagikan SKU Beras Lama CH009' }));
+
+  await waitFor(() => expect(shareSku).toHaveBeenCalledOnce());
+  expect(shareSku).toHaveBeenCalledWith(expect.objectContaining({
+    id: 'sku-1',
+    name: 'Beras Lama CH009',
+    skuNumber: 'BRS-108-BLK',
+  }));
+  expect(await screen.findByRole('status')).toHaveTextContent('Beras Lama CH009 siap dibagikan.');
+});
+
+test('recommendation share failure is non-destructive and can be retried', async () => {
+  const shareSku = vi.fn()
+    .mockRejectedValueOnce(new Error('share cancelled'))
+    .mockResolvedValueOnce(undefined);
+  renderMobile({ share: { shareSku } }, createRecommendationState);
+  fireEvent.click(screen.getByRole('button', { name: 'Rekomendasi Share' }));
+  fireEvent.change(screen.getByLabelText('Tanggal rekomendasi'), { target: { value: '2026-07-23' } });
+  const shareButton = screen.getByRole('button', { name: 'Bagikan SKU Beras Lama CH009' });
+
+  fireEvent.click(shareButton);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Beras Lama CH009 belum dibagikan. Coba lagi.');
+  fireEvent.click(shareButton);
+
+  await waitFor(() => expect(shareSku).toHaveBeenCalledTimes(2));
+  expect(await screen.findByRole('status')).toHaveTextContent('Beras Lama CH009 siap dibagikan.');
+});
+
+test('recommendation row can open the existing SKU detail', () => {
+  renderMobile({}, createRecommendationState);
+  fireEvent.click(screen.getByRole('button', { name: 'Rekomendasi Share' }));
+  fireEvent.change(screen.getByLabelText('Tanggal rekomendasi'), { target: { value: '2026-07-23' } });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Buka detail Beras Lama CH009' }));
+
+  expect(screen.getByRole('heading', { name: 'Beras Lama CH009' })).toHaveFocus();
+  expect(screen.getByText('BRS-108')).toBeInTheDocument();
 });
 
 test('SKU detail shows aliases and per-SKU price history', () => {
@@ -292,7 +388,7 @@ test('bell opens only unread changes and marks displayed rows read after render'
 test('empty price feed distinguishes normal history from unread notifications', () => {
   const gateway = new MockOperationsGateway(() => ({ ...createMobileDemoState(), priceChanges: [] }));
   const ports = createPorts();
-  render(<MobileApp gateway={gateway} scanner={ports.scanner} notifications={ports.notifications} />);
+  render(<MobileApp gateway={gateway} scanner={ports.scanner} notifications={ports.notifications} share={ports.share} />);
 
   fireEvent.click(screen.getByRole('button', { name: 'Perubahan Harga' }));
   expect(screen.getByText('Belum ada riwayat perubahan harga pada sesi ini.')).toBeInTheDocument();
@@ -376,7 +472,8 @@ test('listener removal rejection during unmount remains non-fatal', async () => 
     listenForPriceChangeActions,
   };
   const gateway = new MockOperationsGateway(createMobileDemoState);
-  const { unmount } = render(<MobileApp gateway={gateway} scanner={createPorts().scanner} notifications={notifications} />);
+  const ports = createPorts();
+  const { unmount } = render(<MobileApp gateway={gateway} scanner={ports.scanner} notifications={notifications} share={ports.share} />);
   await waitFor(() => expect(listenForPriceChangeActions).toHaveBeenCalledOnce());
 
   unmount();
@@ -403,7 +500,8 @@ test('late listener removal rejection after unmount remains non-fatal', async ()
     listenForPriceChangeActions,
   };
   const gateway = new MockOperationsGateway(createMobileDemoState);
-  const { unmount } = render(<MobileApp gateway={gateway} scanner={createPorts().scanner} notifications={notifications} />);
+  const ports = createPorts();
+  const { unmount } = render(<MobileApp gateway={gateway} scanner={ports.scanner} notifications={notifications} share={ports.share} />);
   await waitFor(() => expect(resolveListener).toBeTypeOf('function'));
   unmount();
 

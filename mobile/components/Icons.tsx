@@ -47,3 +47,7 @@ export function BackIcon(props: IconProps) {
 export function InfoIcon(props: IconProps) {
   return <IconBase {...props}><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7h.01" /></IconBase>;
 }
+
+export function ShareIcon(props: IconProps) {
+  return <IconBase {...props}><circle cx="6" cy="12" r="2" /><circle cx="17" cy="6" r="2" /><circle cx="17" cy="18" r="2" /><path d="m8 11 7-4M8 13l7 4" /></IconBase>;
+}

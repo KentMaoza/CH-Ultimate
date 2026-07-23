@@ -1,5 +1,5 @@
 import type { DemoState, Sku } from '../../src/domain/types';
-import { BellIcon, BoxIcon, ChevronIcon, InfoIcon, ScanIcon, SearchIcon, TrendIcon } from './Icons';
+import { BellIcon, BoxIcon, ChevronIcon, InfoIcon, ScanIcon, SearchIcon, ShareIcon, TrendIcon } from './Icons';
 import { PriceChangeList } from './PriceChangeList';
 
 export function DashboardView({
@@ -10,6 +10,7 @@ export function DashboardView({
   onOpenPrices,
   onOpenUnread,
   onOpenSku,
+  onOpenRecommendations,
 }: {
   snapshot: DemoState;
   unreadCount: number;
@@ -18,6 +19,7 @@ export function DashboardView({
   onOpenPrices: () => void;
   onOpenUnread: () => void;
   onOpenSku: (sku: Sku) => void;
+  onOpenRecommendations: () => void;
 }) {
   const activeSkus = snapshot.skus.filter((sku) => !sku.archived);
   const lowStockCount = activeSkus.filter((sku) => sku.tracked && sku.stock <= 2).length;
@@ -38,6 +40,7 @@ export function DashboardView({
     <section className="quick-actions" aria-label="Aksi cepat">
       <button className="quick-action primary" onClick={onScan}><ScanIcon />Scan Barcode</button>
       <button className="quick-action" onClick={onSearch}><SearchIcon />Cari SKU</button>
+      <button className="quick-action recommendations-action" onClick={onOpenRecommendations}><ShareIcon />Rekomendasi Share</button>
     </section>
     <section className="summary-panel" aria-label="Ringkasan gudang">
       <div><BoxIcon /><span><small>Total SKU</small><strong data-testid="active-sku-count">{activeSkus.length.toLocaleString('id-ID')}</strong><em>SKU aktif di gudang</em></span></div>

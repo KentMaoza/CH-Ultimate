@@ -21,7 +21,7 @@ npm run package
 
 - Data exists only for the current app session and resets on reload or exit.
 - Runtime XLSX imports are parsed in memory and are never copied into this repository.
-- Printing Nota/template label/invoice, final PDF export, NAS/database integration, mobile dashboards, and other CH apps are intentionally deferred. SKU Gudang barcode can use the operating system print dialog.
+- Printing Nota/template label/invoice and their PDF exports, NAS/database integration, mobile dashboards, and other CH apps are intentionally deferred. Rekomendasi Share shares one SKU at a time through the system share sheet or its local fallback, while SKU Gudang barcode can use the operating system print dialog.
 - `CHU` is temporary branding.
 
 The future NAS phase will replace the mock `OperationsGateway` implementation with an authoritative CH Core API.
@@ -36,6 +36,7 @@ Reloading or closing the application discards the imported workbook, stock edits
 
 - SKU Gudang with runtime XLSX import, search, edit aliases/prices, archive, explicit add/subtract stock actions, and quantity-controlled QR barcode printing
 - Perubahan SKU with date-filtered price/quantity history and CSV price export
+- Rekomendasi Share with daily supplier grouping, oldest-stock priority, a 300-SKU daily cap, an urgent over-eight-month section, and per-SKU sharing
 - Buat SKU with tracked/untracked stock
 - Thermal/A4 QR label builder plus configurable invoice template preview
 - Full-screen Nota workspace for session-only draft/reopened transactions
@@ -59,8 +60,12 @@ Reloading or closing the application discards the imported workbook, stock edits
 
 Barang Kosong can show zero/negative stock, exactly one piece, exactly two pieces, or every tracked SKU at two pieces or below. It can also be searched by SKU name or number and filtered by a supplier code found only at the end of the name (`CH` followed by digits). Codes keep their exact zero padding, so `CH02` and `CH002` are separate suppliers. **Pilih semua hasil filter** adds the current result to the report selection without dropping items chosen through another filter. After a SKU is selected, its session-only planned restock quantity from `0` to `9.999` is edited directly in the **Laporan Barang Kosong** preview; it never changes warehouse stock.
 
+## Rekomendasi Share
+
+Rekomendasi Share uses active SKU with positive stock. It sorts by the latest completed Nota sale; a SKU that has never sold uses its creation time as the baseline. The daily list is capped at 300 SKU and grouped by the trailing supplier code found in the SKU name or number, such as `CH009` and `CH010`. The **SKU Urgent** tab contains items that have not moved for more than eight calendar months. Choosing another date recalculates the session-only recommendation from the data available on that date. **Bagikan SKU** shares one selected product's image, name, SKU number, and reference price without warehouse stock. When the operating-system share sheet is unavailable, the local dialog can copy the same information or save the product image.
+
 ## Template Label & Invoice
 
 The template module keeps the existing thermal/A4 label builder and adds an **Invoice** tab. Invoice width, height, font size, logo URL, bank account, address, and phone number are configurable in memory. Logo, address, phone, and bank elements can be shown/hidden and moved with explicit up/down controls. The preview uses current demo Nota data; print and PDF actions remain disabled.
 
-This port deliberately contains no CH Nota backend, IPC bridge, database/persistence, network API, production printing, or PDF service. The renderer continues to use the asynchronous `OperationsGateway` boundary, so a future authenticated NAS/CH Core implementation can replace the in-memory adapter without rewriting the screens.
+This port deliberately contains no CH Nota backend, IPC bridge, database/persistence, network API, production printing, or external PDF service. The renderer continues to use the asynchronous `OperationsGateway` boundary, so a future authenticated NAS/CH Core implementation can replace the in-memory adapter without rewriting the screens.

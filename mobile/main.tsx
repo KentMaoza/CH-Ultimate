@@ -12,6 +12,6 @@ const ports = createMobilePorts(Capacitor.isNativePlatform());
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <MobileApp gateway={gateway} notifications={ports.notifications} scanner={ports.scanner} />
+    <MobileApp gateway={gateway} notifications={ports.notifications} scanner={ports.scanner} share={ports.share} />
   </StrictMode>,
 );

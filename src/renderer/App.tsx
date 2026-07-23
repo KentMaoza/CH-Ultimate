@@ -10,13 +10,15 @@ import { RevenuePage } from './pages/RevenuePage';
 import { EmptyStockPage } from './pages/EmptyStockPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ArchiveNotaPage, initialArchiveNotaView, type ArchiveNotaViewState } from './pages/ArchiveNotaPage';
+import { ShareRecommendationsPage } from './pages/ShareRecommendationsPage';
 
-export type ModuleId = 'inventory' | 'skuChanges' | 'create' | 'label' | 'nota' | 'notaArchive' | 'revenue' | 'empty' | 'settings';
-type NavIconName = 'warehouse' | 'history' | 'add' | 'template' | 'nota' | 'archive' | 'revenue' | 'empty' | 'settings';
+export type ModuleId = 'inventory' | 'skuChanges' | 'shareRecommendations' | 'create' | 'label' | 'nota' | 'notaArchive' | 'revenue' | 'empty' | 'settings';
+type NavIconName = 'warehouse' | 'history' | 'share' | 'add' | 'template' | 'nota' | 'archive' | 'revenue' | 'empty' | 'settings';
 
 const modules: Array<{ id: ModuleId; label: string; icon: NavIconName }> = [
   { id: 'inventory', label: 'SKU Gudang', icon: 'warehouse' },
   { id: 'skuChanges', label: 'Perubahan SKU', icon: 'history' },
+  { id: 'shareRecommendations', label: 'Rekomendasi Share', icon: 'share' },
   { id: 'create', label: 'Buat SKU', icon: 'add' },
   { id: 'label', label: 'Template Label & Invoice', icon: 'template' },
   { id: 'nota', label: 'Nota', icon: 'nota' },
@@ -31,6 +33,7 @@ function NavIcon({ name }: { name: NavIconName }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" {...common}>
     {name === 'warehouse' && <><path d="M3 10 12 4l9 6v10H3Z" /><path d="M7 20v-7h10v7M7 16h10" /></>}
     {name === 'history' && <><path d="M4 6h12M4 12h12M4 18h8" /><circle cx="19" cy="17" r="3" /><path d="M19 15.5V17l1 1" /></>}
+    {name === 'share' && <><circle cx="6" cy="12" r="2" /><circle cx="17" cy="6" r="2" /><circle cx="17" cy="18" r="2" /><path d="m8 11 7-4M8 13l7 4" /></>}
     {name === 'add' && <><rect x="4" y="4" width="16" height="16" rx="1" /><path d="M12 8v8M8 12h8" /></>}
     {name === 'template' && <><path d="M5 3h11l3 3v15H5Z" /><path d="M15 3v4h4M8 11h8M8 15h5" /></>}
     {name === 'nota' && <><path d="M6 3h12v18l-3-2-3 2-3-2-3 2Z" /><path d="M9 8h6M9 12h6M9 16h4" /></>}
@@ -88,7 +91,7 @@ function AppLayout() {
           <div><span className="eyebrow">CH ULTIMATE / DEMO</span><h1>{current.label}</h1></div>
           <div className="session-pill">Keluar / reload = data hilang</div>
         </header>
-        {active === 'inventory' ? <InventoryPage /> : active === 'skuChanges' ? <SkuChangesPage /> : active === 'create' ? <CreateSkuPage /> : active === 'label' ? <LabelPage /> : active === 'notaArchive' ? <ArchiveNotaPage view={archiveView} onViewChange={setArchiveView} onOpenNota={openNota} /> : active === 'revenue' ? <RevenuePage /> : active === 'empty' ? <EmptyStockPage /> : active === 'settings' ? <SettingsPage /> : (
+        {active === 'inventory' ? <InventoryPage /> : active === 'skuChanges' ? <SkuChangesPage /> : active === 'shareRecommendations' ? <ShareRecommendationsPage /> : active === 'create' ? <CreateSkuPage /> : active === 'label' ? <LabelPage /> : active === 'notaArchive' ? <ArchiveNotaPage view={archiveView} onViewChange={setArchiveView} onOpenNota={openNota} /> : active === 'revenue' ? <RevenuePage /> : active === 'empty' ? <EmptyStockPage /> : active === 'settings' ? <SettingsPage /> : (
           <section className="page-placeholder"><span className="placeholder-number">0{modules.findIndex((module) => module.id === active) + 1}</span><div><h2>{current.label}</h2><p>Frontend operasional sedang aktif. Data hanya berlaku untuk sesi ini.</p></div></section>
         )}
       </main>

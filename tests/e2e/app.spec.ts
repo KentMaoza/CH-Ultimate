@@ -73,7 +73,7 @@ test('Nota is a full-window workspace, stays horizontally contained, and returns
     await window.getByRole('button', { name: 'Kembali ke CH Ultimate' }).click();
     await expect(window.getByRole('heading', { name: 'SKU Gudang', level: 1 })).toBeVisible();
     await expect(window.getByRole('navigation', { name: 'Modul CH Ultimate' })).toBeVisible();
-    await expect(window.locator('.nav-glyph svg')).toHaveCount(9);
+    await expect(window.locator('.nav-glyph svg')).toHaveCount(10);
     const rail = await window.locator('.app-rail').boundingBox();
     const templateLabel = await window.getByRole('button', { name: 'Template Label & Invoice' }).locator('span').last().boundingBox();
     expect(rail?.width).toBeGreaterThanOrEqual(288);

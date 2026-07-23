@@ -8,7 +8,9 @@ import type { ActionPerformed } from '@capacitor/local-notifications';
 import {
   createNativeBarcodeScanner,
   createNativeLocalNotifications,
+  createNativeSkuShare,
 } from '../../mobile/native-adapters';
+import { formatSkuShareText } from '../../mobile/ports';
 import { createMobileDemoState } from '../../src/domain/mobile-demo-state';
 
 function createNotificationPlugin(display: 'granted' | 'denied' | 'prompt' = 'granted') {
@@ -124,4 +126,88 @@ test('native notification actions forward only a valid skuId and expose listener
   expect(onSku).toHaveBeenCalledOnce();
   expect(onSku).toHaveBeenCalledWith('sku-2');
   expect(native.remove).toHaveBeenCalledOnce();
+});
+
+test('SKU share text contains public product fields without warehouse stock', () => {
+  const sku = createMobileDemoState().skus[0]!;
+
+  expect(formatSkuShareText(sku)).toBe(
+    'Beras Hitam Premium 1 kg\nSKU: BRS-108-BLK\nHarga referensi: Rp42.000',
+  );
+  expect(formatSkuShareText(sku)).not.toContain('Stok');
+  expect(formatSkuShareText(sku)).not.toContain(String(sku.stock));
+});
+
+test('native SKU share writes one product image to cache, shares one SKU, and removes the cache file', async () => {
+  const sku = createMobileDemoState().skus[0]!;
+  const share = vi.fn(async () => ({ activityType: 'whatsapp' }));
+  const writeFile = vi.fn(async () => ({ uri: 'file:///cache/chu-share-BRS-108-BLK.svg' }));
+  const deleteFile = vi.fn(async () => undefined);
+  const loadImage = vi.fn(async () => ({ data: 'PHN2Zz4=', extension: 'svg' }));
+  const adapter = createNativeSkuShare({ share }, { writeFile, deleteFile }, loadImage);
+
+  await adapter.shareSku(sku);
+
+  expect(loadImage).toHaveBeenCalledWith('/assets/mobile/beras-hitam-premium.svg');
+  expect(writeFile).toHaveBeenCalledWith(expect.objectContaining({
+    path: 'chu-share-BRS-108-BLK.svg',
+    data: 'PHN2Zz4=',
+  }));
+  expect(share).toHaveBeenCalledOnce();
+  expect(share).toHaveBeenCalledWith({
+    title: 'Beras Hitam Premium 1 kg',
+    text: 'Beras Hitam Premium 1 kg\nSKU: BRS-108-BLK\nHarga referensi: Rp42.000',
+    files: ['file:///cache/chu-share-BRS-108-BLK.svg'],
+    dialogTitle: 'Bagikan SKU',
+  });
+  expect(deleteFile).toHaveBeenCalledWith(expect.objectContaining({
+    path: 'chu-share-BRS-108-BLK.svg',
+  }));
+});
+
+test('native SKU share falls back to text when the image cannot be prepared', async () => {
+  const sku = createMobileDemoState().skus[0]!;
+  const share = vi.fn(async () => ({ activityType: '' }));
+  const writeFile = vi.fn(async () => ({ uri: 'file:///cache/unexpected.svg' }));
+  const deleteFile = vi.fn(async () => undefined);
+  const loadImage = vi.fn(async () => { throw new Error('image unavailable'); });
+
+  await createNativeSkuShare({ share }, { writeFile, deleteFile }, loadImage).shareSku(sku);
+
+  expect(share).toHaveBeenCalledWith({
+    title: sku.name,
+    text: formatSkuShareText(sku),
+    dialogTitle: 'Bagikan SKU',
+  });
+  expect(writeFile).not.toHaveBeenCalled();
+  expect(deleteFile).not.toHaveBeenCalled();
+});
+
+test('native SKU share falls back to text when the cache image cannot be written', async () => {
+  const sku = createMobileDemoState().skus[0]!;
+  const share = vi.fn(async () => ({ activityType: '' }));
+  const writeFile = vi.fn(async () => { throw new Error('cache unavailable'); });
+  const deleteFile = vi.fn(async () => undefined);
+  const loadImage = vi.fn(async () => ({ data: 'PHN2Zz4=', extension: 'svg' }));
+
+  await createNativeSkuShare({ share }, { writeFile, deleteFile }, loadImage).shareSku(sku);
+
+  expect(share).toHaveBeenCalledWith({
+    title: sku.name,
+    text: formatSkuShareText(sku),
+    dialogTitle: 'Bagikan SKU',
+  });
+  expect(deleteFile).not.toHaveBeenCalled();
+});
+
+test('native SKU share removes its cache file even when the share sheet rejects', async () => {
+  const sku = createMobileDemoState().skus[0]!;
+  const share = vi.fn(async () => { throw new Error('share cancelled'); });
+  const writeFile = vi.fn(async () => ({ uri: 'file:///cache/chu-share-BRS-108-BLK.svg' }));
+  const deleteFile = vi.fn(async () => undefined);
+  const loadImage = vi.fn(async () => ({ data: 'PHN2Zz4=', extension: 'svg' }));
+  const adapter = createNativeSkuShare({ share }, { writeFile, deleteFile }, loadImage);
+
+  await expect(adapter.shareSku(sku)).rejects.toThrow('share cancelled');
+  expect(deleteFile).toHaveBeenCalledOnce();
 });

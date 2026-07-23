@@ -288,13 +288,13 @@ test('Template Label and Invoice configures a movable session-only invoice previ
     await expect(preview).toContainText('Barang Nota B');
     await expect(preview).not.toContainText('Beras Hitam Premium 1 kg');
     expect(await preview.locator('thead th').allTextContents()).toEqual([
-      'NO', 'NAMA BARANG', 'JENIS', 'JUMLAH', 'PCS', 'LSN', 'HARGA PCS', 'HARGA LSN', 'TOTAL',
+      'NO', 'NAMA BARANG', 'JENIS', 'JUMLAH', 'PCS/LSN', 'HARGA PCS', 'HARGA LSN', 'TOTAL',
     ]);
     await expect(preview.getByTestId('invoice-kind-1B')).toHaveText('Layanan');
     await expect(preview.getByTestId('invoice-price-pcs-1B')).toHaveText('112.000');
     await expect(preview.getByTestId('invoice-price-lsn-1B')).toHaveText('1.344.000');
-    await expect(preview.getByTestId('invoice-unit-pcs-1B')).toHaveClass(/is-active/);
-    await expect(preview.getByTestId('invoice-unit-lsn-1B')).not.toHaveClass(/is-active/);
+    await expect(preview.getByTestId('invoice-unit-1B')).toHaveText('PCS');
+    await expect(preview.getByTestId('invoice-unit-1B')).not.toHaveClass(/is-active/);
     await expect(preview.getByTestId('invoice-customer-name')).toHaveText('Amelia');
     await expect(preview.getByTestId('invoice-customer-place')).toHaveText('Saibah');
     await expect(preview.getByTestId('invoice-customer-date')).toHaveText(/\d{4}-\d{2}-\d{2}/);

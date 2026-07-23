@@ -73,3 +73,27 @@
   missing columns, and weak metadata hierarchy.
 - [x] Commit the branch and merge it into local `main`.
 - [x] Re-run verification on merged `main` and confirm a clean worktree.
+
+### Task 4: Combine Invoice Unit Display
+
+**Files:**
+- Modify: `tests/unit/label-nota-ui.test.tsx`
+- Modify: `tests/e2e/app.spec.ts`
+- Modify: `src/renderer/pages/InvoiceTemplateBuilder.tsx`
+- Modify: `src/renderer/styles.css`
+
+**Interfaces:**
+- Consumes: the existing `NotaLine.unit` value.
+- Produces: one read-only `PCS/LSN` invoice column while preserving the two
+  independent price columns and the unchanged operator-facing Nota grid.
+
+- [x] Change the invoice tests to expect one `PCS/LSN` header and one plain
+  unit cell, then run the focused unit test and confirm it fails against the
+  previous two-column renderer.
+- [x] Replace the two invoice unit columns with one cell that renders the
+  active unit in uppercase.
+- [x] Remove invoice-only active-unit block styling and preserve total table
+  width by assigning the combined column the previous two-column width.
+- [x] Run full verification, packaging, E2E, and `git diff --check`.
+- [x] Commit on `codex/invoice-combined-unit-column`, merge locally to `main`,
+  and verify the merged worktree.

@@ -27,16 +27,16 @@
 - Consumes: existing `NotaLine` fields and `lineTotal(line)`.
 - Produces: semantic invoice table with `data-testid="invoice-items-grid"` and metadata values with stable test IDs.
 
-- [ ] Add a failing test that expects the exact nine headers, fixed code `3A`,
+- [x] Add a failing test that expects the exact nine headers, fixed code `3A`,
   `JENIS`, distinct PCS/LSN prices, and transaction customer metadata.
-- [ ] Run `npm test -- tests/unit/label-nota-ui.test.tsx` and confirm the old
+- [x] Run `npm test -- tests/unit/label-nota-ui.test.tsx` and confirm the old
   six-column table fails.
-- [ ] Replace the old `NOTA` and combined price/unit cells with the nine
+- [x] Replace the old `NOTA` and combined price/unit cells with the nine
   approved columns.
-- [ ] Render the current unit as an active read-only unit cell and keep missing
+- [x] Render the current unit as an active read-only unit cell and keep missing
   prices as `—`.
-- [ ] Add the three-column customer metadata block.
-- [ ] Run the focused test and `npm run typecheck`.
+- [x] Add the three-column customer metadata block.
+- [x] Run the focused test and `npm run typecheck`.
 
 ### Task 2: Add the Full Grid and Readable Metadata
 
@@ -48,13 +48,13 @@
 - Consumes: invoice table and metadata classes from Task 1.
 - Produces: full cell borders, black header, stable column widths, and large identity values.
 
-- [ ] Add assertions for metadata hooks and unit active state.
-- [ ] Add namespaced CSS so every invoice header/body cell has a black border.
-- [ ] Use a wide fixed table layout with larger item names and right-aligned
+- [x] Add assertions for metadata hooks and unit active state.
+- [x] Add namespaced CSS so every invoice header/body cell has a black border.
+- [x] Use a wide fixed table layout with larger item names and right-aligned
   numeric columns.
-- [ ] Increase customer/place/date values independently of the configurable
+- [x] Increase customer/place/date values independently of the configurable
   base invoice font size.
-- [ ] Run the focused test and `git diff --check`.
+- [x] Run the focused test and `git diff --check`.
 
 ### Task 3: Rendered QA and Integration
 
@@ -65,11 +65,11 @@
 - Consumes: final Invoice tab UI.
 - Produces: Electron regression proof for A/B selection and the new grid.
 
-- [ ] Extend E2E assertions for exact headers, full customer metadata, kind,
+- [x] Extend E2E assertions for exact headers, full customer metadata, kind,
   PCS/LSN state, and independent prices.
-- [ ] Run `npm run verify`.
-- [ ] Run `npm run package` and `npm run test:e2e`.
-- [ ] Inspect the rendered Invoice tab at desktop size for clipping, overlap,
+- [x] Run `npm run verify`.
+- [x] Run `npm run package` and `npm run test:e2e`.
+- [x] Inspect the rendered Invoice tab at desktop size for clipping, overlap,
   missing columns, and weak metadata hierarchy.
-- [ ] Commit the branch and merge it into local `main`.
-- [ ] Re-run verification on merged `main` and confirm a clean worktree.
+- [x] Commit the branch and merge it into local `main`.
+- [x] Re-run verification on merged `main` and confirm a clean worktree.

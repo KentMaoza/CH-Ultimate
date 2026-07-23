@@ -3,6 +3,7 @@ export interface NotaVoiceRequest {
   suffix: string;
   quantity: number;
   unit: 'pcs' | 'lsn';
+  price: number;
 }
 
 export interface NotaVoiceAudio {
@@ -28,14 +29,31 @@ export interface NotaVoicePlayer {
 
 const suffixes = new Set([...Array.from({ length: 26 }, (_, index) => String.fromCharCode(65 + index)), 'AA']);
 
-export function resolveNotaVoice(request: NotaVoiceRequest): [string, string] | null {
+function resolvePriceVoice(price: number): string[] | null {
+  if (!Number.isInteger(price) || price < 1 || price > 1_000_000) return null;
+  if (price === 1_000_000) return ['./assets/nota-voice/prices/satu-juta.ogg'];
+  if (price < 1_000) return [`./assets/nota-voice/prices/values/${price}.ogg`];
+  const thousands = Math.floor(price / 1_000);
+  const remainder = price % 1_000;
+  const clips = thousands === 1
+    ? ['./assets/nota-voice/prices/seribu.ogg']
+    : [`./assets/nota-voice/prices/values/${thousands}.ogg`, './assets/nota-voice/prices/ribu.ogg'];
+  if (remainder) clips.push(`./assets/nota-voice/prices/values/${remainder}.ogg`);
+  return clips;
+}
+
+export function resolveNotaVoice(request: NotaVoiceRequest): string[] | null {
   if (!Number.isInteger(request.rowNumber) || request.rowNumber < 1 || request.rowNumber > 15) return null;
   if (!suffixes.has(request.suffix)) return null;
   if (!Number.isInteger(request.quantity) || request.quantity < 1 || request.quantity > 48) return null;
   if (request.unit !== 'pcs' && request.unit !== 'lsn') return null;
+  const priceClips = resolvePriceVoice(request.price);
+  if (!priceClips) return null;
   return [
     `./assets/nota-voice/rows/${request.rowNumber}${request.suffix}.ogg`,
     `./assets/nota-voice/quantities/${request.unit}/${request.quantity}.ogg`,
+    './assets/nota-voice/prices/harga.ogg',
+    ...priceClips,
   ];
 }
 
@@ -102,7 +120,7 @@ export function createNotaVoicePlayer({ audioFactory = browserAudioFactory, onPl
   return {
     speak,
     cancel,
-    test: () => speak({ rowNumber: 1, suffix: 'A', quantity: 1, unit: 'pcs' }),
+    test: () => speak({ rowNumber: 1, suffix: 'A', quantity: 1, unit: 'pcs', price: 1_000 }),
     dispose: () => {
       disposed = true;
       cancel();

@@ -26,6 +26,7 @@ function recommendation(index: number, supplierCode: string | null = 'CH009'): S
     lastOutAt: '2025-01-01T00:00:00.000Z',
     idleDays: 568,
     urgent: true,
+    reasons: ['idle'],
   };
 }
 

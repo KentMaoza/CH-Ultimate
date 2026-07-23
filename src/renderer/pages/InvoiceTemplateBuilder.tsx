@@ -1,5 +1,6 @@
-import { lineTotal } from '../../domain/nota';
-import type { InvoiceElementId, InvoiceTemplate } from '../../domain/types';
+import { useEffect, useState } from 'react';
+import { lineTotal, selectedPrice } from '../../domain/nota';
+import type { InvoiceElementId, InvoiceTemplate, NotaLine } from '../../domain/types';
 import { formatRupiah } from '../format';
 import { useOperations } from '../operations-context';
 
@@ -7,12 +8,32 @@ const elementLabels: Record<InvoiceElementId, string> = {
   logo: 'Logo', address: 'Alamat', phone: 'No. Telp', bank: 'No. rekening',
 };
 
+function invoicePrice(line: NotaLine) {
+  return line.unit === 'lsn' && line.lsnPrice <= 0
+    ? { amount: line.pcsPrice, unit: 'pcs' as const }
+    : { amount: selectedPrice(line), unit: line.unit };
+}
+
 export function InvoiceTemplateBuilder() {
   const { state, gateway } = useOperations();
   const template = state.invoiceTemplate;
   const transaction = state.notaTransactions[0];
-  const lines = transaction?.pages.find((page) => page.status === 'active')?.lines.filter((line) => line.description) ?? [];
-  const total = lines.reduce((sum, line) => sum + lineTotal(line), 0);
+  const pages = transaction?.pages
+    .filter((page) => page.status === 'active')
+    .map((page) => ({
+      ...page,
+      rows: page.lines
+        .map((line, rowIndex) => ({ line, rowIndex }))
+        .filter(({ line }) => line.description.trim()),
+    })) ?? [];
+  const [selectedPageId, setSelectedPageId] = useState<string>();
+  useEffect(() => {
+    if (!pages.some((page) => page.id === selectedPageId)) setSelectedPageId(pages[0]?.id);
+  }, [pages, selectedPageId]);
+  const selectedPage = pages.find((page) => page.id === selectedPageId) ?? pages[0];
+  const transactionTotal = selectedPage?.rows.reduce((sum, { line }) => sum + lineTotal(line), 0) ?? 0;
+  const ppn = Math.round(transactionTotal * 12 / 112);
+  const noteTotal = transactionTotal - ppn;
   const update = (patch: Partial<InvoiceTemplate>) => void gateway.setInvoiceTemplate({ ...template, ...patch });
   const updateElement = (id: InvoiceElementId, visible: boolean) => update({ elements: template.elements.map((element) => element.id === id ? { ...element, visible } : element) });
   const moveElement = (id: InvoiceElementId, direction: -1 | 1) => {
@@ -47,11 +68,25 @@ export function InvoiceTemplateBuilder() {
     </section>
     <section className="preview-panel invoice-preview-wrap">
       <div className="preview-title"><strong>Preview invoice</strong><span>Session-only · output produksi belum aktif</span></div>
+      <div className="invoice-page-selector" aria-label="Pilih Nota untuk preview">{pages.map((page) => <button type="button" key={page.id} aria-label={`Preview Nota ${page.suffix}`} aria-pressed={page.id === selectedPage?.id} onClick={() => setSelectedPageId(page.id)}>Nota {page.suffix}</button>)}</div>
       <article className="invoice-paper" data-testid="invoice-preview" style={{ width: `${template.widthMm}mm`, minHeight: `${template.heightMm}mm`, fontSize: `${template.fontSize}px` }}>
         <header>{template.elements.filter((element) => element.visible).map((element) => <div key={element.id} data-testid={`invoice-element-${element.id}`}>{renderElement(element.id)}</div>)}</header>
-        <div className="invoice-heading"><div><b>INVOICE</b><span>{transaction?.baseNumber ?? 'CHU-DEMO-0001'}A</span></div><div><span>Pelanggan</span><strong>{transaction?.customerName || 'Pelanggan Demo'}</strong></div></div>
-        <table><thead><tr><th>Barang</th><th>Jumlah</th><th>Total</th></tr></thead><tbody>{lines.slice(0, 4).map((line) => <tr key={line.id}><td>{line.description}</td><td>{line.quantity} {line.unit}</td><td>{formatRupiah(lineTotal(line))}</td></tr>)}</tbody></table>
-        <footer><span>Total invoice</span><strong>{formatRupiah(total)}</strong></footer>
+        <div className="invoice-heading">
+          <div><b>INVOICE NOTA</b><span>{transaction?.baseNumber ?? 'CHU-DEMO-0001'}</span></div>
+          <div><span>Pelanggan</span><strong>{transaction?.customerName || 'Pelanggan Demo'}</strong><span>{transaction?.customerPlace || 'Tempat belum diisi'}</span><span>{transaction?.transactionDate || 'Tanggal belum diisi'}</span></div>
+        </div>
+        {selectedPage ? <section className="invoice-nota-section">
+            <div className="invoice-nota-heading"><strong>Nota {selectedPage.suffix}</strong><span>{transaction?.baseNumber ?? 'CHU-DEMO-0001'}{selectedPage.suffix}</span></div>
+            {selectedPage.rows.length ? <table><thead><tr><th>NO</th><th>NOTA</th><th>NAMA BARANG</th><th>JUMLAH</th><th>HARGA</th><th>TOTAL</th></tr></thead><tbody>{selectedPage.rows.map(({ line, rowIndex }) => {
+              const price = invoicePrice(line);
+              return <tr key={line.id}><td className="invoice-item-code">{rowIndex + 1}{selectedPage.suffix}</td><td>Nota {selectedPage.suffix}</td><td className="invoice-item-name">{line.description}</td><td>{line.quantity} {line.unit}</td><td className="invoice-item-price">{formatRupiah(price.amount)} / {price.unit}</td><td>{formatRupiah(lineTotal(line))}</td></tr>;
+            })}</tbody></table> : <p className="invoice-empty">Belum ada barang pada Nota {selectedPage.suffix}.</p>}
+          </section> : <p className="invoice-empty">Belum ada Nota aktif pada transaksi ini.</p>}
+        <footer className="invoice-summary">
+          <div data-testid="invoice-note-total"><span>Total Nota</span><strong>{formatRupiah(noteTotal)}</strong></div>
+          <div data-testid="invoice-ppn"><span>PPN 12%</span><strong>{formatRupiah(ppn)}</strong></div>
+          <div data-testid="invoice-transaction-total"><span>Total Transaksi</span><strong>{formatRupiah(transactionTotal)}</strong></div>
+        </footer>
       </article>
     </section>
   </div>;

@@ -5,7 +5,13 @@ import type { Sku } from '../../src/domain/types';
 
 test('shows revenue cards and tracked empty-stock report preview', () => {
   render(<App />);
+  fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+  fireEvent.change(screen.getByLabelText('Password omzet baru'), { target: { value: 'demo' } });
+  fireEvent.change(screen.getByLabelText('Konfirmasi password omzet'), { target: { value: 'demo' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Simpan password omzet' }));
   fireEvent.click(screen.getByRole('button', { name: 'Laporan Omzet' }));
+  fireEvent.change(screen.getByLabelText('Password Laporan Omzet'), { target: { value: 'demo' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Buka Laporan Omzet' }));
   expect(screen.getByText('OMZET HARI INI')).toBeInTheDocument();
   expect(screen.getByTestId('revenue-today')).toBeInTheDocument();
   expect(screen.getByTestId('revenue-month')).toBeInTheDocument();

@@ -10,6 +10,11 @@ import { formatDate, formatRupiah } from '../format';
 import { useOperations } from '../operations-context';
 
 type RecommendationTab = RecommendationPdfMode;
+const reasonLabels = {
+  'price-updated': 'Harga diperbarui',
+  restocked: 'Restock',
+  idle: 'Stok lama',
+} as const;
 
 function witaDateToday(): string {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Makassar', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
@@ -36,6 +41,7 @@ function RecommendationRow({ item }: { item: ShareRecommendationItem }) {
     <div className="share-recommendation__price"><span>Harga</span><strong>{formatRupiah(item.sku.referencePrice)}</strong></div>
     <div className="share-recommendation__movement"><span>Terakhir keluar / dibuat</span><strong>{formatDate(item.lastOutAt)}</strong><small>{item.idleDays.toLocaleString('id-ID')} hari tidak keluar</small></div>
     <div className="share-recommendation__priority">
+      {item.reasons.map((reason) => <b className="share-recommendation__reason" key={reason}>{reasonLabels[reason]}</b>)}
       {item.urgent ? <b className="share-recommendation__urgent">URGENT</b> : null}
     </div>
   </article>;
@@ -84,7 +90,7 @@ export function ShareRecommendationsPage() {
 
   return <div className="feature-page share-recommendation">
     <div className="feature-toolbar">
-      <div><strong>Rekomendasi share harian</strong><span>Stok tersedia dengan pergerakan paling lama · maksimal 300 SKU per hari</span></div>
+      <div><strong>Rekomendasi share harian</strong><span>Rotasi harga baru, restock, stok lama, dan supplier.</span></div>
       <div className="share-recommendation__actions">
         <label><span>Tanggal rekomendasi</span><input type="date" value={date} onChange={(event) => { setDate(event.target.value); setMessage(''); }} /></label>
         <button
@@ -103,7 +109,7 @@ export function ShareRecommendationsPage() {
     </div>
     <div className="share-recommendation__summary">
       <div><span>{tab === 'daily' ? 'DAFTAR HARIAN' : 'PRIORITAS URGENT'}</span><strong>{tab === 'daily' ? `${report.daily.length} dari ${report.totalEligible} SKU dipilih untuk hari ini` : `${pdfPlan.totalIncluded} dari ${pdfPlan.totalAvailable} SKU urgent dimasukkan ke PDF`}</strong></div>
-      <small>{tab === 'daily' ? 'Urutan dimulai dari SKU yang paling lama tidak keluar.' : 'Urgent dihitung dengan ambang kalender, bukan perkiraan jumlah hari.'}</small>
+      <small>{tab === 'daily' ? 'Daftar berganti secara deterministik menurut tanggal WITA dan kode supplier.' : 'Urgent dihitung dengan ambang kalender, bukan perkiraan jumlah hari.'}</small>
     </div>
     {groups.length ? <RecommendationGroups groups={groups} /> : <p className="empty-state">Tidak ada SKU yang memenuhi rekomendasi pada tanggal ini.</p>}
   </div>;

@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { createNotaVoicePlayer, resolveNotaVoice, type NotaVoiceAudio, type NotaVoiceRequest } from '../../src/renderer/nota/nota-voice';
 
 function request(overrides: Partial<NotaVoiceRequest> = {}): NotaVoiceRequest {
-  return { rowNumber: 1, suffix: 'A', quantity: 1, unit: 'pcs', ...overrides };
+  return { rowNumber: 1, suffix: 'A', quantity: 1, unit: 'pcs', price: 1_000, ...overrides };
 }
 
 function createAudio(url: string) {
@@ -45,15 +45,31 @@ async function expectCancelledPlayRejectionToBeIgnored(
 }
 
 describe('nota voice', () => {
-  test('resolves only supported row and quantity requests to their two local clips', () => {
+  test('resolves supported row, quantity, and active price requests to local compositional clips', () => {
     expect(resolveNotaVoice(request({ rowNumber: 15, suffix: 'AA', quantity: 48, unit: 'lsn' }))).toEqual([
       './assets/nota-voice/rows/15AA.ogg',
       './assets/nota-voice/quantities/lsn/48.ogg',
+      './assets/nota-voice/prices/harga.ogg',
+      './assets/nota-voice/prices/seribu.ogg',
     ]);
+    expect(resolveNotaVoice(request({ price: 1 }))).toContain('./assets/nota-voice/prices/values/1.ogg');
+    expect(resolveNotaVoice(request({ price: 999 }))).toContain('./assets/nota-voice/prices/values/999.ogg');
+    expect(resolveNotaVoice(request({ price: 1_001 }))).toEqual([
+      './assets/nota-voice/rows/1A.ogg',
+      './assets/nota-voice/quantities/pcs/1.ogg',
+      './assets/nota-voice/prices/harga.ogg',
+      './assets/nota-voice/prices/seribu.ogg',
+      './assets/nota-voice/prices/values/1.ogg',
+    ]);
+    expect(resolveNotaVoice(request({ price: 999_999 }))).toContain('./assets/nota-voice/prices/values/999.ogg');
+    expect(resolveNotaVoice(request({ price: 1_000_000 }))).toContain('./assets/nota-voice/prices/satu-juta.ogg');
     expect(resolveNotaVoice(request({ rowNumber: 16 }))).toBeNull();
     expect(resolveNotaVoice(request({ suffix: 'AB' }))).toBeNull();
     expect(resolveNotaVoice(request({ quantity: 0 }))).toBeNull();
     expect(resolveNotaVoice({ ...request(), quantity: 1.5 })).toBeNull();
+    expect(resolveNotaVoice(request({ price: 0 }))).toBeNull();
+    expect(resolveNotaVoice(request({ price: 1_000_001 }))).toBeNull();
+    expect(resolveNotaVoice(request({ price: 1.5 }))).toBeNull();
   });
 
   test('resolves clips beside the packaged file renderer instead of the filesystem root', () => {
@@ -63,7 +79,7 @@ describe('nota voice', () => {
       .toBe('file:///Applications/CH%20Ultimate.app/Contents/Resources/app.asar/.vite/renderer/main_window/assets/nota-voice/rows/1A.ogg');
   });
 
-  test('replaces the current sequence and plays the two newest clips in order', () => {
+  test('replaces the current sequence and plays the newest row, quantity, and price clips in order', () => {
     const clips: ReturnType<typeof createAudio>[] = [];
     const playedUrls: string[] = [];
     const player = createNotaVoicePlayer({ audioFactory: (url) => {
@@ -77,7 +93,7 @@ describe('nota voice', () => {
     } });
 
     player.speak(request());
-    player.speak(request({ rowNumber: 2, suffix: 'B', quantity: 3, unit: 'lsn' }));
+    player.speak(request({ rowNumber: 2, suffix: 'B', quantity: 3, unit: 'lsn', price: 32_000 }));
 
     expect(clips[0]!.pause).toHaveBeenCalledOnce();
     expect(clips[1]!.url).toBe('./assets/nota-voice/rows/2B.ogg');
@@ -85,12 +101,16 @@ describe('nota voice', () => {
     expect(playedUrls).toEqual(['./assets/nota-voice/rows/1A.ogg', './assets/nota-voice/rows/2B.ogg']);
     clips[0]!.onended?.(new Event('ended'));
     expect(clips).toHaveLength(2);
-    clips[1]!.onended?.(new Event('ended'));
-    expect(clips[2]!.url).toBe('./assets/nota-voice/quantities/lsn/3.ogg');
-    expect(clips[2]!.play).toHaveBeenCalledOnce();
-    expect(playedUrls.slice(1)).toEqual([
+    const expected = [
       './assets/nota-voice/rows/2B.ogg',
       './assets/nota-voice/quantities/lsn/3.ogg',
+      './assets/nota-voice/prices/harga.ogg',
+      './assets/nota-voice/prices/values/32.ogg',
+      './assets/nota-voice/prices/ribu.ogg',
+    ];
+    for (let index = 1; index < expected.length; index += 1) clips[index]!.onended?.(new Event('ended'));
+    expect(playedUrls.slice(1)).toEqual([
+      ...expected,
     ]);
   });
 

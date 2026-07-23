@@ -17,7 +17,10 @@ export function noteSuffixFromIndex(index: number): string {
 }
 
 export function suggestedPrice(referencePrice: number, unit: Unit): number { return unit === 'lsn' ? referencePrice * 12 : referencePrice; }
-export function selectedPrice(line: NotaLine): number { return line.unit === 'pcs' ? line.pcsPrice : line.lsnPrice; }
+export function selectedPrice(line: NotaLine): number {
+  if (line.unit === 'pcs') return line.pcsPrice;
+  return line.lsnPrice > 0 ? line.lsnPrice : line.pcsPrice * 12;
+}
 export function lineTotal(line: NotaLine): number { return Math.max(0, line.quantity) * Math.max(0, selectedPrice(line)); }
 export function linePieces(line: NotaLine): number { return line.quantity * (line.unit === 'lsn' ? 12 : 1); }
 

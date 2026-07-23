@@ -422,6 +422,16 @@ test('unit buttons preserve dual overrides while the active unit controls total'
   expect(screen.getByLabelText('Harga PCS baris 3')).toHaveValue('12.000');
 });
 
+test('derives the lsn total from twelve pieces when only Harga PCS is entered', () => {
+  openNota();
+  fireEvent.change(screen.getByLabelText('Jumlah baris 3'), { target: { value: '5' } });
+  fireEvent.click(screen.getByRole('button', { name: 'LSN baris 3' }));
+  fireEvent.change(screen.getByLabelText('Harga PCS baris 3'), { target: { value: '165000' } });
+
+  expect(screen.getByLabelText('Harga LSN baris 3')).toHaveValue('');
+  expect(screen.getByLabelText('Total baris 3')).toHaveTextContent('9.900.000');
+});
+
 test('grid arrows always traverse data cells, including unit buttons and row wrapping', () => {
   openNota();
   const name = screen.getByRole('textbox', { name: 'Nama barang baris 1' });

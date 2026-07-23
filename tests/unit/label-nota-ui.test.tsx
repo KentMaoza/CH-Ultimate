@@ -40,6 +40,50 @@ test('configures an invoice preview and reorders its business identity elements'
   expect(screen.getByRole('button', { name: 'Export PDF invoice' })).toBeDisabled();
 });
 
+test('previews one Nota page at a time with inclusive PPN totals', () => {
+  const gateway = new MockOperationsGateway();
+  const transaction = gateway.getSnapshot().notaTransactions[0]!;
+  const pageA = transaction.pages.find((page) => page.suffix === 'A')!;
+  const pageB = transaction.pages.find((page) => page.suffix === 'B')!;
+  pageA.lines[0] = { ...pageA.lines[0]!, description: '', kind: '', quantity: 0, pcsPrice: 0, lsnPrice: 0 };
+  pageA.lines[1] = { ...pageA.lines[1]!, description: '', kind: '', quantity: 0, pcsPrice: 0, lsnPrice: 0 };
+  pageA.lines[2] = { ...pageA.lines[2]!, description: 'Barang Nota A', quantity: 1, unit: 'pcs', pcsPrice: 112_000 };
+  pageB.lines[0] = {
+    ...pageB.lines[0]!,
+    description: 'Barang Nota B',
+    quantity: 1,
+    unit: 'pcs',
+    pcsPrice: 224_000,
+  };
+
+  render(<App gateway={gateway} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Template Label & Invoice' }));
+  fireEvent.click(screen.getByRole('tab', { name: 'Invoice' }));
+
+  const preview = screen.getByTestId('invoice-preview');
+  expect(screen.getByRole('button', { name: 'Preview Nota A' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', { name: 'Preview Nota B' })).toHaveAttribute('aria-pressed', 'false');
+  expect(preview).toHaveTextContent('Nota A');
+  expect(preview).toHaveTextContent('3A');
+  expect(preview).not.toHaveTextContent('2A');
+  expect(preview).not.toHaveTextContent('Barang Nota B');
+  expect(within(preview).getByTestId('invoice-note-total')).toHaveTextContent('Total NotaRp 100.000');
+  expect(within(preview).getByTestId('invoice-ppn')).toHaveTextContent('PPN 12%Rp 12.000');
+  expect(within(preview).getByTestId('invoice-transaction-total')).toHaveTextContent('Total TransaksiRp 112.000');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Preview Nota B' }));
+  expect(preview).toHaveTextContent('Nota B');
+  expect(preview).toHaveTextContent('1B');
+  expect(preview).not.toHaveTextContent('Barang Nota A');
+  expect(within(preview).getByTestId('invoice-note-total')).toHaveTextContent('Total NotaRp 200.000');
+  expect(within(preview).getByTestId('invoice-ppn')).toHaveTextContent('PPN 12%Rp 24.000');
+  expect(within(preview).getByTestId('invoice-transaction-total')).toHaveTextContent('Total TransaksiRp 224.000');
+  expect(within(preview).getAllByTestId(/invoice-(note-total|ppn|transaction-total)/).map((item) => item.dataset.testid)).toEqual([
+    'invoice-note-total', 'invoice-ppn', 'invoice-transaction-total',
+  ]);
+  expect(preview).not.toHaveTextContent('PPN tidak ditambahkan ke total transaksi');
+});
+
 test('completes a lsn nota from the CH Nota workspace and deducts twelve pieces', async () => {
   render(<App />);
   fireEvent.click(screen.getByRole('button', { name: 'Nota' }));

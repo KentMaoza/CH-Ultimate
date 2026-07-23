@@ -11,6 +11,7 @@ import { EmptyStockPage } from './pages/EmptyStockPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ArchiveNotaPage, initialArchiveNotaView, type ArchiveNotaViewState } from './pages/ArchiveNotaPage';
 import { ShareRecommendationsPage } from './pages/ShareRecommendationsPage';
+import { RevenueAccessProvider } from './revenue-access';
 
 export type ModuleId = 'inventory' | 'skuChanges' | 'shareRecommendations' | 'create' | 'label' | 'nota' | 'notaArchive' | 'revenue' | 'empty' | 'settings';
 type NavIconName = 'warehouse' | 'history' | 'share' | 'add' | 'template' | 'nota' | 'archive' | 'revenue' | 'empty' | 'settings';
@@ -91,7 +92,7 @@ function AppLayout() {
           <div><span className="eyebrow">CH ULTIMATE / DEMO</span><h1>{current.label}</h1></div>
           <div className="session-pill">Keluar / reload = data hilang</div>
         </header>
-        {active === 'inventory' ? <InventoryPage /> : active === 'skuChanges' ? <SkuChangesPage /> : active === 'shareRecommendations' ? <ShareRecommendationsPage /> : active === 'create' ? <CreateSkuPage /> : active === 'label' ? <LabelPage /> : active === 'notaArchive' ? <ArchiveNotaPage view={archiveView} onViewChange={setArchiveView} onOpenNota={openNota} /> : active === 'revenue' ? <RevenuePage /> : active === 'empty' ? <EmptyStockPage /> : active === 'settings' ? <SettingsPage /> : (
+        {active === 'inventory' ? <InventoryPage /> : active === 'skuChanges' ? <SkuChangesPage /> : active === 'shareRecommendations' ? <ShareRecommendationsPage /> : active === 'create' ? <CreateSkuPage /> : active === 'label' ? <LabelPage /> : active === 'notaArchive' ? <ArchiveNotaPage view={archiveView} onViewChange={setArchiveView} onOpenNota={openNota} /> : active === 'revenue' ? <RevenuePage onOpenSettings={() => setActive('settings')} /> : active === 'empty' ? <EmptyStockPage /> : active === 'settings' ? <SettingsPage /> : (
           <section className="page-placeholder"><span className="placeholder-number">0{modules.findIndex((module) => module.id === active) + 1}</span><div><h2>{current.label}</h2><p>Frontend operasional sedang aktif. Data hanya berlaku untuk sesi ini.</p></div></section>
         )}
       </main>
@@ -99,4 +100,6 @@ function AppLayout() {
   );
 }
 
-export function App({ gateway }: { gateway?: OperationsGateway }) { return <OperationsProvider gateway={gateway}><AppLayout /></OperationsProvider>; }
+export function App({ gateway }: { gateway?: OperationsGateway }) {
+  return <OperationsProvider gateway={gateway}><RevenueAccessProvider><AppLayout /></RevenueAccessProvider></OperationsProvider>;
+}

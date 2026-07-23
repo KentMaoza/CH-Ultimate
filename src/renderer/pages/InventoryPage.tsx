@@ -1,14 +1,37 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { parseSkuWorkbook } from '../../domain/workbook';
 import type { Sku } from '../../domain/types';
 import { useOperations } from '../operations-context';
 import { formatDate, formatRupiah, formatTitleCaseInput } from '../format';
 
-function SkuImage({ sku }: { sku: Sku }) {
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => typeof reader.result === 'string'
+      ? resolve(reader.result)
+      : reject(new Error('File gambar tidak dapat dibaca.'));
+    reader.onerror = () => reject(reader.error ?? new Error('File gambar tidak dapat dibaca.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function SkuImage({ sku, onSelect }: { sku: Sku; onSelect: () => void }) {
   const [failed, setFailed] = useState(false);
-  if (!sku.imageUrl || failed) return <div className="image-placeholder">CHU</div>;
-  return <img className="sku-image" src={sku.imageUrl} alt="" onError={() => setFailed(true)} />;
+  useEffect(() => setFailed(false), [sku.imageUrl]);
+  const showImage = Boolean(sku.imageUrl) && !failed;
+  return (
+    <button type="button" className="sku-image-button" aria-label={`Ubah gambar ${sku.skuNumber}`} onClick={onSelect}>
+      {showImage
+        ? <img className="sku-image" src={sku.imageUrl} alt={`Gambar ${sku.skuNumber}`} onError={() => setFailed(true)} />
+        : <span className="image-placeholder">CHU</span>}
+      <span className="sku-image-hover-preview" data-testid="sku-image-hover-preview" aria-hidden="true">
+        {showImage
+          ? <img src={sku.imageUrl} alt="" />
+          : <span className="image-placeholder">CHU</span>}
+      </span>
+    </button>
+  );
 }
 
 export function InventoryPage() {
@@ -19,7 +42,7 @@ export function InventoryPage() {
   const [adjusting, setAdjusting] = useState<{ sku: Sku; direction: 1 | -1 } | null>(null);
   const [editing, setEditing] = useState<Sku | null>(null);
   const [printing, setPrinting] = useState<Sku | null>(null);
-  const [printQuantity, setPrintQuantity] = useState(1);
+  const [printQuantity, setPrintQuantity] = useState('1');
   const [editNumber, setEditNumber] = useState('');
   const [editName, setEditName] = useState('');
   const [editNote, setEditNote] = useState('');
@@ -27,6 +50,8 @@ export function InventoryPage() {
   const [quantity, setQuantity] = useState('');
   const [message, setMessage] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
+  const imageInput = useRef<HTMLInputElement>(null);
+  const [imageTarget, setImageTarget] = useState<Sku | null>(null);
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('id-ID');
     return state.skus.filter((sku) => {
@@ -49,6 +74,25 @@ export function InventoryPage() {
     if (fileInput.current) fileInput.current.value = '';
   }
 
+  function openImagePicker(sku: Sku) {
+    setImageTarget(sku);
+    imageInput.current?.click();
+  }
+
+  async function replaceImage(file?: File) {
+    if (!file || !imageTarget) return;
+    try {
+      if (!file.type.startsWith('image/')) throw new Error('Pilih file gambar yang valid.');
+      await gateway.updateSku(imageTarget.id, { imageUrl: await readFileAsDataUrl(file) });
+      setMessage(`Gambar ${imageTarget.skuNumber} diperbarui.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Gambar gagal diperbarui.');
+    } finally {
+      if (imageInput.current) imageInput.current.value = '';
+      setImageTarget(null);
+    }
+  }
+
   async function applyAdjustment() {
     if (!adjusting) return;
     await gateway.adjustStock(adjusting.sku.id, Number(quantity) * adjusting.direction);
@@ -56,13 +100,16 @@ export function InventoryPage() {
   }
 
   function openAdjustment(sku: Sku, direction: 1 | -1) { setAdjusting({ sku, direction }); setQuantity(''); }
-  function openBarcodePrint(sku: Sku) { setPrinting(sku); setPrintQuantity(1); }
+  function openBarcodePrint(sku: Sku) { setPrinting(sku); setPrintQuantity('1'); }
   function openEdit(sku: Sku) { setEditing(sku); setEditNumber(sku.skuNumber); setEditName(sku.name); setEditNote(sku.note); setEditPrice(String(sku.referencePrice)); }
   async function saveEdit() {
     if (!editing) return;
     try { await gateway.updateSku(editing.id, { skuNumber: editNumber, name: editName, note: editNote, referencePrice: Number(editPrice) }); setEditing(null); }
     catch (error) { setMessage(error instanceof Error ? error.message : 'Perubahan gagal disimpan.'); }
   }
+  const parsedPrintQuantity = Number(printQuantity);
+  const validPrintQuantity = printQuantity !== '' && Number.isInteger(parsedPrintQuantity) && parsedPrintQuantity >= 1 && parsedPrintQuantity <= 10000;
+  const barcodeCount = validPrintQuantity ? parsedPrintQuantity : 0;
 
   return (
     <div className="feature-page">
@@ -70,6 +117,7 @@ export function InventoryPage() {
         <div><strong>{state.skus.length.toLocaleString('id-ID')} SKU</strong><span>{state.sourceLabel}</span></div>
         <div className="toolbar-actions">
           <input ref={fileInput} className="visually-hidden" type="file" accept=".xlsx" aria-label="Import XLSX" onChange={(event) => void importFile(event.target.files?.[0])} />
+          <input ref={imageInput} className="visually-hidden" type="file" accept="image/*" aria-label="Pilih file gambar SKU" onChange={(event) => void replaceImage(event.target.files?.[0])} />
           <button className="button secondary" onClick={() => fileInput.current?.click()}>Import XLSX</button>
         </div>
       </div>
@@ -83,7 +131,7 @@ export function InventoryPage() {
         <table><thead><tr><th>Gambar</th><th>Nomor SKU</th><th>Nama SKU</th><th>Harga Referensi</th><th>Stok</th><th>Catatan</th><th>Dibuat</th><th>Aksi</th></tr></thead>
         <tbody>{filtered.slice(0, 50).map((sku) => (
           <tr key={sku.id}>
-            <td><SkuImage sku={sku} /></td><td className="sku-number" title={sku.skuNumber}>{sku.skuNumber}</td><td>{sku.name}<small>{sku.tracked ? 'Stok dilacak' : 'Tanpa stok'}</small></td>
+            <td><SkuImage sku={sku} onSelect={() => openImagePicker(sku)} /></td><td className="sku-number" title={sku.skuNumber}>{sku.skuNumber}</td><td>{sku.name}<small>{sku.tracked ? 'Stok dilacak' : 'Tanpa stok'}</small></td>
             <td>{formatRupiah(sku.referencePrice)}</td><td data-testid={`sku-stock-${sku.id}`} className={`stock-value ${sku.stock < 0 ? 'negative' : ''}`}>{sku.tracked ? sku.stock : '—'}</td><td>{sku.note || '—'}</td><td>{formatDate(sku.createdAt)}</td>
             <td><div className="row-actions">{!sku.archived && <><button aria-label={`Edit ${sku.skuNumber}`} onClick={() => openEdit(sku)}>Edit</button><button aria-label={`Print barcode ${sku.skuNumber}`} onClick={() => openBarcodePrint(sku)}>Barcode</button></>}{sku.tracked && !sku.archived && <><button aria-label={`Tambah stok ${sku.skuNumber}`} onClick={() => openAdjustment(sku, 1)}>+ Stok</button><button aria-label={`Kurangi stok ${sku.skuNumber}`} onClick={() => openAdjustment(sku, -1)}>− Stok</button></>}<button onClick={() => void gateway.setArchived(sku.id, !sku.archived)}>{sku.archived ? 'Pulihkan' : 'Arsip'}</button></div></td>
           </tr>
@@ -92,7 +140,7 @@ export function InventoryPage() {
       </div>
       <div className="table-footer">Menampilkan {Math.min(filtered.length, 50)} dari {filtered.length.toLocaleString('id-ID')}</div>
       {adjusting && <div className="dialog-backdrop"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="adjust-title"><h2 id="adjust-title">{adjusting.direction === 1 ? 'Tambah stok' : 'Kurangi stok'}</h2><p><strong>{adjusting.sku.skuNumber}</strong> · stok saat ini {adjusting.sku.stock}</p><label><span>{adjusting.direction === 1 ? 'Jumlah stok ditambah' : 'Jumlah stok dikurangi'}</span><input autoFocus min="1" step="1" type="number" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></label><div className="dialog-actions"><button className="button secondary" onClick={() => setAdjusting(null)}>Batal</button><button className="button primary" disabled={!quantity || !Number.isInteger(Number(quantity)) || Number(quantity) <= 0} onClick={() => void applyAdjustment()}>{adjusting.direction === 1 ? 'Tambah stok' : 'Kurangi stok'}</button></div></section></div>}
-      {printing && <div className="dialog-backdrop barcode-print-dialog"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="barcode-print-title"><h2 id="barcode-print-title">Print barcode produk</h2><p><strong>{printing.skuNumber}</strong> · {printing.name}</p><label><span>Jumlah barcode</span><input autoFocus min="1" max="10000" step="1" type="number" value={printQuantity} onChange={(event) => setPrintQuantity(Math.min(10000, Math.max(1, Math.round(Number(event.target.value) || 1))))} /></label><div className="barcode-print-sheet" aria-label="Preview barcode produk">{Array.from({ length: printQuantity }, (_, index) => <div className="barcode-print-item" data-testid="barcode-print-item" key={index}><QRCodeSVG data-testid="barcode-product-qr" data-value={printing.skuNumber} value={printing.skuNumber} size={88} marginSize={0} /><strong>{printing.name}</strong><span>{printing.skuNumber}</span></div>)}</div><div className="dialog-actions"><button className="button secondary" aria-label="Tutup print barcode" onClick={() => setPrinting(null)}>Batal</button><button className="button primary" onClick={() => window.print()}>Print barcode sekarang</button></div></section></div>}
+      {printing && <div className="dialog-backdrop barcode-print-dialog"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="barcode-print-title"><h2 id="barcode-print-title">Print barcode produk</h2><p><strong>{printing.skuNumber}</strong> · {printing.name}</p><label><span>Jumlah barcode</span><input autoFocus min="1" max="10000" step="1" type="number" value={printQuantity} onChange={(event) => setPrintQuantity(event.target.value)} /></label><div className="barcode-print-sheet" aria-label="Preview barcode produk">{Array.from({ length: barcodeCount }, (_, index) => <div className="barcode-print-item" data-testid="barcode-print-item" key={index}><QRCodeSVG data-testid="barcode-product-qr" data-value={printing.skuNumber} value={printing.skuNumber} size={88} marginSize={0} /><strong>{printing.name}</strong><span>{printing.skuNumber}</span></div>)}</div><div className="dialog-actions"><button className="button secondary" aria-label="Tutup print barcode" onClick={() => setPrinting(null)}>Batal</button><button className="button primary" disabled={!validPrintQuantity} onClick={() => window.print()}>Print barcode sekarang</button></div></section></div>}
       {editing && <div className="dialog-backdrop"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="edit-title"><h2 id="edit-title">Edit SKU</h2><p>Nomor lama akan tetap menjadi alias pencarian.</p><div className="stack-fields"><label><span>Edit nomor SKU</span><input autoFocus value={editNumber} onChange={(event) => setEditNumber(event.target.value)} /></label><label><span>Edit nama SKU</span><input value={editName} onChange={(event) => setEditName(formatTitleCaseInput(event.currentTarget))} /></label><label><span>Edit harga referensi</span><input min="0" step="1" type="number" value={editPrice} onChange={(event) => setEditPrice(event.target.value)} /></label><label><span>Edit catatan SKU</span><textarea value={editNote} onChange={(event) => setEditNote(event.target.value)} /></label></div><div className="dialog-actions"><button className="button secondary" onClick={() => setEditing(null)}>Batal</button><button className="button primary" disabled={!editPrice || Number(editPrice) < 0} onClick={() => void saveEdit()}>Simpan perubahan SKU</button></div></section></div>}
     </div>
   );

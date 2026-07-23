@@ -25,6 +25,18 @@ async function finishNota(window: Page) {
 async function expectStockAndRevenue(window: Page, stock: number, revenue: number) {
   await expect(window.getByTestId('sku-stock-sku-1')).toHaveText(String(stock));
   await window.getByRole('button', { name: 'Laporan Omzet' }).click();
+  if (await window.getByRole('button', { name: 'Atur password di Settings' }).count()) {
+    await expect(window.getByTestId('revenue-today')).toHaveCount(0);
+    await window.getByRole('button', { name: 'Atur password di Settings' }).click();
+    await window.getByLabel('Password omzet baru').fill('demo-omzet');
+    await window.getByLabel('Konfirmasi password omzet').fill('demo-omzet');
+    await window.getByRole('button', { name: 'Simpan password omzet' }).click();
+    await window.getByRole('button', { name: 'Laporan Omzet' }).click();
+  }
+  if (await window.getByRole('button', { name: 'Buka Laporan Omzet' }).count()) {
+    await window.getByLabel('Password Laporan Omzet').fill('demo-omzet');
+    await window.getByRole('button', { name: 'Buka Laporan Omzet' }).click();
+  }
   const formatted = `Rp ${revenue.toLocaleString('id-ID')}`;
   await expect(window.getByTestId('revenue-today')).toContainText(formatted);
   await expect(window.getByTestId('revenue-month')).toContainText(formatted);
@@ -87,13 +99,34 @@ test('SKU changes record price and quantity history and export filtered prices',
   const { application, window } = await launch();
   try {
     const skuRow = window.getByRole('row', { name: /BRS-108-BLK/ });
+    const imageButton = skuRow.getByRole('button', { name: 'Ubah gambar BRS-108-BLK' });
+    await imageButton.hover();
+    await expect(imageButton.getByTestId('sku-image-hover-preview')).toBeVisible();
+    const fileChooserPromise = window.waitForEvent('filechooser');
+    await imageButton.click();
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles({
+      name: 'beras.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Wl3sAAAAASUVORK5CYII=', 'base64'),
+    });
+    await expect(window.getByRole('status')).toHaveText('Gambar BRS-108-BLK diperbarui.');
+    await expect(imageButton.getByRole('img', { name: 'Gambar BRS-108-BLK' })).toHaveAttribute('src', /^data:image\/png;base64,/);
+
     await window.evaluate(() => {
       const target = globalThis as typeof globalThis & { barcodePrintRequested?: boolean; print: () => void };
       target.barcodePrintRequested = false;
       target.print = () => { target.barcodePrintRequested = true; };
     });
     await skuRow.getByRole('button', { name: 'Print barcode BRS-108-BLK' }).click();
-    await window.getByLabel('Jumlah barcode').fill('2');
+    const barcodeQuantity = window.getByLabel('Jumlah barcode');
+    await barcodeQuantity.focus();
+    await window.keyboard.press('ControlOrMeta+A');
+    await window.keyboard.press('Backspace');
+    await expect(barcodeQuantity).toHaveValue('');
+    await expect(window.getByRole('button', { name: 'Print barcode sekarang' })).toBeDisabled();
+    await barcodeQuantity.pressSequentially('2');
+    await expect(barcodeQuantity).toHaveValue('2');
     await expect(window.getByTestId('barcode-print-item')).toHaveCount(2);
     await window.getByRole('button', { name: 'Print barcode sekarang' }).click();
     expect(await window.evaluate(() => (globalThis as typeof globalThis & { barcodePrintRequested?: boolean }).barcodePrintRequested)).toBe(true);
@@ -146,6 +179,11 @@ test('Nota keyboard essentials use the platform Ctrl/Cmd+K shortcut and retain f
     await expect(window.getByLabel('Jumlah baris 1', { exact: true })).toBeFocused();
     await window.keyboard.press('ArrowDown');
     await expect(window.getByLabel('Jumlah baris 2', { exact: true })).toBeFocused();
+
+    await window.getByLabel('Jumlah baris 3', { exact: true }).fill('5');
+    await window.getByRole('button', { name: 'LSN baris 3' }).click();
+    await window.getByLabel('Harga PCS baris 3', { exact: true }).fill('165000');
+    await expect(window.getByLabel('Total baris 3', { exact: true })).toHaveText('9.900.000');
 
     const complete = window.getByRole('button', { name: 'Selesaikan nota' });
     await complete.click();
@@ -219,6 +257,12 @@ test('Nota title case and empty-stock restock planning stay frontend-only', asyn
 test('Template Label and Invoice configures a movable session-only invoice preview', async () => {
   const { application, window } = await launch();
   try {
+    await openNota(window);
+    await window.getByRole('button', { name: 'Halaman B', exact: true }).click();
+    await window.getByLabel('Nama barang baris 1', { exact: true }).fill('Barang Nota B');
+    await window.getByLabel('Jumlah baris 1', { exact: true }).fill('1');
+    await window.getByLabel('Harga PCS baris 1', { exact: true }).fill('112000');
+    await window.getByRole('button', { name: 'Kembali ke CH Ultimate' }).click();
     await window.getByRole('button', { name: 'Template Label & Invoice' }).click();
     await expect(window.getByTestId('label-qr')).toBeVisible();
     await window.getByRole('tab', { name: 'Invoice' }).click();
@@ -229,6 +273,21 @@ test('Template Label and Invoice configures a movable session-only invoice previ
     await window.getByRole('textbox', { name: 'No. Telp' }).fill('0812-3456-7890');
     await window.getByRole('textbox', { name: 'No. rekening' }).fill('BCA 1234567890');
     const preview = window.getByTestId('invoice-preview');
+    await expect(preview).toContainText('Nota A');
+    await expect(preview).toContainText('1A');
+    await expect(preview).not.toContainText('Barang Nota B');
+    await expect(preview.getByTestId('invoice-note-total')).toContainText('Rp 41.964');
+    await expect(preview.getByTestId('invoice-ppn')).toContainText('PPN 12%');
+    await expect(preview.getByTestId('invoice-ppn')).toContainText('Rp 5.036');
+    await expect(preview.getByTestId('invoice-transaction-total')).toContainText('Rp 47.000');
+    await window.getByRole('button', { name: 'Preview Nota B' }).click();
+    await expect(preview).toContainText('Nota B');
+    await expect(preview).toContainText('1B');
+    await expect(preview).toContainText('Barang Nota B');
+    await expect(preview).not.toContainText('Beras Hitam Premium 1 kg');
+    await expect(preview.getByTestId('invoice-note-total')).toContainText('Rp 100.000');
+    await expect(preview.getByTestId('invoice-ppn')).toContainText('Rp 12.000');
+    await expect(preview.getByTestId('invoice-transaction-total')).toContainText('Rp 112.000');
     await expect(preview).toContainText('Jl. Pasar Baru No. 10');
     await expect(preview).toContainText('0812-3456-7890');
     await expect(preview).toHaveAttribute('style', /width: 190mm; min-height: 120mm; font-size: 16px/);

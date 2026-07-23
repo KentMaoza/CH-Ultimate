@@ -1,35 +1,37 @@
 CH Ultimate — Nota Voice Assets
 Generated 2026-07-23
 
-These 501 short Indonesian speech clips were synthesized for CH Ultimate with:
+These 1,505 short Indonesian speech clips were synthesized for CH Ultimate with:
 
-Model:
-  grandhigh/Chatterbox-TTS-Indonesian
-  Revision: 4224700012365780cf891af53bd839412d3e18fd
-  https://huggingface.co/grandhigh/Chatterbox-TTS-Indonesian
-  License declared by the model publisher: Apache License 2.0
+Synthesis engine:
+  OHF-Voice/piper1-gpl
+  Version: 1.4.2
+  https://github.com/OHF-Voice/piper1-gpl
+  License declared by the engine publisher: GPL-3.0
 
-Base model:
-  ResembleAI/Chatterbox
-  https://huggingface.co/ResembleAI/chatterbox
-  License declared by the publisher: MIT
+Indonesian voice model:
+  rhasspy/piper-voices/id_ID-news_tts-medium
+  Revision: 5b44ec7bab7c5822cfec48fbd5aa99db71a823d6
+  https://huggingface.co/rhasspy/piper-voices/tree/5b44ec7bab7c5822cfec48fbd5aa99db71a823d6/id/id_ID/news_tts/medium
+  Repository-level license declared by the publisher: MIT
 
-Training dataset:
-  grandhigh/SuaraGabungan-ID
-  https://huggingface.co/datasets/grandhigh/SuaraGabungan-ID
-  Aggregate license declared by the dataset publisher: Apache License 2.0
-
-The dataset publisher attributes its component sources as:
-  - Espeak-ID-5K — grandhigh — MIT
-  - FLEURS — Google — CC BY 4.0
-  - ind_famal — Majiang213 — Apache License 2.0
+Provenance warning:
+  The voice-specific MODEL_CARD at the pinned revision contains inconsistent
+  metadata: it identifies a different voice and language. The training dataset
+  and its voice-level licensing could therefore not be confirmed from that
+  MODEL_CARD. This warning is retained with the bundled output so the source
+  limitation is explicit.
 
 Generation notes:
   - No reference audio or voice-cloning input was used.
-  - The synthesized output was trimmed, peak-normalized, and encoded as
-    mono Ogg/Opus.
+  - Piper normalized the synthesized output, which was then encoded as mono
+    Ogg/Opus.
+  - Prices from Rp1 through Rp1,000,000 are spoken by composing verified value
+    and connector clips; no speech is synthesized while the application runs.
   - The application bundles only the generated audio, this notice, and the
-    prompt/checksum manifest. It does not bundle the TTS model or dataset.
+    prompt/checksum manifest. It does not bundle Piper, Python, the ONNX model,
+    or any training dataset.
+  - Playback is fully offline and does not make a runtime network request.
 
 The exact prompt and SHA-256 checksum for every clip are recorded in
 manifest.json.

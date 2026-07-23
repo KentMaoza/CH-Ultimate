@@ -6,7 +6,10 @@ export interface ShareRecommendationItem {
   lastOutAt: string;
   idleDays: number;
   urgent: boolean;
+  reasons: ShareRecommendationReason[];
 }
+
+export type ShareRecommendationReason = 'price-updated' | 'restocked' | 'idle';
 
 export interface ShareRecommendationGroup {
   supplierCode: string | null;
@@ -53,6 +56,64 @@ export function groupShareRecommendationItems(items: ShareRecommendationItem[]):
   return [...groups].map(([supplierCode, groupedItems]) => ({ supplierCode, items: groupedItems }));
 }
 
+function latestEventBySku<T extends { skuId: string; createdAt: string }>(
+  events: T[],
+  date: string,
+  include: (event: T) => boolean = () => true,
+): Map<string, string> {
+  const latest = new Map<string, string>();
+  for (const event of events) {
+    if (!include(event) || witaDate(event.createdAt) > date) continue;
+    const previous = latest.get(event.skuId);
+    if (!previous || event.createdAt > previous) latest.set(event.skuId, event.createdAt);
+  }
+  return latest;
+}
+
+function roundRobinSuppliers(items: ShareRecommendationItem[], date: string): ShareRecommendationItem[] {
+  const groups = new Map<string | null, ShareRecommendationItem[]>();
+  for (const item of items) groups.set(item.supplierCode, [...(groups.get(item.supplierCode) ?? []), item]);
+  const entries = [...groups.entries()];
+  if (entries.length < 2) return items;
+  const offset = (Math.floor(dateValue(date) / DAY_MS) + 1) % entries.length;
+  const rotated = [...entries.slice(offset), ...entries.slice(0, offset)];
+  const result: ShareRecommendationItem[] = [];
+  for (let index = 0; result.length < items.length; index += 1) {
+    for (const [, group] of rotated) {
+      const item = group[index];
+      if (item) result.push(item);
+    }
+  }
+  return result;
+}
+
+function interleaveUnique(queues: ShareRecommendationItem[][], fallback: ShareRecommendationItem[], limit: number): ShareRecommendationItem[] {
+  const selected: ShareRecommendationItem[] = [];
+  const selectedIds = new Set<string>();
+  const indexes = queues.map(() => 0);
+  let progressed = true;
+  while (selected.length < limit && progressed) {
+    progressed = false;
+    for (const [queueIndex, queue] of queues.entries()) {
+      while (indexes[queueIndex]! < queue.length && selectedIds.has(queue[indexes[queueIndex]!]!.sku.id)) indexes[queueIndex]! += 1;
+      const item = queue[indexes[queueIndex]!];
+      if (!item) continue;
+      indexes[queueIndex]! += 1;
+      selected.push(item);
+      selectedIds.add(item.sku.id);
+      progressed = true;
+      if (selected.length >= limit) break;
+    }
+  }
+  for (const item of fallback) {
+    if (selected.length >= limit) break;
+    if (selectedIds.has(item.sku.id)) continue;
+    selected.push(item);
+    selectedIds.add(item.sku.id);
+  }
+  return selected;
+}
+
 export function buildShareRecommendationReport(state: DemoState, asOf = new Date(), limit = 300): ShareRecommendationReport {
   const date = witaDate(asOf);
   const cutoff = eightMonthsBefore(date);
@@ -64,23 +125,55 @@ export function buildShareRecommendationReport(state: DemoState, asOf = new Date
       if (!previous || transaction.completedAt > previous) lastSaleBySku.set(skuId, transaction.completedAt);
     }
   }
+  const latestPriceChangeBySku = latestEventBySku(state.priceChanges, date);
+  const latestRestockBySku = latestEventBySku(
+    state.adjustments,
+    date,
+    (adjustment) => adjustment.source === 'manual' && adjustment.quantity > 0,
+  );
 
   const eligible = state.skus
     .filter((sku) => !sku.archived && sku.stock > 0 && witaDate(sku.createdAt) <= date)
     .map((sku): ShareRecommendationItem => {
       const lastOutAt = lastSaleBySku.get(sku.id) ?? sku.createdAt;
       const lastOutDate = witaDate(lastOutAt);
+      const idleDays = Math.max(0, Math.floor((dateValue(date) - dateValue(lastOutDate)) / DAY_MS));
+      const reasons: ShareRecommendationReason[] = [];
+      if (latestPriceChangeBySku.has(sku.id)) reasons.push('price-updated');
+      if (latestRestockBySku.has(sku.id)) reasons.push('restocked');
+      if (idleDays > 0 || reasons.length === 0) reasons.push('idle');
       return {
         sku,
         supplierCode: supplierCodeFromSku(sku),
         lastOutAt,
-        idleDays: Math.max(0, Math.floor((dateValue(date) - dateValue(lastOutDate)) / DAY_MS)),
+        idleDays,
         urgent: lastOutDate < cutoff,
+        reasons,
       };
     })
     .sort((left, right) => left.lastOutAt.localeCompare(right.lastOutAt) || left.sku.skuNumber.localeCompare(right.sku.skuNumber, 'id-ID'));
   const safeLimit = Math.min(300, Math.max(0, Math.floor(limit)));
-  const daily = eligible.slice(0, safeLimit);
+  const priceQueue = roundRobinSuppliers(
+    eligible
+      .filter((item) => latestPriceChangeBySku.has(item.sku.id))
+      .sort((left, right) => latestPriceChangeBySku.get(right.sku.id)!.localeCompare(latestPriceChangeBySku.get(left.sku.id)!)),
+    date,
+  );
+  const restockQueue = roundRobinSuppliers(
+    eligible
+      .filter((item) => latestRestockBySku.has(item.sku.id))
+      .sort((left, right) => latestRestockBySku.get(right.sku.id)!.localeCompare(latestRestockBySku.get(left.sku.id)!)),
+    date,
+  );
+  const idleQueue = roundRobinSuppliers(
+    eligible.filter((item) => !latestPriceChangeBySku.has(item.sku.id) && !latestRestockBySku.has(item.sku.id)),
+    date,
+  );
+  const daily = interleaveUnique(
+    [priceQueue, restockQueue, idleQueue],
+    roundRobinSuppliers(eligible, date),
+    safeLimit,
+  );
   return {
     date,
     daily,

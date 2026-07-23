@@ -2,12 +2,22 @@ import { useState } from 'react';
 import { buildRevenueReport } from '../../domain/reports';
 import { formatRupiah } from '../format';
 import { useOperations } from '../operations-context';
+import { useRevenueAccess } from '../revenue-access';
 
-export function RevenuePage() {
+export function RevenuePage({ onOpenSettings }: { onOpenSettings: () => void }) {
   const { state } = useOperations();
+  const access = useRevenueAccess();
   const [metric, setMetric] = useState<'revenue' | 'units'>('revenue');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [password, setPassword] = useState('');
+  const [message, setMessage] = useState('');
+  if (!access.configured) return <div className="feature-page"><section className="revenue-lock"><span>AKSES OMZET · SESSION ONLY</span><h2>Password omzet belum diatur</h2><p>Atur password di Settings sebelum membuka angka omzet. Password hilang saat aplikasi direload.</p><button className="button primary" onClick={onOpenSettings}>Atur password di Settings</button></section></div>;
+  if (!access.unlocked) return <div className="feature-page"><form className="revenue-lock" onSubmit={(event) => {
+    event.preventDefault();
+    if (access.unlock(password)) { setPassword(''); setMessage(''); }
+    else setMessage('Password salah. Coba lagi.');
+  }}><span>AKSES OMZET · SESSION ONLY</span><h2>Laporan Omzet terkunci</h2><p>Masukkan password yang diatur di Settings.</p><label><span>Password Laporan Omzet</span><input autoFocus type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>{message && <p className="notice" role="status">{message}</p>}<button className="button primary" type="submit">Buka Laporan Omzet</button></form></div>;
   const report = buildRevenueReport(state, new Date(), { from, to });
   const max = Math.max(1, ...report.bySku.map((item) => metric === 'revenue' ? item.revenue : item.units));
   return <div className="feature-page report-page">

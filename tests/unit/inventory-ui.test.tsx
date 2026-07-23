@@ -69,11 +69,18 @@ test('prints a chosen quantity of warehouse SKU barcodes', () => {
   const row = screen.getByRole('row', { name: /BRS-108-BLK/ });
   fireEvent.click(within(row).getByRole('button', { name: 'Print barcode BRS-108-BLK' }));
   const dialog = screen.getByRole('dialog', { name: 'Print barcode produk' });
-  expect(within(dialog).getByLabelText('Jumlah barcode')).toHaveValue(1);
-  fireEvent.change(within(dialog).getByLabelText('Jumlah barcode'), { target: { value: '3' } });
+  const quantity = within(dialog).getByLabelText('Jumlah barcode');
+  const printNow = within(dialog).getByRole('button', { name: 'Print barcode sekarang' });
+  expect(quantity).toHaveValue(1);
+  fireEvent.change(quantity, { target: { value: '' } });
+  expect(quantity).toHaveValue(null);
+  expect(screen.queryAllByTestId('barcode-print-item')).toHaveLength(0);
+  expect(printNow).toBeDisabled();
+  fireEvent.change(quantity, { target: { value: '3' } });
+  expect(quantity).toHaveValue(3);
   expect(screen.getAllByTestId('barcode-print-item')).toHaveLength(3);
   expect(screen.getAllByTestId('barcode-product-qr')[0]).toHaveAttribute('data-value', 'BRS-108-BLK');
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Print barcode sekarang' }));
+  fireEvent.click(printNow);
   expect(print).toHaveBeenCalledOnce();
   print.mockRestore();
 });
@@ -125,4 +132,26 @@ test('edits a SKU number while keeping the old value searchable', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Simpan perubahan SKU' }));
   fireEvent.change(screen.getByPlaceholderText('Nama / nomor SKU / scan QR'), { target: { value: 'BRS-108-BLK' } });
   expect(await screen.findByText('BRS-NEW')).toBeInTheDocument();
+});
+
+test('replaces a warehouse image from a clickable thumbnail and exposes an enlarged preview', async () => {
+  const gateway = new MockOperationsGateway();
+  const untouchedImage = gateway.getSnapshot().skus.find((sku) => sku.id === 'sku-2')!.imageUrl;
+  const inputClick = vi.spyOn(HTMLInputElement.prototype, 'click');
+  render(<App gateway={gateway} />);
+
+  const button = screen.getByRole('button', { name: 'Ubah gambar BRS-108-BLK' });
+  expect(within(button).getByTestId('sku-image-hover-preview')).toBeInTheDocument();
+  fireEvent.click(button);
+  expect(inputClick).toHaveBeenCalledOnce();
+
+  const fileInput = screen.getByLabelText('Pilih file gambar SKU');
+  const file = new File([new Uint8Array([137, 80, 78, 71])], 'beras.png', { type: 'image/png' });
+  fireEvent.change(fileInput, { target: { files: [file] } });
+
+  await waitFor(() => expect(gateway.getSnapshot().skus.find((sku) => sku.id === 'sku-1')!.imageUrl).toMatch(/^data:image\/png;base64,/));
+  expect(gateway.getSnapshot().skus.find((sku) => sku.id === 'sku-2')!.imageUrl).toBe(untouchedImage);
+  expect(fileInput).toHaveValue('');
+  expect(within(screen.getByRole('button', { name: 'Ubah gambar BRS-108-BLK' })).getByRole('img', { name: 'Gambar BRS-108-BLK' })).toHaveAttribute('src', expect.stringMatching(/^data:image\/png;base64,/));
+  inputClick.mockRestore();
 });

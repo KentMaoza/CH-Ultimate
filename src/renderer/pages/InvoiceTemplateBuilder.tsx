@@ -79,8 +79,8 @@ export function InvoiceTemplateBuilder() {
         {selectedPage ? <section className="invoice-nota-section">
             <div className="invoice-nota-heading"><strong>Nota {selectedPage.suffix}</strong><span>{transaction?.baseNumber ?? 'CHU-DEMO-0001'}{selectedPage.suffix}</span></div>
             {selectedPage.rows.length ? <table className="invoice-items-grid" data-testid="invoice-items-grid">
-              <colgroup><col className="invoice-col-no" /><col className="invoice-col-name" /><col className="invoice-col-kind" /><col className="invoice-col-quantity" /><col className="invoice-col-unit" /><col className="invoice-col-unit" /><col className="invoice-col-price" /><col className="invoice-col-price" /><col className="invoice-col-total" /></colgroup>
-              <thead><tr><th>NO</th><th>NAMA BARANG</th><th>JENIS</th><th>JUMLAH</th><th>PCS</th><th>LSN</th><th>HARGA PCS</th><th>HARGA LSN</th><th>TOTAL</th></tr></thead>
+              <colgroup><col className="invoice-col-no" /><col className="invoice-col-name" /><col className="invoice-col-kind" /><col className="invoice-col-quantity" /><col className="invoice-col-unit" /><col className="invoice-col-price" /><col className="invoice-col-price" /><col className="invoice-col-total" /></colgroup>
+              <thead><tr><th>NO</th><th>NAMA BARANG</th><th>JENIS</th><th>JUMLAH</th><th>PCS/LSN</th><th>HARGA PCS</th><th>HARGA LSN</th><th>TOTAL</th></tr></thead>
               <tbody>{selectedPage.rows.map(({ line, rowIndex }) => {
                 const code = `${rowIndex + 1}${selectedPage.suffix}`;
                 return <tr key={line.id}>
@@ -88,8 +88,7 @@ export function InvoiceTemplateBuilder() {
                   <td className="invoice-item-name">{line.description}</td>
                   <td data-testid={`invoice-kind-${code}`}>{line.kind || '—'}</td>
                   <td data-testid={`invoice-quantity-${code}`}>{line.quantity}</td>
-                  <td className={`invoice-unit-cell ${line.unit === 'pcs' ? 'is-active' : ''}`} data-testid={`invoice-unit-pcs-${code}`}>PCS</td>
-                  <td className={`invoice-unit-cell ${line.unit === 'lsn' ? 'is-active' : ''}`} data-testid={`invoice-unit-lsn-${code}`}>LSN</td>
+                  <td className="invoice-unit-cell" data-testid={`invoice-unit-${code}`}>{line.unit.toUpperCase()}</td>
                   <td className="invoice-item-price" data-testid={`invoice-price-pcs-${code}`}>{invoicePrice(line.pcsPrice)}</td>
                   <td className="invoice-item-price" data-testid={`invoice-price-lsn-${code}`}>{invoicePrice(line.lsnPrice)}</td>
                   <td data-testid={`invoice-line-total-${code}`}>{formatRupiah(lineTotal(line))}</td>

@@ -150,7 +150,7 @@ td small { display: block; margin-top: 3px; color: #777; font-size: 9px; }
 .invoice-items-grid .invoice-col-name { width: 23%; }
 .invoice-items-grid .invoice-col-kind { width: 13%; }
 .invoice-items-grid .invoice-col-quantity { width: 7%; }
-.invoice-items-grid .invoice-col-unit { width: 5%; }
+.invoice-items-grid .invoice-col-unit { width: 10%; }
 .invoice-items-grid .invoice-col-price { width: 12%; }
 .invoice-items-grid .invoice-col-total { width: 17%; }
 .invoice-paper th, .invoice-paper td { max-width: none; padding: 7px; border: 1px solid #111; font-weight: 700; text-align: left; overflow-wrap: anywhere; }
@@ -161,7 +161,6 @@ td small { display: block; margin-top: 3px; color: #777; font-size: 9px; }
 .invoice-item-code, .invoice-item-price, .invoice-item-name { font-weight: 900 !important; }
 .invoice-item-code, .invoice-unit-cell, .invoice-items-grid td:nth-child(4) { text-align: center; }
 .invoice-unit-cell { padding-right: 3px !important; padding-left: 3px !important; font-size: .82em; font-weight: 900 !important; }
-.invoice-unit-cell.is-active { color: #fff; background: #111; }
 .invoice-item-price, .invoice-items-grid td:last-child { text-align: right; white-space: nowrap; }
 .invoice-empty { margin: 0; padding: 18px; color: #555; font-weight: 700; text-align: center; }
 .invoice-paper > .invoice-summary { display: grid; gap: 8px; margin-top: 18px; padding-top: 10px; border-top: 3px solid #111; }

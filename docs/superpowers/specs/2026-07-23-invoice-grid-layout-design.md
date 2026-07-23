@@ -33,16 +33,17 @@ The selected page renders these columns in this exact order:
 2. `NAMA BARANG`
 3. `JENIS`
 4. `JUMLAH`
-5. `PCS`
-6. `LSN`
-7. `HARGA PCS`
-8. `HARGA LSN`
-9. `TOTAL`
+5. `PCS/LSN`
+6. `HARGA PCS`
+7. `HARGA LSN`
+8. `TOTAL`
 
 Only populated fixed rows are printed, and their original row codes remain
-unchanged. The active unit is a solid black cell with white text; the inactive
-unit stays white. PCS and LSN prices are shown independently, matching the
-Nota data. Zero prices display as a dash. Totals remain integer rupiah.
+unchanged. The combined unit cell displays only the active unit (`PCS` or
+`LSN`) as plain text, with no selected-state block. PCS and LSN prices are
+shown independently, matching the Nota data. Zero prices display as a dash.
+Totals remain integer rupiah. The operator-facing Nota grid retains separate
+PCS and LSN controls.
 
 The table uses a collapsed full grid: every header and body cell has visible
 vertical and horizontal black borders. Headers use the existing black bar with
@@ -51,13 +52,13 @@ white uppercase text.
 ## Responsive Preview
 
 The invoice keeps its configured physical width. The surrounding preview panel
-may scroll horizontally when the configured paper or nine-column grid is wider
+may scroll horizontally when the configured paper or eight-column grid is wider
 than the available desktop viewport. Columns must not disappear or overlap.
 
 ## Verification
 
 - Unit tests assert exact header order, fixed row code, kind, independent
-  prices, active unit styling, and customer metadata.
+  prices, plain combined unit text, and customer metadata.
 - E2E verifies the rendered Invoice tab after editing Nota A/B.
 - Visual QA checks the invoice at a desktop viewport against the supplied
   references.

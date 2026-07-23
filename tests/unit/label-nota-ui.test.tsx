@@ -76,15 +76,17 @@ test('previews one Nota page at a time with inclusive PPN totals', () => {
   expect(preview).not.toHaveTextContent('2A');
   expect(preview).not.toHaveTextContent('Barang Nota B');
   expect(within(preview).getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
-    'NO', 'NAMA BARANG', 'JENIS', 'JUMLAH', 'PCS', 'LSN', 'HARGA PCS', 'HARGA LSN', 'TOTAL',
+    'NO', 'NAMA BARANG', 'JENIS', 'JUMLAH', 'PCS/LSN', 'HARGA PCS', 'HARGA LSN', 'TOTAL',
   ]);
   expect(within(preview).getByTestId('invoice-kind-3A')).toHaveTextContent('Aksesoris');
   expect(within(preview).getByTestId('invoice-quantity-3A')).toHaveTextContent('1');
   expect(within(preview).getByTestId('invoice-price-pcs-3A')).toHaveTextContent('112.000');
   expect(within(preview).getByTestId('invoice-price-lsn-3A')).toHaveTextContent('1.344.000');
   expect(within(preview).getByTestId('invoice-line-total-3A')).toHaveTextContent('Rp 112.000');
-  expect(within(preview).getByTestId('invoice-unit-pcs-3A')).toHaveClass('is-active');
-  expect(within(preview).getByTestId('invoice-unit-lsn-3A')).not.toHaveClass('is-active');
+  expect(within(preview).getByTestId('invoice-unit-3A')).toHaveTextContent('PCS');
+  expect(within(preview).getByTestId('invoice-unit-3A')).not.toHaveClass('is-active');
+  expect(within(preview).queryByTestId('invoice-unit-pcs-3A')).not.toBeInTheDocument();
+  expect(within(preview).queryByTestId('invoice-unit-lsn-3A')).not.toBeInTheDocument();
   expect(within(preview).getByTestId('invoice-customer-name')).toHaveTextContent('Amelia');
   expect(within(preview).getByTestId('invoice-customer-place')).toHaveTextContent('Saibah');
   expect(within(preview).getByTestId('invoice-customer-date')).toHaveTextContent(transaction.transactionDate);

@@ -260,8 +260,10 @@ test('Template Label and Invoice configures a movable session-only invoice previ
     await openNota(window);
     await window.getByRole('button', { name: 'Halaman B', exact: true }).click();
     await window.getByLabel('Nama barang baris 1', { exact: true }).fill('Barang Nota B');
+    await window.getByLabel('Jenis baris 1', { exact: true }).fill('Layanan');
     await window.getByLabel('Jumlah baris 1', { exact: true }).fill('1');
     await window.getByLabel('Harga PCS baris 1', { exact: true }).fill('112000');
+    await window.getByLabel('Harga LSN baris 1', { exact: true }).fill('1344000');
     await window.getByRole('button', { name: 'Kembali ke CH Ultimate' }).click();
     await window.getByRole('button', { name: 'Template Label & Invoice' }).click();
     await expect(window.getByTestId('label-qr')).toBeVisible();
@@ -285,6 +287,43 @@ test('Template Label and Invoice configures a movable session-only invoice previ
     await expect(preview).toContainText('1B');
     await expect(preview).toContainText('Barang Nota B');
     await expect(preview).not.toContainText('Beras Hitam Premium 1 kg');
+    expect(await preview.locator('thead th').allTextContents()).toEqual([
+      'NO', 'NAMA BARANG', 'JENIS', 'JUMLAH', 'PCS', 'LSN', 'HARGA PCS', 'HARGA LSN', 'TOTAL',
+    ]);
+    await expect(preview.getByTestId('invoice-kind-1B')).toHaveText('Layanan');
+    await expect(preview.getByTestId('invoice-price-pcs-1B')).toHaveText('112.000');
+    await expect(preview.getByTestId('invoice-price-lsn-1B')).toHaveText('1.344.000');
+    await expect(preview.getByTestId('invoice-unit-pcs-1B')).toHaveClass(/is-active/);
+    await expect(preview.getByTestId('invoice-unit-lsn-1B')).not.toHaveClass(/is-active/);
+    await expect(preview.getByTestId('invoice-customer-name')).toHaveText('Amelia');
+    await expect(preview.getByTestId('invoice-customer-place')).toHaveText('Saibah');
+    await expect(preview.getByTestId('invoice-customer-date')).toHaveText(/\d{4}-\d{2}-\d{2}/);
+    const gridCellStyle = await preview.locator('tbody td').first().evaluate((cell) => {
+      const style = getComputedStyle(cell);
+      return { borderLeftStyle: style.borderLeftStyle, borderLeftWidth: style.borderLeftWidth };
+    });
+    expect(gridCellStyle).toEqual({ borderLeftStyle: 'solid', borderLeftWidth: '1px' });
+    const customerFontSize = await preview.getByTestId('invoice-customer-name').evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+    expect(customerFontSize).toBeGreaterThan(16);
+    for (const [index, viewport] of [
+      { width: 1366, height: 768 },
+      { width: 1920, height: 1080 },
+    ].entries()) {
+      await window.setViewportSize(viewport);
+      const layout = await preview.evaluate((paper) => {
+        const table = paper.querySelector('[data-testid="invoice-items-grid"]');
+        const panel = paper.closest('.invoice-preview-wrap');
+        if (!table || !panel) return null;
+        const paperRect = paper.getBoundingClientRect();
+        const tableRect = table.getBoundingClientRect();
+        return {
+          tableInsidePaper: tableRect.left >= paperRect.left && tableRect.right <= paperRect.right,
+          panelOverflow: panel.scrollWidth > panel.clientWidth,
+        };
+      });
+      expect(layout?.tableInsidePaper).toBe(true);
+      expect(layout?.panelOverflow).toBe(index === 0);
+    }
     await expect(preview.getByTestId('invoice-note-total')).toContainText('Rp 100.000');
     await expect(preview.getByTestId('invoice-ppn')).toContainText('Rp 12.000');
     await expect(preview.getByTestId('invoice-transaction-total')).toContainText('Rp 112.000');

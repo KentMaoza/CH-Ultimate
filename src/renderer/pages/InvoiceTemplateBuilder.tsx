@@ -1,18 +1,15 @@
 import { useEffect, useState } from 'react';
-import { lineTotal, selectedPrice } from '../../domain/nota';
-import type { InvoiceElementId, InvoiceTemplate, NotaLine } from '../../domain/types';
+import { lineTotal } from '../../domain/nota';
+import type { InvoiceElementId, InvoiceTemplate } from '../../domain/types';
 import { formatRupiah } from '../format';
 import { useOperations } from '../operations-context';
 
+const integerFormat = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 });
 const elementLabels: Record<InvoiceElementId, string> = {
   logo: 'Logo', address: 'Alamat', phone: 'No. Telp', bank: 'No. rekening',
 };
 
-function invoicePrice(line: NotaLine) {
-  return line.unit === 'lsn' && line.lsnPrice <= 0
-    ? { amount: line.pcsPrice, unit: 'pcs' as const }
-    : { amount: selectedPrice(line), unit: line.unit };
-}
+function invoicePrice(value: number) { return value > 0 ? integerFormat.format(value) : '—'; }
 
 export function InvoiceTemplateBuilder() {
   const { state, gateway } = useOperations();
@@ -72,15 +69,33 @@ export function InvoiceTemplateBuilder() {
       <article className="invoice-paper" data-testid="invoice-preview" style={{ width: `${template.widthMm}mm`, minHeight: `${template.heightMm}mm`, fontSize: `${template.fontSize}px` }}>
         <header>{template.elements.filter((element) => element.visible).map((element) => <div key={element.id} data-testid={`invoice-element-${element.id}`}>{renderElement(element.id)}</div>)}</header>
         <div className="invoice-heading">
-          <div><b>INVOICE NOTA</b><span>{transaction?.baseNumber ?? 'CHU-DEMO-0001'}</span></div>
-          <div><span>Pelanggan</span><strong>{transaction?.customerName || 'Pelanggan Demo'}</strong><span>{transaction?.customerPlace || 'Tempat belum diisi'}</span><span>{transaction?.transactionDate || 'Tanggal belum diisi'}</span></div>
+          <div className="invoice-heading__number"><b>INVOICE NOTA</b><span>{transaction?.baseNumber ?? 'CHU-DEMO-0001'}</span></div>
+          <div className="invoice-customer-grid">
+            <div><span>Pelanggan</span><strong data-testid="invoice-customer-name">{transaction?.customerName || 'Pelanggan Demo'}</strong></div>
+            <div><span>Tempat</span><strong data-testid="invoice-customer-place">{transaction?.customerPlace || 'Tempat belum diisi'}</strong></div>
+            <div><span>Tanggal</span><strong data-testid="invoice-customer-date">{transaction?.transactionDate || 'Tanggal belum diisi'}</strong></div>
+          </div>
         </div>
         {selectedPage ? <section className="invoice-nota-section">
             <div className="invoice-nota-heading"><strong>Nota {selectedPage.suffix}</strong><span>{transaction?.baseNumber ?? 'CHU-DEMO-0001'}{selectedPage.suffix}</span></div>
-            {selectedPage.rows.length ? <table><thead><tr><th>NO</th><th>NOTA</th><th>NAMA BARANG</th><th>JUMLAH</th><th>HARGA</th><th>TOTAL</th></tr></thead><tbody>{selectedPage.rows.map(({ line, rowIndex }) => {
-              const price = invoicePrice(line);
-              return <tr key={line.id}><td className="invoice-item-code">{rowIndex + 1}{selectedPage.suffix}</td><td>Nota {selectedPage.suffix}</td><td className="invoice-item-name">{line.description}</td><td>{line.quantity} {line.unit}</td><td className="invoice-item-price">{formatRupiah(price.amount)} / {price.unit}</td><td>{formatRupiah(lineTotal(line))}</td></tr>;
-            })}</tbody></table> : <p className="invoice-empty">Belum ada barang pada Nota {selectedPage.suffix}.</p>}
+            {selectedPage.rows.length ? <table className="invoice-items-grid" data-testid="invoice-items-grid">
+              <colgroup><col className="invoice-col-no" /><col className="invoice-col-name" /><col className="invoice-col-kind" /><col className="invoice-col-quantity" /><col className="invoice-col-unit" /><col className="invoice-col-unit" /><col className="invoice-col-price" /><col className="invoice-col-price" /><col className="invoice-col-total" /></colgroup>
+              <thead><tr><th>NO</th><th>NAMA BARANG</th><th>JENIS</th><th>JUMLAH</th><th>PCS</th><th>LSN</th><th>HARGA PCS</th><th>HARGA LSN</th><th>TOTAL</th></tr></thead>
+              <tbody>{selectedPage.rows.map(({ line, rowIndex }) => {
+                const code = `${rowIndex + 1}${selectedPage.suffix}`;
+                return <tr key={line.id}>
+                  <td className="invoice-item-code">{code}</td>
+                  <td className="invoice-item-name">{line.description}</td>
+                  <td data-testid={`invoice-kind-${code}`}>{line.kind || '—'}</td>
+                  <td data-testid={`invoice-quantity-${code}`}>{line.quantity}</td>
+                  <td className={`invoice-unit-cell ${line.unit === 'pcs' ? 'is-active' : ''}`} data-testid={`invoice-unit-pcs-${code}`}>PCS</td>
+                  <td className={`invoice-unit-cell ${line.unit === 'lsn' ? 'is-active' : ''}`} data-testid={`invoice-unit-lsn-${code}`}>LSN</td>
+                  <td className="invoice-item-price" data-testid={`invoice-price-pcs-${code}`}>{invoicePrice(line.pcsPrice)}</td>
+                  <td className="invoice-item-price" data-testid={`invoice-price-lsn-${code}`}>{invoicePrice(line.lsnPrice)}</td>
+                  <td data-testid={`invoice-line-total-${code}`}>{formatRupiah(lineTotal(line))}</td>
+                </tr>;
+              })}</tbody>
+            </table> : <p className="invoice-empty">Belum ada barang pada Nota {selectedPage.suffix}.</p>}
           </section> : <p className="invoice-empty">Belum ada Nota aktif pada transaksi ini.</p>}
         <footer className="invoice-summary">
           <div data-testid="invoice-note-total"><span>Total Nota</span><strong>{formatRupiah(noteTotal)}</strong></div>

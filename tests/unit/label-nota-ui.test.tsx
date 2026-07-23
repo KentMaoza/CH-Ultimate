@@ -47,7 +47,15 @@ test('previews one Nota page at a time with inclusive PPN totals', () => {
   const pageB = transaction.pages.find((page) => page.suffix === 'B')!;
   pageA.lines[0] = { ...pageA.lines[0]!, description: '', kind: '', quantity: 0, pcsPrice: 0, lsnPrice: 0 };
   pageA.lines[1] = { ...pageA.lines[1]!, description: '', kind: '', quantity: 0, pcsPrice: 0, lsnPrice: 0 };
-  pageA.lines[2] = { ...pageA.lines[2]!, description: 'Barang Nota A', quantity: 1, unit: 'pcs', pcsPrice: 112_000 };
+  pageA.lines[2] = {
+    ...pageA.lines[2]!,
+    description: 'Barang Nota A',
+    kind: 'Aksesoris',
+    quantity: 1,
+    unit: 'pcs',
+    pcsPrice: 112_000,
+    lsnPrice: 1_344_000,
+  };
   pageB.lines[0] = {
     ...pageB.lines[0]!,
     description: 'Barang Nota B',
@@ -67,6 +75,19 @@ test('previews one Nota page at a time with inclusive PPN totals', () => {
   expect(preview).toHaveTextContent('3A');
   expect(preview).not.toHaveTextContent('2A');
   expect(preview).not.toHaveTextContent('Barang Nota B');
+  expect(within(preview).getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
+    'NO', 'NAMA BARANG', 'JENIS', 'JUMLAH', 'PCS', 'LSN', 'HARGA PCS', 'HARGA LSN', 'TOTAL',
+  ]);
+  expect(within(preview).getByTestId('invoice-kind-3A')).toHaveTextContent('Aksesoris');
+  expect(within(preview).getByTestId('invoice-quantity-3A')).toHaveTextContent('1');
+  expect(within(preview).getByTestId('invoice-price-pcs-3A')).toHaveTextContent('112.000');
+  expect(within(preview).getByTestId('invoice-price-lsn-3A')).toHaveTextContent('1.344.000');
+  expect(within(preview).getByTestId('invoice-line-total-3A')).toHaveTextContent('Rp 112.000');
+  expect(within(preview).getByTestId('invoice-unit-pcs-3A')).toHaveClass('is-active');
+  expect(within(preview).getByTestId('invoice-unit-lsn-3A')).not.toHaveClass('is-active');
+  expect(within(preview).getByTestId('invoice-customer-name')).toHaveTextContent('Amelia');
+  expect(within(preview).getByTestId('invoice-customer-place')).toHaveTextContent('Saibah');
+  expect(within(preview).getByTestId('invoice-customer-date')).toHaveTextContent(transaction.transactionDate);
   expect(within(preview).getByTestId('invoice-note-total')).toHaveTextContent('Total NotaRp 100.000');
   expect(within(preview).getByTestId('invoice-ppn')).toHaveTextContent('PPN 12%Rp 12.000');
   expect(within(preview).getByTestId('invoice-transaction-total')).toHaveTextContent('Total TransaksiRp 112.000');

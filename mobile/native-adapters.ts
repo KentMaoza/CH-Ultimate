@@ -9,9 +9,12 @@ import { Haptics, ImpactStyle, type HapticsPlugin } from '@capacitor/haptics';
 import { LocalNotifications, type LocalNotificationsPlugin } from '@capacitor/local-notifications';
 import { Directory, Filesystem, type FilesystemPlugin } from '@capacitor/filesystem';
 import { Share, type SharePlugin } from '@capacitor/share';
-import type { Sku } from '../src/domain/types';
 import { formatRupiah } from './format';
-import { formatSkuShareText, type BarcodeScannerPort, type LocalNotificationPort, type SkuSharePort } from './ports';
+import type {
+  BarcodeScannerPort,
+  LocalNotificationPort,
+  RecommendationPdfSharePort,
+} from './ports';
 
 type ScannerPlugin = Pick<CapacitorBarcodeScannerPlugin, 'scanBarcode'>;
 type HapticPlugin = Pick<HapticsPlugin, 'impact'>;
@@ -19,8 +22,7 @@ type NotificationPlugin = Pick<LocalNotificationsPlugin,
   'addListener' | 'checkPermissions' | 'createChannel' | 'requestPermissions' | 'schedule'>;
 type NativeSharePlugin = Pick<SharePlugin, 'share'>;
 type NativeFilesystemPlugin = Pick<FilesystemPlugin, 'deleteFile' | 'writeFile'>;
-type LoadedShareImage = { data: string; extension: string };
-type ShareImageLoader = (url: string) => Promise<LoadedShareImage>;
+type BlobToBase64 = (blob: Blob) => Promise<string>;
 
 function notificationId(value: string): number {
   let hash = 0;
@@ -28,78 +30,41 @@ function notificationId(value: string): number {
   return hash || 1;
 }
 
-function shareFileName(sku: Sku, extension: string): string {
-  const safeSkuNumber = sku.skuNumber.replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '') || 'sku';
-  return `chu-share-${safeSkuNumber}.${extension}`;
-}
-
-function extensionForMimeType(mimeType: string): string {
-  if (mimeType.includes('svg')) return 'svg';
-  if (mimeType.includes('png')) return 'png';
-  if (mimeType.includes('webp')) return 'webp';
-  return 'jpg';
-}
-
-async function loadShareImage(url: string): Promise<LoadedShareImage> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error('Gambar produk tidak dapat dimuat.');
-  const blob = await response.blob();
+async function blobToBase64(blob: Blob): Promise<string> {
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Gambar produk tidak dapat dibaca.'));
+    reader.onerror = () => reject(new Error('PDF tidak dapat dibaca.'));
     reader.onload = () => resolve(String(reader.result));
     reader.readAsDataURL(blob);
   });
   const separator = dataUrl.indexOf(',');
-  if (separator < 0) throw new Error('Format gambar produk tidak didukung.');
-  return {
-    data: dataUrl.slice(separator + 1),
-    extension: extensionForMimeType(blob.type),
-  };
+  if (separator < 0) throw new Error('Format PDF tidak didukung.');
+  return dataUrl.slice(separator + 1);
 }
 
-export function createNativeSkuShare(
+export function createNativeRecommendationPdfShare(
   sharePlugin: NativeSharePlugin = Share,
   filesystem: NativeFilesystemPlugin = Filesystem,
-  imageLoader: ShareImageLoader = loadShareImage,
-): SkuSharePort {
+  convertBlob: BlobToBase64 = blobToBase64,
+): RecommendationPdfSharePort {
   return {
-    async shareSku(sku) {
-      const common = {
-        title: sku.name,
-        text: formatSkuShareText(sku),
-        dialogTitle: 'Bagikan SKU',
-      };
-      if (!sku.imageUrl) {
-        await sharePlugin.share(common);
-        return;
-      }
+    async sharePdf({ blob, fileName, title }) {
+      const data = await convertBlob(blob);
+      const written = await filesystem.writeFile({
+        path: fileName,
+        data,
+        directory: Directory.Cache,
+      });
 
-      let image: LoadedShareImage;
       try {
-        image = await imageLoader(sku.imageUrl);
-      } catch {
-        await sharePlugin.share(common);
-        return;
-      }
-
-      const path = shareFileName(sku, image.extension);
-      let written: Awaited<ReturnType<NativeFilesystemPlugin['writeFile']>>;
-      try {
-        written = await filesystem.writeFile({
-          path,
-          data: image.data,
-          directory: Directory.Cache,
+        await sharePlugin.share({
+          title,
+          text: 'DATA DEMO · SESSION ONLY',
+          files: [written.uri],
+          dialogTitle: 'Bagikan PDF',
         });
-      } catch {
-        await sharePlugin.share(common);
-        return;
-      }
-
-      try {
-        await sharePlugin.share({ ...common, files: [written.uri] });
       } finally {
-        await filesystem.deleteFile({ path, directory: Directory.Cache }).catch(() => undefined);
+        await filesystem.deleteFile({ path: fileName, directory: Directory.Cache }).catch(() => undefined);
       }
     },
   };

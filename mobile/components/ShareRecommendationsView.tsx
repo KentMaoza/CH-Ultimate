@@ -1,15 +1,21 @@
 import { useMemo, useState } from 'react';
 import {
+  buildRecommendationPdfPlan,
+  createRecommendationPdfBlob,
+  type RecommendationPdfMode,
+} from '../../src/domain/recommendation-pdf';
+import {
   buildShareRecommendationReport,
   groupShareRecommendationItems,
   type ShareRecommendationItem,
 } from '../../src/domain/share-recommendations';
 import type { DemoState, Sku } from '../../src/domain/types';
+import type { RecommendationPdfSharePort } from '../ports';
 import { formatRupiah, formatWita } from '../format';
 import { BackIcon, ShareIcon } from './Icons';
 import { ProductImage } from './ProductImage';
 
-type RecommendationTab = 'daily' | 'urgent';
+type RecommendationTab = RecommendationPdfMode;
 
 function witaToday(): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -28,14 +34,10 @@ function recommendationDate(value: string): Date {
 
 function RecommendationItem({
   item,
-  pending,
   onOpenSku,
-  onShareSku,
 }: {
   item: ShareRecommendationItem;
-  pending: boolean;
   onOpenSku: (sku: Sku) => void;
-  onShareSku: (sku: Sku) => void;
 }) {
   return <article className="share-item">
     <div className="share-item__product">
@@ -60,14 +62,6 @@ function RecommendationItem({
       >
         Detail
       </button>
-      <button
-        aria-label={`Bagikan SKU ${item.sku.name}`}
-        className="primary-action"
-        disabled={pending}
-        onClick={() => onShareSku(item.sku)}
-      >
-        <ShareIcon />{pending ? 'Membuka…' : 'Bagikan SKU'}
-      </button>
     </div>
   </article>;
 }
@@ -76,37 +70,39 @@ export function ShareRecommendationsView({
   snapshot,
   onBack,
   onOpenSku,
-  onShareSku,
+  onSharePdf,
 }: {
   snapshot: DemoState;
   onBack: () => void;
   onOpenSku: (sku: Sku) => void;
-  onShareSku: (sku: Sku) => Promise<void>;
+  onSharePdf: RecommendationPdfSharePort['sharePdf'];
 }) {
   const [tab, setTab] = useState<RecommendationTab>('daily');
   const [date, setDate] = useState(witaToday);
-  const [pendingSkuId, setPendingSkuId] = useState<string | null>(null);
+  const [sharingPdf, setSharingPdf] = useState(false);
   const [status, setStatus] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
   const report = useMemo(() => buildShareRecommendationReport(snapshot, recommendationDate(date)), [date, snapshot]);
   const groups = tab === 'daily' ? report.groups : groupShareRecommendationItems(report.urgent);
+  const pdfPlan = useMemo(() => buildRecommendationPdfPlan(report, tab), [report, tab]);
 
-  async function shareSku(sku: Sku) {
-    setPendingSkuId(sku.id);
+  async function sharePdf() {
+    setSharingPdf(true);
     setStatus(null);
     try {
-      await onShareSku(sku);
-      setStatus({ kind: 'success', message: `${sku.name} siap dibagikan.` });
+      const blob = await createRecommendationPdfBlob(pdfPlan);
+      await onSharePdf({ blob, fileName: pdfPlan.fileName, title: pdfPlan.title });
+      setStatus({ kind: 'success', message: `PDF ${pdfPlan.title} siap dibagikan.` });
     } catch {
-      setStatus({ kind: 'error', message: `${sku.name} belum dibagikan. Coba lagi.` });
+      setStatus({ kind: 'error', message: 'PDF belum dibagikan. Coba lagi.' });
     } finally {
-      setPendingSkuId(null);
+      setSharingPdf(false);
     }
   }
 
   return <section className="page-view share-view">
     <button className="back-button" onClick={onBack}><BackIcon />Kembali</button>
     <h1 data-page-heading tabIndex={-1}>Rekomendasi Share</h1>
-    <p>Pilih satu SKU, lalu bagikan gambar dan informasi produknya.</p>
+    <p>Buat satu katalog PDF dari seluruh rekomendasi pada tanggal terpilih.</p>
 
     <label className="share-date">
       <span>Tanggal rekomendasi</span>
@@ -122,16 +118,24 @@ export function ShareRecommendationsView({
     </label>
 
     <div aria-label="Bagian rekomendasi share" className="share-tabs" role="tablist">
-      <button aria-selected={tab === 'daily'} onClick={() => setTab('daily')} role="tab">Rekomendasi Harian</button>
-      <button aria-selected={tab === 'urgent'} onClick={() => setTab('urgent')} role="tab">SKU Urgent</button>
+      <button aria-selected={tab === 'daily'} onClick={() => { setTab('daily'); setStatus(null); }} role="tab">Rekomendasi Harian</button>
+      <button aria-selected={tab === 'urgent'} onClick={() => { setTab('urgent'); setStatus(null); }} role="tab">SKU Urgent</button>
     </div>
+
+    <button
+      className="primary-action share-pdf-action"
+      disabled={sharingPdf || pdfPlan.totalIncluded === 0}
+      onClick={() => void sharePdf()}
+    >
+      <ShareIcon />{sharingPdf ? 'Membuat PDF…' : `Bagikan PDF ${tab === 'daily' ? 'Harian' : 'Urgent'}`}
+    </button>
 
     <div className="share-summary">
       <span>{tab === 'daily' ? 'DAFTAR HARIAN' : 'PRIORITAS URGENT'}</span>
       <strong>
         {tab === 'daily'
           ? `${report.daily.length} dari ${report.totalEligible} SKU dipilih`
-          : `${report.urgent.length} SKU tidak keluar lebih dari 8 bulan`}
+          : `${pdfPlan.totalIncluded} dari ${pdfPlan.totalAvailable} SKU urgent dimasukkan ke PDF`}
       </strong>
       <small>
         {tab === 'daily'
@@ -150,8 +154,6 @@ export function ShareRecommendationsView({
           item={item}
           key={item.sku.id}
           onOpenSku={onOpenSku}
-          onShareSku={(sku) => void shareSku(sku)}
-          pending={pendingSkuId === item.sku.id}
         />)}</div>
       </section>;
     })}</div> : <p className="empty-state">Tidak ada SKU yang memenuhi rekomendasi pada tanggal ini.</p>}

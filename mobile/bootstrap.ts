@@ -1,26 +1,26 @@
-import { createNativeBarcodeScanner, createNativeLocalNotifications, createNativeSkuShare } from './native-adapters';
+import { createNativeBarcodeScanner, createNativeLocalNotifications, createNativeRecommendationPdfShare } from './native-adapters';
 import {
   browserBarcodeScanner,
   browserLocalNotifications,
-  browserSkuShare,
+  browserRecommendationPdfShare,
   type BarcodeScannerPort,
   type LocalNotificationPort,
-  type SkuSharePort,
+  type RecommendationPdfSharePort,
 } from './ports';
 
 export interface MobilePorts {
   scanner: BarcodeScannerPort;
   notifications: LocalNotificationPort;
-  share: SkuSharePort;
+  share: RecommendationPdfSharePort;
 }
 
 export function createMobilePorts(isNativePlatform: boolean): MobilePorts {
   if (!isNativePlatform) {
-    return { scanner: browserBarcodeScanner, notifications: browserLocalNotifications, share: browserSkuShare };
+    return { scanner: browserBarcodeScanner, notifications: browserLocalNotifications, share: browserRecommendationPdfShare };
   }
   return {
     scanner: createNativeBarcodeScanner(),
     notifications: createNativeLocalNotifications(),
-    share: createNativeSkuShare(),
+    share: createNativeRecommendationPdfShare(),
   };
 }

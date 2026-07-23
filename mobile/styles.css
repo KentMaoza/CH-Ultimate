@@ -630,6 +630,17 @@ input:focus-visible,
   background: #050505;
 }
 
+.share-pdf-action {
+  width: 100%;
+  min-height: 50px;
+  margin-top: 14px;
+}
+
+.share-pdf-action:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
 .share-summary {
   margin-top: 16px;
   padding: 14px;
@@ -795,24 +806,13 @@ input:focus-visible,
 .share-item__actions {
   display: grid;
   margin-top: 14px;
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 9px;
 }
 
-.share-item__actions .secondary-action,
-.share-item__actions .primary-action {
+.share-item__actions .secondary-action {
   min-height: 48px;
   margin-top: 0;
-}
-
-.share-item__actions .primary-action svg {
-  width: 21px;
-  height: 21px;
-}
-
-.share-item__actions button:disabled {
-  cursor: wait;
-  opacity: 0.6;
 }
 
 .bottom-nav {
@@ -826,7 +826,7 @@ input:focus-visible,
   min-height: calc(72px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   margin: 0 auto;
   padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   border-top: 1px solid #cfcfcf;
   background: rgb(255 255 255 / 96%);
   backdrop-filter: blur(12px);
@@ -886,6 +886,15 @@ input:focus-visible,
     padding: 4px;
     gap: 6px;
     font-size: 0.82rem;
+  }
+
+  .bottom-nav button {
+    font-size: 0.64rem;
+  }
+
+  .bottom-nav svg {
+    width: 23px;
+    height: 23px;
   }
 
   .summary-panel > div {

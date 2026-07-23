@@ -1,7 +1,4 @@
 import type { Sku, SkuPriceChange } from '../src/domain/types';
-import { formatSkuShareText } from '../src/domain/sku-share';
-
-export { formatSkuShareText } from '../src/domain/sku-share';
 
 export interface BarcodeScanResult {
   rawValue: string;
@@ -18,8 +15,14 @@ export interface LocalNotificationPort {
   listenForPriceChangeActions(listener: (skuId: string) => void): Promise<() => Promise<void>>;
 }
 
-export interface SkuSharePort {
-  shareSku(sku: Sku): Promise<void>;
+export interface RecommendationPdfSharePayload {
+  blob: Blob;
+  fileName: string;
+  title: string;
+}
+
+export interface RecommendationPdfSharePort {
+  sharePdf(payload: RecommendationPdfSharePayload): Promise<void>;
 }
 
 export const browserBarcodeScanner: BarcodeScannerPort = {
@@ -32,12 +35,17 @@ export const browserLocalNotifications: LocalNotificationPort = {
   listenForPriceChangeActions: async () => async () => undefined,
 };
 
-export const browserSkuShare: SkuSharePort = {
-  async shareSku(sku) {
+export const browserRecommendationPdfShare: RecommendationPdfSharePort = {
+  async sharePdf({ blob, fileName, title }) {
     if (!navigator.share) throw new Error('Menu berbagi tidak tersedia di browser ini.');
+    const file = new File([blob], fileName, { type: 'application/pdf' });
+    if (navigator.canShare && !navigator.canShare({ files: [file] })) {
+      throw new Error('Berbagi file PDF tidak tersedia di browser ini.');
+    }
     await navigator.share({
-      title: sku.name,
-      text: formatSkuShareText(sku),
+      files: [file],
+      title,
+      text: 'DATA DEMO · SESSION ONLY',
     });
   },
 };

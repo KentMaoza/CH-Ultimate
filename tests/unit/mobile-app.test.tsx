@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MobileApp } from '../../mobile/MobileApp';
 import { ProductImage } from '../../mobile/components/ProductImage';
-import type { BarcodeScannerPort, LocalNotificationPort, SkuSharePort } from '../../mobile/ports';
+import type { BarcodeScannerPort, LocalNotificationPort, RecommendationPdfSharePort } from '../../mobile/ports';
 import { createMobileDemoState } from '../../src/domain/mobile-demo-state';
 import type { DemoState } from '../../src/domain/types';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
@@ -9,7 +9,7 @@ import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 function createPorts(): {
   scanner: BarcodeScannerPort;
   notifications: LocalNotificationPort;
-  share: SkuSharePort;
+  share: RecommendationPdfSharePort;
 } {
   return {
     scanner: { scan: async () => null },
@@ -18,7 +18,7 @@ function createPorts(): {
       notifyPriceChange: async () => undefined,
       listenForPriceChangeActions: async () => async () => undefined,
     },
-    share: { shareSku: async () => undefined },
+    share: { sharePdf: async () => undefined },
   };
 }
 
@@ -37,10 +37,10 @@ function createRecommendationState(): DemoState {
   return {
     ...state,
     skus: state.skus.map((sku) => {
-      if (sku.id === 'sku-1') return { ...sku, name: 'Beras Lama CH009', stock: 4, createdAt: '2025-01-10T00:00:00.000Z' };
-      if (sku.id === 'sku-2') return { ...sku, name: 'Kemeja Lama CH009', stock: 2, createdAt: '2025-06-10T00:00:00.000Z' };
-      if (sku.id === 'sku-3') return { ...sku, name: 'Aksesori Baru CH010', stock: 8, createdAt: '2026-06-10T00:00:00.000Z' };
-      return { ...sku, stock: 0 };
+      if (sku.id === 'sku-1') return { ...sku, imageUrl: '', name: 'Beras Lama CH009', stock: 4, createdAt: '2025-01-10T00:00:00.000Z' };
+      if (sku.id === 'sku-2') return { ...sku, imageUrl: '', name: 'Kemeja Lama CH009', stock: 2, createdAt: '2025-06-10T00:00:00.000Z' };
+      if (sku.id === 'sku-3') return { ...sku, imageUrl: '', name: 'Aksesori Baru CH010', stock: 8, createdAt: '2026-06-10T00:00:00.000Z' };
+      return { ...sku, imageUrl: '', stock: 0 };
     }),
     notaTransactions: [],
   };
@@ -71,18 +71,21 @@ test('dashboard renders fixture counts and the two newest price changes', () => 
   expect(rows[1]).toHaveTextContent('Beras Hitam Premium 1 kg');
 });
 
-test('bottom navigation has exactly three destinations and changes view', () => {
+test('bottom navigation has four destinations with recommendations after SKU Gudang', () => {
   renderMobile();
 
   const navigation = screen.getByRole('navigation', { name: 'Navigasi utama' });
   expect(within(navigation).getAllByRole('button').map((button) => button.textContent)).toEqual([
     'Beranda',
     'SKU Gudang',
+    'Rekomendasi',
     'Perubahan Harga',
   ]);
 
   fireEvent.click(within(navigation).getByRole('button', { name: 'SKU Gudang' }));
   expect(screen.getByRole('heading', { name: 'SKU Gudang' })).toBeInTheDocument();
+  fireEvent.click(within(navigation).getByRole('button', { name: 'Rekomendasi' }));
+  expect(screen.getByRole('heading', { name: 'Rekomendasi Share' })).toHaveFocus();
   fireEvent.click(within(navigation).getByRole('button', { name: 'Perubahan Harga' }));
   expect(screen.getByRole('heading', { name: 'Perubahan Harga' })).toBeInTheDocument();
 });
@@ -130,7 +133,7 @@ test('dashboard search action opens the searchable SKU list', () => {
   expect(screen.getByRole('searchbox', { name: 'Cari SKU' })).toHaveFocus();
 });
 
-test('dashboard opens mobile share recommendations while keeping three bottom destinations', () => {
+test('dashboard keeps its recommendation shortcut while mobile navigation has four destinations', () => {
   renderMobile({}, createRecommendationState);
 
   const quickActions = screen.getByRole('region', { name: 'Aksi cepat' });
@@ -139,7 +142,7 @@ test('dashboard opens mobile share recommendations while keeping three bottom de
 
   expect(screen.getByRole('heading', { name: 'Rekomendasi Share' })).toHaveFocus();
   expect(screen.getByLabelText('Tanggal rekomendasi')).toHaveValue('2026-07-23');
-  expect(within(screen.getByRole('navigation', { name: 'Navigasi utama' })).getAllByRole('button')).toHaveLength(3);
+  expect(within(screen.getByRole('navigation', { name: 'Navigasi utama' })).getAllByRole('button')).toHaveLength(4);
 });
 
 test('share recommendations use the Windows daily and urgent grouping rules', () => {
@@ -155,44 +158,59 @@ test('share recommendations use the Windows daily and urgent grouping rules', ()
   expect(screen.getByRole('region', { name: 'Grup supplier CH010' })).toHaveTextContent('Aksesori Baru CH010');
 
   fireEvent.click(screen.getByRole('tab', { name: 'SKU Urgent' }));
-  expect(screen.getByText('2 SKU tidak keluar lebih dari 8 bulan')).toBeInTheDocument();
+  expect(screen.getByText('2 dari 2 SKU urgent dimasukkan ke PDF')).toBeInTheDocument();
   expect(screen.getByText('Beras Lama CH009')).toBeInTheDocument();
   expect(screen.getByText('Kemeja Lama CH009')).toBeInTheDocument();
   expect(screen.queryByText('Aksesori Baru CH010')).not.toBeInTheDocument();
 });
 
-test('each recommendation invokes the share port for exactly one selected SKU', async () => {
-  const shareSku = vi.fn(async () => undefined);
-  renderMobile({ share: { shareSku } }, createRecommendationState);
+test('shares one catalogue PDF for the active recommendation tab without per-SKU share actions', async () => {
+  const sharePdf = vi.fn(async () => undefined);
+  renderMobile({ share: { sharePdf } }, createRecommendationState);
   fireEvent.click(screen.getByRole('button', { name: 'Rekomendasi Share' }));
   fireEvent.change(screen.getByLabelText('Tanggal rekomendasi'), { target: { value: '2026-07-23' } });
 
-  fireEvent.click(screen.getByRole('button', { name: 'Bagikan SKU Beras Lama CH009' }));
+  expect(screen.queryByRole('button', { name: /^Bagikan SKU / })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('tab', { name: 'SKU Urgent' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Bagikan PDF Urgent' }));
 
-  await waitFor(() => expect(shareSku).toHaveBeenCalledOnce());
-  expect(shareSku).toHaveBeenCalledWith(expect.objectContaining({
-    id: 'sku-1',
-    name: 'Beras Lama CH009',
-    skuNumber: 'BRS-108-BLK',
-  }));
-  expect(await screen.findByRole('status')).toHaveTextContent('Beras Lama CH009 siap dibagikan.');
+  await waitFor(() => expect(sharePdf).toHaveBeenCalledOnce());
+  expect(sharePdf).toHaveBeenCalledWith({
+    blob: expect.any(Blob),
+    fileName: 'CHU-SKU-Urgent-2026-07-23.pdf',
+    title: 'SKU Urgent',
+  });
+  expect(await screen.findByRole('status')).toHaveTextContent('PDF SKU Urgent siap dibagikan.');
 });
 
-test('recommendation share failure is non-destructive and can be retried', async () => {
-  const shareSku = vi.fn()
+test('recommendation PDF share failure is non-destructive and can be retried', async () => {
+  const sharePdf = vi.fn()
     .mockRejectedValueOnce(new Error('share cancelled'))
     .mockResolvedValueOnce(undefined);
-  renderMobile({ share: { shareSku } }, createRecommendationState);
+  renderMobile({ share: { sharePdf } }, createRecommendationState);
   fireEvent.click(screen.getByRole('button', { name: 'Rekomendasi Share' }));
   fireEvent.change(screen.getByLabelText('Tanggal rekomendasi'), { target: { value: '2026-07-23' } });
-  const shareButton = screen.getByRole('button', { name: 'Bagikan SKU Beras Lama CH009' });
+  const shareButton = screen.getByRole('button', { name: 'Bagikan PDF Harian' });
 
   fireEvent.click(shareButton);
-  expect(await screen.findByRole('alert')).toHaveTextContent('Beras Lama CH009 belum dibagikan. Coba lagi.');
+  expect(await screen.findByRole('alert')).toHaveTextContent('PDF belum dibagikan. Coba lagi.');
   fireEvent.click(shareButton);
 
-  await waitFor(() => expect(shareSku).toHaveBeenCalledTimes(2));
-  expect(await screen.findByRole('status')).toHaveTextContent('Beras Lama CH009 siap dibagikan.');
+  await waitFor(() => expect(sharePdf).toHaveBeenCalledTimes(2));
+  expect(await screen.findByRole('status')).toHaveTextContent('PDF Rekomendasi Harian siap dibagikan.');
+  expect(screen.getByText('Beras Lama CH009')).toBeInTheDocument();
+});
+
+test('recommendation PDF button is full-list action above the product groups', () => {
+  renderMobile({}, createRecommendationState);
+  fireEvent.click(screen.getByRole('button', { name: 'Rekomendasi Share' }));
+  const shareButton = screen.getByRole('button', { name: 'Bagikan PDF Harian' });
+  const summary = screen.getByText('DAFTAR HARIAN').closest('.share-summary');
+
+  expect(shareButton.compareDocumentPosition(summary!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  expect(screen.getAllByRole('button', { name: /^Buka detail / })).toHaveLength(3);
+  expect(screen.queryByRole('button', { name: /^Bagikan SKU / })).not.toBeInTheDocument();
+  expect(shareButton).toHaveClass('share-pdf-action');
 });
 
 test('recommendation row can open the existing SKU detail', () => {

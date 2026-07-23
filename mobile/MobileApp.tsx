@@ -2,8 +2,8 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { OperationsGateway } from '../src/gateway/operations-gateway';
 import type { Sku } from '../src/domain/types';
 import { findSkuByScanCode } from '../src/domain/mobile-demo-state';
-import type { BarcodeScannerPort, LocalNotificationPort, SkuSharePort } from './ports';
-import { BoxIcon, ClockIcon, HomeIcon } from './components/Icons';
+import type { BarcodeScannerPort, LocalNotificationPort, RecommendationPdfSharePort } from './ports';
+import { BoxIcon, ClockIcon, HomeIcon, ShareIcon } from './components/Icons';
 import { DashboardView } from './components/DashboardView';
 import { SkuCatalog } from './components/SkuCatalog';
 import { ScanSurface } from './components/ScanSurface';
@@ -19,7 +19,7 @@ export function MobileApp({ gateway, scanner, notifications, share }: {
   gateway: OperationsGateway;
   scanner: BarcodeScannerPort;
   notifications: LocalNotificationPort;
-  share: SkuSharePort;
+  share: RecommendationPdfSharePort;
 }) {
   const snapshot = useSyncExternalStore(gateway.subscribe, gateway.getSnapshot, gateway.getSnapshot);
   const [view, setView] = useState<MainView>('home');
@@ -186,13 +186,14 @@ export function MobileApp({ gateway, scanner, notifications, share }: {
       {view === 'recommendations' && !scanOpen && !selectedSku ? <ShareRecommendationsView
         onBack={() => navigate('home')}
         onOpenSku={openSku}
-        onShareSku={share.shareSku}
+        onSharePdf={share.sharePdf}
         snapshot={snapshot}
       /> : null}
     </main>
     <nav aria-label="Navigasi utama" className="bottom-nav">
-      <button aria-current={view === 'home' || view === 'recommendations' ? 'page' : undefined} onClick={() => navigate('home')}><HomeIcon />Beranda</button>
+      <button aria-current={view === 'home' ? 'page' : undefined} onClick={() => navigate('home')}><HomeIcon />Beranda</button>
       <button aria-current={view === 'skus' ? 'page' : undefined} onClick={() => navigate('skus')}><BoxIcon />SKU Gudang</button>
+      <button aria-current={view === 'recommendations' ? 'page' : undefined} onClick={() => navigate('recommendations')}><ShareIcon />Rekomendasi</button>
       <button aria-current={view === 'prices' ? 'page' : undefined} onClick={() => navigate('prices')}><ClockIcon />Perubahan Harga</button>
     </nav>
   </div>;

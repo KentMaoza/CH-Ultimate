@@ -63,7 +63,7 @@ Barang Kosong can show zero/negative stock, exactly one piece, exactly two piece
 
 ## Rekomendasi Share
 
-Rekomendasi Share uses active SKU with positive stock. It sorts by the latest completed Nota sale; a SKU that has never sold uses its creation time as the baseline. The daily list is capped at 300 SKU and grouped by the trailing supplier code found in the SKU name or number, such as `CH009` and `CH010`. The **SKU Urgent** tab contains items that have not moved for more than eight calendar months. Choosing another date recalculates the session-only recommendation from the data available on that date. **Bagikan SKU** shares one selected product's image, name, SKU number, and reference price without warehouse stock. When the operating-system share sheet is unavailable, the local dialog can copy the same information or save the product image.
+Rekomendasi Share uses active SKU with positive stock. It sorts by the latest completed Nota sale; a SKU that has never sold uses its creation time as the baseline. The daily list is capped at 300 SKU and grouped by the trailing supplier code found in the SKU name or number, such as `CH009` and `CH010`. The **SKU Urgent** tab contains items that have not moved for more than eight calendar months and its PDF is also capped at 300 SKU. Choosing another date recalculates the session-only recommendation from the data available on that date. Windows downloads one three-column A4 catalogue PDF for the active tab; Android exposes the same feature directly after **SKU Gudang** and opens the system share sheet for that PDF. The catalogue contains product image, name, SKU number, and current reference price without stock or movement history, and is marked `DATA DEMO · SESSION ONLY`.
 
 ## Template Label & Invoice
 

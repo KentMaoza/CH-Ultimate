@@ -5,7 +5,7 @@
 .chu-nota-workspace button { padding: 4px 8px; cursor: pointer; font-size: calc(11px * var(--nota-font-scale)); font-weight: 750; }
 .chu-nota-workspace button:disabled, .chu-nota-workspace input:disabled, .chu-nota-workspace select:disabled { cursor: not-allowed; opacity: .52; }
 .chu-nota-workspace button:focus-visible, .chu-nota-workspace input:focus-visible, .chu-nota-workspace select:focus-visible, .chu-nota-workspace output:focus-visible, .chu-nota-workspace [role='option']:focus-visible { outline: 3px solid #111; outline-offset: 2px; }
-.chu-nota-workspace__toolbar { display: grid; grid-template-columns: max-content 42px max-content max-content minmax(170px, 1fr) max-content max-content max-content; gap: 6px; align-items: center; min-height: 40px; padding: 4px; border: 2px solid #111; background: #fff; }
+.chu-nota-workspace__toolbar { display: grid; grid-template-columns: max-content 42px max-content max-content minmax(170px, 1fr) max-content max-content max-content; gap: 6px; align-items: center; max-width: 100%; min-height: 40px; overflow-x: auto; padding: 4px; border: 2px solid #111; background: #fff; }
 .chu-nota-workspace__back { color: #fff !important; background: #111 !important; }
 .chu-nota-workspace__wordmark { display: grid; width: 42px; height: 28px; place-items: center; color: #fff; background: #111; letter-spacing: -.08em; }
 .chu-nota-workspace__section { font-size: calc(12px * var(--nota-font-scale)); font-weight: 900; white-space: nowrap; }
@@ -13,6 +13,8 @@
 .chu-nota-workspace__zoom { display: flex; align-items: center; border: 1px solid #111; background: #fff; }
 .chu-nota-workspace__zoom button { min-width: 28px; border: 0; }
 .chu-nota-workspace__zoom button:nth-child(2) { min-width: 52px; border-inline: 1px solid #111; font-size: calc(10px * var(--nota-font-scale)); font-weight: 800; text-align: center; }
+.chu-nota-workspace__voice-controls { display: flex; gap: 4px; }
+.chu-nota-workspace__voice-controls button { white-space: nowrap; }
 .chu-nota-workspace__demo { padding: 6px 8px; border: 1px solid #111; font-size: calc(9px * var(--nota-font-scale)); font-weight: 900; letter-spacing: .08em; white-space: nowrap; }
 .chu-nota-workspace__new, .chu-nota-workspace__complete { color: #fff !important; background: #111 !important; }
 .chu-nota-workspace__meta { display: grid; grid-template-columns: 1.2fr repeat(4, minmax(130px, 1fr)) 1.2fr; gap: 6px; align-items: end; margin-top: 6px; padding: 6px; border: 2px solid #111; background: #fff; }
@@ -106,4 +108,4 @@
 .chu-nota-workspace__footer p { margin: 0; color: #555; font-size: calc(10px * var(--nota-font-scale)); }
 .chu-nota-workspace__lifecycle { display: flex; gap: 7px; }
 .chu-nota-workspace__empty { display: grid; min-height: 100vh; place-content: center; gap: 12px; text-align: center; }
-@media (max-width: 1180px) { .chu-nota-workspace__toolbar { grid-template-columns: max-content 42px 1fr max-content max-content; } .chu-nota-workspace__toolbar input, .chu-nota-workspace__toolbar .chu-nota-workspace__demo { display: none; } .chu-nota-workspace__meta { grid-template-columns: repeat(3, 1fr); } .chu-nota-workspace__footer { grid-template-columns: max-content 1fr max-content; } .chu-nota-workspace__footer label, .chu-nota-workspace__footer p { display: none; } }
+@media (max-width: 1180px) { .chu-nota-workspace__toolbar { grid-template-columns: max-content 42px 1fr max-content max-content max-content; } .chu-nota-workspace__toolbar input, .chu-nota-workspace__toolbar .chu-nota-workspace__demo { display: none; } .chu-nota-workspace__meta { grid-template-columns: repeat(3, 1fr); } .chu-nota-workspace__footer { grid-template-columns: max-content 1fr max-content; } .chu-nota-workspace__footer label, .chu-nota-workspace__footer p { display: none; } }

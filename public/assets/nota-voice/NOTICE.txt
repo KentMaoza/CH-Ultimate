@@ -1,0 +1,35 @@
+CH Ultimate — Nota Voice Assets
+Generated 2026-07-23
+
+These 501 short Indonesian speech clips were synthesized for CH Ultimate with:
+
+Model:
+  grandhigh/Chatterbox-TTS-Indonesian
+  Revision: 4224700012365780cf891af53bd839412d3e18fd
+  https://huggingface.co/grandhigh/Chatterbox-TTS-Indonesian
+  License declared by the model publisher: Apache License 2.0
+
+Base model:
+  ResembleAI/Chatterbox
+  https://huggingface.co/ResembleAI/chatterbox
+  License declared by the publisher: MIT
+
+Training dataset:
+  grandhigh/SuaraGabungan-ID
+  https://huggingface.co/datasets/grandhigh/SuaraGabungan-ID
+  Aggregate license declared by the dataset publisher: Apache License 2.0
+
+The dataset publisher attributes its component sources as:
+  - Espeak-ID-5K — grandhigh — MIT
+  - FLEURS — Google — CC BY 4.0
+  - ind_famal — Majiang213 — Apache License 2.0
+
+Generation notes:
+  - No reference audio or voice-cloning input was used.
+  - The synthesized output was trimmed, peak-normalized, and encoded as
+    mono Ogg/Opus.
+  - The application bundles only the generated audio, this notice, and the
+    prompt/checksum manifest. It does not bundle the TTS model or dataset.
+
+The exact prompt and SHA-256 checksum for every clip are recorded in
+manifest.json.

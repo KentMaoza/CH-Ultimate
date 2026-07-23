@@ -1,0 +1,2527 @@
+{
+  "schemaVersion": 1,
+  "format": "Ogg/Opus mono",
+  "sourceSampleRateHz": 24000,
+  "generatedAt": "2026-07-23",
+  "model": {
+    "name": "grandhigh/Chatterbox-TTS-Indonesian",
+    "revision": "4224700012365780cf891af53bd839412d3e18fd",
+    "url": "https://huggingface.co/grandhigh/Chatterbox-TTS-Indonesian"
+  },
+  "dataset": {
+    "name": "grandhigh/SuaraGabungan-ID",
+    "url": "https://huggingface.co/datasets/grandhigh/SuaraGabungan-ID"
+  },
+  "generation": {
+    "voiceCloning": false,
+    "runtimeNetworkRequired": false,
+    "notes": "Synthesized without a reference voice, trimmed, peak-normalized, and encoded as Opus."
+  },
+  "clips": [
+    {
+      "file": "rows/1A.ogg",
+      "prompt": "satu a",
+      "sha256": "f4b3e8de0bf6e67deec50e370b92e4ef8dfd73a105e1c1cc5db77b1d9bf1d335"
+    },
+    {
+      "file": "rows/2A.ogg",
+      "prompt": "dua a",
+      "sha256": "2c853f4ca005ff0728f8a7c06d90730bc9aff9d7cbde61e1d6ea7b326651de06"
+    },
+    {
+      "file": "rows/3A.ogg",
+      "prompt": "tiga a",
+      "sha256": "53b7236f4f70d30474b89513bb3d52c6293d22a8c083e882319ff1739fc85ebe"
+    },
+    {
+      "file": "rows/4A.ogg",
+      "prompt": "empat a",
+      "sha256": "736eaef5c0c248fec7a5566c0d5bb1e88fbfc3522216b59d75986ca8713f0f74"
+    },
+    {
+      "file": "rows/5A.ogg",
+      "prompt": "lima a",
+      "sha256": "d43a66db30ffa7384e9d251bc98d925ce05d7193b23549b2ffd3af6bab4e344b"
+    },
+    {
+      "file": "rows/6A.ogg",
+      "prompt": "enam a",
+      "sha256": "53d6b7b153300e246b7440ac542c431476c64978c527b79b8c556aed366fb6c9"
+    },
+    {
+      "file": "rows/7A.ogg",
+      "prompt": "tujuh a",
+      "sha256": "05b329e6d5774d36baa06b46d3a3bd465852a4e388130e5e4e215b6ffc129617"
+    },
+    {
+      "file": "rows/8A.ogg",
+      "prompt": "delapan a",
+      "sha256": "50bc68a091c72c7da2d34a752e51e101daec4f5d5c14954c8932d8c86166b36b"
+    },
+    {
+      "file": "rows/9A.ogg",
+      "prompt": "sembilan a",
+      "sha256": "4306f05a76fd9cda4b8b8a8a16c300b0baba4eb499518fe4d1bc1f0c9db18e66"
+    },
+    {
+      "file": "rows/10A.ogg",
+      "prompt": "sepuluh a",
+      "sha256": "d79e68d7bf24e6bf2be067fd1e45d1cb5731b1317a2a20faf52c991aca9b031b"
+    },
+    {
+      "file": "rows/11A.ogg",
+      "prompt": "sebelas a",
+      "sha256": "c0852e70083f0a77c699f58f8fa845425fc17bb90d39665ff6c62c03fac5bb7c"
+    },
+    {
+      "file": "rows/12A.ogg",
+      "prompt": "dua belas a",
+      "sha256": "84e03be695f6e32f89d70033c927d5bfaa0c36cd5bd949d5e12c3a047ea6eb05"
+    },
+    {
+      "file": "rows/13A.ogg",
+      "prompt": "tiga belas a",
+      "sha256": "65fed31e3563d826b5354f7491ac5c166550573bd2dac050d170363fc130088a"
+    },
+    {
+      "file": "rows/14A.ogg",
+      "prompt": "empat belas a",
+      "sha256": "eba8ed953e34ec0a66fc2c0a51b6388ade12fa5869b8f5dfcd9c54fbaf54085a"
+    },
+    {
+      "file": "rows/15A.ogg",
+      "prompt": "lima belas a",
+      "sha256": "d2a9bc35ebe79401cbdddb411b1d03285fbbd1a2f7e3b103a65a4bfaa5828fc9"
+    },
+    {
+      "file": "rows/1B.ogg",
+      "prompt": "satu bé",
+      "sha256": "d5dd0c08413642a169ef78d4b8898fc2413f2326b14fb78e55fe36f50b6c0066"
+    },
+    {
+      "file": "rows/2B.ogg",
+      "prompt": "dua bé",
+      "sha256": "bfaf39670c8ecd7e340827c401949b38543bb865f4411c11fef0bd2343f88f2f"
+    },
+    {
+      "file": "rows/3B.ogg",
+      "prompt": "tiga bé",
+      "sha256": "7845a50f9f92256fa43b6ad8bfa92f2437cee0f4a7b12119d544b37d797dc18b"
+    },
+    {
+      "file": "rows/4B.ogg",
+      "prompt": "empat bé",
+      "sha256": "0ef306cc3da2b5fc1911a90ede611fb67970e38cc6e4b4a4478efc2fb2f782b1"
+    },
+    {
+      "file": "rows/5B.ogg",
+      "prompt": "lima bé",
+      "sha256": "101ea2de6e688f1e363557c2559ef612883e98f54e9ef3f0ea14b7407aaaf986"
+    },
+    {
+      "file": "rows/6B.ogg",
+      "prompt": "enam bé",
+      "sha256": "822b05a8cd0d8f32b492d2f9bea0f64c499c31841874b86b740ef8010c4fd73c"
+    },
+    {
+      "file": "rows/7B.ogg",
+      "prompt": "tujuh bé",
+      "sha256": "0a03eb09052a912eca137d9a326e5e89687ae3d7f8eee8cc49e817d16e964bde"
+    },
+    {
+      "file": "rows/8B.ogg",
+      "prompt": "delapan bé",
+      "sha256": "49a3b29de14c34ee683cd4a9a880991b9f90986983bdf0846c807318290f3d2b"
+    },
+    {
+      "file": "rows/9B.ogg",
+      "prompt": "sembilan bé",
+      "sha256": "c60cb0afa2ec26356e045f494518996321a4e1f9304b4feec600a86c8038adee"
+    },
+    {
+      "file": "rows/10B.ogg",
+      "prompt": "sepuluh bé",
+      "sha256": "6d80656e508467529a89371deadd100bd280486cccdade7bb98405caed10def6"
+    },
+    {
+      "file": "rows/11B.ogg",
+      "prompt": "sebelas bé",
+      "sha256": "0d9457e374d7e4247a815ee535b988e92f7478c2185eeb55cca9598147474ad0"
+    },
+    {
+      "file": "rows/12B.ogg",
+      "prompt": "dua belas bé",
+      "sha256": "95c21643434b105e339a85935040676d1240891182a8e0d22b08c887d16e6d9e"
+    },
+    {
+      "file": "rows/13B.ogg",
+      "prompt": "tiga belas bé",
+      "sha256": "af7487368903d30f6169228a993dde6f605deae5bd79205dfa78c2f35025df64"
+    },
+    {
+      "file": "rows/14B.ogg",
+      "prompt": "empat belas bé",
+      "sha256": "aaa4c6ad28943f39988c463c97dc5e7844fe0c9860929b1218725cb374aa2387"
+    },
+    {
+      "file": "rows/15B.ogg",
+      "prompt": "lima belas bé",
+      "sha256": "910f4c42847cf7fd59986dbf10e28cb82809772e8f37037abb86b75168d34625"
+    },
+    {
+      "file": "rows/1C.ogg",
+      "prompt": "satu cé",
+      "sha256": "6ec3df39c63e168337b056e1e7cd6f487582fc503963f7c853e677c02bb215e1"
+    },
+    {
+      "file": "rows/2C.ogg",
+      "prompt": "dua cé",
+      "sha256": "2972952c3157034ae70032e266c92fecbe305072d12957a5a3701afbc93a0cc0"
+    },
+    {
+      "file": "rows/3C.ogg",
+      "prompt": "tiga cé",
+      "sha256": "1a916277cbdd950a272900083cf20edc694f1c5a8b65372ae3e19267ac5cd8a3"
+    },
+    {
+      "file": "rows/4C.ogg",
+      "prompt": "empat cé",
+      "sha256": "52cdabc170609d7ae31adb3cfbe40449a7161962979cc59e17732344234f2d49"
+    },
+    {
+      "file": "rows/5C.ogg",
+      "prompt": "lima cé",
+      "sha256": "750a03a68345dd8c20f0f7adb5d58ba93c30ff1dffbc8c30e50c36ed8ddafacb"
+    },
+    {
+      "file": "rows/6C.ogg",
+      "prompt": "enam cé",
+      "sha256": "eec824a12fe4c33dc1aee5c60c65d0ab42e9fabacad3f59bc700334b496185df"
+    },
+    {
+      "file": "rows/7C.ogg",
+      "prompt": "tujuh cé",
+      "sha256": "1a276309a2266bb489941660418784b680986d001f824d082722cd1f18ae42e5"
+    },
+    {
+      "file": "rows/8C.ogg",
+      "prompt": "delapan cé",
+      "sha256": "111131cd38eaae7459d4720f3d23fb310b12b5c97bf495a3db065be0ac75f741"
+    },
+    {
+      "file": "rows/9C.ogg",
+      "prompt": "sembilan cé",
+      "sha256": "520839839cebbbd18ad18d93544ffa8c722c1f078d0753d9eb799981c6f4b4b3"
+    },
+    {
+      "file": "rows/10C.ogg",
+      "prompt": "sepuluh cé",
+      "sha256": "584d3e3b0471d7036ec55e5a626668972c4db22e4a264e6e81d68d04508917c7"
+    },
+    {
+      "file": "rows/11C.ogg",
+      "prompt": "sebelas cé",
+      "sha256": "a348e4ddbca628cd2b17159ef624250104a4daaa394443c71ed199f35bdf2c6b"
+    },
+    {
+      "file": "rows/12C.ogg",
+      "prompt": "dua belas cé",
+      "sha256": "de1e1df2f9d2d48ee5535dae9869154bcce3dcac4feadbfb8d9faed07d7f1675"
+    },
+    {
+      "file": "rows/13C.ogg",
+      "prompt": "tiga belas cé",
+      "sha256": "1aa8529632c88339742c6f8b4aa98a5672762333456febc333694e4b07ea5ee3"
+    },
+    {
+      "file": "rows/14C.ogg",
+      "prompt": "empat belas cé",
+      "sha256": "1181ec5467ae669aa17189ffb2467388f2468a0cfa98558b494f8b7b8c284478"
+    },
+    {
+      "file": "rows/15C.ogg",
+      "prompt": "lima belas cé",
+      "sha256": "7d6578c554b901c2b5aa69df095fa484ffdfc6f46d9f5755ef1634753f46440a"
+    },
+    {
+      "file": "rows/1D.ogg",
+      "prompt": "satu dé",
+      "sha256": "47bf0f42f30f2f6bbd8b86fc6abb0785a1370d7992fd1f2a2f36a46ea32ce762"
+    },
+    {
+      "file": "rows/2D.ogg",
+      "prompt": "dua dé",
+      "sha256": "f39a2388635360c977df926d1c7e55fc910efe65e092634daf9418f3d9511bf5"
+    },
+    {
+      "file": "rows/3D.ogg",
+      "prompt": "tiga dé",
+      "sha256": "ce5bf67b6250b4c9a7742fa4449f2bea03566fc5ed038dcaf8eded47cdd8586a"
+    },
+    {
+      "file": "rows/4D.ogg",
+      "prompt": "empat dé",
+      "sha256": "55f4c297854406eb1abaca25e42a4f8f25c53cc75ece600b4f5149cc2dc2c9de"
+    },
+    {
+      "file": "rows/5D.ogg",
+      "prompt": "lima dé",
+      "sha256": "825be5138b76d252e66ed3765dc143f3197b28ecb7ed414ac2e0517910946a03"
+    },
+    {
+      "file": "rows/6D.ogg",
+      "prompt": "enam dé",
+      "sha256": "dfae9b173ad12f24e69a76528e1ed3270d3ecefff21813e19ef478bf69cb04ee"
+    },
+    {
+      "file": "rows/7D.ogg",
+      "prompt": "tujuh dé",
+      "sha256": "13ec999a1f5f1563848df3334203b11f8e49b7f472551b142195bd8b9cbe2e6a"
+    },
+    {
+      "file": "rows/8D.ogg",
+      "prompt": "delapan dé",
+      "sha256": "659998926e5219f12848a574d63b60812ccf889982f7ad5dbbadae610c16116d"
+    },
+    {
+      "file": "rows/9D.ogg",
+      "prompt": "sembilan dé",
+      "sha256": "2080343bf9867ce1198cc2459535b5031540d9b88ebcbbbf050223241d3c18d9"
+    },
+    {
+      "file": "rows/10D.ogg",
+      "prompt": "sepuluh dé",
+      "sha256": "a50fe9e9d3afd4456cdbb576d0465a1ddee4112b3773f1d152e9a5c0bf170317"
+    },
+    {
+      "file": "rows/11D.ogg",
+      "prompt": "sebelas dé",
+      "sha256": "8760df37658c2c4c61889164093ec5f92a5274ee4687d401e34602c7192fe7c1"
+    },
+    {
+      "file": "rows/12D.ogg",
+      "prompt": "dua belas dé",
+      "sha256": "9d753053ee3904f4ea5469666ac356c6e3bd04b886ef7b8f6f6f1836273eac8a"
+    },
+    {
+      "file": "rows/13D.ogg",
+      "prompt": "tiga belas dé",
+      "sha256": "692ce03505290cd0383f29ec60ce32da1b18dad6066e942147932b44ff5811dd"
+    },
+    {
+      "file": "rows/14D.ogg",
+      "prompt": "empat belas dé",
+      "sha256": "7a1d2a0a2c0c89fd2ea38d2674fbbc89e668a0fb79b3caffe6adcd91f9cef8f2"
+    },
+    {
+      "file": "rows/15D.ogg",
+      "prompt": "lima belas dé",
+      "sha256": "69aee654e21b38606d98c20dc1fc598acc6dc0e17e0419e2a7c55ab3458c0cce"
+    },
+    {
+      "file": "rows/1E.ogg",
+      "prompt": "satu é",
+      "sha256": "bd177c252740d3b437c9c34ff76d2c56486579cf74101e7676b1925ab4ad64b8"
+    },
+    {
+      "file": "rows/2E.ogg",
+      "prompt": "dua é",
+      "sha256": "878e828537fc1e06750a305927195a62004c6dee4abb2437f1d2b2ce56cb270a"
+    },
+    {
+      "file": "rows/3E.ogg",
+      "prompt": "tiga é",
+      "sha256": "539c48eaf80661cb8bbee49373a00b80744b086543c07767ad91fa0d8fdb523b"
+    },
+    {
+      "file": "rows/4E.ogg",
+      "prompt": "empat é",
+      "sha256": "a8d926fe499ccbd868d80d5573f320bc6ef824909ce94a082c5aa0d52742a202"
+    },
+    {
+      "file": "rows/5E.ogg",
+      "prompt": "lima é",
+      "sha256": "9b94caaabdad362367250a26910eda9488c42a430bcda0e674c9fc574b9100b2"
+    },
+    {
+      "file": "rows/6E.ogg",
+      "prompt": "enam é",
+      "sha256": "bc2e14d8834fb0a0526db1ddcb3e360fb44548ac7211dc7935f498dbe72cb2c8"
+    },
+    {
+      "file": "rows/7E.ogg",
+      "prompt": "tujuh é",
+      "sha256": "87efb28572fb77709a3c0f950b82d49fcddfdc0a94148c897fec6108d14686e7"
+    },
+    {
+      "file": "rows/8E.ogg",
+      "prompt": "delapan é",
+      "sha256": "2ded0a13961c92780892ef34ca8d6e4d434a98bb2dce5165a705600f4a590056"
+    },
+    {
+      "file": "rows/9E.ogg",
+      "prompt": "sembilan é",
+      "sha256": "8d249cc5f1182e4a2f4508172fa83a8c2cb80e24b64e4ea806e13fc0d3d53201"
+    },
+    {
+      "file": "rows/10E.ogg",
+      "prompt": "sepuluh é",
+      "sha256": "c085e8af72a7fce9818193e5e5ff5a283ebfaa2db4b83ac621f58ced3263ed4e"
+    },
+    {
+      "file": "rows/11E.ogg",
+      "prompt": "sebelas é",
+      "sha256": "2a85c2fe7da280be1689119aaf85d95df7347977bb0f2a4d94c43e8c066625c4"
+    },
+    {
+      "file": "rows/12E.ogg",
+      "prompt": "dua belas é",
+      "sha256": "0c465caec2debbbc26a1a27616d5cebb2eddff3d19b7288bf91f6a1f4b47103e"
+    },
+    {
+      "file": "rows/13E.ogg",
+      "prompt": "tiga belas é",
+      "sha256": "5ac595757ef81ed5280cd89cfb0f7a8e6a88ec70af7fd4a752b9792b491e8a62"
+    },
+    {
+      "file": "rows/14E.ogg",
+      "prompt": "empat belas é",
+      "sha256": "4ef75c0ae328e63d052aa9aea1bedeacd45c72100690f150a34156feaa99e58d"
+    },
+    {
+      "file": "rows/15E.ogg",
+      "prompt": "lima belas é",
+      "sha256": "b1d8ca7a69d5855431e4961aabcaef95a02b7b486992ca5e7fbb4954e1c7f836"
+    },
+    {
+      "file": "rows/1F.ogg",
+      "prompt": "satu ef",
+      "sha256": "789e508acd236ad96065816ba3074f1b38b392e14bc14fa66f01b3c0b915f7fc"
+    },
+    {
+      "file": "rows/2F.ogg",
+      "prompt": "dua ef",
+      "sha256": "076047165e6e1e814e42e029dd051ab7af619d72cc20c3ba7272089db4055228"
+    },
+    {
+      "file": "rows/3F.ogg",
+      "prompt": "tiga ef",
+      "sha256": "049ccf74b3e7eaf0daa8440b53cf10cdabd954c34ddd285a09325bcc41245992"
+    },
+    {
+      "file": "rows/4F.ogg",
+      "prompt": "empat ef",
+      "sha256": "b72440f4ef92f6b4ffa41c3dbee317aac640ad31eb78b95883a0cc88efc1952b"
+    },
+    {
+      "file": "rows/5F.ogg",
+      "prompt": "lima ef",
+      "sha256": "e8377875899536cc5cfd70bb2804b025f2b92ed7c77d6bd7531a147f9291956c"
+    },
+    {
+      "file": "rows/6F.ogg",
+      "prompt": "enam ef",
+      "sha256": "b58c4dc916e3735d849313ad5a54cebac7efd79c9f98b6f1ae28184468b02191"
+    },
+    {
+      "file": "rows/7F.ogg",
+      "prompt": "tujuh ef",
+      "sha256": "850f910c58466d53711c6eaed66170464951aa9ea3426fbd1ab8bc42039e103c"
+    },
+    {
+      "file": "rows/8F.ogg",
+      "prompt": "delapan ef",
+      "sha256": "df4eb874a32cd0331e89da29aaf497bbcaffe38dcd1556e2cfbe7b1d9091f4a2"
+    },
+    {
+      "file": "rows/9F.ogg",
+      "prompt": "sembilan ef",
+      "sha256": "6b6bad2e08a148d2309b148ffccf4bc0576a1f5fd22b7216f9ab798edbb1e3b5"
+    },
+    {
+      "file": "rows/10F.ogg",
+      "prompt": "sepuluh ef",
+      "sha256": "e4f5f8663690ed4d8e7dc503efaa7cd3a00e74dbeca65d929df5b964a79efdc6"
+    },
+    {
+      "file": "rows/11F.ogg",
+      "prompt": "sebelas ef",
+      "sha256": "10f0f1f60c88dc2dbbbc0e0007e905efe6524cd8470d565bc54fd452c733e597"
+    },
+    {
+      "file": "rows/12F.ogg",
+      "prompt": "dua belas ef",
+      "sha256": "a73d927f305d387a559c9ea2568d3f9c0faf2faac0b92821c0a8a7e82c69fff7"
+    },
+    {
+      "file": "rows/13F.ogg",
+      "prompt": "tiga belas ef",
+      "sha256": "239c2b415bde36e610974251c89613ee4a088e59346524e4cf29068ba59ba301"
+    },
+    {
+      "file": "rows/14F.ogg",
+      "prompt": "empat belas ef",
+      "sha256": "c974f5cd0a90e7e373020ad136df2820eac69d2383802140e538eca98778252e"
+    },
+    {
+      "file": "rows/15F.ogg",
+      "prompt": "lima belas ef",
+      "sha256": "d34da483fe057d3a1cacb18733fa297fd4c271ea53dc12a698a99d3410988f8a"
+    },
+    {
+      "file": "rows/1G.ogg",
+      "prompt": "satu gé",
+      "sha256": "e8dee338b8ff83768b00161b8db9ca852e16328fc523f417298d025f5bd2620a"
+    },
+    {
+      "file": "rows/2G.ogg",
+      "prompt": "dua gé",
+      "sha256": "8228349edf627bb616fb9dc864ff3633e5ccde956f8b981b99d40a0abad53c61"
+    },
+    {
+      "file": "rows/3G.ogg",
+      "prompt": "tiga gé",
+      "sha256": "3c6b3edb102a749f08b15fb5623d7c8f7f2a1b97d45de42e946f9926b2325c38"
+    },
+    {
+      "file": "rows/4G.ogg",
+      "prompt": "empat gé",
+      "sha256": "87516f9a342dd8d938360f178fa3bc205587e3bd458535c3fd65c3ff38a38762"
+    },
+    {
+      "file": "rows/5G.ogg",
+      "prompt": "lima gé",
+      "sha256": "9f185bc31af04338872060474fbe237472bcc166d2fe4742578934d0b000f2ec"
+    },
+    {
+      "file": "rows/6G.ogg",
+      "prompt": "enam gé",
+      "sha256": "7e77f72b15ade43e219594b38219cabd10914af537edf3ffc770938966f0ff6c"
+    },
+    {
+      "file": "rows/7G.ogg",
+      "prompt": "tujuh gé",
+      "sha256": "d625a9c0b08e861a26de559e80418711bbd795f58d248fad9b08c55837394052"
+    },
+    {
+      "file": "rows/8G.ogg",
+      "prompt": "delapan gé",
+      "sha256": "f36571ae695e2478bbd90b4f866424e4e2af2a6d3432926f1bc5405ca90de5b5"
+    },
+    {
+      "file": "rows/9G.ogg",
+      "prompt": "sembilan gé",
+      "sha256": "bd61b07cad891bba263c401f4be197d08e44a700781eef60919a17e7a2640232"
+    },
+    {
+      "file": "rows/10G.ogg",
+      "prompt": "sepuluh gé",
+      "sha256": "029ae418719e4d7a26ad4e40db8b0f21060938daa1a33b2b4b78268f010c2d66"
+    },
+    {
+      "file": "rows/11G.ogg",
+      "prompt": "sebelas gé",
+      "sha256": "35385408b1e331286209ef8f1703ff64e1ab02ad2819bb7cd4bc424567af0814"
+    },
+    {
+      "file": "rows/12G.ogg",
+      "prompt": "dua belas gé",
+      "sha256": "cf540ad02b666905a3f4421f331d96809a01570726f1b496d10d714714a298ec"
+    },
+    {
+      "file": "rows/13G.ogg",
+      "prompt": "tiga belas gé",
+      "sha256": "caf8530d31ba07032cc013b937252713a0e64ff7240edb3834ef8c3ae3157cc7"
+    },
+    {
+      "file": "rows/14G.ogg",
+      "prompt": "empat belas gé",
+      "sha256": "fc000eceef071812a2db5a36214140998c3b2d55258cf2a3f8d3861f362814e6"
+    },
+    {
+      "file": "rows/15G.ogg",
+      "prompt": "lima belas gé",
+      "sha256": "943c373da1cd27310b41a2f4b2f6fd3831f18beea45d748a483707f7eb265943"
+    },
+    {
+      "file": "rows/1H.ogg",
+      "prompt": "satu ha",
+      "sha256": "c9897d089a8d7b7520dcdccdb7510ce0773d585491fe9936104ca0723ec15aff"
+    },
+    {
+      "file": "rows/2H.ogg",
+      "prompt": "dua ha",
+      "sha256": "0c57e9317874b81390c253a897d1cb35cd1a5f89beff5a0786aea499f494a08f"
+    },
+    {
+      "file": "rows/3H.ogg",
+      "prompt": "tiga ha",
+      "sha256": "fcb49fb892c89d9bb31bf0192cb76c1c274ab0769811123f11bfd0dad83abb1d"
+    },
+    {
+      "file": "rows/4H.ogg",
+      "prompt": "empat ha",
+      "sha256": "6c0dbb1342d76b8c3cc4120ea2c10f46bf831b1238c65dce2e27eccf8e04d318"
+    },
+    {
+      "file": "rows/5H.ogg",
+      "prompt": "lima ha",
+      "sha256": "85ecfdd365731d97f91c0147ca938f5284f1ec6010510e82d45152f4d1f9bb9d"
+    },
+    {
+      "file": "rows/6H.ogg",
+      "prompt": "enam ha",
+      "sha256": "80157dce5bf0dbda796eb934b06a77f29fb32fc5615ed731be3d59c8fcef771a"
+    },
+    {
+      "file": "rows/7H.ogg",
+      "prompt": "tujuh ha",
+      "sha256": "4f4b7cd852d71663118951b9849455c5ad1c7e10d11b1b593397b81056f3c6cd"
+    },
+    {
+      "file": "rows/8H.ogg",
+      "prompt": "delapan ha",
+      "sha256": "f2c3e57ffa9ca503dd403757635fbdf4c300da28334fa67c8a883e7cfb184e14"
+    },
+    {
+      "file": "rows/9H.ogg",
+      "prompt": "sembilan ha",
+      "sha256": "5e3179e456ddd7fc6c3583ea75fb7de64a9d057ac9a8cee557e568c8c4a42287"
+    },
+    {
+      "file": "rows/10H.ogg",
+      "prompt": "sepuluh ha",
+      "sha256": "cc5004866c7a4df9aea4a08125d9daba47391642265f6133f5bb07fb905e7f3e"
+    },
+    {
+      "file": "rows/11H.ogg",
+      "prompt": "sebelas ha",
+      "sha256": "8b1ed6a65701ccf0d92c34196246bf3b02251a58b2b46e9186c56d916da6c948"
+    },
+    {
+      "file": "rows/12H.ogg",
+      "prompt": "dua belas ha",
+      "sha256": "e2ef2a3417220d8640acb316df9d0911fe218eb1056aaec947eaad25e6b7b4b0"
+    },
+    {
+      "file": "rows/13H.ogg",
+      "prompt": "tiga belas ha",
+      "sha256": "9c70074f4f79d9c7e1afb3fbe86a7f1a2efe1596bb617970d62f19c98ad868cc"
+    },
+    {
+      "file": "rows/14H.ogg",
+      "prompt": "empat belas ha",
+      "sha256": "498f63c85b1655b8d3fc061eeade9a677c19cefe27de24857627338fcb1ef17c"
+    },
+    {
+      "file": "rows/15H.ogg",
+      "prompt": "lima belas ha",
+      "sha256": "8176fc12279ed1b98347adea46a9addeabd50770d34ee8ec1db165d54ddd3f72"
+    },
+    {
+      "file": "rows/1I.ogg",
+      "prompt": "satu i",
+      "sha256": "015f0fe47653255fa2c1cf1b8c991cab6555e25ef3dde92ea05158955f8baaba"
+    },
+    {
+      "file": "rows/2I.ogg",
+      "prompt": "dua i",
+      "sha256": "5f4108a330735515f19ac17fd0cb47944c830c2c109a9ae1c515d935f60b0f28"
+    },
+    {
+      "file": "rows/3I.ogg",
+      "prompt": "tiga i",
+      "sha256": "48a61fcdad48200a0952fd3f6073ea30f3737cad437f186f80bfde16cf5970c3"
+    },
+    {
+      "file": "rows/4I.ogg",
+      "prompt": "empat i",
+      "sha256": "220e53f72c0c975bcb367b70189c5501faa73045ad292d5c435177f756f6c666"
+    },
+    {
+      "file": "rows/5I.ogg",
+      "prompt": "lima i",
+      "sha256": "9bc17a7e63da5b187086b94bec94c202bd7ee585b1d8ef8b0cdc0ed334ac25d3"
+    },
+    {
+      "file": "rows/6I.ogg",
+      "prompt": "enam i",
+      "sha256": "539fdc368bb256dd44096e709423b4d6afedbc9f6404e180dab6e3a8ff53bf1f"
+    },
+    {
+      "file": "rows/7I.ogg",
+      "prompt": "tujuh i",
+      "sha256": "687e6b846b33d7e95886cb99d0573e9bf9d0bca9f6c37c00c9788f966fc0cacb"
+    },
+    {
+      "file": "rows/8I.ogg",
+      "prompt": "delapan i",
+      "sha256": "68c1dd8c8fa4da3a73640baa7f25853b3189af5fae80ed3cdb87bca26c3b9381"
+    },
+    {
+      "file": "rows/9I.ogg",
+      "prompt": "sembilan i",
+      "sha256": "0aaf056479415dec8c128d2fb46370e286fbc031f4097d5e5a785b1a62365081"
+    },
+    {
+      "file": "rows/10I.ogg",
+      "prompt": "sepuluh i",
+      "sha256": "75892dff2a9a03ef9ed6127f17e1ce0429852099292bd4de429a057a5520f0c1"
+    },
+    {
+      "file": "rows/11I.ogg",
+      "prompt": "sebelas i",
+      "sha256": "d893b2e0750a3ef08f42ccb9f3b9f46d44bb45e0243205b3a87b90a4c6d205a8"
+    },
+    {
+      "file": "rows/12I.ogg",
+      "prompt": "dua belas i",
+      "sha256": "506d28cbd8acd6f8786b5d648a49e0c26517cd292e43182f3c5a110920d49acb"
+    },
+    {
+      "file": "rows/13I.ogg",
+      "prompt": "tiga belas i",
+      "sha256": "41b9a1ff79f7d8a23414ae20e8b28996ad52c7e2051419697ad94a15283212bd"
+    },
+    {
+      "file": "rows/14I.ogg",
+      "prompt": "empat belas i",
+      "sha256": "78c201f697b90e93a4ae25443dbce5544f3d503c18cf0bd5d9da3e65ac299eda"
+    },
+    {
+      "file": "rows/15I.ogg",
+      "prompt": "lima belas i",
+      "sha256": "051e4c69c01123cf9c98e8aa659d4a12635323738315d5cbc0c52406da96529f"
+    },
+    {
+      "file": "rows/1J.ogg",
+      "prompt": "satu jé",
+      "sha256": "21bc1db6035e207a9f9b070bf8e5caa32acc7bca485a736e7668a320c26eeacf"
+    },
+    {
+      "file": "rows/2J.ogg",
+      "prompt": "dua jé",
+      "sha256": "ccdb93750dcf6eb99cfc15cdae49f7f4a0597b9ef1c57d52581f05a15e4148b3"
+    },
+    {
+      "file": "rows/3J.ogg",
+      "prompt": "tiga jé",
+      "sha256": "1a9d4fc431df3fb42dd8f7f9f398725ec03444d49700b58525f4191ba3b80808"
+    },
+    {
+      "file": "rows/4J.ogg",
+      "prompt": "empat jé",
+      "sha256": "1a4197503254e81f16993db2e7b44a46658497acff5a44c506a26ef94944fed0"
+    },
+    {
+      "file": "rows/5J.ogg",
+      "prompt": "lima jé",
+      "sha256": "509af5f517e61d22ec7867439855183c11d22f87ff9f006a9401c8b56a487b8a"
+    },
+    {
+      "file": "rows/6J.ogg",
+      "prompt": "enam jé",
+      "sha256": "505d21f14ada57dfe79b91cf9df3468fa887ccf17e1a0d5f52095f53d1c831cc"
+    },
+    {
+      "file": "rows/7J.ogg",
+      "prompt": "tujuh jé",
+      "sha256": "a02842236f7942356464e584e6b111f85fd87481e12a347ca6584d931d12c768"
+    },
+    {
+      "file": "rows/8J.ogg",
+      "prompt": "delapan jé",
+      "sha256": "b4c35e75277cc807689e0602a651d26e22c460ad9b0c23173b6265d7163b9fd6"
+    },
+    {
+      "file": "rows/9J.ogg",
+      "prompt": "sembilan jé",
+      "sha256": "b10a2649280d33a5279a8a88a48345b81731b9003d022e7240e492d55e652715"
+    },
+    {
+      "file": "rows/10J.ogg",
+      "prompt": "sepuluh jé",
+      "sha256": "1fe1dfdc1d9975e809390e57dba2216e209350812e5da99242c8103fe7396293"
+    },
+    {
+      "file": "rows/11J.ogg",
+      "prompt": "sebelas jé",
+      "sha256": "efe961f431460ad0365a5a6bbb0c61b862d7c58cf5ed435d01af93363963cb65"
+    },
+    {
+      "file": "rows/12J.ogg",
+      "prompt": "dua belas jé",
+      "sha256": "1ddf1fae95c828e8721ab82c9a9591ffaeaf52be69cd08f0aa4445987760e4f4"
+    },
+    {
+      "file": "rows/13J.ogg",
+      "prompt": "tiga belas jé",
+      "sha256": "06ed888630fa1a1c467503ba884100f9b5e9e3e72abba87567732082a54ffffb"
+    },
+    {
+      "file": "rows/14J.ogg",
+      "prompt": "empat belas jé",
+      "sha256": "6b4193f6b75b86b3da0b88b39aa01c475586ce1e0019aca53cc9ea1b3e9c4b8a"
+    },
+    {
+      "file": "rows/15J.ogg",
+      "prompt": "lima belas jé",
+      "sha256": "ddddbea6caa5964264d2fb3dbf359c7f09ba2152a2473fa9d12d6cdcba3cf176"
+    },
+    {
+      "file": "rows/1K.ogg",
+      "prompt": "satu ka",
+      "sha256": "c2379e3f67858e9995cc463a2bdf7dfeccd491477b0d004001f4867d45ae2680"
+    },
+    {
+      "file": "rows/2K.ogg",
+      "prompt": "dua ka",
+      "sha256": "74d757359a765d4e622fc4a6e04c4d3e907401eb55978c7396adcbbb0027c1f6"
+    },
+    {
+      "file": "rows/3K.ogg",
+      "prompt": "tiga ka",
+      "sha256": "ed1da314c2c16f9450e22e8a40cbd72ef2132c6b263a803d7bd8f2c299b97da8"
+    },
+    {
+      "file": "rows/4K.ogg",
+      "prompt": "empat ka",
+      "sha256": "d465eb3991d514775dcb7b0452855880aaea2f243c346860320695e2de6d6fd7"
+    },
+    {
+      "file": "rows/5K.ogg",
+      "prompt": "lima ka",
+      "sha256": "8a21a22c56407516884d63e74ab933bb015014ea5e21cdb3d6917630ca7b5416"
+    },
+    {
+      "file": "rows/6K.ogg",
+      "prompt": "enam ka",
+      "sha256": "e39a6d97c338530eafd9f270a5e6fd32e9588e3c8cc13df430e788acefecba9e"
+    },
+    {
+      "file": "rows/7K.ogg",
+      "prompt": "tujuh ka",
+      "sha256": "3370b16a9d3d1bf01edcf3d20c383d8f464e027818b4b38a4f1ce1170c3e6e31"
+    },
+    {
+      "file": "rows/8K.ogg",
+      "prompt": "delapan ka",
+      "sha256": "9a195a415f2c1b77efcfb4d4df7ebaa7f7922e3296c81726bcfa22bc38a56c11"
+    },
+    {
+      "file": "rows/9K.ogg",
+      "prompt": "sembilan ka",
+      "sha256": "d1b9a95ce59d63f063932ecf64747085be7ff0b1fe805da3c2a0faa9c9cb448f"
+    },
+    {
+      "file": "rows/10K.ogg",
+      "prompt": "sepuluh ka",
+      "sha256": "23d66bb453eed0e9cf1aa20f520776037d3578e80e9b894b39b93d2d9c481e27"
+    },
+    {
+      "file": "rows/11K.ogg",
+      "prompt": "sebelas ka",
+      "sha256": "e8e1443622704ebf3b414ebafc7af547b68399cd5aa7f372d86332b745c59180"
+    },
+    {
+      "file": "rows/12K.ogg",
+      "prompt": "dua belas ka",
+      "sha256": "b1c85795a161a59e824d801ad6253badc48fa9856175206c80ce0c0a09ddfa72"
+    },
+    {
+      "file": "rows/13K.ogg",
+      "prompt": "tiga belas ka",
+      "sha256": "353ecee1974cf114667f3759436dbf8cf24f400e0b0b5ba351f27cafb048e5cb"
+    },
+    {
+      "file": "rows/14K.ogg",
+      "prompt": "empat belas ka",
+      "sha256": "ea2e5357a23a718e2e98feaaca72ce2fcffa0cac2e7c88931f6ecaf1b8ab54cc"
+    },
+    {
+      "file": "rows/15K.ogg",
+      "prompt": "lima belas ka",
+      "sha256": "7d7f7a0f4a16ca8b12af9945b81a29d443a404b8446666b717be93b34f03274d"
+    },
+    {
+      "file": "rows/1L.ogg",
+      "prompt": "satu el",
+      "sha256": "e85bdf4b1ced8186742aed54a20e91bc946918d556c1380571f4ce5cde7a1a31"
+    },
+    {
+      "file": "rows/2L.ogg",
+      "prompt": "dua el",
+      "sha256": "0a7bb7b496a9b1cd22e40c4178b86c1dba7e47c172b1354dfb22b769a5cd0c37"
+    },
+    {
+      "file": "rows/3L.ogg",
+      "prompt": "tiga el",
+      "sha256": "a81aab55547f322fc0516b3445f4e9294ec1dc90ff972810554302721044edb7"
+    },
+    {
+      "file": "rows/4L.ogg",
+      "prompt": "empat el",
+      "sha256": "97e0be8b3150d67a59639c2e7d18525c875ed244bd759e2bad2863e5a5a474df"
+    },
+    {
+      "file": "rows/5L.ogg",
+      "prompt": "lima el",
+      "sha256": "a9040f257f584822a315964d78de34920852a740e6a110e4f0e4fe1807168813"
+    },
+    {
+      "file": "rows/6L.ogg",
+      "prompt": "enam el",
+      "sha256": "d1bfd3b2107dbe63bb0c6ee92d5136e0e604777ea646dd82cfc7d7d7b6fd5248"
+    },
+    {
+      "file": "rows/7L.ogg",
+      "prompt": "tujuh el",
+      "sha256": "90c04044dd22325eda85152c397be911389a6f50f2e6a3a3ba1cab6aea8615e8"
+    },
+    {
+      "file": "rows/8L.ogg",
+      "prompt": "delapan el",
+      "sha256": "c2ebf7d969e393f351437569e9af952379533f008deb319bd3e6e119d81c343a"
+    },
+    {
+      "file": "rows/9L.ogg",
+      "prompt": "sembilan el",
+      "sha256": "cc54fca4bd0b9441e583c37d16bb1438ddde9f8b98a3978174c590377abb8bbe"
+    },
+    {
+      "file": "rows/10L.ogg",
+      "prompt": "sepuluh el",
+      "sha256": "4af0fbe4a73c518b3f67114ddbc2fc674690435773ed93e44cdac52c0495a1c7"
+    },
+    {
+      "file": "rows/11L.ogg",
+      "prompt": "sebelas el",
+      "sha256": "1f21c35602c8cf6602a57f87621ce48ec4105ed6025e568a68380558cb893bfe"
+    },
+    {
+      "file": "rows/12L.ogg",
+      "prompt": "dua belas el",
+      "sha256": "596e5d3d279c69da7af80d969dbf9d446363fdcfa8117723fcd385fa0f521f93"
+    },
+    {
+      "file": "rows/13L.ogg",
+      "prompt": "tiga belas el",
+      "sha256": "8f64e1e9ee73936c265fc9db39296c9882f8041d21b7f45f4b88f5b2b1609e7e"
+    },
+    {
+      "file": "rows/14L.ogg",
+      "prompt": "empat belas el",
+      "sha256": "c999694dce2bbfee934b394314655a308f3e573dfde51c3703f3bb1e4ca882d2"
+    },
+    {
+      "file": "rows/15L.ogg",
+      "prompt": "lima belas el",
+      "sha256": "442c33b005e478f4bb5f391d3831e02760bd5cec6736899c458ae8dacd95656a"
+    },
+    {
+      "file": "rows/1M.ogg",
+      "prompt": "satu em",
+      "sha256": "d234c091c797595656ed7f261200a9f3b72b135978953a176879bfd87fc7fe17"
+    },
+    {
+      "file": "rows/2M.ogg",
+      "prompt": "dua em",
+      "sha256": "2290bb7f4549cce4deae6d8f50b2620f8b81bb976f3f1c9ecd30ce9a93ac348e"
+    },
+    {
+      "file": "rows/3M.ogg",
+      "prompt": "tiga em",
+      "sha256": "cc1c54049f42b600de9137379927b75af16cbdcca230f85dd4b29e7a28e53a82"
+    },
+    {
+      "file": "rows/4M.ogg",
+      "prompt": "empat em",
+      "sha256": "7ca00da10ecaefb5d4fc66fb791ce3b1ac9fe854438c526524185be9b4207cd8"
+    },
+    {
+      "file": "rows/5M.ogg",
+      "prompt": "lima em",
+      "sha256": "98af1eca7a346b9e52bfb5ffefed04db77ef573f9ab1354fedd77014ea7b2dd9"
+    },
+    {
+      "file": "rows/6M.ogg",
+      "prompt": "enam em",
+      "sha256": "4b42026136411b36eb2d4dd38b2a5c5c3f1046cbd7dba3db109c35584b2f9db4"
+    },
+    {
+      "file": "rows/7M.ogg",
+      "prompt": "tujuh em",
+      "sha256": "6fceb8d937c5c555617f3e70b8234c756ea4d597b13184bf91e8fe5148eedabc"
+    },
+    {
+      "file": "rows/8M.ogg",
+      "prompt": "delapan em",
+      "sha256": "6bda6034e68581bf69a553eb4ecb0b15d66d0054e8937c388a1233d923c01f16"
+    },
+    {
+      "file": "rows/9M.ogg",
+      "prompt": "sembilan em",
+      "sha256": "f166eb2c8e7fe4e580745b1f6b43aa5ee6a2aa1c35755a940b92c472ba3c40da"
+    },
+    {
+      "file": "rows/10M.ogg",
+      "prompt": "sepuluh em",
+      "sha256": "a0978fb6a82d9d0996595c28d723551194db84142a56673cc319f3d3df3259a8"
+    },
+    {
+      "file": "rows/11M.ogg",
+      "prompt": "sebelas em",
+      "sha256": "65bd9b3fa591874f20c53e89e97574a05eada1025a0e17c6e26e8610bc771359"
+    },
+    {
+      "file": "rows/12M.ogg",
+      "prompt": "dua belas em",
+      "sha256": "6387113be56136b8ee098c96fc4e705a4f0bb5947561b03618158643a72e1bb5"
+    },
+    {
+      "file": "rows/13M.ogg",
+      "prompt": "tiga belas em",
+      "sha256": "537cf99f7aefcef534b6628ac407d3674f6b2fb64bb40b9018a77b57d89f0c5a"
+    },
+    {
+      "file": "rows/14M.ogg",
+      "prompt": "empat belas em",
+      "sha256": "db15a3fd9a8d919d6b928cbdba3e36d0a25b9f1cae8ac55524768bff1da3202c"
+    },
+    {
+      "file": "rows/15M.ogg",
+      "prompt": "lima belas em",
+      "sha256": "0a5ec801281078944ee47d3deec095d72f5d1181b0274331ddd68c5de592a815"
+    },
+    {
+      "file": "rows/1N.ogg",
+      "prompt": "satu en",
+      "sha256": "92fb88dfcf1f5714f40290e51ec4c34e0fb32c6c2aa29c37efe48d04893731de"
+    },
+    {
+      "file": "rows/2N.ogg",
+      "prompt": "dua en",
+      "sha256": "a2590e766c1ee72f77097bf04f015a90f974c92645dee1fd94c7bb3e2067ee25"
+    },
+    {
+      "file": "rows/3N.ogg",
+      "prompt": "tiga en",
+      "sha256": "2e578c8f1e48ab1d9e62f212a96e187808705055a869672194c6b68384c3f4b2"
+    },
+    {
+      "file": "rows/4N.ogg",
+      "prompt": "empat en",
+      "sha256": "d7e832cac7ecaadb01679aae6b48245ad9b8842880680fad041c8edf79d9a5ba"
+    },
+    {
+      "file": "rows/5N.ogg",
+      "prompt": "lima en",
+      "sha256": "478b185c4fdc8b89db37d760ab362674074caf20ee2df8ea142175238903609c"
+    },
+    {
+      "file": "rows/6N.ogg",
+      "prompt": "enam en",
+      "sha256": "803cf5b4caa2d2e3d398ddb426506ce50084d58da1200c0f847aecf4e61bd2ba"
+    },
+    {
+      "file": "rows/7N.ogg",
+      "prompt": "tujuh en",
+      "sha256": "c50c8edac9566414cb1bb8e8804e6ee8a4a8dfb84ddd1d7f50df7bf9522c944e"
+    },
+    {
+      "file": "rows/8N.ogg",
+      "prompt": "delapan en",
+      "sha256": "4b164d94b677730691094a84e6bfd0f0997eb86f95a607c339d2e842680c56b8"
+    },
+    {
+      "file": "rows/9N.ogg",
+      "prompt": "sembilan en",
+      "sha256": "076a954fe3d18706046cca0e32f7424c42e30c6ef37a80b02e35597b94e64ba5"
+    },
+    {
+      "file": "rows/10N.ogg",
+      "prompt": "sepuluh en",
+      "sha256": "f0440c7f2c55f3ad11ca81614351adfe1a99392f57c475aa33789bd56d8f5397"
+    },
+    {
+      "file": "rows/11N.ogg",
+      "prompt": "sebelas en",
+      "sha256": "6fa214d617f1cf703f86eb9439215d42cc2f4f2540dc7a55d6705ce10ec37410"
+    },
+    {
+      "file": "rows/12N.ogg",
+      "prompt": "dua belas en",
+      "sha256": "f8e91032a5eeb76937e879c5c21416e97beb3ebb92a87014b439c2458cccee7c"
+    },
+    {
+      "file": "rows/13N.ogg",
+      "prompt": "tiga belas en",
+      "sha256": "2a62d1f284e182c2150d4b62b61e1233088d8721d3f041d89bbf4b25f72ae45b"
+    },
+    {
+      "file": "rows/14N.ogg",
+      "prompt": "empat belas en",
+      "sha256": "fb803943036a7b13112150e16a51d2f5b6c542a8620fcc5ff406f4f46abbe29d"
+    },
+    {
+      "file": "rows/15N.ogg",
+      "prompt": "lima belas en",
+      "sha256": "acdbbaa277839f8e82822943cc348030ad58832268cd5dc4c03432800fd79905"
+    },
+    {
+      "file": "rows/1O.ogg",
+      "prompt": "satu o",
+      "sha256": "030763f9f07c77be8462b00a8fcb152e4c0883416184c037746c2b330273be6a"
+    },
+    {
+      "file": "rows/2O.ogg",
+      "prompt": "dua o",
+      "sha256": "9fb3a9f2e34315db2584ae7e86d71feac15c2edf4606957f8e19d7e2644e9618"
+    },
+    {
+      "file": "rows/3O.ogg",
+      "prompt": "tiga o",
+      "sha256": "0fead784c377dce24ba0d973ddd0f3cc4ce5fe98c29aa23d8fdb3b5ecd22e157"
+    },
+    {
+      "file": "rows/4O.ogg",
+      "prompt": "empat o",
+      "sha256": "e4651483f262c02f880abb5d16e7af035a378915b8f5f80c78b095ea7ad17d74"
+    },
+    {
+      "file": "rows/5O.ogg",
+      "prompt": "lima o",
+      "sha256": "b5cfcf19b6f15f67c866779f49cd44ad0cfc3a6aed655351f15bf0ff57647453"
+    },
+    {
+      "file": "rows/6O.ogg",
+      "prompt": "enam o",
+      "sha256": "0a16e4cd9adf71e023e4222329c5369478badae1d52bfdc5e60463f3ecead77d"
+    },
+    {
+      "file": "rows/7O.ogg",
+      "prompt": "tujuh o",
+      "sha256": "e18ed0cfd0a6333946ace943d95ec0524cae4059b284b74134ecdadc3220a8a7"
+    },
+    {
+      "file": "rows/8O.ogg",
+      "prompt": "delapan o",
+      "sha256": "ab34caf340a181e2f4b4dd1cb9b97b26334475b40ff9c8483581722dded47143"
+    },
+    {
+      "file": "rows/9O.ogg",
+      "prompt": "sembilan o",
+      "sha256": "1649dda4a4de03d5d7d6bf96f2e2ee37bc9c74cd4d72ca40f1d31df9312b70f2"
+    },
+    {
+      "file": "rows/10O.ogg",
+      "prompt": "sepuluh o",
+      "sha256": "83f163b0d2d0f1cc3bf540f5f4f2820ab4fd59395160de0d849c497b951431e5"
+    },
+    {
+      "file": "rows/11O.ogg",
+      "prompt": "sebelas o",
+      "sha256": "8b2caaf90373123409d36c6b4536b415e192e7a5c00d85b5d38ea1d8ab088fa2"
+    },
+    {
+      "file": "rows/12O.ogg",
+      "prompt": "dua belas o",
+      "sha256": "18ac41ae5dfb4b36e9b5a3dab825be13e7f7d52bf9e56c4e2fa3dcd3c03d12db"
+    },
+    {
+      "file": "rows/13O.ogg",
+      "prompt": "tiga belas o",
+      "sha256": "ee78dfad1fe8673f3876c2117d47d50210fbaf55276685a514dd48c834cd9890"
+    },
+    {
+      "file": "rows/14O.ogg",
+      "prompt": "empat belas o",
+      "sha256": "51ed981a4f3136d38716cdf764adce9349dd68ff4751e69fd52bbe87c0f44017"
+    },
+    {
+      "file": "rows/15O.ogg",
+      "prompt": "lima belas o",
+      "sha256": "e674a0f5bc57cec9e6060fb8abe5f981d91c35d9e6cb74cd8845c9ec0bfb5e68"
+    },
+    {
+      "file": "rows/1P.ogg",
+      "prompt": "satu pé",
+      "sha256": "177765ce794d60bf948956897d9d48f22bd6c3850a7ab7ae1de734162481ad04"
+    },
+    {
+      "file": "rows/2P.ogg",
+      "prompt": "dua pé",
+      "sha256": "f7309ed6a01fa84e32f0eb0f91fec9797387b056dc7ea78dec402bbd94e51b73"
+    },
+    {
+      "file": "rows/3P.ogg",
+      "prompt": "tiga pé",
+      "sha256": "c14d261e3ad7bdc4ed7dd6d157016c3a49a4b2c3839b7875c307ded8095c96d5"
+    },
+    {
+      "file": "rows/4P.ogg",
+      "prompt": "empat pé",
+      "sha256": "6193e748d3aa32f4281ada899ada592cc9fd5dd1b14193c3cf7f3776c43635d9"
+    },
+    {
+      "file": "rows/5P.ogg",
+      "prompt": "lima pé",
+      "sha256": "a093947826a41bdce406cadcbe3e0ceac516bb9385f73c0e1c3cd7bb1d710855"
+    },
+    {
+      "file": "rows/6P.ogg",
+      "prompt": "enam pé",
+      "sha256": "483131409c7b6f97b3be34f6ba26a2e4ebfd0978d8fb8e92ffeea1019048ec3b"
+    },
+    {
+      "file": "rows/7P.ogg",
+      "prompt": "tujuh pé",
+      "sha256": "92cd0f767fbafa863cbedd26278d9fb2b7bff3ee98e17c9fd0410ff17d842437"
+    },
+    {
+      "file": "rows/8P.ogg",
+      "prompt": "delapan pé",
+      "sha256": "c229fb298fe84f7b700a6f24abf25603be145caf4e5a61631eefa66b04d71d76"
+    },
+    {
+      "file": "rows/9P.ogg",
+      "prompt": "sembilan pé",
+      "sha256": "2df68491fc1359ccaf06343fb341e22c498d5661024f993763fed187b803601c"
+    },
+    {
+      "file": "rows/10P.ogg",
+      "prompt": "sepuluh pé",
+      "sha256": "73b7fcd1dd74092664af98b997c00b05453f3fb2c8d832be4539d48968306278"
+    },
+    {
+      "file": "rows/11P.ogg",
+      "prompt": "sebelas pé",
+      "sha256": "4b5dcfe05e4725e1bc1daa26ab99dd4556f8a48a8e19e7e2972c2a51a3cdf02f"
+    },
+    {
+      "file": "rows/12P.ogg",
+      "prompt": "dua belas pé",
+      "sha256": "427ffd4c98ade86b4a93ca72b8db215582a5ced08ac80ee842f0097c295704c1"
+    },
+    {
+      "file": "rows/13P.ogg",
+      "prompt": "tiga belas pé",
+      "sha256": "641bc58eee1b2fe3d69e26eccca5cdc2320c391e65073792ee2a2bae4d0737db"
+    },
+    {
+      "file": "rows/14P.ogg",
+      "prompt": "empat belas pé",
+      "sha256": "5f279861a94a1d8a916758fd02264ec1ac94e2c6e6fedbd7e8f690a645e34faa"
+    },
+    {
+      "file": "rows/15P.ogg",
+      "prompt": "lima belas pé",
+      "sha256": "2bba1e4fe82307399b88a70864dc419b4628ef4d2b6571facabe2a5bd293ee1b"
+    },
+    {
+      "file": "rows/1Q.ogg",
+      "prompt": "satu ki",
+      "sha256": "131b7729ac71683e2ac265ac870702130cfc2b621c90fcdaf32e1d500e368da4"
+    },
+    {
+      "file": "rows/2Q.ogg",
+      "prompt": "dua ki",
+      "sha256": "6ecb423315f24c780beae2d3d172a02ac58628eeb1bd5c52e64c08ca9e0b2d47"
+    },
+    {
+      "file": "rows/3Q.ogg",
+      "prompt": "tiga ki",
+      "sha256": "999e8a7bdcc064f403e6c0f1ad4ea994319b2428ac34541c571b10df62d2e95f"
+    },
+    {
+      "file": "rows/4Q.ogg",
+      "prompt": "empat ki",
+      "sha256": "f096b5241758879ae52c140d233ec3b1b378f181e35f808e6588a44da8834f6b"
+    },
+    {
+      "file": "rows/5Q.ogg",
+      "prompt": "lima ki",
+      "sha256": "fdd6830341ac603c5f86e6f40bad76ebf0a8732fb13f123219cec4d5bf2da107"
+    },
+    {
+      "file": "rows/6Q.ogg",
+      "prompt": "enam ki",
+      "sha256": "d71e030991f0b224b183912320078a9fad026b678673d73864ff7c0138c1f79f"
+    },
+    {
+      "file": "rows/7Q.ogg",
+      "prompt": "tujuh ki",
+      "sha256": "a33b79c0157959fd6edaf8a2204444d0df4d5691e63e7419950726a9aa8f5d02"
+    },
+    {
+      "file": "rows/8Q.ogg",
+      "prompt": "delapan ki",
+      "sha256": "dd0c2e7e746d5249c6195fbb25f8501a4f68989bd12794a0e4de3b6bab09ebb6"
+    },
+    {
+      "file": "rows/9Q.ogg",
+      "prompt": "sembilan ki",
+      "sha256": "11bca68313aa7bb5103596e48177bfd963f5dbdf72b1b22c00d454a1d71a5552"
+    },
+    {
+      "file": "rows/10Q.ogg",
+      "prompt": "sepuluh ki",
+      "sha256": "68ba4accbc305c15f745eb80c9ce71c60683ca7fb7e080e9418a4fae3b1c0704"
+    },
+    {
+      "file": "rows/11Q.ogg",
+      "prompt": "sebelas ki",
+      "sha256": "8e4053a3fc75032f5d0e4d64e11adb1a7c1ccb70cc8ef3c5c5b119ff241bb276"
+    },
+    {
+      "file": "rows/12Q.ogg",
+      "prompt": "dua belas ki",
+      "sha256": "4a5b4138756a924b994cefb8955bf3b187e3b31b794168f8832a2ccc67806f57"
+    },
+    {
+      "file": "rows/13Q.ogg",
+      "prompt": "tiga belas ki",
+      "sha256": "1a4e0d08c4b71dcb9a46574a756f2ff73e499535be938fbc6627be45d958ffbf"
+    },
+    {
+      "file": "rows/14Q.ogg",
+      "prompt": "empat belas ki",
+      "sha256": "7011b705c0eb040397c2b7785b00a229e198770a57398ee9db3fe5eeeada6308"
+    },
+    {
+      "file": "rows/15Q.ogg",
+      "prompt": "lima belas ki",
+      "sha256": "dbb2a30091618875dcb52faca0d299f09058a4823d8bb3b24858093da4781460"
+    },
+    {
+      "file": "rows/1R.ogg",
+      "prompt": "satu er",
+      "sha256": "079b4ab42de0c212ecd1f4d1a8dd39e57a6cb168eb81f7ff650fbf7ba2eb51ec"
+    },
+    {
+      "file": "rows/2R.ogg",
+      "prompt": "dua er",
+      "sha256": "be9f11f19bbb8637273c3487e5dc6aa4e551f0e207e875f5772cf0e8d0a3951a"
+    },
+    {
+      "file": "rows/3R.ogg",
+      "prompt": "tiga er",
+      "sha256": "da5ddd9efc12e04d888af94464ef0168eb31fee6a5295c78b30ebadded6d4ccb"
+    },
+    {
+      "file": "rows/4R.ogg",
+      "prompt": "empat er",
+      "sha256": "7f59a3d30050e367018915476cb3b61ca03e40189e4b29d57728aba2685b9c67"
+    },
+    {
+      "file": "rows/5R.ogg",
+      "prompt": "lima er",
+      "sha256": "564f9ed962a8621d604574f06da3fa320ae73ebb489671742b877eb4969a170b"
+    },
+    {
+      "file": "rows/6R.ogg",
+      "prompt": "enam er",
+      "sha256": "cbb46d263f520b191aef08438181e873b9a6c511955999ce139d769c89492e28"
+    },
+    {
+      "file": "rows/7R.ogg",
+      "prompt": "tujuh er",
+      "sha256": "60d7854200575062d4a59d39f64037849bf955e264002a0a8662a6aff4a5a29d"
+    },
+    {
+      "file": "rows/8R.ogg",
+      "prompt": "delapan er",
+      "sha256": "d91cf900ce47dce06e007de04b441c831cb3a8564f6ec1c39ed422c37ce324c7"
+    },
+    {
+      "file": "rows/9R.ogg",
+      "prompt": "sembilan er",
+      "sha256": "a6b0f93e068ab772458d2c924a51eb06dc949ae1f1136479744e09969dc48264"
+    },
+    {
+      "file": "rows/10R.ogg",
+      "prompt": "sepuluh er",
+      "sha256": "b70f5e45c09675b295b8563965bec3c8860b709142d71d31af80f6aa2c6eab6b"
+    },
+    {
+      "file": "rows/11R.ogg",
+      "prompt": "sebelas er",
+      "sha256": "36a675a95a2b39fc010311a07705de37e39295060c9512d6e6cb26bd656462d5"
+    },
+    {
+      "file": "rows/12R.ogg",
+      "prompt": "dua belas er",
+      "sha256": "3815613c543ac5cb7c7bb8bc19dc9f971faaeb1780bf531682557512ab60ddd5"
+    },
+    {
+      "file": "rows/13R.ogg",
+      "prompt": "tiga belas er",
+      "sha256": "a4e8498582d0696a4f8377888d0934bda5ad3a64dbb655689dc7b3910a50d2bb"
+    },
+    {
+      "file": "rows/14R.ogg",
+      "prompt": "empat belas er",
+      "sha256": "1488c2a020ffbae9f4ba041b8062cb8a02e0f1e9687a4c6b2d685175afcaa5c2"
+    },
+    {
+      "file": "rows/15R.ogg",
+      "prompt": "lima belas er",
+      "sha256": "960bce0b00394999e48c88f1dc8724692d123dff527e65757d825a745f21f507"
+    },
+    {
+      "file": "rows/1S.ogg",
+      "prompt": "satu es",
+      "sha256": "c60fc7049ae4b3f3ef817eebe2649b8a2dd7af8de865e75d92c06c2c4c40b884"
+    },
+    {
+      "file": "rows/2S.ogg",
+      "prompt": "dua es",
+      "sha256": "0cfcf28e9843436e1c9f3e576f91ad887693741c6192b36d0d221da02cde3d08"
+    },
+    {
+      "file": "rows/3S.ogg",
+      "prompt": "tiga es",
+      "sha256": "25473cc310a1e140aceb7f6764c82e2d83afdf63907ebbfd7e91369aff977eb5"
+    },
+    {
+      "file": "rows/4S.ogg",
+      "prompt": "empat es",
+      "sha256": "9a0979c2539bc00d8baf9cc6970cceaca2e7ec72537f84bd405a6939ebee7b4b"
+    },
+    {
+      "file": "rows/5S.ogg",
+      "prompt": "lima es",
+      "sha256": "c742898e172c548407b05c07e29a1d698f43efc3a6a627dc527593e288f45bd0"
+    },
+    {
+      "file": "rows/6S.ogg",
+      "prompt": "enam es",
+      "sha256": "3f7ef0f725442b9a1a645e5fdd6790960666f96330ef852bbd67202597b2c4f8"
+    },
+    {
+      "file": "rows/7S.ogg",
+      "prompt": "tujuh es",
+      "sha256": "5728b9e5dd978367d72d99be81ba35b7000f756e914e64610fdc71dd09f24d95"
+    },
+    {
+      "file": "rows/8S.ogg",
+      "prompt": "delapan es",
+      "sha256": "ed80c79cd9fa3137445b5a1985d9938155b53035ef970522f74de2e6ef5bf5e5"
+    },
+    {
+      "file": "rows/9S.ogg",
+      "prompt": "sembilan es",
+      "sha256": "312fe8b290dcac5ab8c73344b521a992441ad709f16e15859d8485de9d88a457"
+    },
+    {
+      "file": "rows/10S.ogg",
+      "prompt": "sepuluh es",
+      "sha256": "da76d904c23e8fd8aea86c530ef7ad9bd2db86c094bc45ed4dde804f02cf9e28"
+    },
+    {
+      "file": "rows/11S.ogg",
+      "prompt": "sebelas es",
+      "sha256": "ed19a4b24e7f42fa7b171ef0cf940ceba1f35f411a698fc1e50b828a6cef81b6"
+    },
+    {
+      "file": "rows/12S.ogg",
+      "prompt": "dua belas es",
+      "sha256": "149f70b60fb3bcba5661c71c60713a096eecd7727cf48e324ff4ae2fd5c94699"
+    },
+    {
+      "file": "rows/13S.ogg",
+      "prompt": "tiga belas es",
+      "sha256": "7f09f92c874e6df514374cc25ad41ec1307760f4a5564e478a67477356c7615e"
+    },
+    {
+      "file": "rows/14S.ogg",
+      "prompt": "empat belas es",
+      "sha256": "501ecf50b829deb83b212727e93be7f8cf46fe5a1829837ce6ee18925b4c37c5"
+    },
+    {
+      "file": "rows/15S.ogg",
+      "prompt": "lima belas es",
+      "sha256": "a0c817aadd533cb4b31ec780e65bde411e4d20bbe62059a6e6167c948d3b716c"
+    },
+    {
+      "file": "rows/1T.ogg",
+      "prompt": "satu té",
+      "sha256": "f9c0eb5db0e8889c8b18d856d54e109560fff81819d83f1cd528d4b098598280"
+    },
+    {
+      "file": "rows/2T.ogg",
+      "prompt": "dua té",
+      "sha256": "27f430452549e6ad574dcbf27c63b99ed63534c42762a42ed8a2f7d7e355ad12"
+    },
+    {
+      "file": "rows/3T.ogg",
+      "prompt": "tiga té",
+      "sha256": "4bd9bcc1afcdee3c9781d6068c3c5e86278daee87accecd770ab7d8cd88526db"
+    },
+    {
+      "file": "rows/4T.ogg",
+      "prompt": "empat té",
+      "sha256": "9b3bb812ac70be90ff9ea49eee760d5e47d1adf9a5ea09d15d69a67e8686104f"
+    },
+    {
+      "file": "rows/5T.ogg",
+      "prompt": "lima té",
+      "sha256": "c44bbe8945baa52cd70a2cd5c6eaeff01247966d021c101b4e3798fb92bbd44a"
+    },
+    {
+      "file": "rows/6T.ogg",
+      "prompt": "enam té",
+      "sha256": "ba0e8fcc93be6184e61fcf2bc6fe5df1d6291ef9f26aac3fbe8d6309d90d0851"
+    },
+    {
+      "file": "rows/7T.ogg",
+      "prompt": "tujuh té",
+      "sha256": "9a4ad8ce951e207bdc09c72caf7e52271cfa1984829d04ea4422ac71effaa724"
+    },
+    {
+      "file": "rows/8T.ogg",
+      "prompt": "delapan té",
+      "sha256": "78ba89adc8cd0b1b6d0e7f9db616046e90b3a6ee0887420c21a0b4f03e805a60"
+    },
+    {
+      "file": "rows/9T.ogg",
+      "prompt": "sembilan té",
+      "sha256": "cc7ba55ed314f7d5b771da9f08c3674af5712e86ae595f34b4d89a82c472fcf6"
+    },
+    {
+      "file": "rows/10T.ogg",
+      "prompt": "sepuluh té",
+      "sha256": "5eaa1b845765ba5e68fae079e8492be8560be09bf1fb5e6bd5c7986956cd7230"
+    },
+    {
+      "file": "rows/11T.ogg",
+      "prompt": "sebelas té",
+      "sha256": "cd694ad85b8206d6a665df9c7ccca4981501bdeeddab2f049344d83eb714c365"
+    },
+    {
+      "file": "rows/12T.ogg",
+      "prompt": "dua belas té",
+      "sha256": "987f34cf922d88f134c1be2f1087ece512ae51a313bcf0bb7d5dc5f7d4983360"
+    },
+    {
+      "file": "rows/13T.ogg",
+      "prompt": "tiga belas té",
+      "sha256": "fe18edaadf3fe5daa7e90e21133416b8d446c187a0d633df382df626bb0c8c37"
+    },
+    {
+      "file": "rows/14T.ogg",
+      "prompt": "empat belas té",
+      "sha256": "0c2bd076162db4e51de12a8b7ecb47445ba4710c3c7d9f425bc2413cd81f7eab"
+    },
+    {
+      "file": "rows/15T.ogg",
+      "prompt": "lima belas té",
+      "sha256": "b8dd337428ba828923581e4e91b792239bb311706be1d96b32981da29bbcd031"
+    },
+    {
+      "file": "rows/1U.ogg",
+      "prompt": "satu u",
+      "sha256": "65f87488135819c7abbbdba9eb8858ddf815f77bc56998383aae7b52fb05f1ee"
+    },
+    {
+      "file": "rows/2U.ogg",
+      "prompt": "dua u",
+      "sha256": "98a49250fe29943f3120058d2a6ac9640d2f7915896a85d85bee751b426bf480"
+    },
+    {
+      "file": "rows/3U.ogg",
+      "prompt": "tiga u",
+      "sha256": "62b5364913148a0d1ac9ebed9824cef6b004e77dda8e8902eae459be234b2e4e"
+    },
+    {
+      "file": "rows/4U.ogg",
+      "prompt": "empat u",
+      "sha256": "b77378c32262e0b43e22c144586865ff64d9d60ebb2bf4361ca961619cc37f1d"
+    },
+    {
+      "file": "rows/5U.ogg",
+      "prompt": "lima u",
+      "sha256": "eef31dd4d4e7f3be97980ce476ea374d3d09b744bee999da28ef8c1ac40051f0"
+    },
+    {
+      "file": "rows/6U.ogg",
+      "prompt": "enam u",
+      "sha256": "806db0d3ad06e00af73a991ddf63e8e3caca8c8a9aec78ea4f0a544d02dc56c2"
+    },
+    {
+      "file": "rows/7U.ogg",
+      "prompt": "tujuh u",
+      "sha256": "d406cc67bcf2211e2e41e162c8bd4bd5c49fce3be3e7ea4e95c3f31b24aa8937"
+    },
+    {
+      "file": "rows/8U.ogg",
+      "prompt": "delapan u",
+      "sha256": "40ebeffaa75f99c0c344a34e3c4c6f6fa3cd4037d03ddd384d3b008ca0d983f9"
+    },
+    {
+      "file": "rows/9U.ogg",
+      "prompt": "sembilan u",
+      "sha256": "4fc3e2715d06d345dab85b327a5de75d8c05e36e885bfe39ff5f58750276d0dc"
+    },
+    {
+      "file": "rows/10U.ogg",
+      "prompt": "sepuluh u",
+      "sha256": "880d9eeb3b9b1ef903588b1728477b0cd6a24c3effd3282942f24e06ffef754a"
+    },
+    {
+      "file": "rows/11U.ogg",
+      "prompt": "sebelas u",
+      "sha256": "0ea9da6e1d49bfe1477383070f4d1d3dd41020880dbee50d408f18dadd628db2"
+    },
+    {
+      "file": "rows/12U.ogg",
+      "prompt": "dua belas u",
+      "sha256": "45ebdb27cd62aec6aeec1fa9d7f128e79f01c20ed2658ef3980516e6b71fed5c"
+    },
+    {
+      "file": "rows/13U.ogg",
+      "prompt": "tiga belas u",
+      "sha256": "fb8ff1ef3a76f540e0ea3dd6311d4a19f5594ed3139c795254dfde329e1fbc40"
+    },
+    {
+      "file": "rows/14U.ogg",
+      "prompt": "empat belas u",
+      "sha256": "569f3cf5a2097402e540b63443a7ddc2470ff3a93309b1c79f10c3ff657639ca"
+    },
+    {
+      "file": "rows/15U.ogg",
+      "prompt": "lima belas u",
+      "sha256": "530755e1a673da2a1d863d932bb78c5cf88d6150492ab5b0f0808b2a20a82182"
+    },
+    {
+      "file": "rows/1V.ogg",
+      "prompt": "satu vé",
+      "sha256": "b51b5da446af1d3777a5692c63f87016f2de800f09c0d414c6956190ae64c9e4"
+    },
+    {
+      "file": "rows/2V.ogg",
+      "prompt": "dua vé",
+      "sha256": "6391c87ed1f1a26fc59bc6d98918e5e0852a2b1f693166448c3b65882b927ac8"
+    },
+    {
+      "file": "rows/3V.ogg",
+      "prompt": "tiga vé",
+      "sha256": "ddb0f9d05c34a13b23d27fa32c2df90f0ecb7b6aa6dfd76dfb2b27de1bbb59ea"
+    },
+    {
+      "file": "rows/4V.ogg",
+      "prompt": "empat vé",
+      "sha256": "bbff058dff587b9cc6cc2911a8598221dc63a552de9fe76b06587f558c4d24bb"
+    },
+    {
+      "file": "rows/5V.ogg",
+      "prompt": "lima vé",
+      "sha256": "9629f0d587152251f1076039295f91de60bfffe1b2d651cace02e27c8b0a6b86"
+    },
+    {
+      "file": "rows/6V.ogg",
+      "prompt": "enam vé",
+      "sha256": "f7d9106ef6fce7480a4678c04b5b9293a32ad82732e9ed86bb362ed60066265f"
+    },
+    {
+      "file": "rows/7V.ogg",
+      "prompt": "tujuh vé",
+      "sha256": "6db2c0b700dd58724f562743079af05fd069d74c85484b11e1fc95825500e4ec"
+    },
+    {
+      "file": "rows/8V.ogg",
+      "prompt": "delapan vé",
+      "sha256": "fbd1f3be1f0ab200ac6f1f8e422acdeb628028153d05c8d7c3f109795863d06f"
+    },
+    {
+      "file": "rows/9V.ogg",
+      "prompt": "sembilan vé",
+      "sha256": "c5b1974fe1706865ff39eec66330f2633c265b842a8569c307f882067032c96f"
+    },
+    {
+      "file": "rows/10V.ogg",
+      "prompt": "sepuluh vé",
+      "sha256": "b5ffb1980aacc947aa8530b9994aa3937484f3fc2792feda1b4fab863669903d"
+    },
+    {
+      "file": "rows/11V.ogg",
+      "prompt": "sebelas vé",
+      "sha256": "519f70b8778e261ab86e17910e562c05a55fee1ff37dd60bfea5fa914daeee43"
+    },
+    {
+      "file": "rows/12V.ogg",
+      "prompt": "dua belas vé",
+      "sha256": "7a1f57a4bc5c113c74f4b70a9d3243ae1ea7ceb531e3b2123f87b061c909e2c6"
+    },
+    {
+      "file": "rows/13V.ogg",
+      "prompt": "tiga belas vé",
+      "sha256": "27c40e3d91fcab0d3edf8d5d6c357b4af0c9c150b68610bd3dd0188f6b36b0aa"
+    },
+    {
+      "file": "rows/14V.ogg",
+      "prompt": "empat belas vé",
+      "sha256": "0a59525e2cb88f0481b0535fea0b829082165bb28a6ff2b65fb63af7b68702e7"
+    },
+    {
+      "file": "rows/15V.ogg",
+      "prompt": "lima belas vé",
+      "sha256": "42be02c809be4cc02675656fe2048ec1ca85010d832c4301e22a06b663dda575"
+    },
+    {
+      "file": "rows/1W.ogg",
+      "prompt": "satu wé",
+      "sha256": "6998c4a5e48c6824a4bb41bcc318b2588c33fb0c0839c7f343f67ca296e7f564"
+    },
+    {
+      "file": "rows/2W.ogg",
+      "prompt": "dua wé",
+      "sha256": "2b8cf2ea5fcbdae13d35647283f71ba3cb05d516cadb8f643fbc5e41a9da2580"
+    },
+    {
+      "file": "rows/3W.ogg",
+      "prompt": "tiga wé",
+      "sha256": "e2795d95ab508ab91fd1314730848a5449331b48953ce6d9b61626dbe9a7af65"
+    },
+    {
+      "file": "rows/4W.ogg",
+      "prompt": "empat wé",
+      "sha256": "c14602b5d8722443d69be4114f964cce17226c36aa540d0fbfa15d4ffb581f14"
+    },
+    {
+      "file": "rows/5W.ogg",
+      "prompt": "lima wé",
+      "sha256": "81b7c2d11c237c9c18dc8170e02ff4276a6dd90ecf7c043d66799e2e4c0a7c38"
+    },
+    {
+      "file": "rows/6W.ogg",
+      "prompt": "enam wé",
+      "sha256": "ef494771c638e19e9b0720a12309fd9cd1793e3d68cf45731f04bfa61dbcc0ee"
+    },
+    {
+      "file": "rows/7W.ogg",
+      "prompt": "tujuh wé",
+      "sha256": "08464f592a6f6916892798a08d1264c4491d14c026d47c1d2d55cdae72399add"
+    },
+    {
+      "file": "rows/8W.ogg",
+      "prompt": "delapan wé",
+      "sha256": "c825a709c8818c36ecd82bccd115d7a03c75fb5f18c91034a6ea7a09fa8b4bbb"
+    },
+    {
+      "file": "rows/9W.ogg",
+      "prompt": "sembilan wé",
+      "sha256": "f279ea64c887a86b3d4ad8f4b99b2372a09d6aef48a150f0218a7ec965d0ab79"
+    },
+    {
+      "file": "rows/10W.ogg",
+      "prompt": "sepuluh wé",
+      "sha256": "fd8912c3aa949ef960487fcf9054148e7f2a79d727c1a4fa9a80553c823ab019"
+    },
+    {
+      "file": "rows/11W.ogg",
+      "prompt": "sebelas wé",
+      "sha256": "4476baf5bc9c85205e2f66f666cb8d3f6b9a23ec561cfeb5cd82373a8f875622"
+    },
+    {
+      "file": "rows/12W.ogg",
+      "prompt": "dua belas wé",
+      "sha256": "6358aa0fac92ec6f2cbcbdbc04e53e65010441663c211c63cc0c634d0c9af102"
+    },
+    {
+      "file": "rows/13W.ogg",
+      "prompt": "tiga belas wé",
+      "sha256": "b3802435f356f70c6f6928300de4d4ed04a3536314a7db849c41d4d231f82f5a"
+    },
+    {
+      "file": "rows/14W.ogg",
+      "prompt": "empat belas wé",
+      "sha256": "2379ed1e653f2859c0601a8d40677d96fcf77f55c1b0c6c21220d5077c1336b6"
+    },
+    {
+      "file": "rows/15W.ogg",
+      "prompt": "lima belas wé",
+      "sha256": "c03b8caa8de4373efc973effc6ec57f8c7b3b769886b2764a2cc5e21e6a9ee97"
+    },
+    {
+      "file": "rows/1X.ogg",
+      "prompt": "satu eks",
+      "sha256": "9c8faee5b9f3ccaa1e1d7002cad23d3c29887d89aaafbaff8d2170a059d88e2c"
+    },
+    {
+      "file": "rows/2X.ogg",
+      "prompt": "dua eks",
+      "sha256": "505ef2a68aea4c47eee773d9ad2c19ba7ea7f6beb41b168c5c12ed7258874521"
+    },
+    {
+      "file": "rows/3X.ogg",
+      "prompt": "tiga eks",
+      "sha256": "2505a3162c29d2b407847082513c777fa96974349cb96afec1ec489c272bb69d"
+    },
+    {
+      "file": "rows/4X.ogg",
+      "prompt": "empat eks",
+      "sha256": "0c702a1a4cc9ac1580572de10b338d5dd20c872de664ae18e225de26d9a66646"
+    },
+    {
+      "file": "rows/5X.ogg",
+      "prompt": "lima eks",
+      "sha256": "b50b7275accb6e1c2155ee8f02ec0f9de2383be962a8a436565a8c5951788848"
+    },
+    {
+      "file": "rows/6X.ogg",
+      "prompt": "enam eks",
+      "sha256": "9653783aba908ed9620251fa4088de2c6f4deafc2f696ab5ba13fc8772584461"
+    },
+    {
+      "file": "rows/7X.ogg",
+      "prompt": "tujuh eks",
+      "sha256": "f7e3c83a212f0bcc5ff039f1954c49213952b34e1de118f699ba021d9169c60e"
+    },
+    {
+      "file": "rows/8X.ogg",
+      "prompt": "delapan eks",
+      "sha256": "660f859b81a0aca26c26edcfdd157540697b269fc4b92e9aa2648baaf44611c3"
+    },
+    {
+      "file": "rows/9X.ogg",
+      "prompt": "sembilan eks",
+      "sha256": "0a1eeea52fbd222e6027ea0b8cda1313c590d89a4f6139aa20e04be589ef6905"
+    },
+    {
+      "file": "rows/10X.ogg",
+      "prompt": "sepuluh eks",
+      "sha256": "f1d9835489ab99837ba8e14ede6c48c42c1642c82ffb18bb7294e19726ddbfbd"
+    },
+    {
+      "file": "rows/11X.ogg",
+      "prompt": "sebelas eks",
+      "sha256": "c3ac44835e080bbe7578908fe141f48959e52cadff386a3f9b2b4b3e88c0662a"
+    },
+    {
+      "file": "rows/12X.ogg",
+      "prompt": "dua belas eks",
+      "sha256": "af8024617e7d98978a03685d10139a7f3cdee2023cb64d1a22580a17ef9de375"
+    },
+    {
+      "file": "rows/13X.ogg",
+      "prompt": "tiga belas eks",
+      "sha256": "fbd024f3b648010a14958c8dc9500326e3996ab1654fcd4e2fcf33cdc26c5c0b"
+    },
+    {
+      "file": "rows/14X.ogg",
+      "prompt": "empat belas eks",
+      "sha256": "e973c934c1d94d302ddf175dbcc63d09c72d0617d9f71fd029a51eb36ac6c68d"
+    },
+    {
+      "file": "rows/15X.ogg",
+      "prompt": "lima belas eks",
+      "sha256": "6c8ae4fa4a71fd5779f57e048f2fd6ba62096242f7f52dcdb9601232cd483584"
+    },
+    {
+      "file": "rows/1Y.ogg",
+      "prompt": "satu yé",
+      "sha256": "05233160655d66cefce2a69afbf601072cb25f338fa54fd267c4ce364835ffdf"
+    },
+    {
+      "file": "rows/2Y.ogg",
+      "prompt": "dua yé",
+      "sha256": "88f6a40f35d5500562f2135ea86149161d29b71148b7a93d9335029361791dda"
+    },
+    {
+      "file": "rows/3Y.ogg",
+      "prompt": "tiga yé",
+      "sha256": "0226da23c8ff02b5e15b9f31cd047f9e6fbae7d33a78654b30f0bc3fcee83090"
+    },
+    {
+      "file": "rows/4Y.ogg",
+      "prompt": "empat yé",
+      "sha256": "90fea3bfa44634426f7d16208495bd677e600c05427cf486f3733232751de77f"
+    },
+    {
+      "file": "rows/5Y.ogg",
+      "prompt": "lima yé",
+      "sha256": "56018b2c9b651a11ce38ca34a8b1511094ee71d249a688e127d0bf72bb9f3e36"
+    },
+    {
+      "file": "rows/6Y.ogg",
+      "prompt": "enam yé",
+      "sha256": "d7a1e8e5def6063d7d5bdffd0fc5df1566832ec4ebe198d8765df141ee55981f"
+    },
+    {
+      "file": "rows/7Y.ogg",
+      "prompt": "tujuh yé",
+      "sha256": "cc1862b52aba75aad2727ad6e4f966b8c8a2d7ee7a6b7e5fc55afdb8fc4fe735"
+    },
+    {
+      "file": "rows/8Y.ogg",
+      "prompt": "delapan yé",
+      "sha256": "9c1d00f18760408fa12c4206173130768472bc215a700d35ccf91db24da3d425"
+    },
+    {
+      "file": "rows/9Y.ogg",
+      "prompt": "sembilan yé",
+      "sha256": "a923eea609b0d30759bef916fa98fd21e3f898211ada0144f773cfcf853edd8c"
+    },
+    {
+      "file": "rows/10Y.ogg",
+      "prompt": "sepuluh yé",
+      "sha256": "bc31394ac173f06166ee0ae91b1e9c3b6509356486bbc2d749c9cc5bf1020a91"
+    },
+    {
+      "file": "rows/11Y.ogg",
+      "prompt": "sebelas yé",
+      "sha256": "7619c1d23eae5062288a891ded0bf64edb07681e0950eacda84893390ae5bc6c"
+    },
+    {
+      "file": "rows/12Y.ogg",
+      "prompt": "dua belas yé",
+      "sha256": "f20eab46c203a53beb87ddf711c291db57aa0536af32fd77d2a9200048164199"
+    },
+    {
+      "file": "rows/13Y.ogg",
+      "prompt": "tiga belas yé",
+      "sha256": "07a1d8bc5f1e876a0189e8d3732ee3415d4c7837f2c3ee2348cf2a9b1db072cf"
+    },
+    {
+      "file": "rows/14Y.ogg",
+      "prompt": "empat belas yé",
+      "sha256": "cec69358fa6dd1763498f0794b26c6b471e860f0ec9d090c649670b6aba835ff"
+    },
+    {
+      "file": "rows/15Y.ogg",
+      "prompt": "lima belas yé",
+      "sha256": "16de23c10577935cfa59c5decc742ddbc091e3002ad8b6c69e8873308a40cbb9"
+    },
+    {
+      "file": "rows/1Z.ogg",
+      "prompt": "satu zet",
+      "sha256": "685afde0770de565f84e1d0c12455665613aa7425c09ff48e671b504dcffc645"
+    },
+    {
+      "file": "rows/2Z.ogg",
+      "prompt": "dua zet",
+      "sha256": "637da9b1583f646d3b045553ada36f4235acdd5e3604075f2cf6a9bf159002aa"
+    },
+    {
+      "file": "rows/3Z.ogg",
+      "prompt": "tiga zet",
+      "sha256": "b510fb6bb343b845b74797cd227e976f9b57eeb03d5ab896fa69cfc02492c824"
+    },
+    {
+      "file": "rows/4Z.ogg",
+      "prompt": "empat zet",
+      "sha256": "86d570a4b68bbbc2a95df316ddaf67450022a6662a4a3e958e66f089f1880b9b"
+    },
+    {
+      "file": "rows/5Z.ogg",
+      "prompt": "lima zet",
+      "sha256": "122e132107ca46da675aac91e4ad397630c7b0978dd19a9515429d415a3ae0c6"
+    },
+    {
+      "file": "rows/6Z.ogg",
+      "prompt": "enam zet",
+      "sha256": "f23d17539c294b0340acff07be51058b9a666f0bb4b6ad491590b393215b7f44"
+    },
+    {
+      "file": "rows/7Z.ogg",
+      "prompt": "tujuh zet",
+      "sha256": "5723bd0d28cbc6a89e361bb24441ef60b2cc25375a79160f83041382e2cee8d2"
+    },
+    {
+      "file": "rows/8Z.ogg",
+      "prompt": "delapan zet",
+      "sha256": "b643b839638a14d04e8ced4bb5292b417d25d25a296120fe864d18746092595a"
+    },
+    {
+      "file": "rows/9Z.ogg",
+      "prompt": "sembilan zet",
+      "sha256": "3aff074bc355a5002d9fe9e3cc284c87c25147dd6926da4e243cbe4be768b917"
+    },
+    {
+      "file": "rows/10Z.ogg",
+      "prompt": "sepuluh zet",
+      "sha256": "12fc4ec4176fa2231c4cf3bd9c3b46062546649d447a3e6340815ce207dabfe3"
+    },
+    {
+      "file": "rows/11Z.ogg",
+      "prompt": "sebelas zet",
+      "sha256": "6dd82bf8f403788bf8a8aae0c2e8a4e6efb7efec95f5bc6494cfd98111c98182"
+    },
+    {
+      "file": "rows/12Z.ogg",
+      "prompt": "dua belas zet",
+      "sha256": "fe303fc3d9d8837c0ca76d3fefe210e14bd55903ab6697bf407fb0eaf3a24880"
+    },
+    {
+      "file": "rows/13Z.ogg",
+      "prompt": "tiga belas zet",
+      "sha256": "b8366a6ae8c3b4c76a2acaccda16ae2bb6613e7db872176b8e2537c36d225ced"
+    },
+    {
+      "file": "rows/14Z.ogg",
+      "prompt": "empat belas zet",
+      "sha256": "21c9e314e373260139eb1a716f15eda5fead76cd9847603550ee20ca4df55698"
+    },
+    {
+      "file": "rows/15Z.ogg",
+      "prompt": "lima belas zet",
+      "sha256": "10d2e73a3371560c85ddbb8bd3e2619109458736867c85388442de08c674b804"
+    },
+    {
+      "file": "rows/1AA.ogg",
+      "prompt": "satu a a",
+      "sha256": "879e737d5faf179a5047c28ebf1b326a9d67a9038fc3caf72843ce29d08f260a"
+    },
+    {
+      "file": "rows/2AA.ogg",
+      "prompt": "dua a a",
+      "sha256": "d2697b8b981d2ee192b3311cd8b4953ad30d2e778e8edecdb92427520c21810b"
+    },
+    {
+      "file": "rows/3AA.ogg",
+      "prompt": "tiga a a",
+      "sha256": "3e024e21a82d5551d49608a4102aca336ca39eee21f4e675d7ad017f129e501c"
+    },
+    {
+      "file": "rows/4AA.ogg",
+      "prompt": "empat a a",
+      "sha256": "e84a1a52bd25b55312889f7d82442807ab6bd67acccb3af9e53aff49c4c4215e"
+    },
+    {
+      "file": "rows/5AA.ogg",
+      "prompt": "lima a a",
+      "sha256": "0efda1499dc9f65a4ba9e2503c1fd979813ca850cd305c0520dff560a2c0f830"
+    },
+    {
+      "file": "rows/6AA.ogg",
+      "prompt": "enam a a",
+      "sha256": "645ffb757dfad73166b76a09e7b9f722734c5becefd9cd44219455cee119daf8"
+    },
+    {
+      "file": "rows/7AA.ogg",
+      "prompt": "tujuh a a",
+      "sha256": "60f800fbf077f2d9c580b40b1ce1deb8cd3341812f8294ee34ace11566571224"
+    },
+    {
+      "file": "rows/8AA.ogg",
+      "prompt": "delapan a a",
+      "sha256": "e64c75e7e846cdeb74db97ae9990654d10740153b620867e2d9c4658f562a042"
+    },
+    {
+      "file": "rows/9AA.ogg",
+      "prompt": "sembilan a a",
+      "sha256": "87a62b44a47d41090f12878b9f76176e4fb7c400af599ed3d042b5a6de6620c2"
+    },
+    {
+      "file": "rows/10AA.ogg",
+      "prompt": "sepuluh a a",
+      "sha256": "55d5fd4135fe16d021f08f81e34574260b08163b3dee9bac9a22df2783077822"
+    },
+    {
+      "file": "rows/11AA.ogg",
+      "prompt": "sebelas a a",
+      "sha256": "9ac1a94494a427b1bc156292c790befb384c12bf78d02313662d76582050bafc"
+    },
+    {
+      "file": "rows/12AA.ogg",
+      "prompt": "dua belas a a",
+      "sha256": "1cb504abbd4652d6bb1ffb75a6bde66917229375e4219519c1893d488a3d3577"
+    },
+    {
+      "file": "rows/13AA.ogg",
+      "prompt": "tiga belas a a",
+      "sha256": "c15bbd90bbb245c52afa7ae365c370ca464c13f0928a722af7656a4409ee7ff7"
+    },
+    {
+      "file": "rows/14AA.ogg",
+      "prompt": "empat belas a a",
+      "sha256": "63b38090f43cf7bb425e727196b40a83f6514fe369910971fb0f1b8f96c9079e"
+    },
+    {
+      "file": "rows/15AA.ogg",
+      "prompt": "lima belas a a",
+      "sha256": "b7af397168c65d0120df3d47978fa433a9c3b909adca4c7558a0cf719a7116bc"
+    },
+    {
+      "file": "quantities/pcs/1.ogg",
+      "prompt": "satu picis",
+      "sha256": "877e4603faf78b2b85e27eaa892ac8a6407572d1f5c114244e24ca4b07125962"
+    },
+    {
+      "file": "quantities/pcs/2.ogg",
+      "prompt": "dua picis",
+      "sha256": "8bc786de8656b230951d4a49d3a6f0a040346b848d6df536a88d25c7206c4ba4"
+    },
+    {
+      "file": "quantities/pcs/3.ogg",
+      "prompt": "tiga picis",
+      "sha256": "7cfae8a154254a99abd9bdf6fa136ed2bdb9f4b2f9b8e04d8ad9c051ba2e53cc"
+    },
+    {
+      "file": "quantities/pcs/4.ogg",
+      "prompt": "empat picis",
+      "sha256": "f77ec664750c7daa8c46523ef04d490189cfce85f014f576683441e6ecfe56bd"
+    },
+    {
+      "file": "quantities/pcs/5.ogg",
+      "prompt": "lima picis",
+      "sha256": "de31045dda9f0b2293857b7a3c988579f88498a19740a02b9260cc6a0c0475f4"
+    },
+    {
+      "file": "quantities/pcs/6.ogg",
+      "prompt": "enam picis",
+      "sha256": "354c4836c0dd2e0d0eec924513636ff29b4821c9633b40ed6d6f13930474f565"
+    },
+    {
+      "file": "quantities/pcs/7.ogg",
+      "prompt": "tujuh picis",
+      "sha256": "d671ff022191f7b93974ada7b3c8e1188baebb3efcd9712308d2f8ad93eb8db2"
+    },
+    {
+      "file": "quantities/pcs/8.ogg",
+      "prompt": "delapan picis",
+      "sha256": "eff4a036ff3e7e447ba1bdf77f1c45302f8ab650b7e24d2fdc2c9e52cbb1d7d8"
+    },
+    {
+      "file": "quantities/pcs/9.ogg",
+      "prompt": "sembilan picis",
+      "sha256": "fb288f693dace70951d75260d1dfc0fe5055394bac5d04656c81dcbab8ab718e"
+    },
+    {
+      "file": "quantities/pcs/10.ogg",
+      "prompt": "sepuluh picis",
+      "sha256": "4fe529bbea36a5ef63dfbb3b7fae6b6e3c9d80153ef406534a2010b4eba32079"
+    },
+    {
+      "file": "quantities/pcs/11.ogg",
+      "prompt": "sebelas picis",
+      "sha256": "26848339dd2886bc36b35613689131a42172030584d2f240e9842371901f64e7"
+    },
+    {
+      "file": "quantities/pcs/12.ogg",
+      "prompt": "dua belas picis",
+      "sha256": "99b5b64e5e7f6761a2eb3b18301950aafc065a935bf2778ba4b1bec7929212c9"
+    },
+    {
+      "file": "quantities/pcs/13.ogg",
+      "prompt": "tiga belas picis",
+      "sha256": "4c1ea6110a33a00f02e0b7a457b8bf18644ecd121240009439e3c4d814dbefb3"
+    },
+    {
+      "file": "quantities/pcs/14.ogg",
+      "prompt": "empat belas picis",
+      "sha256": "16867a4b86fccb148f4428bec5a20319ca70f873e62f6fd91c100da563d2d76f"
+    },
+    {
+      "file": "quantities/pcs/15.ogg",
+      "prompt": "lima belas picis",
+      "sha256": "4953b2faaa8fdcf845a8b754c9445edaa130455e02527b2495577e91b5bba075"
+    },
+    {
+      "file": "quantities/pcs/16.ogg",
+      "prompt": "enam belas picis",
+      "sha256": "e6c4e1d173d5126785acb880eb50af68c4ec968691264c8abb9afc0064beb8f9"
+    },
+    {
+      "file": "quantities/pcs/17.ogg",
+      "prompt": "tujuh belas picis",
+      "sha256": "8553f1fb237c4699c6355a6a67ab406ede55fb4091a6c1eb7f8fc935873027ca"
+    },
+    {
+      "file": "quantities/pcs/18.ogg",
+      "prompt": "delapan belas picis",
+      "sha256": "8a61df0e122d21735df7ac22e074f5854d16ec705d1ba8e64aeff6e681741e4c"
+    },
+    {
+      "file": "quantities/pcs/19.ogg",
+      "prompt": "sembilan belas picis",
+      "sha256": "2e8e8620bbf0f6aa61a6ab0a619d7bc4a9445e03673829454f125ee1f25e7093"
+    },
+    {
+      "file": "quantities/pcs/20.ogg",
+      "prompt": "dua puluh picis",
+      "sha256": "87efbb6e24d0fe365122c7e419a450551a0a1a00b8244bf4f1c6f98dcd85bbff"
+    },
+    {
+      "file": "quantities/pcs/21.ogg",
+      "prompt": "dua puluh satu picis",
+      "sha256": "6235b6647422d830564a94e1694bdf3d4b56513e3aa9de8cbabf89881432db8e"
+    },
+    {
+      "file": "quantities/pcs/22.ogg",
+      "prompt": "dua puluh dua picis",
+      "sha256": "64b5446631a7befa3aad424b17bf441f303b1b05215ef60d62e0d8cc9a6fa341"
+    },
+    {
+      "file": "quantities/pcs/23.ogg",
+      "prompt": "dua puluh tiga picis",
+      "sha256": "f906a2e5a9e52190f9e283bef72124aa7c3542380e3b5930419ffe76f10f4b82"
+    },
+    {
+      "file": "quantities/pcs/24.ogg",
+      "prompt": "dua puluh empat picis",
+      "sha256": "45cf03af3d4b381b53314926f67e1ac9d67dc38d99efcce0aaadb1c9aba5ba49"
+    },
+    {
+      "file": "quantities/pcs/25.ogg",
+      "prompt": "dua puluh lima picis",
+      "sha256": "df7718ca1040d1f9df61a03cf627e7664af414ddcc2394cd1800393a7d7ef9a0"
+    },
+    {
+      "file": "quantities/pcs/26.ogg",
+      "prompt": "dua puluh enam picis",
+      "sha256": "aa526b100084d40914bffafa1c73fafd479f76acf4c809564ff44fc8e48aab92"
+    },
+    {
+      "file": "quantities/pcs/27.ogg",
+      "prompt": "dua puluh tujuh picis",
+      "sha256": "355e2d5aba2a3623423c08406f0cd11c135f9ba51d957df971ae2f60660ceecf"
+    },
+    {
+      "file": "quantities/pcs/28.ogg",
+      "prompt": "dua puluh delapan picis",
+      "sha256": "67fc34bf461b85d8db62352b0153c8ebe1a6561cd31ad4ab0728f8a951c269fa"
+    },
+    {
+      "file": "quantities/pcs/29.ogg",
+      "prompt": "dua puluh sembilan picis",
+      "sha256": "40999774aa1ff91ae78f4ee55cb14f63e52b41ec84a7ea1f51bd4b076b11c170"
+    },
+    {
+      "file": "quantities/pcs/30.ogg",
+      "prompt": "tiga puluh picis",
+      "sha256": "7c4344b0a6c9b65570b36f21a518513ea5ed56719953009ef07dbf7c390ae771"
+    },
+    {
+      "file": "quantities/pcs/31.ogg",
+      "prompt": "tiga puluh satu picis",
+      "sha256": "caf19fde8e76f098ad9641102f3c9f3bf39513c3d5e2dd063dd4b35737f8e967"
+    },
+    {
+      "file": "quantities/pcs/32.ogg",
+      "prompt": "tiga puluh dua picis",
+      "sha256": "9045580dc3e6b85d87679e312e3d1bf479c1bc6e110d236c83d7f687f5c4520a"
+    },
+    {
+      "file": "quantities/pcs/33.ogg",
+      "prompt": "tiga puluh tiga picis",
+      "sha256": "7b8d26eed0dd0d8ef99ce39ec8a922c9405c1fa3c0688957b25dc2400a7558da"
+    },
+    {
+      "file": "quantities/pcs/34.ogg",
+      "prompt": "tiga puluh empat picis",
+      "sha256": "d7b474468df3678e7601af309084c37a11ed746ad51b5299019fcd85e7ea3635"
+    },
+    {
+      "file": "quantities/pcs/35.ogg",
+      "prompt": "tiga puluh lima picis",
+      "sha256": "d5de31241279747314fa79a1ec7836c8446b41e29be89ab70b18dc8e24782573"
+    },
+    {
+      "file": "quantities/pcs/36.ogg",
+      "prompt": "tiga puluh enam picis",
+      "sha256": "84ff5d9c647ca08bb5026f5e4aa574d0fafdde210c1bdf0d7276737db8a6c1cb"
+    },
+    {
+      "file": "quantities/pcs/37.ogg",
+      "prompt": "tiga puluh tujuh picis",
+      "sha256": "6d5427df9ad700ef0885ba3c341020d591300f84fd9ccaae7cbcf98c692e86db"
+    },
+    {
+      "file": "quantities/pcs/38.ogg",
+      "prompt": "tiga puluh delapan picis",
+      "sha256": "3f9b4aff378f6a7f179a339927725f60f84f8eeb46ba86c9fa48a0c6031d76bd"
+    },
+    {
+      "file": "quantities/pcs/39.ogg",
+      "prompt": "tiga puluh sembilan picis",
+      "sha256": "d4235d21a923c8cdbc0460cea5beb672936369c4d7de0f7152f098b3d6f82e41"
+    },
+    {
+      "file": "quantities/pcs/40.ogg",
+      "prompt": "empat puluh picis",
+      "sha256": "9ff4040fd8370c57db6e6ad836b6e2c9363b0d57f24c53ca7c28eaf1ac9afcb5"
+    },
+    {
+      "file": "quantities/pcs/41.ogg",
+      "prompt": "empat puluh satu picis",
+      "sha256": "65ab93dad7326f10608552643ccc10d284a95ef03466200743b4b20e9d4c4374"
+    },
+    {
+      "file": "quantities/pcs/42.ogg",
+      "prompt": "empat puluh dua picis",
+      "sha256": "9f5f4bb9c991ca93b7ffed092de73b3664fe5901452a6596b36c27a43196c73f"
+    },
+    {
+      "file": "quantities/pcs/43.ogg",
+      "prompt": "empat puluh tiga picis",
+      "sha256": "41a8d8c7d8c706ec61669a1a8b65366948f30b75e96ea64a5ff813c2b1eca7cb"
+    },
+    {
+      "file": "quantities/pcs/44.ogg",
+      "prompt": "empat puluh empat picis",
+      "sha256": "2167ee0d993443fb9e829644472e458a2f24bb884266efe23e7b86693c248507"
+    },
+    {
+      "file": "quantities/pcs/45.ogg",
+      "prompt": "empat puluh lima picis",
+      "sha256": "c068c510bca056fb84cfdb6096130c67c406c679b5cdf68be528380c90631e83"
+    },
+    {
+      "file": "quantities/pcs/46.ogg",
+      "prompt": "empat puluh enam picis",
+      "sha256": "13fcccf0767eb2cc8364fdfb680e7b017092b5db2702fb9e75be084049acf564"
+    },
+    {
+      "file": "quantities/pcs/47.ogg",
+      "prompt": "empat puluh tujuh picis",
+      "sha256": "181ed87248cb434f257855f65f43a4fbe647a2093e299f0061b63974782fb4a2"
+    },
+    {
+      "file": "quantities/pcs/48.ogg",
+      "prompt": "empat puluh delapan picis",
+      "sha256": "39cd69ae91837f85f94c767f84c130ac6aef561fe690db0647bc896926c3c10a"
+    },
+    {
+      "file": "quantities/lsn/1.ogg",
+      "prompt": "satu lusin",
+      "sha256": "7c19fbd7082c2941ad2ba9052d76757a5c52fb04345824163e64dcd1c65d1740"
+    },
+    {
+      "file": "quantities/lsn/2.ogg",
+      "prompt": "dua lusin",
+      "sha256": "58a69ee5309a7a0051aab7912d37ca09eb8d12a8b609d4c18938f8d32d8e3466"
+    },
+    {
+      "file": "quantities/lsn/3.ogg",
+      "prompt": "tiga lusin",
+      "sha256": "8f3976e959350746891066cebf12fd23f9298830a7be32fb425dfafef6e7920f"
+    },
+    {
+      "file": "quantities/lsn/4.ogg",
+      "prompt": "empat lusin",
+      "sha256": "9b8337fdc046f61bbd903a94e7db163c10c9496f85feff7bbe2f53766f5bf597"
+    },
+    {
+      "file": "quantities/lsn/5.ogg",
+      "prompt": "lima lusin",
+      "sha256": "3b7ab6ab8b21cc4847e46aececaab20e8ec879cf5c16e31df719200adcaed9fa"
+    },
+    {
+      "file": "quantities/lsn/6.ogg",
+      "prompt": "enam lusin",
+      "sha256": "399108273795804c018ca1e1d518af4d4de3a86b9b59870be3c2c06cdbd4ee34"
+    },
+    {
+      "file": "quantities/lsn/7.ogg",
+      "prompt": "tujuh lusin",
+      "sha256": "ecf0a3a327c67faa5a3411e3a3da16c8c01cecba0fd6e5dea21b32a599fa9cbd"
+    },
+    {
+      "file": "quantities/lsn/8.ogg",
+      "prompt": "delapan lusin",
+      "sha256": "89ffff2f524556ffab1da31a9fb9eec933bfea7e3665756fdb130fde2f58a585"
+    },
+    {
+      "file": "quantities/lsn/9.ogg",
+      "prompt": "sembilan lusin",
+      "sha256": "27349897bc7d18543e61aeecfb9f2728cd6934560d3e3eecd4bcb242207e4c6a"
+    },
+    {
+      "file": "quantities/lsn/10.ogg",
+      "prompt": "sepuluh lusin",
+      "sha256": "5e6864dd39d375d667ac5d5520132e7d6f9ad8dcbc753596134c60a0c03530e8"
+    },
+    {
+      "file": "quantities/lsn/11.ogg",
+      "prompt": "sebelas lusin",
+      "sha256": "ead3d596f284bf117b0be52a41fb48fb8c7fe953b69fbaf15273a7490b510d4e"
+    },
+    {
+      "file": "quantities/lsn/12.ogg",
+      "prompt": "dua belas lusin",
+      "sha256": "0e4e0cb1ca4a8ab45e3308e3ae9e97513a77c3de30ecb6f779dd5dd48172c462"
+    },
+    {
+      "file": "quantities/lsn/13.ogg",
+      "prompt": "tiga belas lusin",
+      "sha256": "66530b35d860df9348f0216212c7b2bd6a34315eeba7744df2bf69ee5d55969d"
+    },
+    {
+      "file": "quantities/lsn/14.ogg",
+      "prompt": "empat belas lusin",
+      "sha256": "d039255b3eb2dfd0964a097e898d39aff4663387a2f00322012ab677f6b11941"
+    },
+    {
+      "file": "quantities/lsn/15.ogg",
+      "prompt": "lima belas lusin",
+      "sha256": "02c1a8651c9c006dc22b07b92103a526915070e3bab1d03d7a4889db98c1ccab"
+    },
+    {
+      "file": "quantities/lsn/16.ogg",
+      "prompt": "enam belas lusin",
+      "sha256": "8f795597652a22507ba8c2ce4cc35fe3882c7cdde62bb6774fdf27e41756ea66"
+    },
+    {
+      "file": "quantities/lsn/17.ogg",
+      "prompt": "tujuh belas lusin",
+      "sha256": "923b751653426aa61236110406dcfc5b40e12914e233e39c680c293362989435"
+    },
+    {
+      "file": "quantities/lsn/18.ogg",
+      "prompt": "delapan belas lusin",
+      "sha256": "7c78a79e7cb7c60752fb4038440a32f2aa05c4c5c7c679c38795612ac2bf5c93"
+    },
+    {
+      "file": "quantities/lsn/19.ogg",
+      "prompt": "sembilan belas lusin",
+      "sha256": "77c846771408327a879c8a9d365de40974e343784c5c767635954a00d3ccda5d"
+    },
+    {
+      "file": "quantities/lsn/20.ogg",
+      "prompt": "dua puluh lusin",
+      "sha256": "37ff4482fd73f856deef27a1acbe0b6f9abb99ba17bf75b43a2af4d6f17f8581"
+    },
+    {
+      "file": "quantities/lsn/21.ogg",
+      "prompt": "dua puluh satu lusin",
+      "sha256": "5e0193b28f58d49c68826f93261c2c72b149c10d8bdd73ece5e3eecaffd8674d"
+    },
+    {
+      "file": "quantities/lsn/22.ogg",
+      "prompt": "dua puluh dua lusin",
+      "sha256": "b965276840262f0f893225629c1dbeab455b4b2c3a3b7072900872aa1282387a"
+    },
+    {
+      "file": "quantities/lsn/23.ogg",
+      "prompt": "dua puluh tiga lusin",
+      "sha256": "97fe68c3d5a3b499162a8a3d59746f7f370b0d5d9096c3d6253af764369afd84"
+    },
+    {
+      "file": "quantities/lsn/24.ogg",
+      "prompt": "dua puluh empat lusin",
+      "sha256": "365ad44b500f7cf514512419a2fac18eb57d8c06d9724651d9bea239e4c8ec76"
+    },
+    {
+      "file": "quantities/lsn/25.ogg",
+      "prompt": "dua puluh lima lusin",
+      "sha256": "f917a8ad66642d64af3e35bba2d8f9f9007a7e90a791ce0c3eb755076ce39b4e"
+    },
+    {
+      "file": "quantities/lsn/26.ogg",
+      "prompt": "dua puluh enam lusin",
+      "sha256": "7c191d3390874c1f78a282028092f36b2aa66fc462cb7c180c79ab06adc69a7c"
+    },
+    {
+      "file": "quantities/lsn/27.ogg",
+      "prompt": "dua puluh tujuh lusin",
+      "sha256": "fb6dfca9fd73fd6bc91993abca0c9fa2c4467e2d1b29d822d401de3a7cc50875"
+    },
+    {
+      "file": "quantities/lsn/28.ogg",
+      "prompt": "dua puluh delapan lusin",
+      "sha256": "3fefc9ea00b7446116654a7aa428cbf6bc11f3914ddd3defa7a1d5f2077e2a7a"
+    },
+    {
+      "file": "quantities/lsn/29.ogg",
+      "prompt": "dua puluh sembilan lusin",
+      "sha256": "99eb841641439bdbc792d7e9c9efc36442fe5cc5dd7a167de0809187b4c4d024"
+    },
+    {
+      "file": "quantities/lsn/30.ogg",
+      "prompt": "tiga puluh lusin",
+      "sha256": "67ac4c79723125a5e76791239c71720679bd70f2d12b40497762e165c11e6551"
+    },
+    {
+      "file": "quantities/lsn/31.ogg",
+      "prompt": "tiga puluh satu lusin",
+      "sha256": "bae9ffe156c2b08927c27aac57ed285a10917f51c813d24888efd6be2ed5717a"
+    },
+    {
+      "file": "quantities/lsn/32.ogg",
+      "prompt": "tiga puluh dua lusin",
+      "sha256": "c42c63e391d1546022924507bb6d0c9ce0907f30eda8675f095c3afece97b7c2"
+    },
+    {
+      "file": "quantities/lsn/33.ogg",
+      "prompt": "tiga puluh tiga lusin",
+      "sha256": "f46d2b1a7edb4dac70cb117cdff67b49624e29e567320ac346fb94c14edcc8c5"
+    },
+    {
+      "file": "quantities/lsn/34.ogg",
+      "prompt": "tiga puluh empat lusin",
+      "sha256": "26fe007678c85a11cba458bb4a88615311cadc12631bb43a531afd2ff52c5f9e"
+    },
+    {
+      "file": "quantities/lsn/35.ogg",
+      "prompt": "tiga puluh lima lusin",
+      "sha256": "4abc3ccef3a4df857a79fdbe083007c4cd73dd425409c3655d8200c64422f145"
+    },
+    {
+      "file": "quantities/lsn/36.ogg",
+      "prompt": "tiga puluh enam lusin",
+      "sha256": "a296130755ec7f6bf1cd01cd3a70ad62eb64f55bbec05d6bf5f92d263a188268"
+    },
+    {
+      "file": "quantities/lsn/37.ogg",
+      "prompt": "tiga puluh tujuh lusin",
+      "sha256": "1774eff20c0550225382d30524f00a32c892ceeadcec85dcf5328e7b20f17c3e"
+    },
+    {
+      "file": "quantities/lsn/38.ogg",
+      "prompt": "tiga puluh delapan lusin",
+      "sha256": "3c48fe51af557f43f2b6f5fddb12943d445fa58b04819f0e0dce34112494d64e"
+    },
+    {
+      "file": "quantities/lsn/39.ogg",
+      "prompt": "tiga puluh sembilan lusin",
+      "sha256": "9136e123a1a7b5a71052862c2626c1d2ceb02c473520fcb674a866522d47e6ce"
+    },
+    {
+      "file": "quantities/lsn/40.ogg",
+      "prompt": "empat puluh lusin",
+      "sha256": "a5393c96580481e3f878f64c55def3676f994406f3e200239290be226246fb84"
+    },
+    {
+      "file": "quantities/lsn/41.ogg",
+      "prompt": "empat puluh satu lusin",
+      "sha256": "f640152460eb479fb3befe570bbda6aec679760c7f0046a7343f11303dc6f11e"
+    },
+    {
+      "file": "quantities/lsn/42.ogg",
+      "prompt": "empat puluh dua lusin",
+      "sha256": "794d1ba8b9d549bf519d136d233e6e8cf52dffed6e70f75ba3e26e0b15ea1086"
+    },
+    {
+      "file": "quantities/lsn/43.ogg",
+      "prompt": "empat puluh tiga lusin",
+      "sha256": "8c8c8b509c106b4f4594b37e68549cfc9df22158804502ecd3373db2f1cb2cd6"
+    },
+    {
+      "file": "quantities/lsn/44.ogg",
+      "prompt": "empat puluh empat lusin",
+      "sha256": "8883891a2d9306714c4adc8b14a6bdd68d3846ed71408c30739ea6cc1cfcaf82"
+    },
+    {
+      "file": "quantities/lsn/45.ogg",
+      "prompt": "empat puluh lima lusin",
+      "sha256": "a3a91ce68208ea41cd6a4d85f0b7a9bd32b97aea41f9cb13da95dd842243b7a0"
+    },
+    {
+      "file": "quantities/lsn/46.ogg",
+      "prompt": "empat puluh enam lusin",
+      "sha256": "92e6c55ffdc924bb2f3c8489af16d4a5d1c3c8ad509577d9d30327157aa02a74"
+    },
+    {
+      "file": "quantities/lsn/47.ogg",
+      "prompt": "empat puluh tujuh lusin",
+      "sha256": "e0444e9357cca6ff4bcd9f7493dadbf909d639431683df3010c87ccf7db32790"
+    },
+    {
+      "file": "quantities/lsn/48.ogg",
+      "prompt": "empat puluh delapan lusin",
+      "sha256": "ae029971e665d2825ba6bd0fac3f6fcabe1d14a4b0f047864f23d01d6f812896"
+    }
+  ]
+}

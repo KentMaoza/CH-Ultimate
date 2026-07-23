@@ -22,7 +22,7 @@ Ganti ekspor PDF pada halaman **Rekomendasi Share** desktop dengan aksi berbagi 
    ```text
    Nama Produk
    SKU: NOMOR-SKU
-   Harga referensi: Rp 25.000
+   Harga referensi: Rp25.000
    ```
 
 5. Jika Web Share tersedia dan menerima file, aplikasi membuka Share Sheet sistem dengan gambar serta teks.

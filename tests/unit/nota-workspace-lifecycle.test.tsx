@@ -73,7 +73,7 @@ test('archive module opens completed nota as inline read-only preview without ch
   const revenueBefore = buildRevenueReport(gateway.getSnapshot()).today;
   openArchive(gateway);
 
-  expect(screen.getByText('SELESAI · HANYA LIHAT')).toBeInTheDocument();
+  expect(screen.getByText('ARSIP · HANYA LIHAT')).toBeInTheDocument();
   expect(screen.getByRole('region', { name: 'Preview arsip nota' })).toBeInTheDocument();
   const collapsePreview = screen.getByRole('button', { name: 'Lipat preview nota' });
   expect(collapsePreview).toHaveAttribute('aria-expanded', 'true');
@@ -290,7 +290,7 @@ test('restoring a completed transaction returns to Arsip rather than the working
   fireEvent.click(screen.getByRole('tab', { name: 'Sampah' }));
   fireEvent.click(screen.getByRole('button', { name: 'Pulihkan' }));
   await waitFor(() => expect(screen.getByRole('tab', { name: 'Arsip' })).toHaveAttribute('aria-selected', 'true'));
-  expect(screen.getByText('SELESAI · HANYA LIHAT')).toBeInTheDocument();
+  expect(screen.getByText('ARSIP · HANYA LIHAT')).toBeInTheDocument();
 });
 
 test.each(['draft', 'reopened'] as const)('restoring a cancelled %s transaction selects its working page', async (status) => {
@@ -314,10 +314,9 @@ test('a confirmation never falls back to a newly reset selection', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
   const confirmation = screen.getByRole('dialog', { name: /Selesaikan nota/i });
   await act(async () => { await gateway.reset(); });
-  fireEvent.click(within(confirmation).getByRole('button', { name: 'Selesaikan' }));
-  await waitFor(() => expect(screen.getByText(/sudah tidak tersedia/i)).toBeInTheDocument());
+  fireEvent.click(within(confirmation).getByRole('button', { name: '1. Barang dikirim sekarang' }));
+  await waitFor(() => expect(screen.getByRole('dialog', { name: 'Nota gagal disimpan' })).toHaveTextContent(/sudah tidak tersedia/i));
   expect(gateway.getSnapshot().notaTransactions[0]?.status).toBe('draft');
-  expect(screen.queryByRole('dialog', { name: /Selesaikan nota/i })).not.toBeInTheDocument();
 });
 
 test('a confirmation after an import closes safely without acting on a replacement session', async () => {
@@ -325,8 +324,8 @@ test('a confirmation after an import closes safely without acting on a replaceme
   fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
   const confirmation = screen.getByRole('dialog', { name: /Selesaikan nota/i });
   await act(async () => { await gateway.replaceFromWorkbook({ skus: [], loaded: 0, skipped: 0, warnings: [] }, 'Workbook pengganti'); });
-  fireEvent.click(within(confirmation).getByRole('button', { name: 'Selesaikan' }));
-  await waitFor(() => expect(screen.getByText(/sudah tidak tersedia/i)).toBeInTheDocument());
+  fireEvent.click(within(confirmation).getByRole('button', { name: '1. Barang dikirim sekarang' }));
+  await waitFor(() => expect(screen.getByRole('dialog', { name: 'Nota gagal disimpan' })).toHaveTextContent(/sudah tidak tersedia/i));
   expect(gateway.getSnapshot().notaTransactions).toEqual([]);
 });
 
@@ -367,9 +366,9 @@ class DelayedCreateGateway extends MockOperationsGateway {
 class DelayedCompleteGateway extends MockOperationsGateway {
   private releaseComplete: (() => void) | null = null;
 
-  override async completeNotaTransaction(transactionId: string) {
+  override async completeNotaTransaction(transactionId: string, destination?: 'archive' | 'finished') {
     await new Promise<void>((resolve) => { this.releaseComplete = resolve; });
-    return super.completeNotaTransaction(transactionId);
+    return super.completeNotaTransaction(transactionId, destination);
   }
 
   release() { this.releaseComplete?.(); }
@@ -422,7 +421,7 @@ test('a pending confirmation disables Batal and ignores Escape and its backdrop'
   const background = screen.getByRole('button', { name: 'Kembali ke CH Ultimate' });
   fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
   const dialog = screen.getByRole('dialog', { name: /Selesaikan nota/i });
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Selesaikan' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: '1. Barang dikirim sekarang' }));
 
   const cancel = within(dialog).getByRole('button', { name: 'Batal' });
   await waitFor(() => expect(cancel).toBeDisabled());
@@ -439,7 +438,7 @@ test('a pending confirmation disables Batal and ignores Escape and its backdrop'
   expect(screen.getByRole('dialog', { name: /Selesaikan nota/i })).toBeInTheDocument();
 
   gateway.release();
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: /Selesaikan nota/i })).not.toBeInTheDocument());
+  await waitFor(() => expect(screen.getByRole('dialog', { name: 'Nota berhasil disimpan' })).toBeInTheDocument());
 });
 
 test('a pending drawer mutation disables close and ignores Escape and its backdrop', async () => {
@@ -484,7 +483,7 @@ test('multi-page completion posts aggregate revenue once, archive confirmation r
   await waitFor(() => expect(gateway.getSnapshot().notaTransactions[0]?.status).toBe('reopened'));
   await act(async () => { await gateway.updateNotaLine(transaction.id, pageB.id, pageB.lines[0]!.id, { quantity: 3 }); });
   fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
-  fireEvent.click(within(screen.getByRole('dialog', { name: /Selesaikan nota/i })).getByRole('button', { name: 'Selesaikan' }));
+  fireEvent.click(within(screen.getByRole('dialog', { name: /Selesaikan nota/i })).getByRole('button', { name: '1. Barang dikirim sekarang' }));
   await waitFor(() => expect(gateway.getSnapshot().notaTransactions[0]?.status).toBe('completed'));
   expect(gateway.getSnapshot().skus.find((sku) => sku.id === 'sku-1')?.stock).toBe(20);
   expect(gateway.getSnapshot().adjustments).toHaveLength(2);

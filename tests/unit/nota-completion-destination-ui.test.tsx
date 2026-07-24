@@ -1,0 +1,72 @@
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { NotaCompletionDestination } from '../../src/domain/types';
+import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
+import { App } from '../../src/renderer/App';
+
+function openNota(gateway: MockOperationsGateway) {
+  render(<App gateway={gateway} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Nota' }));
+}
+
+async function chooseCompletion(destination: NotaCompletionDestination) {
+  fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
+  const dialog = screen.getByRole('dialog', { name: 'Selesaikan nota?' });
+  const label = destination === 'archive'
+    ? '1. Barang dikirim sekarang'
+    : '2. Barang dikirim nanti';
+  fireEvent.click(within(dialog).getByRole('button', { name: label }));
+  await waitFor(() => expect(screen.getByRole('dialog', { name: 'Nota berhasil disimpan' })).toBeInTheDocument());
+}
+
+test.each([
+  ['archive' as const, 'Arsip', 'Nota berhasil disimpan di Arsip.'],
+  ['finished' as const, 'Selesai', 'Nota berhasil disimpan di Selesai.'],
+])('completion to %s names the destination and opens its archive bucket', async (destination, tab, message) => {
+  const gateway = new MockOperationsGateway();
+  openNota(gateway);
+
+  await chooseCompletion(destination);
+
+  const success = screen.getByRole('dialog', { name: 'Nota berhasil disimpan' });
+  expect(within(success).getByText(message)).toBeInTheDocument();
+  expect(gateway.getSnapshot().notaTransactions[0]).toMatchObject({
+    status: 'completed',
+    completionDestination: destination,
+  });
+  fireEvent.click(within(success).getByRole('button', { name: `Lihat ${tab}` }));
+  expect(screen.getByRole('heading', { name: 'Arsip Nota' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: tab })).toHaveAttribute('aria-selected', 'true');
+});
+
+class RejectingCompletionGateway extends MockOperationsGateway {
+  override async completeNotaTransaction(_transactionId: string, _destination?: NotaCompletionDestination) {
+    throw new Error('Stok demo tidak dapat diperbarui.');
+  }
+}
+
+test('a failed completion keeps its exact reason in the dialog and can retry', async () => {
+  const gateway = new RejectingCompletionGateway();
+  openNota(gateway);
+  fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
+  const choice = screen.getByRole('dialog', { name: 'Selesaikan nota?' });
+  fireEvent.click(within(choice).getByRole('button', { name: '1. Barang dikirim sekarang' }));
+
+  const failure = await screen.findByRole('dialog', { name: 'Nota gagal disimpan' });
+  expect(within(failure).getByText('Stok demo tidak dapat diperbarui.')).toBeInTheDocument();
+  expect(within(failure).getByRole('button', { name: 'Coba lagi' })).toBeInTheDocument();
+  expect(gateway.getSnapshot().notaTransactions[0]?.status).toBe('draft');
+});
+
+test('archive tabs are ordered Arsip, Selesai, Sampah and finished notes stay out of Arsip', async () => {
+  const gateway = new MockOperationsGateway();
+  const transaction = gateway.getSnapshot().notaTransactions[0]!;
+  await gateway.completeNotaTransaction(transaction.id, 'finished');
+  render(<App gateway={gateway} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Arsip Nota' }));
+
+  expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Arsip', 'Selesai', 'Sampah']);
+  expect(screen.getByText('Arsip belum memiliki nota.')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('tab', { name: 'Selesai' }));
+  expect(screen.getByRole('region', { name: 'Preview selesai nota' })).toBeInTheDocument();
+  expect(screen.getByText('SELESAI · BARANG DIKIRIM NANTI')).toBeInTheDocument();
+});

@@ -14,7 +14,7 @@ export function useAccessibleModal<T extends HTMLElement = HTMLElement>(open: bo
 
   useEffect(() => {
     const active = document.activeElement;
-    if (open && !canClose && active instanceof HTMLElement && dialogRef.current?.contains(active) && active.matches(':disabled')) dialogRef.current.focus();
+    if (open && !canClose && (!active || !dialogRef.current?.contains(active) || active instanceof HTMLElement && active.matches(':disabled'))) dialogRef.current?.focus();
   }, [open, canClose]);
 
   const close = () => {

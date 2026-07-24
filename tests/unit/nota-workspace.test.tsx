@@ -531,9 +531,10 @@ test('completion confirmation traps focus, closes with Escape, and restores the 
   fireEvent.click(trigger);
   const dialog = screen.getByRole('dialog');
   const cancel = within(dialog).getByRole('button', { name: 'Batal' });
+  const firstChoice = within(dialog).getByRole('button', { name: '1. Barang dikirim sekarang' });
+  expect(firstChoice).toHaveFocus();
+  fireEvent.keyDown(firstChoice, { key: 'Tab', shiftKey: true });
   expect(cancel).toHaveFocus();
-  fireEvent.keyDown(cancel, { key: 'Tab', shiftKey: true });
-  expect(within(dialog).getByRole('button', { name: 'Selesaikan' })).toHaveFocus();
   fireEvent.keyDown(dialog, { key: 'Escape' });
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(trigger).toHaveFocus();

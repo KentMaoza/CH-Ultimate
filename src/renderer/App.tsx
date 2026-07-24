@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { NotaCompletionDestination } from '../domain/types';
 import type { OperationsGateway } from '../gateway/operations-gateway';
 import { OperationsProvider } from './operations-context';
 import { InventoryPage } from './pages/InventoryPage';
@@ -53,7 +54,12 @@ function AppLayout() {
   const [notaReturnsToArchive, setNotaReturnsToArchive] = useState(false);
   const current = modules.find((module) => module.id === active)!;
 
-  if (active === 'nota') return <NotaWorkspace initialSelection={notaSelection} onBack={() => setActive(notaReturnsToArchive ? 'notaArchive' : 'inventory')} />;
+  const openCompletionDestination = (destination: NotaCompletionDestination) => {
+    setArchiveView((view) => ({ ...view, tab: destination === 'finished' ? 'finished' : 'archive', page: 0, transactionId: '', pageId: '' }));
+    setActive('notaArchive');
+  };
+
+  if (active === 'nota') return <NotaWorkspace initialSelection={notaSelection} onBack={() => setActive(notaReturnsToArchive ? 'notaArchive' : 'inventory')} onOpenCompletionDestination={openCompletionDestination} />;
 
   const openNota = (selection: { transactionId: string; pageId: string }, returnToArchive: boolean) => { setNotaSelection(selection); setNotaReturnsToArchive(returnToArchive); setActive('nota'); };
   const selectModule = (module: ModuleId) => {

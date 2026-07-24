@@ -103,6 +103,12 @@
 .chu-nota-workspace__dialog h2 { margin: 0; font-size: calc(18px * var(--nota-font-scale)); }
 .chu-nota-workspace__dialog p { margin: 10px 0 18px; font-size: calc(12px * var(--nota-font-scale)); }
 .chu-nota-workspace__dialog > div { display: flex; justify-content: flex-end; gap: 8px; }
+.chu-nota-workspace__completion-dialog { width: min(500px, 100%); }
+.chu-nota-workspace__completion-dialog > .chu-nota-workspace__completion-options { display: grid; gap: 10px; }
+.chu-nota-workspace__completion-option { display: grid; min-height: 72px; padding: 12px 14px; border: 2px solid #111; background: #fff; text-align: left; }
+.chu-nota-workspace__completion-option:hover, .chu-nota-workspace__completion-option:focus-visible { color: #fff; background: #111; }
+.chu-nota-workspace__completion-option span { margin-top: 4px; font-size: 12px; }
+.chu-nota-workspace__completion-dialog > .chu-nota-workspace__completion-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .chu-nota-workspace__footer { display: grid; grid-template-columns: max-content 205px minmax(180px, 1fr) max-content max-content; gap: 8px; align-items: center; margin-top: 6px; padding: 5px 8px; border: 2px solid #111; background: #fff; }
 .chu-nota-workspace__footer > div > strong { display: block; margin-top: 2px; font-size: calc(18px * var(--nota-font-scale)); }
 .chu-nota-workspace__footer p { margin: 0; color: #555; font-size: calc(10px * var(--nota-font-scale)); }

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { lineTotal, noteSuffixFromIndex } from '../../domain/nota';
-import type { NotaLine, NotaTransaction, PaymentKind } from '../../domain/types';
+import type { NotaCompletionDestination, NotaLine, NotaTransaction, PaymentKind } from '../../domain/types';
 import { formatRupiah, formatTitleCaseInput } from '../format';
 import { useOperations } from '../operations-context';
 import { ConfirmDialog } from './ConfirmDialog';
+import { CompleteNotaDialog, type CompletionDialogPhase } from './CompleteNotaDialog';
 import { WorkingDrawer } from './NotaDrawers';
 import { NewTransactionDialog } from './NewTransactionDialog';
 import { NotaGrid, type NotaGridHandle } from './NotaGrid';
@@ -14,8 +15,14 @@ import { useNotaValidation, type InvalidNotaField } from './useNotaValidation';
 import './nota-workspace.css';
 
 type Selection = { transactionId: string; pageId: string };
-type ConfirmKind = 'complete' | 'cancel';
-type Confirmation = { kind: ConfirmKind; transactionId: string; pageId?: string; restoreFocusTo: HTMLElement | null };
+type Confirmation = { transactionId: string; pageId?: string; restoreFocusTo: HTMLElement | null };
+type Completion = {
+  transactionId: string;
+  phase: CompletionDialogPhase;
+  destination?: NotaCompletionDestination;
+  reason?: string;
+  restoreFocusTo: HTMLElement | null;
+};
 type DrawerKind = 'working' | null;
 type TransactionPatch = Partial<Pick<NotaTransaction, 'customerName' | 'customerPlace' | 'transactionDate' | 'payment'>>;
 const paymentLabel = (payment: PaymentKind) => ({ unclassified: 'Belum diklasifikasi', cash: 'Kas', transfer: 'Transfer', credit: 'Piutang' })[payment];
@@ -30,7 +37,11 @@ function focusTarget(target: EventTarget | null) {
   return target instanceof HTMLElement ? target : null;
 }
 
-export function NotaWorkspace({ onBack, initialSelection }: { onBack: () => void; initialSelection?: Selection }) {
+export function NotaWorkspace({ onBack, initialSelection, onOpenCompletionDestination }: {
+  onBack: () => void;
+  initialSelection?: Selection;
+  onOpenCompletionDestination?: (destination: NotaCompletionDestination) => void;
+}) {
   const { state, gateway } = useOperations();
   const [selected, setSelected] = useState<Selection>(initialSelection ?? { transactionId: '', pageId: '' });
   const [fontScale, setFontScale] = useState(150);
@@ -41,6 +52,7 @@ export function NotaWorkspace({ onBack, initialSelection }: { onBack: () => void
   const [newOpen, setNewOpen] = useState(false);
   const [newRestoreFocus, setNewRestoreFocus] = useState<HTMLElement | null>(null);
   const [confirm, setConfirm] = useState<Confirmation | null>(null);
+  const [completion, setCompletion] = useState<Completion | null>(null);
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -160,7 +172,7 @@ export function NotaWorkspace({ onBack, initialSelection }: { onBack: () => void
     choose({ transactionId: result.value.id, pageId: result.value.pages[0]!.id });
     window.setTimeout(() => document.querySelector<HTMLInputElement>('[aria-label="Nama barang baris 1"]')?.focus(), 0);
   };
-  const requestConfirm = (kind: ConfirmKind, transactionId: string, restoreFocusTo: HTMLElement | null, pageId?: string) => setConfirm({ kind, transactionId, pageId, restoreFocusTo });
+  const requestCancel = (transactionId: string, restoreFocusTo: HTMLElement | null, pageId?: string) => setConfirm({ transactionId, pageId, restoreFocusTo });
   const requestComplete = (target: EventTarget | null) => {
     if (!selectedTransaction) return;
     const invalid = validation.firstInvalid(selectedTransaction);
@@ -170,17 +182,31 @@ export function NotaWorkspace({ onBack, initialSelection }: { onBack: () => void
       setInvalidFocus(invalid);
       return;
     }
-    requestConfirm('complete', selectedTransaction.id, focusTarget(target), page?.id);
+    setCompletion({ transactionId: selectedTransaction.id, phase: 'choice', restoreFocusTo: focusTarget(target) });
   };
-  const complete = async (transactionId: string) => {
-    const result = await run(() => gateway.completeNotaTransaction(transactionId), 'Nota tidak dapat diselesaikan.');
-    const transaction = gateway.getSnapshot().notaTransactions.find((item) => item.id === transactionId);
-    if (!result.ok || transaction?.status !== 'completed') {
-      if (result.ok) setMessage('Nota tidak dapat diselesaikan.');
-      return false;
+  const complete = async (destination: NotaCompletionDestination) => {
+    const pending = completion;
+    if (!pending || busyRef.current) return;
+    const transaction = gateway.getSnapshot().notaTransactions.find((item) => item.id === pending.transactionId);
+    if (!transaction) {
+      setCompletion({ ...pending, phase: 'error', destination, reason: 'Nota yang dikonfirmasi sudah tidak tersedia. Tidak ada perubahan dibuat.' });
+      return;
     }
-    setMessage('Nota selesai dan stok demo diperbarui.');
-    return true;
+    busyRef.current = true;
+    setBusy(true);
+    setMessage('');
+    setCompletion({ ...pending, phase: 'saving', destination, reason: undefined });
+    try {
+      await gateway.completeNotaTransaction(pending.transactionId, destination);
+      const completed = gateway.getSnapshot().notaTransactions.find((item) => item.id === pending.transactionId);
+      if (completed?.status !== 'completed' || (completed.completionDestination ?? 'archive') !== destination) throw new Error('Nota tidak dapat disimpan ke tujuan yang dipilih.');
+      setCompletion({ ...pending, phase: 'success', destination });
+    } catch (error) {
+      setCompletion({ ...pending, phase: 'error', destination, reason: error instanceof Error && error.message ? error.message : 'Nota tidak dapat disimpan.' });
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
   };
   const updateTransaction = (transactionId: string, patch: TransactionPatch) => {
     const transaction = gateway.getSnapshot().notaTransactions.find((item) => item.id === transactionId);
@@ -225,12 +251,9 @@ export function NotaWorkspace({ onBack, initialSelection }: { onBack: () => void
       setMessage('Nota yang dikonfirmasi sudah tidak tersedia. Tidak ada perubahan dibuat.');
       return;
     }
-    if (pending.kind === 'complete') await complete(pending.transactionId);
-    if (pending.kind === 'cancel') {
-      const result = await run(() => gateway.cancelNotaTransaction(pending.transactionId), 'Transaksi tidak dapat dibatalkan.');
-      const cancelled = gateway.getSnapshot().notaTransactions.find((item) => item.id === pending.transactionId);
-      if (result.ok && cancelled?.status !== 'cancelled') setMessage('Transaksi tidak dapat dibatalkan.');
-    }
+    const result = await run(() => gateway.cancelNotaTransaction(pending.transactionId), 'Transaksi tidak dapat dibatalkan.');
+    const cancelled = gateway.getSnapshot().notaTransactions.find((item) => item.id === pending.transactionId);
+    if (result.ok && cancelled?.status !== 'cancelled') setMessage('Transaksi tidak dapat dibatalkan.');
     setConfirm(null);
   };
   const activePages = selectedTransaction?.pages.filter((item) => item.status === 'active') ?? [];
@@ -239,7 +262,6 @@ export function NotaWorkspace({ onBack, initialSelection }: { onBack: () => void
   const pageIndex = selectedTransaction && page ? selectedTransaction.pages.findIndex((item) => item.id === page.id) : 0;
   const pageTheme = notaPageTheme(pageIndex);
   const themeStyle = { '--nota-page-color': pageTheme.background, '--nota-page-text': pageTheme.foreground } as CSSProperties;
-  const confirmTitle = confirm?.kind === 'complete' ? 'Selesaikan nota?' : 'Batalkan transaksi?';
 
   return <main className="chu-nota-workspace" data-testid="chu-nota-workspace" aria-busy={busy || undefined} style={{ '--nota-font-scale': fontScale / 100 } as CSSProperties}>
     <header className="chu-nota-workspace__toolbar">
@@ -262,10 +284,24 @@ export function NotaWorkspace({ onBack, initialSelection }: { onBack: () => void
       <section className="chu-nota-workspace__page-totals" aria-label="Total per nota">{activePages.map((item) => { const theme = notaPageTheme(selectedTransaction.pages.findIndex((candidate) => candidate.id === item.id)); return <div key={item.id} data-testid={`nota-page-total-${item.suffix}`} aria-current={item.id === page.id ? 'true' : undefined} style={{ '--nota-page-color': theme.background } as CSSProperties}><span>Total Nota {item.suffix}</span><strong>{formatRupiah(item.lines.reduce((sum, line) => sum + lineTotal(line), 0))}</strong></div>; })}</section>
       <section className="chu-nota-workspace__meta" aria-label="Metadata nota"><div className="chu-nota-workspace__number" style={themeStyle}><span>NOTA DIBUAT</span><strong>{page.suffix}</strong><b>{selectedTransaction.baseNumber}{page.suffix}</b></div><label className="chu-nota-workspace__customer"><span>Pelanggan</span><input disabled={!editable || busy} value={selectedTransaction.customerName} onChange={(event) => updateTransaction(selectedTransaction.id, { customerName: formatTitleCaseInput(event.currentTarget) })} /></label><label className="chu-nota-workspace__customer"><span>Tempat</span><input disabled={!editable || busy} value={selectedTransaction.customerPlace} onChange={(event) => updateTransaction(selectedTransaction.id, { customerPlace: formatTitleCaseInput(event.currentTarget) })} /></label><label><span>Tanggal</span><input disabled={!editable || busy} type="date" value={selectedTransaction.transactionDate} onChange={(event) => updateTransaction(selectedTransaction.id, { transactionDate: event.target.value })} /></label><label><span>Pembayaran</span><select disabled={!editable || busy} value={selectedTransaction.payment} onChange={(event) => updateTransaction(selectedTransaction.id, { payment: event.target.value as PaymentKind })}><option value="unclassified">Belum diklasifikasi</option><option value="cash">Kas</option><option value="transfer">Transfer</option><option value="credit">Piutang</option></select></label><div className="chu-nota-workspace__meta-total"><span>TOTAL SEMUA HALAMAN AKTIF</span><strong data-testid="nota-transaction-total">{formatRupiah(total)}</strong><small>{paymentLabel(selectedTransaction.payment)}</small></div></section>
       <NotaGrid ref={grid} lines={page.lines} suffix={page.suffix} skus={state.skus} editable={editable} busy={busy} invalidValues={validation.valuesForPage(selectedTransaction.id, page.id)} onInvalidChange={(lineId, field, rawValue) => validation.report({ transactionId: selectedTransaction.id, pageId: page.id, lineId, field }, rawValue)} onUpdate={(line, patch) => updateLine(selectedTransaction.id, page.id, line.id, patch)} onDelete={(line) => deleteLine(selectedTransaction.id, page.id, line.id)} onLineCommitted={speakLine} />
-      <footer className="chu-nota-workspace__footer"><div><span>TOTAL TRANSAKSI</span><strong>{formatRupiah(total)}</strong></div><label><span>Ruang cetak</span><select disabled><option>Semua halaman aktif (segera hadir)</option></select></label><p>Printing produksi belum tersedia. Shortcut Ctrl/Cmd+P sudah disiapkan.</p><button disabled aria-label="Print Nota">Print Nota</button>{editable && <div className="chu-nota-workspace__lifecycle"><button disabled={busy} onClick={(event) => requestConfirm('cancel', selectedTransaction.id, event.currentTarget, page.id)}>Batalkan transaksi</button><button disabled={busy} className="chu-nota-workspace__complete" aria-label="Selesaikan nota" onClick={(event) => requestComplete(event.currentTarget)}>Selesaikan nota</button></div>}</footer>
+      <footer className="chu-nota-workspace__footer"><div><span>TOTAL TRANSAKSI</span><strong>{formatRupiah(total)}</strong></div><label><span>Ruang cetak</span><select disabled><option>Semua halaman aktif (segera hadir)</option></select></label><p>Printing produksi belum tersedia. Shortcut Ctrl/Cmd+P sudah disiapkan.</p><button disabled aria-label="Print Nota">Print Nota</button>{editable && <div className="chu-nota-workspace__lifecycle"><button disabled={busy} onClick={(event) => requestCancel(selectedTransaction.id, event.currentTarget, page.id)}>Batalkan transaksi</button><button disabled={busy} className="chu-nota-workspace__complete" aria-label="Selesaikan nota" onClick={(event) => requestComplete(event.currentTarget)}>Selesaikan nota</button></div>}</footer>
     </> : <section className="chu-nota-workspace__empty"><p>Belum ada nota yang sedang dikerjakan pada sesi ini.</p><button onClick={(event) => openNew(event.currentTarget)}>Transaksi Baru</button></section>}
-    {drawer === 'working' && <WorkingDrawer transactions={state.notaTransactions} selected={selected} onClose={() => setDrawer(null)} onSelect={choose} onAdd={(id) => void addPage(id)} onCancelPage={(choice) => void cancelPage(choice)} onCancelTransaction={(id, target) => requestConfirm('cancel', id, target)} restoreFocusTo={drawerRestoreFocus} busy={busy} />}
+    {drawer === 'working' && <WorkingDrawer transactions={state.notaTransactions} selected={selected} onClose={() => setDrawer(null)} onSelect={choose} onAdd={(id) => void addPage(id)} onCancelPage={(choice) => void cancelPage(choice)} onCancelTransaction={(id, target) => requestCancel(id, target)} restoreFocusTo={drawerRestoreFocus} busy={busy} />}
     <NewTransactionDialog open={newOpen} onClose={() => setNewOpen(false)} onCreate={(input) => void create(input)} restoreFocusTo={newRestoreFocus} busy={busy} />
-    <ConfirmDialog open={confirm !== null} title={confirmTitle} confirmLabel={confirm?.kind === 'complete' ? 'Selesaikan' : 'Batalkan'} onCancel={() => setConfirm(null)} onConfirm={() => void confirmAction()} restoreFocusTo={confirm?.restoreFocusTo ?? null} busy={busy}>{confirm?.kind === 'complete' ? 'Stok demo akan diperbarui berdasarkan baris SKU yang terlacak.' : 'Transaksi akan dipindahkan ke Sampah.'}</ConfirmDialog>
+    <ConfirmDialog open={confirm !== null} title="Batalkan transaksi?" confirmLabel="Batalkan" onCancel={() => setConfirm(null)} onConfirm={() => void confirmAction()} restoreFocusTo={confirm?.restoreFocusTo ?? null} busy={busy}>Transaksi akan dipindahkan ke Sampah.</ConfirmDialog>
+    <CompleteNotaDialog
+      open={completion !== null}
+      phase={completion?.phase ?? 'choice'}
+      destination={completion?.destination}
+      reason={completion?.reason}
+      restoreFocusTo={completion?.restoreFocusTo ?? null}
+      onChoose={(destination) => void complete(destination)}
+      onRetry={() => completion?.destination && void complete(completion.destination)}
+      onClose={() => setCompletion(null)}
+      onOpenDestination={(destination) => {
+        setCompletion(null);
+        onOpenCompletionDestination?.(destination);
+      }}
+    />
   </main>;
 }

@@ -28,7 +28,8 @@ async function addManual(name: string) {
   fireEvent.change(screen.getByLabelText('Nama barang manual'), { target: { value: name } });
   fireEvent.change(screen.getByLabelText('Jenis barang manual'), { target: { value: 'Bebas' } });
   fireEvent.change(screen.getByLabelText('Jumlah barang manual'), { target: { value: '1' } });
-  fireEvent.change(screen.getByLabelText('Harga barang manual'), { target: { value: '1000' } });
+  fireEvent.change(screen.getByLabelText('Harga PCS barang manual'), { target: { value: '1000' } });
+  fireEvent.change(screen.getByLabelText('Harga Lusin barang manual'), { target: { value: '12000' } });
   fireEvent.click(screen.getByRole('button', { name: 'Simpan barang' }));
   await waitFor(() => expect(screen.getByRole('region', { name: new RegExp(name) })).toBeInTheDocument());
 }
@@ -67,7 +68,8 @@ test('manual entry starts in the selected B section and previews its next note n
   fireEvent.change(within(manual).getByLabelText('Nama barang manual'), { target: { value: 'Barang Bagian B' } });
   fireEvent.change(within(manual).getByLabelText('Jenis barang manual'), { target: { value: 'Bebas' } });
   fireEvent.change(within(manual).getByLabelText('Jumlah barang manual'), { target: { value: '3' } });
-  fireEvent.change(within(manual).getByLabelText('Harga barang manual'), { target: { value: '12500' } });
+  fireEvent.change(within(manual).getByLabelText('Harga PCS barang manual'), { target: { value: '12500' } });
+  fireEvent.change(within(manual).getByLabelText('Harga Lusin barang manual'), { target: { value: '150000' } });
   fireEvent.click(within(manual).getByRole('button', { name: 'Simpan barang' }));
 
   const row = await screen.findByRole('region', { name: /Barang Bagian B/ });
@@ -82,6 +84,51 @@ test('manual entry starts in the selected B section and previews its next note n
   });
 });
 
+test('manual entry stores independent PCS and LSN prices and speaks the selected unit price', async () => {
+  const gateway = renderNota();
+  await screen.findByRole('heading', { name: 'Nota Barang' });
+  fireEvent.click(screen.getByRole('button', { name: 'Tambah barang tanpa barcode' }));
+  const manual = screen.getByRole('region', { name: 'Barang tanpa barcode' });
+  fireEvent.change(within(manual).getByLabelText('Nama barang manual'), { target: { value: 'Kopi Lusin' } });
+  fireEvent.change(within(manual).getByLabelText('Jenis barang manual'), { target: { value: 'Minuman' } });
+  fireEvent.change(within(manual).getByLabelText('Jumlah barang manual'), { target: { value: '3' } });
+  fireEvent.change(within(manual).getByLabelText('Unit barang manual'), { target: { value: 'lsn' } });
+  fireEvent.change(within(manual).getByLabelText('Harga PCS barang manual'), { target: { value: '12500' } });
+  fireEvent.change(within(manual).getByLabelText('Harga Lusin barang manual'), { target: { value: '145000' } });
+  fireEvent.click(within(manual).getByRole('button', { name: 'Simpan barang' }));
+
+  const row = await screen.findByRole('region', { name: /Kopi Lusin/ });
+  const savedLine = gateway.getSnapshot().notaTransactions[0]?.pages[0]?.lines[0];
+  expect(savedLine).toMatchObject({
+    quantity: 3,
+    unit: 'lsn',
+    pcsPrice: 12_500,
+    lsnPrice: 145_000,
+  });
+  expect(row).toHaveTextContent('Rp435.000');
+  expect(voice.speak).toHaveBeenLastCalledWith({
+    rowNumber: 1,
+    suffix: 'A',
+    quantity: 3,
+    unit: 'lsn',
+    price: 145_000,
+  });
+});
+
+test('manual entry rejects an invalid PCS or LSN price', async () => {
+  renderNota();
+  await screen.findByRole('heading', { name: 'Nota Barang' });
+  fireEvent.click(screen.getByRole('button', { name: 'Tambah barang tanpa barcode' }));
+  const manual = screen.getByRole('region', { name: 'Barang tanpa barcode' });
+  fireEvent.change(within(manual).getByLabelText('Nama barang manual'), { target: { value: 'Harga Salah' } });
+  fireEvent.change(within(manual).getByLabelText('Jumlah barang manual'), { target: { value: '1' } });
+  fireEvent.change(within(manual).getByLabelText('Harga PCS barang manual'), { target: { value: '1000' } });
+  fireEvent.change(within(manual).getByLabelText('Harga Lusin barang manual'), { target: { value: '-1' } });
+  fireEvent.click(within(manual).getByRole('button', { name: 'Simpan barang' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Harga PCS dan Lusin harus bilangan bulat nol atau lebih.');
+});
+
 test('barcode aliases fill a row, duplicate scans increment it, and failures explain why', async () => {
   const codes = ['BRS-108', 'BERAS-HITAM-1KG', 'MINUMAN-COKELAT', 'TIDAK-ADA'];
   renderNota({ scan: async () => ({ rawValue: codes.shift()!, format: 'CODE_128' }) });
@@ -90,13 +137,28 @@ test('barcode aliases fill a row, duplicate scans increment it, and failures exp
   fireEvent.click(screen.getByRole('button', { name: 'Scan barcode' }));
   const row = await screen.findByRole('region', { name: /Beras Hitam Premium/ });
   expect(within(row).getByLabelText('Jumlah barang 1A')).toHaveValue(1);
+  expect(voice.speak).toHaveBeenLastCalledWith({
+    rowNumber: 1,
+    suffix: 'A',
+    quantity: 1,
+    unit: 'pcs',
+    price: 42_000,
+  });
   fireEvent.click(screen.getByRole('button', { name: 'Scan barcode' }));
   await waitFor(() => expect(within(row).getByLabelText('Jumlah barang 1A')).toHaveValue(2));
+  expect(voice.speak).toHaveBeenLastCalledWith({
+    rowNumber: 1,
+    suffix: 'A',
+    quantity: 2,
+    unit: 'pcs',
+    price: 42_000,
+  });
 
   fireEvent.click(screen.getByRole('button', { name: 'Scan barcode' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('SKU sudah diarsipkan');
   fireEvent.click(screen.getByRole('button', { name: 'Scan barcode' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Kode tidak dikenal: TIDAK-ADA');
+  expect(voice.speak).toHaveBeenCalledTimes(2);
 });
 
 test('the sixteenth unique item automatically creates B and keeps fifteen numbered rows in A', async () => {
@@ -111,17 +173,22 @@ test('the sixteenth unique item automatically creates B and keeps fifteen number
   expect(screen.getByRole('button', { name: 'Bagian B' })).toHaveStyle({ '--mobile-nota-accent': '#1565C0' });
 });
 
-test('mobile completion stores only in archive and honestly reports that desktop transfer is unavailable', async () => {
+test('mobile completion has one archive-and-transfer action and records an honest transfer failure', async () => {
   const gateway = renderNota();
   await screen.findByRole('heading', { name: 'Nota Barang' });
   await addManual('Barang Demo');
   fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
   const dialog = screen.getByRole('dialog', { name: 'Selesaikan nota mobile?' });
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Simpan dan kirim ke desktop' }));
+  expect(within(dialog).getAllByRole('button')).toHaveLength(2);
+  expect(within(dialog).queryByRole('button', { name: 'Simpan ke Arsip' })).not.toBeInTheDocument();
+  expect(within(dialog).queryByRole('button', { name: 'Simpan dan kirim ke desktop' })).not.toBeInTheDocument();
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Simpan ke Arsip dan kirim ke desktop' }));
 
-  expect(await screen.findByRole('status')).toHaveTextContent('tersimpan di Arsip sebagai data demo');
-  expect(screen.getByRole('status')).toHaveTextContent('belum terkirim ke desktop karena CH Core API belum tersedia');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Nota tersimpan di Arsip');
+  expect(screen.getByRole('alert')).toHaveTextContent('Pengiriman ke desktop gagal: CH Core API belum tersedia.');
   expect(gateway.getSnapshot().notaTransactions.find((item) => item.status === 'completed')).toMatchObject({
     completionDestination: 'archive',
+    desktopTransferStatus: 'failed',
+    desktopTransferError: 'CH Core API belum tersedia.',
   });
 });

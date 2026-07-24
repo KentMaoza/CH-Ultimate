@@ -22,6 +22,11 @@ export interface CreateSkuInput {
   imageUrl?: string;
 }
 
+export interface NotaDesktopTransferResult {
+  sent: boolean;
+  reason?: string;
+}
+
 export interface OperationsGateway {
   getSnapshot(): DemoState;
   subscribe(listener: () => void): () => void;
@@ -41,6 +46,7 @@ export interface OperationsGateway {
   updateNotaLine(transactionId: string, pageId: string, lineId: string, patch: Partial<NotaLine>): Promise<void>;
   deleteNotaLine(transactionId: string, pageId: string, lineId: string): Promise<void>;
   completeNotaTransaction(id: string, destination?: NotaCompletionDestination): Promise<void>;
+  transferNotaToDesktop(id: string): Promise<NotaDesktopTransferResult>;
   reopenNotaTransaction(id: string): Promise<void>;
   cancelNotaTransaction(id: string): Promise<void>;
   restoreNotaTransaction(id: string): Promise<void>;
@@ -139,6 +145,23 @@ export class MockOperationsGateway implements OperationsGateway {
     this.publish(deleteNotaLine(this.state, transactionId, pageId, lineId));
   }
   async completeNotaTransaction(id: string, destination: NotaCompletionDestination = 'archive'): Promise<void> { this.publish(completeNotaTransaction(this.state, id, destination)); }
+  async transferNotaToDesktop(id: string): Promise<NotaDesktopTransferResult> {
+    const transaction = this.state.notaTransactions.find((item) => item.id === id);
+    if (transaction?.status !== 'completed' || (transaction.completionDestination ?? 'archive') !== 'archive') {
+      return { sent: false, reason: 'Nota belum tersimpan di Arsip.' };
+    }
+    const reason = 'CH Core API belum tersedia.';
+    this.publish({
+      ...this.state,
+      notaTransactions: this.state.notaTransactions.map((item) => item.id === id ? {
+        ...item,
+        desktopTransferStatus: 'failed',
+        desktopTransferError: reason,
+        desktopTransferAttemptedAt: new Date().toISOString(),
+      } : item),
+    });
+    return { sent: false, reason };
+  }
   async reopenNotaTransaction(id: string): Promise<void> { this.publish(reopenNotaTransaction(this.state, id)); }
   async cancelNotaTransaction(id: string): Promise<void> { this.publish(cancelNotaTransaction(this.state, id)); }
   async restoreNotaTransaction(id: string): Promise<void> { this.publish(restoreNotaTransaction(this.state, id)); }

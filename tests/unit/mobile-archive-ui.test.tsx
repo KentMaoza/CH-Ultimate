@@ -91,6 +91,29 @@ test('opening another archived customer closes the current detail', async () => 
   expect(ferdianButton.parentElement).toContainElement(screen.getByRole('region', { name: `Nota arsip ${ferdian.baseNumber}` }));
 });
 
+test('a failed desktop transfer shows its reason and can be retried without reposting stock', async () => {
+  const gateway = new MockOperationsGateway(createMobileDemoState);
+  const transaction = await createCompleted(gateway, 'Amelia Gagal', 'archive');
+  await gateway.transferNotaToDesktop(transaction.id);
+  const stockBefore = gateway.getSnapshot().skus.map((sku) => ({ id: sku.id, stock: sku.stock }));
+  render(<MobileApp gateway={gateway} scanner={scanner} notifications={notifications} share={share} />);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Arsip' }));
+  fireEvent.click(screen.getByRole('button', { name: /Amelia Gagal/ }));
+
+  expect(screen.getByText('Gagal terkirim ke desktop · frontend demo')).toBeInTheDocument();
+  expect(screen.getByText('CH Core API belum tersedia.')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: `Sinkronisasi ulang ${transaction.baseNumber}` }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Sinkronisasi ulang gagal: CH Core API belum tersedia.');
+  expect(gateway.getSnapshot().notaTransactions.find((item) => item.id === transaction.id)).toMatchObject({
+    status: 'completed',
+    completionDestination: 'archive',
+    desktopTransferStatus: 'failed',
+  });
+  expect(gateway.getSnapshot().skus.map((sku) => ({ id: sku.id, stock: sku.stock }))).toEqual(stockBefore);
+});
+
 test('a note completed in the mobile editor can be reopened for editing before desktop transfer', async () => {
   const gateway = new MockOperationsGateway(createMobileDemoState);
   render(<MobileApp gateway={gateway} scanner={scanner} notifications={notifications} share={share} />);
@@ -99,12 +122,13 @@ test('a note completed in the mobile editor can be reopened for editing before d
   fireEvent.click(screen.getByRole('button', { name: 'Tambah barang tanpa barcode' }));
   fireEvent.change(screen.getByLabelText('Nama barang manual'), { target: { value: 'Kopi Mobile' } });
   fireEvent.change(screen.getByLabelText('Jumlah barang manual'), { target: { value: '1' } });
-  fireEvent.change(screen.getByLabelText('Harga barang manual'), { target: { value: '12000' } });
+  fireEvent.change(screen.getByLabelText('Harga PCS barang manual'), { target: { value: '12000' } });
+  fireEvent.change(screen.getByLabelText('Harga Lusin barang manual'), { target: { value: '144000' } });
   fireEvent.click(screen.getByRole('button', { name: 'Simpan barang' }));
   await screen.findByRole('region', { name: /Kopi Mobile/ });
   fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
   await act(async () => {
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Selesaikan nota mobile?' })).getByRole('button', { name: 'Simpan ke Arsip' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Selesaikan nota mobile?' })).getByRole('button', { name: 'Simpan ke Arsip dan kirim ke desktop' }));
   });
   await waitFor(() => expect(gateway.getSnapshot().notaTransactions.some((item) => item.status === 'completed')).toBe(true));
   fireEvent.click(screen.getByRole('button', { name: 'Arsip' }));

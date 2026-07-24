@@ -921,6 +921,10 @@ input:focus-visible,
 .mobile-archive-detail > header span { font-size: .75rem; font-weight: 800; }
 .mobile-archive-detail > header strong { padding: 5px 8px; border-radius: 99px; background: #eee; font-size: .7rem; text-transform: uppercase; }
 .mobile-archive-detail > header button { width: auto; min-height: 44px; margin: 0; }
+.mobile-archive-transfer { display: grid; padding: 10px; gap: 8px; border-left: 5px solid #d32f2f; background: #fff5f5; }
+.mobile-archive-transfer strong, .mobile-archive-transfer span { display: block; }
+.mobile-archive-transfer span { color: #666; font-size: .78rem; }
+.mobile-archive-transfer button { min-height: 44px; margin: 0; }
 .mobile-archive-page { overflow: hidden; border: 2px solid var(--mobile-nota-accent); border-radius: 12px; }
 .mobile-archive-page > header { display: flex; padding: 10px 12px; align-items: center; justify-content: space-between; color: var(--mobile-nota-accent-text); background: var(--mobile-nota-accent); }
 .mobile-archive-page article { display: grid; padding: 11px; grid-template-columns: 38px 1fr auto; align-items: center; gap: 9px; border-top: 1px solid #ddd; }

@@ -195,6 +195,27 @@ test('gateway records an explicit completion destination', async () => {
   expect(gateway.getSnapshot().notaTransactions[0]).toMatchObject({ status: 'completed', completionDestination: 'finished' });
 });
 
+test('mock desktop transfer records an honest session-only failure without reposting stock', async () => {
+  const gateway = new MockOperationsGateway();
+  const transaction = gateway.getSnapshot().notaTransactions[0]!;
+  await gateway.completeNotaTransaction(transaction.id, 'archive');
+  const stockBefore = gateway.getSnapshot().skus.map((sku) => ({ id: sku.id, stock: sku.stock }));
+
+  await expect(gateway.transferNotaToDesktop(transaction.id)).resolves.toEqual({
+    sent: false,
+    reason: 'CH Core API belum tersedia.',
+  });
+
+  expect(gateway.getSnapshot().notaTransactions[0]).toMatchObject({
+    status: 'completed',
+    completionDestination: 'archive',
+    desktopTransferStatus: 'failed',
+    desktopTransferError: 'CH Core API belum tersedia.',
+  });
+  expect(gateway.getSnapshot().notaTransactions[0]?.desktopTransferAttemptedAt).toEqual(expect.any(String));
+  expect(gateway.getSnapshot().skus.map((sku) => ({ id: sku.id, stock: sku.stock }))).toEqual(stockBefore);
+});
+
 test('gateway row deletion clears the selected slot without moving later row numbers', async () => {
   const gateway = new MockOperationsGateway();
   const transaction = gateway.getSnapshot().notaTransactions[0]!;

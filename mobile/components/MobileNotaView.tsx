@@ -9,8 +9,8 @@ import { formatRupiah } from '../format';
 import type { BarcodeScannerPort } from '../ports';
 import { ScanIcon } from './Icons';
 
-type ManualDraft = { description: string; kind: string; quantity: string; unit: Unit; price: string };
-const emptyManual: ManualDraft = { description: '', kind: '', quantity: '1', unit: 'pcs', price: '' };
+type ManualDraft = { description: string; kind: string; quantity: string; unit: Unit; pcsPrice: string; lsnPrice: string };
+const emptyManual: ManualDraft = { description: '', kind: '', quantity: '1', unit: 'pcs', pcsPrice: '', lsnPrice: '' };
 
 function populated(line: NotaLine) {
   return Boolean(line.skuId || line.description.trim() || line.kind.trim() || line.quantity || line.pcsPrice || line.lsnPrice);
@@ -105,6 +105,13 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
       .find(({ page, line }) => page.status === 'active' && line.skuId === sku.id);
     if (duplicate) {
       await gateway.updateNotaLine(current.id, duplicate.page.id, duplicate.line.id, { quantity: duplicate.line.quantity + 1 });
+      voicePlayer.current?.speak({
+        rowNumber: duplicate.page.lines.findIndex((line) => line.id === duplicate.line.id) + 1,
+        suffix: duplicate.page.suffix,
+        quantity: duplicate.line.quantity + 1,
+        unit: duplicate.line.unit,
+        price: rowPrice(duplicate.line),
+      });
       setSelectedPageId(duplicate.page.id);
       setNoticeKind('status');
       setNotice(`${sku.name} ditambah menjadi ${duplicate.line.quantity + 1}.`);
@@ -124,6 +131,13 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
       unit: 'pcs',
       pcsPrice: sku.referencePrice,
       lsnPrice: sku.referencePrice * 12,
+    });
+    voicePlayer.current?.speak({
+      rowNumber: slot.page.lines.findIndex((line) => line.id === slot.line.id) + 1,
+      suffix: slot.page.suffix,
+      quantity: 1,
+      unit: 'pcs',
+      price: sku.referencePrice,
     });
     setSelectedPageId(slot.page.id);
     setNoticeKind('status');
@@ -152,15 +166,21 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
   async function addManual() {
     const current = workingTransaction(gateway.getSnapshot().notaTransactions, transactionId);
     const quantity = Number(manual.quantity);
-    const price = Number(manual.price);
+    const pcsPrice = Number(manual.pcsPrice);
+    const lsnPrice = Number(manual.lsnPrice);
     if (!current || !manual.description.trim()) {
       setNoticeKind('alert');
       setNotice('Nama barang wajib diisi.');
       return;
     }
-    if (!Number.isInteger(quantity) || quantity <= 0 || !Number.isInteger(price) || price < 0) {
+    if (!Number.isInteger(quantity) || quantity <= 0) {
       setNoticeKind('alert');
-      setNotice('Jumlah harus bilangan bulat positif dan harga tidak boleh negatif.');
+      setNotice('Jumlah harus bilangan bulat positif.');
+      return;
+    }
+    if (!Number.isInteger(pcsPrice) || pcsPrice < 0 || !Number.isInteger(lsnPrice) || lsnPrice < 0) {
+      setNoticeKind('alert');
+      setNotice('Harga PCS dan Lusin harus bilangan bulat nol atau lebih.');
       return;
     }
     const slot = await findSlot(current);
@@ -171,15 +191,15 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
       kind: manual.kind.trim(),
       quantity,
       unit: manual.unit,
-      pcsPrice: manual.unit === 'pcs' ? price : Math.round(price / 12),
-      lsnPrice: manual.unit === 'lsn' ? price : price * 12,
+      pcsPrice,
+      lsnPrice,
     });
     voicePlayer.current?.speak({
       rowNumber: slot.page.lines.findIndex((line) => line.id === slot.line.id) + 1,
       suffix: slot.page.suffix,
       quantity,
       unit: manual.unit,
-      price,
+      price: manual.unit === 'pcs' ? pcsPrice : lsnPrice,
     });
     setSelectedPageId(slot.page.id);
     setManual(emptyManual);
@@ -199,21 +219,33 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
     await gateway.updateNotaLine(transaction.id, selectedPage.id, line.id, patch);
   }
 
-  async function complete(sendToDesktop: boolean) {
+  async function complete() {
     if (!transaction) return;
     completionStarted.current = true;
     setBusy(true);
+    let saved = false;
     try {
       await gateway.completeNotaTransaction(transaction.id, 'archive');
       const completed = gateway.getSnapshot().notaTransactions.find((item) => item.id === transaction.id);
       if (completed?.status !== 'completed') throw new Error('Nota tidak dapat disimpan.');
+      saved = true;
       setCompletionOpen(false);
+      const transfer = await gateway.transferNotaToDesktop(transaction.id);
+      if (!transfer.sent) {
+        setNoticeKind('alert');
+        setNotice(`Nota tersimpan di Arsip. Pengiriman ke desktop gagal: ${transfer.reason ?? 'Alasan tidak tersedia.'}`);
+        return;
+      }
       setNoticeKind('status');
-      setNotice(`Nota tersimpan di Arsip sebagai data demo${sendToDesktop ? ', tetapi' : ' dan'} belum terkirim ke desktop karena CH Core API belum tersedia.`);
+      setNotice('Nota tersimpan di Arsip dan berhasil dikirim ke desktop.');
     } catch (error) {
-      completionStarted.current = false;
       setNoticeKind('alert');
-      setNotice(error instanceof Error ? error.message : 'Nota tidak dapat disimpan.');
+      if (saved) {
+        setNotice(`Nota tersimpan di Arsip. Pengiriman ke desktop gagal: ${error instanceof Error ? error.message : 'Alasan tidak tersedia.'}`);
+      } else {
+        completionStarted.current = false;
+        setNotice(error instanceof Error ? error.message : 'Nota tidak dapat disimpan.');
+      }
     } finally {
       setBusy(false);
     }
@@ -247,7 +279,7 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
         <div className="mobile-nota-manual__name"><strong aria-label={`Nomor barang ${nextManualLabel}`}>{nextManualLabel}</strong><label><span>Nama barang</span><input aria-label="Nama barang manual" value={manual.description} onChange={(event) => setManual({ ...manual, description: event.target.value })} /></label></div>
         <label><span>Jenis</span><input aria-label="Jenis barang manual" value={manual.kind} onChange={(event) => setManual({ ...manual, kind: event.target.value })} /></label>
         <div><label><span>Jumlah</span><input aria-label="Jumlah barang manual" inputMode="numeric" value={manual.quantity} onChange={(event) => setManual({ ...manual, quantity: event.target.value })} /></label><label><span>Unit</span><select aria-label="Unit barang manual" value={manual.unit} onChange={(event) => setManual({ ...manual, unit: event.target.value as Unit })}><option value="pcs">PCS</option><option value="lsn">LSN</option></select></label></div>
-        <label><span>Harga</span><input aria-label="Harga barang manual" inputMode="numeric" value={manual.price} onChange={(event) => setManual({ ...manual, price: event.target.value })} /></label>
+        <div><label><span>Harga PCS</span><input aria-label="Harga PCS barang manual" inputMode="numeric" value={manual.pcsPrice} onChange={(event) => setManual({ ...manual, pcsPrice: event.target.value })} /></label><label><span>Harga Lusin</span><input aria-label="Harga Lusin barang manual" inputMode="numeric" value={manual.lsnPrice} onChange={(event) => setManual({ ...manual, lsnPrice: event.target.value })} /></label></div>
         <button className="primary-action" onClick={() => void addManual()}>Simpan barang</button>
       </section>}
       <div className="mobile-nota-pages" aria-label="Bagian nota">{activePages.map((page) => {
@@ -271,6 +303,6 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
       </section>
       <footer className="mobile-nota-finish"><div><span>Total transaksi</span><strong>{formatRupiah(transactionTotal)}</strong></div><button className="primary-action" disabled={busy} onClick={() => setCompletionOpen(true)}>Selesaikan nota</button></footer>
     </> : !notice && <p className="mobile-nota-empty">Menyiapkan nota baru…</p>}
-    {completionOpen && <div className="mobile-nota-dialog-backdrop"><section role="dialog" aria-modal="true" aria-label="Selesaikan nota mobile?" className="mobile-nota-dialog"><h2>Selesaikan nota mobile?</h2><p>Nota akan disimpan ke Arsip mobile sebagai data demo sesi ini.</p><button className="primary-action" disabled={busy} onClick={() => void complete(false)}>Simpan ke Arsip</button><button className="secondary-action" disabled={busy} onClick={() => void complete(true)}>Simpan dan kirim ke desktop</button><button disabled={busy} onClick={() => setCompletionOpen(false)}>Batal</button></section></div>}
+    {completionOpen && <div className="mobile-nota-dialog-backdrop"><section role="dialog" aria-modal="true" aria-label="Selesaikan nota mobile?" className="mobile-nota-dialog"><h2>Selesaikan nota mobile?</h2><p>Nota disimpan ke Arsip lalu dicoba dikirim ke desktop.</p><button className="primary-action" disabled={busy} onClick={() => void complete()}>Simpan ke Arsip dan kirim ke desktop</button><button disabled={busy} onClick={() => setCompletionOpen(false)}>Batal</button></section></div>}
   </section>;
 }

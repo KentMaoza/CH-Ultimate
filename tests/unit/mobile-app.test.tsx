@@ -32,6 +32,11 @@ function renderMobile(
   return { gateway, ...ports };
 }
 
+function openMoreDestination(name: 'Perubahan Harga' | 'Rekomendasi') {
+  fireEvent.click(screen.getByRole('button', { name: 'Lainnya' }));
+  fireEvent.click(screen.getByRole('button', { name }));
+}
+
 function createRecommendationState(): DemoState {
   const state = createMobileDemoState();
   return {
@@ -71,29 +76,37 @@ test('dashboard renders fixture counts and the two newest price changes', () => 
   expect(rows[1]).toHaveTextContent('Beras Hitam Premium 1 kg');
 });
 
-test('bottom navigation has four destinations with recommendations after SKU Gudang', () => {
+test('bottom navigation has five destinations and moves legacy feeds under Lainnya', () => {
   renderMobile();
 
   const navigation = screen.getByRole('navigation', { name: 'Navigasi utama' });
   expect(within(navigation).getAllByRole('button').map((button) => button.textContent)).toEqual([
     'Beranda',
-    'SKU Gudang',
-    'Rekomendasi',
-    'Perubahan Harga',
+    'SKU',
+    'Nota',
+    'Arsip',
+    'Lainnya',
   ]);
 
-  fireEvent.click(within(navigation).getByRole('button', { name: 'SKU Gudang' }));
+  fireEvent.click(within(navigation).getByRole('button', { name: 'SKU' }));
   expect(screen.getByRole('heading', { name: 'SKU Gudang' })).toBeInTheDocument();
-  fireEvent.click(within(navigation).getByRole('button', { name: 'Rekomendasi' }));
+  fireEvent.click(within(navigation).getByRole('button', { name: 'Nota' }));
+  expect(screen.getByRole('heading', { name: 'Nota Barang' })).toBeInTheDocument();
+  fireEvent.click(within(navigation).getByRole('button', { name: 'Arsip' }));
+  expect(screen.getByRole('heading', { name: 'Arsip Nota' })).toBeInTheDocument();
+  fireEvent.click(within(navigation).getByRole('button', { name: 'Lainnya' }));
+  expect(screen.getByRole('heading', { name: 'Lainnya' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Rekomendasi' }));
   expect(screen.getByRole('heading', { name: 'Rekomendasi Share' })).toHaveFocus();
-  fireEvent.click(within(navigation).getByRole('button', { name: 'Perubahan Harga' }));
+  fireEvent.click(within(navigation).getByRole('button', { name: 'Lainnya' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Perubahan Harga' }));
   expect(screen.getByRole('heading', { name: 'Perubahan Harga' })).toBeInTheDocument();
 });
 
 test('new pages and SKU detail transitions move focus into the routed content', () => {
   renderMobile();
 
-  fireEvent.click(screen.getByRole('button', { name: 'SKU Gudang' }));
+  fireEvent.click(screen.getByRole('button', { name: 'SKU' }));
   expect(screen.getByRole('searchbox', { name: 'Cari SKU' })).toHaveFocus();
 
   fireEvent.click(screen.getByRole('button', { name: /Beras Hitam Premium 1 kg/ }));
@@ -102,13 +115,13 @@ test('new pages and SKU detail transitions move focus into the routed content', 
   fireEvent.click(screen.getByRole('button', { name: 'Kembali' }));
   expect(screen.getByRole('searchbox', { name: 'Cari SKU' })).toHaveFocus();
 
-  fireEvent.click(screen.getByRole('button', { name: 'Perubahan Harga' }));
+  openMoreDestination('Perubahan Harga');
   expect(screen.getByRole('heading', { name: 'Perubahan Harga' })).toHaveFocus();
 });
 
 test('SKU list excludes archived products and searches partial name, current number, and alias', () => {
   renderMobile();
-  fireEvent.click(screen.getByRole('button', { name: 'SKU Gudang' }));
+  fireEvent.click(screen.getByRole('button', { name: 'SKU' }));
   const search = screen.getByRole('searchbox', { name: 'Cari SKU' });
 
   expect(screen.getByText('Beras Hitam Premium 1 kg')).toBeInTheDocument();
@@ -133,7 +146,7 @@ test('dashboard search action opens the searchable SKU list', () => {
   expect(screen.getByRole('searchbox', { name: 'Cari SKU' })).toHaveFocus();
 });
 
-test('dashboard keeps its recommendation shortcut while mobile navigation has four destinations', () => {
+test('dashboard keeps its recommendation shortcut while mobile navigation has five destinations', () => {
   renderMobile({}, createRecommendationState);
 
   const quickActions = screen.getByRole('region', { name: 'Aksi cepat' });
@@ -142,7 +155,7 @@ test('dashboard keeps its recommendation shortcut while mobile navigation has fo
 
   expect(screen.getByRole('heading', { name: 'Rekomendasi Share' })).toHaveFocus();
   expect(screen.getByLabelText('Tanggal rekomendasi')).toHaveValue('2026-07-23');
-  expect(within(screen.getByRole('navigation', { name: 'Navigasi utama' })).getAllByRole('button')).toHaveLength(4);
+  expect(within(screen.getByRole('navigation', { name: 'Navigasi utama' })).getAllByRole('button')).toHaveLength(5);
 });
 
 test('share recommendations use the Windows daily and urgent grouping rules', () => {
@@ -226,7 +239,7 @@ test('recommendation row can open the existing SKU detail', () => {
 
 test('SKU detail shows aliases and per-SKU price history', () => {
   renderMobile();
-  fireEvent.click(screen.getByRole('button', { name: 'SKU Gudang' }));
+  fireEvent.click(screen.getByRole('button', { name: 'SKU' }));
   fireEvent.click(screen.getByRole('button', { name: /Beras Hitam Premium 1 kg/ }));
 
   expect(screen.getByRole('heading', { name: 'Beras Hitam Premium 1 kg' })).toBeInTheDocument();
@@ -240,7 +253,7 @@ test('SKU detail shows aliases and per-SKU price history', () => {
 
 test('open SKU detail follows the current gateway snapshot', async () => {
   const { gateway } = renderMobile();
-  fireEvent.click(screen.getByRole('button', { name: 'SKU Gudang' }));
+  fireEvent.click(screen.getByRole('button', { name: 'SKU' }));
   fireEvent.click(screen.getByRole('button', { name: /Beras Hitam Premium 1 kg/ }));
 
   await act(async () => {
@@ -295,7 +308,7 @@ test('late scanner error cannot replace a page opened through navigation', async
   renderMobile({ scanner });
 
   fireEvent.click(screen.getByRole('button', { name: 'Scan Barcode' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Perubahan Harga' }));
+  openMoreDestination('Perubahan Harga');
   expect(screen.getByRole('heading', { name: 'Perubahan Harga' })).toBeInTheDocument();
 
   await act(async () => {
@@ -338,7 +351,7 @@ test('unknown manual code stays on scan surface with retry and manual options', 
 
 test('normal price navigation shows the global newest-first history', () => {
   renderMobile();
-  fireEvent.click(screen.getByRole('button', { name: 'Perubahan Harga' }));
+  openMoreDestination('Perubahan Harga');
 
   const rows = screen.getAllByRole('button', { name: /SKU:/ });
   expect(rows).toHaveLength(2);
@@ -351,7 +364,7 @@ test('price feed and SKU detail expose direction plus old and new price labels',
   await act(async () => {
     await gateway.updateSku('sku-1', { referencePrice: 40_000 });
   });
-  fireEvent.click(screen.getByRole('button', { name: 'Perubahan Harga' }));
+  openMoreDestination('Perubahan Harga');
 
   const row = screen.getAllByRole('button', { name: /Beras Hitam Premium 1 kg/ })[0]!;
   expect(row).toHaveAccessibleDescription('Harga turun. Harga lama Rp42.000. Harga baru Rp40.000.');
@@ -365,7 +378,7 @@ test('price feed and SKU detail expose direction plus old and new price labels',
 
 test('product image switches to a local fallback when loading fails', () => {
   renderMobile();
-  fireEvent.click(screen.getByRole('button', { name: 'SKU Gudang' }));
+  fireEvent.click(screen.getByRole('button', { name: 'SKU' }));
   const image = document.querySelector<HTMLImageElement>('img[src="/assets/mobile/beras-hitam-premium.svg"]');
   expect(image).not.toBeNull();
 
@@ -399,7 +412,7 @@ test('bell opens only unread changes and marks displayed rows read after render'
   fireEvent.click(screen.getByRole('button', { name: 'Beranda' }));
   expect(screen.getByRole('button', { name: 'Notifikasi harga, 0 belum dibaca' })).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: 'Perubahan Harga' }));
+  openMoreDestination('Perubahan Harga');
   expect(screen.getAllByRole('button', { name: /SKU:/ })).toHaveLength(2);
 });
 
@@ -408,7 +421,7 @@ test('empty price feed distinguishes normal history from unread notifications', 
   const ports = createPorts();
   render(<MobileApp gateway={gateway} scanner={ports.scanner} notifications={ports.notifications} share={ports.share} />);
 
-  fireEvent.click(screen.getByRole('button', { name: 'Perubahan Harga' }));
+  openMoreDestination('Perubahan Harga');
   expect(screen.getByText('Belum ada riwayat perubahan harga pada sesi ini.')).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: 'Beranda' }));
@@ -424,7 +437,7 @@ test('price simulation updates an active SKU and sends a notification when grant
     listenForPriceChangeActions: async () => async () => undefined,
   };
   const { gateway } = renderMobile({ notifications });
-  fireEvent.click(screen.getByRole('button', { name: 'Perubahan Harga' }));
+  openMoreDestination('Perubahan Harga');
 
   fireEvent.click(screen.getByRole('button', { name: 'Simulasikan perubahan harga' }));
 
@@ -447,7 +460,7 @@ test('notification denial does not block the in-app price update', async () => {
     listenForPriceChangeActions: async () => async () => undefined,
   };
   const { gateway } = renderMobile({ notifications });
-  fireEvent.click(screen.getByRole('button', { name: 'Perubahan Harga' }));
+  openMoreDestination('Perubahan Harga');
 
   fireEvent.click(screen.getByRole('button', { name: 'Simulasikan perubahan harga' }));
 

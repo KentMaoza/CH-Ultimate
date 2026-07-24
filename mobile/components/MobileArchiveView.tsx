@@ -1,0 +1,41 @@
+import { useMemo, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { lineTotal } from '../../src/domain/nota';
+import type { OperationsGateway } from '../../src/gateway/operations-gateway';
+import { notaPageTheme } from '../../src/renderer/nota/nota-page-colors';
+import { formatRupiah } from '../format';
+
+export function MobileArchiveView({ gateway }: { gateway: OperationsGateway }) {
+  const snapshot = useSyncExternalStore(gateway.subscribe, gateway.getSnapshot, gateway.getSnapshot);
+  const archived = useMemo(() => snapshot.notaTransactions
+    .filter((transaction) => transaction.status === 'completed' && (transaction.completionDestination ?? 'archive') === 'archive')
+    .sort((a, b) => Date.parse(b.completedAt ?? '') - Date.parse(a.completedAt ?? '')), [snapshot.notaTransactions]);
+  const [selectedId, setSelectedId] = useState('');
+  const selected = archived.find((transaction) => transaction.id === selectedId) ?? archived[0];
+
+  return <section className="mobile-archive-view">
+    <header className="mobile-header"><div><span className="eyebrow">ARSIP SAJA · SESSION ONLY</span><h1 data-page-heading tabIndex={-1}>Arsip Nota</h1></div></header>
+    <p className="mobile-archive-badge">Belum terkirim ke desktop · frontend demo</p>
+    {!archived.length ? <p className="mobile-nota-empty">Arsip mobile belum memiliki nota.</p> : <>
+      <div className="mobile-archive-list" aria-label="Daftar arsip nota">{archived.map((transaction) => {
+        const total = transaction.pages.filter((page) => page.status === 'active').flatMap((page) => page.lines).reduce((sum, line) => sum + lineTotal(line), 0);
+        return <button key={transaction.id} aria-pressed={transaction.id === selected?.id} onClick={() => setSelectedId(transaction.id)}>
+          <strong>{transaction.customerName || 'Tanpa pelanggan'}</strong>
+          <span>{transaction.customerPlace || 'Tanpa tempat'} · {transaction.transactionDate}</span>
+          <b>{formatRupiah(total)}</b>
+        </button>;
+      })}</div>
+      {selected && <section className="mobile-archive-detail" aria-label={`Nota arsip ${selected.baseNumber}`}>
+        <header><span>{selected.baseNumber}</span><strong>Hanya lihat</strong></header>
+        {selected.pages.filter((page) => page.status === 'active').map((page) => {
+          const pageIndex = selected.pages.findIndex((candidate) => candidate.id === page.id);
+          const theme = notaPageTheme(pageIndex);
+          const lines = page.lines.map((line, index) => ({ line, index })).filter(({ line }) => line.description.trim() || line.quantity || line.pcsPrice || line.lsnPrice);
+          return <section key={page.id} className="mobile-archive-page" style={{ '--mobile-nota-accent': theme.background, '--mobile-nota-accent-text': theme.foreground } as CSSProperties}>
+            <header><strong>Bagian {page.suffix}</strong><b>{formatRupiah(lines.reduce((sum, item) => sum + lineTotal(item.line), 0))}</b></header>
+            {lines.map(({ line, index }) => <article key={line.id}><span>{index + 1}{page.suffix}</span><div><strong>{line.description}</strong><small>{line.quantity} {line.unit.toUpperCase()} · {formatRupiah(line.unit === 'lsn' ? line.lsnPrice : line.pcsPrice)}</small></div><b>{formatRupiah(lineTotal(line))}</b></article>)}
+          </section>;
+        })}
+      </section>}
+    </>}
+  </section>;
+}

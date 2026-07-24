@@ -51,3 +51,15 @@ export function InfoIcon(props: IconProps) {
 export function ShareIcon(props: IconProps) {
   return <IconBase {...props}><circle cx="6" cy="12" r="2" /><circle cx="17" cy="6" r="2" /><circle cx="17" cy="18" r="2" /><path d="m8 11 7-4M8 13l7 4" /></IconBase>;
 }
+
+export function NotaIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M6 3h12v18l-3-2-3 2-3-2-3 2Z" /><path d="M9 8h6M9 12h6M9 16h4" /></IconBase>;
+}
+
+export function ArchiveIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M4 7h16v13H4Z" /><path d="M3 4h18v4H3ZM9 12h6" /></IconBase>;
+}
+
+export function MoreIcon(props: IconProps) {
+  return <IconBase {...props}><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></IconBase>;
+}

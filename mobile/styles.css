@@ -37,7 +37,6 @@ button {
 
 button:focus-visible,
 input:focus-visible,
-[data-page-heading]:focus,
 [data-page-heading]:focus-visible {
   outline: 3px solid #0a0a0a;
   outline-offset: 3px;
@@ -826,7 +825,7 @@ input:focus-visible,
   min-height: calc(72px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   margin: 0 auto;
   padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   border-top: 1px solid #cfcfcf;
   background: rgb(255 255 255 / 96%);
   backdrop-filter: blur(12px);
@@ -866,6 +865,69 @@ input:focus-visible,
   width: 25px;
   height: 25px;
 }
+
+.mobile-nota-view { display: grid; gap: 14px; }
+.mobile-nota-header { align-items: end; }
+.mobile-nota-header > strong { font-size: 1.25rem; }
+.mobile-nota-notice { margin: 0; padding: 12px; border: 1px solid #111; background: #fff; font-weight: 650; line-height: 1.4; }
+.mobile-nota-notice--alert { border-left: 6px solid #d32f2f; }
+.mobile-nota-meta, .mobile-nota-manual { display: grid; gap: 10px; padding: 14px; border: 1px solid #cfcfcf; border-radius: 14px; background: #fff; }
+.mobile-nota-meta { grid-template-columns: 1fr 1fr; }
+.mobile-nota-meta label, .mobile-nota-manual label, .mobile-nota-line label { display: grid; gap: 5px; min-width: 0; }
+.mobile-nota-meta label > span, .mobile-nota-manual label > span, .mobile-nota-line label > span { color: #666; font-size: .7rem; font-weight: 800; text-transform: uppercase; }
+.mobile-nota-meta input, .mobile-nota-manual input, .mobile-nota-manual select, .mobile-nota-line input, .mobile-nota-line select { width: 100%; min-height: 46px; padding: 9px 10px; border: 1px solid #aaa; border-radius: 9px; background: #fff; font: inherit; }
+.mobile-nota-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.mobile-nota-actions button { min-height: 52px; margin: 0; }
+.mobile-nota-actions svg { width: 21px; height: 21px; margin-right: 6px; vertical-align: middle; }
+.mobile-nota-manual > div { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mobile-nota-manual .primary-action { margin: 0; }
+.mobile-nota-pages { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 5px; }
+.mobile-nota-pages button { min-width: 48px; min-height: 46px; padding: 7px 12px; border: 2px solid var(--mobile-nota-accent, #111); border-radius: 10px; background: #fff; font-weight: 900; }
+.mobile-nota-pages button[aria-pressed="true"] { color: var(--mobile-nota-accent-text, #fff); background: var(--mobile-nota-accent); }
+.mobile-nota-pages .mobile-nota-pages__add { min-width: max-content; border-color: #111; font-weight: 750; }
+.mobile-nota-section { overflow: hidden; border: 2px solid var(--mobile-nota-accent); border-radius: 16px; background: #fff; }
+.mobile-nota-section > header { display: grid; padding: 12px 14px; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; border-bottom: 2px solid var(--mobile-nota-accent); }
+.mobile-nota-section > header > div { display: flex; align-items: center; gap: 7px; }
+.mobile-nota-section > header span, .mobile-nota-section > header p { color: #666; font-size: .72rem; font-weight: 800; }
+.mobile-nota-section > header strong { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 8px; color: var(--mobile-nota-accent-text); background: var(--mobile-nota-accent); }
+.mobile-nota-section > header p { margin: 0; }
+.mobile-nota-lines { display: grid; gap: 10px; padding: 10px; }
+.mobile-nota-line { position: relative; display: grid; gap: 9px; padding: 13px 12px 11px 52px; border: 1px solid #d4d4d4; border-radius: 12px; }
+.mobile-nota-line__number { position: absolute; top: 12px; left: 10px; display: grid; width: 34px; height: 34px; place-items: center; border-radius: 9px; color: var(--mobile-nota-accent-text); background: var(--mobile-nota-accent); font-weight: 900; }
+.mobile-nota-line__numbers { display: grid; grid-template-columns: .7fr .7fr 1.2fr; gap: 8px; }
+.mobile-nota-line footer { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 10px; }
+.mobile-nota-line footer button { min-height: 44px; padding: 8px 12px; color: #8d1111; font-weight: 750; }
+.mobile-nota-empty { margin: 0; padding: 22px 12px; color: #666; text-align: center; }
+.mobile-nota-finish { position: sticky; z-index: 5; bottom: calc(66px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))); display: grid; padding: 10px; grid-template-columns: 1fr auto; align-items: center; gap: 12px; border: 1px solid #aaa; border-radius: 14px; background: rgb(255 255 255 / 96%); box-shadow: 0 8px 28px rgb(0 0 0 / .16); }
+.mobile-nota-finish span, .mobile-nota-finish strong { display: block; }
+.mobile-nota-finish span { color: #666; font-size: .7rem; font-weight: 750; text-transform: uppercase; }
+.mobile-nota-finish .primary-action { min-height: 48px; margin: 0; }
+.mobile-nota-dialog-backdrop { position: fixed; z-index: 40; inset: 0; display: grid; place-items: end center; padding: 16px; background: rgb(0 0 0 / .42); }
+.mobile-nota-dialog { display: grid; width: min(100%, 448px); padding: 18px; gap: 10px; border-radius: 18px; background: #fff; }
+.mobile-nota-dialog h2, .mobile-nota-dialog p { margin: 0 0 6px; }
+.mobile-nota-dialog button { min-height: 48px; margin: 0; }
+.mobile-archive-view, .mobile-more-view { display: grid; gap: 14px; }
+.mobile-archive-badge { margin: 0; padding: 10px 12px; border: 1px solid #111; border-radius: 10px; background: #fff; font-size: .78rem; font-weight: 800; text-align: center; }
+.mobile-archive-list { display: grid; gap: 9px; }
+.mobile-archive-list button { display: grid; min-height: 78px; padding: 12px 14px; grid-template-columns: 1fr auto; gap: 4px 10px; border: 1px solid #cfcfcf; border-radius: 13px; background: #fff; text-align: left; }
+.mobile-archive-list button[aria-pressed="true"] { border: 2px solid #111; }
+.mobile-archive-list button span { color: #666; font-size: .78rem; }
+.mobile-archive-list button b { grid-row: 1 / 3; grid-column: 2; align-self: center; }
+.mobile-archive-detail { display: grid; gap: 10px; padding: 12px; border: 1px solid #aaa; border-radius: 14px; background: #fff; }
+.mobile-archive-detail > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mobile-archive-detail > header span { font-size: .75rem; font-weight: 800; }
+.mobile-archive-detail > header strong { padding: 5px 8px; border-radius: 99px; background: #eee; font-size: .7rem; text-transform: uppercase; }
+.mobile-archive-page { overflow: hidden; border: 2px solid var(--mobile-nota-accent); border-radius: 12px; }
+.mobile-archive-page > header { display: flex; padding: 10px 12px; align-items: center; justify-content: space-between; color: var(--mobile-nota-accent-text); background: var(--mobile-nota-accent); }
+.mobile-archive-page article { display: grid; padding: 11px; grid-template-columns: 38px 1fr auto; align-items: center; gap: 9px; border-top: 1px solid #ddd; }
+.mobile-archive-page article > span { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 8px; color: var(--mobile-nota-accent-text); background: var(--mobile-nota-accent); font-weight: 900; }
+.mobile-archive-page article strong, .mobile-archive-page article small { display: block; }
+.mobile-archive-page article small { margin-top: 3px; color: #666; }
+.mobile-more-list { display: grid; gap: 10px; }
+.mobile-more-list button { display: grid; min-height: 82px; padding: 14px; grid-template-columns: 34px 1fr; align-items: center; gap: 12px; border: 1px solid #ccc; border-radius: 14px; background: #fff; text-align: left; }
+.mobile-more-list svg { width: 30px; height: 30px; }
+.mobile-more-list strong, .mobile-more-list small { display: block; }
+.mobile-more-list small { margin-top: 4px; color: #666; line-height: 1.35; }
 
 .sr-only {
   position: absolute;

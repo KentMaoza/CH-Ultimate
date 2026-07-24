@@ -3,16 +3,19 @@ import type { OperationsGateway } from '../src/gateway/operations-gateway';
 import type { Sku } from '../src/domain/types';
 import { findSkuByScanCode } from '../src/domain/mobile-demo-state';
 import type { BarcodeScannerPort, LocalNotificationPort, RecommendationPdfSharePort } from './ports';
-import { BoxIcon, ClockIcon, HomeIcon, ShareIcon } from './components/Icons';
+import { ArchiveIcon, BoxIcon, HomeIcon, MoreIcon, NotaIcon } from './components/Icons';
 import { DashboardView } from './components/DashboardView';
 import { SkuCatalog } from './components/SkuCatalog';
 import { ScanSurface } from './components/ScanSurface';
 import { SkuDetail } from './components/SkuDetail';
 import { PriceFeedView } from './components/PriceFeedView';
 import { ShareRecommendationsView } from './components/ShareRecommendationsView';
+import { MobileNotaView } from './components/MobileNotaView';
+import { MobileArchiveView } from './components/MobileArchiveView';
+import { MoreView } from './components/MoreView';
 import { formatRupiah } from './format';
 
-type MainView = 'home' | 'skus' | 'prices' | 'recommendations';
+type MainView = 'home' | 'skus' | 'nota' | 'archive' | 'more' | 'prices' | 'recommendations';
 type PriceMode = 'all' | 'unread';
 
 export function MobileApp({ gateway, scanner, notifications, share }: {
@@ -189,12 +192,16 @@ export function MobileApp({ gateway, scanner, notifications, share }: {
         onSharePdf={share.sharePdf}
         snapshot={snapshot}
       /> : null}
+      {view === 'nota' && !scanOpen && !selectedSku ? <MobileNotaView gateway={gateway} scanner={scanner} /> : null}
+      {view === 'archive' && !scanOpen && !selectedSku ? <MobileArchiveView gateway={gateway} /> : null}
+      {view === 'more' && !scanOpen && !selectedSku ? <MoreView onOpenPrices={() => navigate('prices')} onOpenRecommendations={() => navigate('recommendations')} /> : null}
     </main>
     <nav aria-label="Navigasi utama" className="bottom-nav">
       <button aria-current={view === 'home' ? 'page' : undefined} onClick={() => navigate('home')}><HomeIcon />Beranda</button>
-      <button aria-current={view === 'skus' ? 'page' : undefined} onClick={() => navigate('skus')}><BoxIcon />SKU Gudang</button>
-      <button aria-current={view === 'recommendations' ? 'page' : undefined} onClick={() => navigate('recommendations')}><ShareIcon />Rekomendasi</button>
-      <button aria-current={view === 'prices' ? 'page' : undefined} onClick={() => navigate('prices')}><ClockIcon />Perubahan Harga</button>
+      <button aria-current={view === 'skus' ? 'page' : undefined} onClick={() => navigate('skus')}><BoxIcon />SKU</button>
+      <button aria-current={view === 'nota' ? 'page' : undefined} onClick={() => navigate('nota')}><NotaIcon />Nota</button>
+      <button aria-current={view === 'archive' ? 'page' : undefined} onClick={() => navigate('archive')}><ArchiveIcon />Arsip</button>
+      <button aria-current={['more', 'prices', 'recommendations'].includes(view) ? 'page' : undefined} onClick={() => navigate('more')}><MoreIcon />Lainnya</button>
     </nav>
   </div>;
 }

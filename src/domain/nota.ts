@@ -1,4 +1,4 @@
-import type { DemoState, Nota, NotaLine, NotaTransaction, Unit } from './types';
+import type { DemoState, Nota, NotaCompletionDestination, NotaLine, NotaTransaction, Unit } from './types';
 
 const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
@@ -171,7 +171,7 @@ function difference(current: Map<string, number>, previous: Map<string, number>)
   return delta;
 }
 
-export function completeNotaTransaction(state: DemoState, transactionId: string): DemoState {
+export function completeNotaTransaction(state: DemoState, transactionId: string, destination: NotaCompletionDestination = 'archive'): DemoState {
   const transaction = state.notaTransactions.find((item) => item.id === transactionId);
   if (!transaction || !['draft', 'reopened'].includes(transaction.status)) return state;
   const postedLines = validateLines(activeLines(transaction));
@@ -182,7 +182,7 @@ export function completeNotaTransaction(state: DemoState, transactionId: string)
   return {
     ...next,
     notaTransactions: next.notaTransactions.map((item) => item.id === transactionId ? {
-      ...item, status: 'completed', completedAt: new Date().toISOString(),
+      ...item, status: 'completed', completionDestination: destination, completedAt: new Date().toISOString(),
       postedLines: postedLines.map((line) => ({ ...line })), postedStockEffects: Object.fromEntries(currentEffects), postedTrackedLineIds: trackedLineIds, cancelledFromStatus: undefined,
     } : item),
   };

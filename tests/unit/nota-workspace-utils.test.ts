@@ -1,13 +1,13 @@
 import { completeNotaTransaction, createDraftNotaTransaction } from '../../src/domain/nota';
 import { createInitialState } from '../../src/domain/operations';
-import { archivePage, searchNota, trashPage, workingPage } from '../../src/renderer/nota/nota-workspace-utils';
+import { archivePage, finishedPage, searchNota, trashPage, workingPage } from '../../src/renderer/nota/nota-workspace-utils';
 
-function completed(sequence: number, customerName: string, customerPlace: string) {
+function completed(sequence: number, customerName: string, customerPlace: string, destination: 'archive' | 'finished' = 'archive') {
   const transaction = createDraftNotaTransaction(sequence);
   transaction.customerName = customerName;
   transaction.customerPlace = customerPlace;
   transaction.pages[0]!.lines[0] = { ...transaction.pages[0]!.lines[0]!, skuId: 'sku-1', description: 'Beras Hitam Premium 1 kg', quantity: 1, pcsPrice: 42_000 };
-  return completeNotaTransaction({ ...createInitialState(), notaTransactions: [transaction] }, transaction.id).notaTransactions[0]!;
+  return completeNotaTransaction({ ...createInitialState(), notaTransactions: [transaction] }, transaction.id, destination).notaTransactions[0]!;
 }
 
 test('global nota search matches CHU fields, lines, current SKU, and aliases across pages', () => {
@@ -31,6 +31,16 @@ test('archive filters completed transactions and paginates in groups of fifty', 
   const budi = archivePage(transactions, { query: 'Budi', place: 'Makassar', from: '', to: '' });
   expect(budi.items.map((item) => item.customerName)).toEqual(['Budi']);
   expect(archivePage(transactions, { query: transactions[0]!.baseNumber, place: '', from: '', to: '' }).items).toHaveLength(1);
+});
+
+test('archive and finished selectors separate destinations while legacy completed nota stays archived', () => {
+  const archived = completed(1, 'Arsip', 'Saibah', 'archive');
+  const finished = completed(2, 'Selesai', 'Makassar', 'finished');
+  const { completionDestination: _legacyDestination, ...legacy } = completed(3, 'Lama', 'Banjarbaru', 'archive');
+  const filters = { query: '', place: '', from: '', to: '' };
+
+  expect(archivePage([archived, finished, legacy], filters).items.map((item) => item.customerName).sort()).toEqual(['Arsip', 'Lama']);
+  expect(finishedPage([archived, finished, legacy], filters).items.map((item) => item.customerName)).toEqual(['Selesai']);
 });
 
 test('trash search includes cancelled transactions and cancelled pages with pagination', () => {

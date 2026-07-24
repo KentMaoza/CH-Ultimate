@@ -10,7 +10,7 @@ import {
   restoreNotaPage,
   restoreNotaTransaction,
 } from '../domain/nota';
-import type { DemoState, InvoiceTemplate, LabelTemplate, Nota, NotaLine, NotaTransaction, Sku, WorkbookImportResult } from '../domain/types';
+import type { DemoState, InvoiceTemplate, LabelTemplate, Nota, NotaCompletionDestination, NotaLine, NotaTransaction, Sku, WorkbookImportResult } from '../domain/types';
 
 export interface CreateSkuInput {
   skuNumber: string;
@@ -37,10 +37,10 @@ export interface OperationsGateway {
   addNotaPage(transactionId: string): Promise<Nota | undefined>;
   cancelNotaPage(transactionId: string, pageId: string): Promise<void>;
   restoreNotaPage(transactionId: string, pageId: string): Promise<void>;
-  updateNotaTransaction(id: string, patch: Partial<Omit<NotaTransaction, 'id' | 'baseNumber' | 'status' | 'completedAt' | 'nextNoteIndex' | 'pages' | 'postedLines' | 'postedStockEffects' | 'postedTrackedLineIds' | 'cancelledFromStatus'>>): Promise<void>;
+  updateNotaTransaction(id: string, patch: Partial<Omit<NotaTransaction, 'id' | 'baseNumber' | 'status' | 'completionDestination' | 'completedAt' | 'nextNoteIndex' | 'pages' | 'postedLines' | 'postedStockEffects' | 'postedTrackedLineIds' | 'cancelledFromStatus'>>): Promise<void>;
   updateNotaLine(transactionId: string, pageId: string, lineId: string, patch: Partial<NotaLine>): Promise<void>;
   deleteNotaLine(transactionId: string, pageId: string, lineId: string): Promise<void>;
-  completeNotaTransaction(id: string): Promise<void>;
+  completeNotaTransaction(id: string, destination?: NotaCompletionDestination): Promise<void>;
   reopenNotaTransaction(id: string): Promise<void>;
   cancelNotaTransaction(id: string): Promise<void>;
   restoreNotaTransaction(id: string): Promise<void>;
@@ -122,7 +122,7 @@ export class MockOperationsGateway implements OperationsGateway {
   }
   async cancelNotaPage(transactionId: string, pageId: string): Promise<void> { this.publish(cancelNotaPage(this.state, transactionId, pageId)); }
   async restoreNotaPage(transactionId: string, pageId: string): Promise<void> { this.publish(restoreNotaPage(this.state, transactionId, pageId)); }
-  async updateNotaTransaction(id: string, patch: Partial<Omit<NotaTransaction, 'id' | 'baseNumber' | 'status' | 'completedAt' | 'nextNoteIndex' | 'pages' | 'postedLines' | 'postedStockEffects' | 'postedTrackedLineIds' | 'cancelledFromStatus'>>): Promise<void> {
+  async updateNotaTransaction(id: string, patch: Partial<Omit<NotaTransaction, 'id' | 'baseNumber' | 'status' | 'completionDestination' | 'completedAt' | 'nextNoteIndex' | 'pages' | 'postedLines' | 'postedStockEffects' | 'postedTrackedLineIds' | 'cancelledFromStatus'>>): Promise<void> {
     const transaction = this.state.notaTransactions.find((item) => item.id === id);
     if (!transaction || !['draft', 'reopened'].includes(transaction.status)) return;
     this.publish({ ...this.state, notaTransactions: this.state.notaTransactions.map((transaction) => transaction.id === id ? { ...transaction, ...patch } : transaction) });
@@ -138,7 +138,7 @@ export class MockOperationsGateway implements OperationsGateway {
   async deleteNotaLine(transactionId: string, pageId: string, lineId: string): Promise<void> {
     this.publish(deleteNotaLine(this.state, transactionId, pageId, lineId));
   }
-  async completeNotaTransaction(id: string): Promise<void> { this.publish(completeNotaTransaction(this.state, id)); }
+  async completeNotaTransaction(id: string, destination: NotaCompletionDestination = 'archive'): Promise<void> { this.publish(completeNotaTransaction(this.state, id, destination)); }
   async reopenNotaTransaction(id: string): Promise<void> { this.publish(reopenNotaTransaction(this.state, id)); }
   async cancelNotaTransaction(id: string): Promise<void> { this.publish(cancelNotaTransaction(this.state, id)); }
   async restoreNotaTransaction(id: string): Promise<void> { this.publish(restoreNotaTransaction(this.state, id)); }

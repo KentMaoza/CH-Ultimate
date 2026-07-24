@@ -1,5 +1,6 @@
 export type PaymentKind = 'unclassified' | 'cash' | 'transfer' | 'credit';
 export type NotaTransactionStatus = 'draft' | 'completed' | 'reopened' | 'cancelled';
+export type NotaCompletionDestination = 'archive' | 'finished';
 export type NotaPageStatus = 'active' | 'cancelled';
 export type Unit = 'pcs' | 'lsn';
 
@@ -63,6 +64,7 @@ export interface NotaTransaction {
   transactionDate: string;
   payment: PaymentKind;
   status: NotaTransactionStatus;
+  completionDestination?: NotaCompletionDestination;
   completedAt?: string;
   nextNoteIndex: number;
   pages: Nota[];

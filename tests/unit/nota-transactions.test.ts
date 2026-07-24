@@ -47,6 +47,23 @@ test('completion aggregates active pages, deducting only tracked linked SKUs', (
   expect(state.notaTransactions[0]?.status).toBe('completed');
 });
 
+test('completion destination survives restore and can change on recompletion without reposting unchanged stock', () => {
+  const transaction = createDraftNotaTransaction(1);
+  transaction.pages[0]!.lines = [line('tracked', { skuId: 'sku-1', description: 'Beras', quantity: 2, pcsPrice: 42_000 })];
+  let state = completeNotaTransaction({ ...createInitialState(), notaTransactions: [transaction] }, transaction.id, 'finished');
+  expect(state.notaTransactions[0]).toMatchObject({ status: 'completed', completionDestination: 'finished' });
+  expect(state.skus.find((sku) => sku.id === 'sku-1')?.stock).toBe(22);
+
+  state = cancelNotaTransaction(state, transaction.id);
+  state = restoreNotaTransaction(state, transaction.id);
+  expect(state.notaTransactions[0]).toMatchObject({ status: 'completed', completionDestination: 'finished' });
+  expect(state.skus.find((sku) => sku.id === 'sku-1')?.stock).toBe(22);
+
+  state = completeNotaTransaction(reopenNotaTransaction(state, transaction.id), transaction.id, 'archive');
+  expect(state.notaTransactions[0]).toMatchObject({ status: 'completed', completionDestination: 'archive' });
+  expect(state.skus.find((sku) => sku.id === 'sku-1')?.stock).toBe(22);
+});
+
 test('recompletion posts only the difference and transaction cancellation reverses then restores stock', () => {
   const transaction = createDraftNotaTransaction(1);
   transaction.pages[0]!.lines = [line('tracked', { skuId: 'sku-1', description: 'Beras', quantity: 2, pcsPrice: 42_000 })];
@@ -169,6 +186,13 @@ test('gateway refuses metadata and line edits outside an editable transaction or
   expect(gateway.getSnapshot().notaTransactions[0]?.pages[1]?.status).toBe('cancelled');
   await gateway.updateNotaLine(resetTransaction.id, resetCancelledPage.id, resetCancelledPage.lines[0]!.id, { description: 'Halaman batal tidak boleh berubah' });
   expect(gateway.getSnapshot().notaTransactions[0]?.pages[1]?.lines[0]?.description).toBe('');
+});
+
+test('gateway records an explicit completion destination', async () => {
+  const gateway = new MockOperationsGateway();
+  const transaction = gateway.getSnapshot().notaTransactions[0]!;
+  await gateway.completeNotaTransaction(transaction.id, 'finished');
+  expect(gateway.getSnapshot().notaTransactions[0]).toMatchObject({ status: 'completed', completionDestination: 'finished' });
 });
 
 test('gateway row deletion clears the selected slot without moving later row numbers', async () => {

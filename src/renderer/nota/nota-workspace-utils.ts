@@ -61,11 +61,20 @@ export function searchNota(state: DemoState, query: string): NotaSearchResult[] 
   }).filter((result): result is NotaSearchResult => result !== null));
 }
 
-export function archivePage(transactions: NotaTransaction[], filters: ArchiveFilters, page = 0, size = 50) {
-  const items = transactions.filter((transaction) => transaction.status === 'completed')
+function completionPage(transactions: NotaTransaction[], destination: 'archive' | 'finished', filters: ArchiveFilters, page: number, size: number) {
+  const items = transactions.filter((transaction) => transaction.status === 'completed'
+      && (transaction.completionDestination ?? 'archive') === destination)
     .filter((transaction) => transactionMatches(transaction, filters))
     .sort((left, right) => right.transactionDate.localeCompare(left.transactionDate) || (right.completedAt ?? '').localeCompare(left.completedAt ?? ''));
   return paginate(items, page, size);
+}
+
+export function archivePage(transactions: NotaTransaction[], filters: ArchiveFilters, page = 0, size = 50) {
+  return completionPage(transactions, 'archive', filters, page, size);
+}
+
+export function finishedPage(transactions: NotaTransaction[], filters: ArchiveFilters, page = 0, size = 50) {
+  return completionPage(transactions, 'finished', filters, page, size);
 }
 
 export function trashPage(transactions: NotaTransaction[], filters: ArchiveFilters, page = 0, size = 50) {

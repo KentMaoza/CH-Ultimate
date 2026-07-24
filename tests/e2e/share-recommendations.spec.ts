@@ -6,6 +6,7 @@ test('desktop recommendation downloads one catalogue PDF for the active tab', as
   try {
     await window.setViewportSize({ width: 1024, height: 720 });
     await window.getByRole('button', { name: 'Rekomendasi Share' }).click();
+    const recommendationDate = await window.getByLabel('Tanggal rekomendasi').inputValue();
 
     await expect(window.getByRole('button', { name: 'Download PDF Harian' })).toBeVisible();
     await expect(window.getByRole('button', { name: /^Bagikan SKU / })).toHaveCount(0);
@@ -42,7 +43,7 @@ test('desktop recommendation downloads one catalogue PDF for the active tab', as
       };
     });
     expect(download).toMatchObject({
-      fileName: 'CHU-Rekomendasi-Harian-2026-07-23.pdf',
+      fileName: `CHU-Rekomendasi-Harian-${recommendationDate}.pdf`,
       type: 'application/pdf',
       signature: '%PDF',
       revokedUrl: 'blob:recommendation-pdf',

@@ -33,13 +33,14 @@ function createNotificationPlugin(display: 'granted' | 'denied' | 'prompt' = 'gr
   };
 }
 
-test('native scanner maps ALL formats, back camera, adaptive orientation, result, and haptic feedback', async () => {
+test('native scanner maps its result and gives haptic plus sound feedback after a successful decode', async () => {
   const scanBarcode = vi.fn(async () => ({
     ScanResult: '  SKU-001\n',
     format: CapacitorBarcodeScannerTypeHint.CODE_128,
   }));
   const impact = vi.fn(async () => undefined);
-  const scanner = createNativeBarcodeScanner({ scanBarcode }, { impact });
+  const playSuccessSound = vi.fn(async () => { throw new Error('audio unavailable'); });
+  const scanner = createNativeBarcodeScanner({ scanBarcode }, { impact }, playSuccessSound);
 
   await expect(scanner.scan()).resolves.toEqual({
     rawValue: '  SKU-001\n',
@@ -51,22 +52,27 @@ test('native scanner maps ALL formats, back camera, adaptive orientation, result
     scanOrientation: CapacitorBarcodeScannerScanOrientation.ADAPTIVE,
   }));
   expect(impact).toHaveBeenCalledWith({ style: ImpactStyle.Medium });
+  expect(playSuccessSound).toHaveBeenCalledOnce();
 });
 
-test('native scanner returns null for cancellation, empty results, and plugin errors', async () => {
+test('native scanner returns null without success feedback for cancellation, empty results, and plugin errors', async () => {
   const impact = vi.fn(async () => undefined);
+  const playSuccessSound = vi.fn(async () => undefined);
   const cancelled = createNativeBarcodeScanner(
     { scanBarcode: vi.fn(async () => ({ ScanResult: '', format: CapacitorBarcodeScannerTypeHint.ALL })) },
     { impact },
+    playSuccessSound,
   );
   const failed = createNativeBarcodeScanner(
     { scanBarcode: vi.fn(async () => { throw new Error('camera unavailable'); }) },
     { impact },
+    playSuccessSound,
   );
 
   await expect(cancelled.scan()).resolves.toBeNull();
   await expect(failed.scan()).resolves.toBeNull();
   expect(impact).not.toHaveBeenCalled();
+  expect(playSuccessSound).not.toHaveBeenCalled();
 });
 
 test('native notifications use an existing grant or request Android display permission', async () => {

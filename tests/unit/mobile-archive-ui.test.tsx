@@ -49,6 +49,48 @@ test('mobile archive shows only archived completed notes with a frontend-demo tr
   expect(screen.getByText('Belum terkirim ke desktop · frontend demo')).toBeInTheDocument();
 });
 
+test('archived note details open inline below the customer and close when tapped again', async () => {
+  const gateway = new MockOperationsGateway(createMobileDemoState);
+  const amelia = await createCompleted(gateway, 'Amelia', 'archive');
+  render(<MobileApp gateway={gateway} scanner={scanner} notifications={notifications} share={share} />);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Arsip' }));
+
+  const ameliaButton = screen.getByRole('button', { name: /Amelia/ });
+  expect(ameliaButton).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.queryByRole('region', { name: `Nota arsip ${amelia.baseNumber}` })).not.toBeInTheDocument();
+
+  fireEvent.click(ameliaButton);
+
+  const ameliaDetail = screen.getByRole('region', { name: `Nota arsip ${amelia.baseNumber}` });
+  expect(ameliaButton).toHaveAttribute('aria-expanded', 'true');
+  expect(ameliaButton.parentElement).toContainElement(ameliaDetail);
+
+  fireEvent.click(ameliaButton);
+
+  expect(ameliaButton).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.queryByRole('region', { name: `Nota arsip ${amelia.baseNumber}` })).not.toBeInTheDocument();
+});
+
+test('opening another archived customer closes the current detail', async () => {
+  const gateway = new MockOperationsGateway(createMobileDemoState);
+  const amelia = await createCompleted(gateway, 'Amelia', 'archive');
+  const ferdian = await createCompleted(gateway, 'Ferdian', 'archive');
+  render(<MobileApp gateway={gateway} scanner={scanner} notifications={notifications} share={share} />);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Arsip' }));
+
+  const ameliaButton = screen.getByRole('button', { name: /Amelia/ });
+  const ferdianButton = screen.getByRole('button', { name: /Ferdian/ });
+  fireEvent.click(ameliaButton);
+  fireEvent.click(ferdianButton);
+
+  expect(ameliaButton).toHaveAttribute('aria-expanded', 'false');
+  expect(ferdianButton).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.queryByRole('region', { name: `Nota arsip ${amelia.baseNumber}` })).not.toBeInTheDocument();
+  expect(ferdianButton.parentElement).toContainElement(screen.getByRole('region', { name: `Nota arsip ${ferdian.baseNumber}` }));
+});
+
 test('a note completed in the mobile editor can be reopened for editing before desktop transfer', async () => {
   const gateway = new MockOperationsGateway(createMobileDemoState);
   render(<MobileApp gateway={gateway} scanner={scanner} notifications={notifications} share={share} />);
@@ -66,6 +108,7 @@ test('a note completed in the mobile editor can be reopened for editing before d
   });
   await waitFor(() => expect(gateway.getSnapshot().notaTransactions.some((item) => item.status === 'completed')).toBe(true));
   fireEvent.click(screen.getByRole('button', { name: 'Arsip' }));
+  fireEvent.click(screen.getByRole('button', { name: /Tanpa pelanggan/ }));
 
   expect(screen.getByText('Kopi Mobile')).toBeInTheDocument();
   expect(screen.queryByRole('textbox', { name: /Kopi Mobile/ })).not.toBeInTheDocument();

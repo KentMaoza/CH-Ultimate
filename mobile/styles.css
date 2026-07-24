@@ -911,10 +911,11 @@ input:focus-visible,
 .mobile-archive-view, .mobile-more-view { display: grid; gap: 14px; }
 .mobile-archive-badge { margin: 0; padding: 10px 12px; border: 1px solid #111; border-radius: 10px; background: #fff; font-size: .78rem; font-weight: 800; text-align: center; }
 .mobile-archive-list { display: grid; gap: 9px; }
-.mobile-archive-list button { display: grid; min-height: 78px; padding: 12px 14px; grid-template-columns: 1fr auto; gap: 4px 10px; border: 1px solid #cfcfcf; border-radius: 13px; background: #fff; text-align: left; }
-.mobile-archive-list button[aria-pressed="true"] { border: 2px solid #111; }
-.mobile-archive-list button span { color: #666; font-size: .78rem; }
-.mobile-archive-list button b { grid-row: 1 / 3; grid-column: 2; align-self: center; }
+.mobile-archive-item { display: grid; gap: 8px; }
+.mobile-archive-summary { display: grid; min-height: 78px; padding: 12px 14px; grid-template-columns: 1fr auto; gap: 4px 10px; border: 1px solid #cfcfcf; border-radius: 13px; background: #fff; text-align: left; }
+.mobile-archive-summary[aria-expanded="true"] { border: 2px solid #111; }
+.mobile-archive-summary span { color: #666; font-size: .78rem; }
+.mobile-archive-summary b { grid-row: 1 / 3; grid-column: 2; align-self: center; }
 .mobile-archive-detail { display: grid; gap: 10px; padding: 12px; border: 1px solid #aaa; border-radius: 14px; background: #fff; }
 .mobile-archive-detail > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .mobile-archive-detail > header span { font-size: .75rem; font-weight: 800; }

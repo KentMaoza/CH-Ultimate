@@ -18,6 +18,7 @@ import type {
 
 type ScannerPlugin = Pick<CapacitorBarcodeScannerPlugin, 'scanBarcode'>;
 type HapticPlugin = Pick<HapticsPlugin, 'impact'>;
+type ScanSuccessSound = () => Promise<void> | void;
 type NotificationPlugin = Pick<LocalNotificationsPlugin,
   'addListener' | 'checkPermissions' | 'createChannel' | 'requestPermissions' | 'schedule'>;
 type NativeSharePlugin = Pick<SharePlugin, 'share'>;
@@ -40,6 +41,31 @@ async function blobToBase64(blob: Blob): Promise<string> {
   const separator = dataUrl.indexOf(',');
   if (separator < 0) throw new Error('Format PDF tidak didukung.');
   return dataUrl.slice(separator + 1);
+}
+
+async function playScanSuccessTone() {
+  if (!globalThis.AudioContext) return;
+  const context = new AudioContext();
+  try {
+    if (context.state === 'suspended') await context.resume();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    const now = context.currentTime;
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(1_320, now);
+    gain.gain.setValueAtTime(0.14, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.addEventListener('ended', () => {
+      void context.close().catch(() => undefined);
+    }, { once: true });
+    oscillator.start(now);
+    oscillator.stop(now + 0.12);
+  } catch (error) {
+    await context.close().catch(() => undefined);
+    throw error;
+  }
 }
 
 export function createNativeRecommendationPdfShare(
@@ -73,6 +99,7 @@ export function createNativeRecommendationPdfShare(
 export function createNativeBarcodeScanner(
   plugin: ScannerPlugin = CapacitorBarcodeScanner,
   haptics: HapticPlugin = Haptics,
+  playSuccessSound: ScanSuccessSound = playScanSuccessTone,
 ): BarcodeScannerPort {
   return {
     async scan() {
@@ -90,6 +117,11 @@ export function createNativeBarcodeScanner(
           await haptics.impact({ style: ImpactStyle.Medium });
         } catch {
           // A decoded barcode remains usable if device haptics are unavailable.
+        }
+        try {
+          await playSuccessSound();
+        } catch {
+          // A decoded barcode remains usable if audio playback is unavailable.
         }
         return { rawValue: result.ScanResult, format: result.format };
       } catch {

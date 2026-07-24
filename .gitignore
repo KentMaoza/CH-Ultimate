@@ -5,6 +5,7 @@ playwright-report/
 test-results/
 coverage/
 .superpowers/
+.worktrees/
 dist-mobile/
 android/.gradle/
 android/local.properties

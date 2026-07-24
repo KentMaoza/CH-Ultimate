@@ -1,9 +1,21 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { beforeEach, vi } from 'vitest';
 import type { BarcodeScannerPort } from '../../mobile/ports';
 import { MobileNotaView } from '../../mobile/components/MobileNotaView';
 import { createMobileDemoState } from '../../src/domain/mobile-demo-state';
 import type { DemoState } from '../../src/domain/types';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
+
+const voice = vi.hoisted(() => ({ speak: vi.fn(), cancel: vi.fn(), dispose: vi.fn(), test: vi.fn() }));
+vi.mock('../../src/renderer/nota/nota-voice', () => ({
+  createNotaVoicePlayer: () => voice,
+}));
+
+beforeEach(() => {
+  voice.speak.mockClear();
+  voice.cancel.mockClear();
+  voice.dispose.mockClear();
+});
 
 function renderNota(scanner: BarcodeScannerPort = { scan: async () => null }, seedFactory: () => DemoState = createMobileDemoState) {
   const gateway = new MockOperationsGateway(seedFactory);
@@ -41,6 +53,33 @@ test('manual section buttons continue with the desktop B and C accents', async (
   expect(await screen.findByRole('button', { name: 'Bagian B' })).toHaveStyle({ '--mobile-nota-accent': '#1565C0' });
   fireEvent.click(screen.getByRole('button', { name: 'Tambah Bagian C' }));
   expect(await screen.findByRole('button', { name: 'Bagian C' })).toHaveStyle({ '--mobile-nota-accent': '#FBC02D' });
+});
+
+test('manual entry starts in the selected B section and previews its next note number', async () => {
+  renderNota();
+  await screen.findByRole('heading', { name: 'Nota Barang' });
+  fireEvent.click(screen.getByRole('button', { name: 'Tambah Bagian B' }));
+  await screen.findByRole('button', { name: 'Bagian B' });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Tambah barang tanpa barcode' }));
+  const manual = screen.getByRole('region', { name: 'Barang tanpa barcode' });
+  expect(within(manual).getByText('1B')).toBeInTheDocument();
+  fireEvent.change(within(manual).getByLabelText('Nama barang manual'), { target: { value: 'Barang Bagian B' } });
+  fireEvent.change(within(manual).getByLabelText('Jenis barang manual'), { target: { value: 'Bebas' } });
+  fireEvent.change(within(manual).getByLabelText('Jumlah barang manual'), { target: { value: '3' } });
+  fireEvent.change(within(manual).getByLabelText('Harga barang manual'), { target: { value: '12500' } });
+  fireEvent.click(within(manual).getByRole('button', { name: 'Simpan barang' }));
+
+  const row = await screen.findByRole('region', { name: /Barang Bagian B/ });
+  expect(row).toHaveTextContent('1B');
+  expect(screen.queryByRole('region', { name: /Barang 1A: Barang Bagian B/ })).not.toBeInTheDocument();
+  expect(voice.speak).toHaveBeenCalledWith({
+    rowNumber: 1,
+    suffix: 'B',
+    quantity: 3,
+    unit: 'pcs',
+    price: 12_500,
+  });
 });
 
 test('barcode aliases fill a row, duplicate scans increment it, and failures explain why', async () => {

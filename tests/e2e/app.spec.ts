@@ -18,7 +18,7 @@ async function finishNota(window: Page) {
   await window.getByRole('button', { name: 'Selesaikan nota' }).click();
   const confirmation = window.getByRole('dialog', { name: 'Selesaikan nota?' });
   await expect(confirmation).toBeVisible();
-  await confirmation.getByRole('button', { name: '1. Barang dikirim sekarang' }).click();
+  await confirmation.getByRole('button', { name: '2. Barang dikirim nanti' }).click();
   const success = window.getByRole('dialog', { name: 'Nota berhasil disimpan' });
   await expect(success).toContainText('Nota berhasil disimpan di Arsip.');
   await success.getByRole('button', { name: 'Tutup' }).click();
@@ -364,7 +364,7 @@ test('Nota lifecycle posts linked and ad-hoc lines, then import resets the sessi
     await expectStockAndRevenue(window, 21, 141_000);
 
     await window.getByRole('button', { name: 'Arsip Nota' }).click();
-    await expect(window.getByText('ARSIP · HANYA LIHAT')).toBeVisible();
+    await expect(window.getByText('ARSIP · BARANG DIKIRIM NANTI')).toBeVisible();
     const archivePageA = window.getByRole('button', { name: 'Preview halaman A' });
     const archivePageB = window.getByRole('button', { name: 'Preview halaman B' });
     await expect(archivePageA).toHaveCSS('border-color', 'rgb(211, 47, 47)');
@@ -377,7 +377,7 @@ test('Nota lifecycle posts linked and ad-hoc lines, then import resets the sessi
     await window.getByRole('button', { name: 'Lipat preview nota' }).click();
     await expect(window.getByRole('region', { name: 'Preview arsip nota' })).toHaveCount(0);
     await window.getByRole('button', { name: 'Buka preview nota' }).click();
-    await expect(window.getByText('ARSIP · HANYA LIHAT')).toBeVisible();
+    await expect(window.getByText('ARSIP · BARANG DIKIRIM NANTI')).toBeVisible();
     await window.getByRole('button', { name: 'Buka kembali untuk edit' }).click();
     await window.getByRole('dialog', { name: 'Buka kembali nota?' }).getByRole('button', { name: 'Buka kembali' }).click();
     await window.getByLabel('Jumlah baris 3', { exact: true }).fill('3');

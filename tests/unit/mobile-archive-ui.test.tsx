@@ -1,8 +1,13 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { vi } from 'vitest';
 import { MobileApp } from '../../mobile/MobileApp';
 import type { BarcodeScannerPort, LocalNotificationPort, RecommendationPdfSharePort } from '../../mobile/ports';
 import { createMobileDemoState } from '../../src/domain/mobile-demo-state';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
+
+vi.mock('../../src/renderer/nota/nota-voice', () => ({
+  createNotaVoicePlayer: () => ({ speak: vi.fn(), cancel: vi.fn(), dispose: vi.fn(), test: vi.fn() }),
+}));
 
 const scanner: BarcodeScannerPort = { scan: async () => null };
 const notifications: LocalNotificationPort = {
@@ -44,7 +49,7 @@ test('mobile archive shows only archived completed notes with a frontend-demo tr
   expect(screen.getByText('Belum terkirim ke desktop · frontend demo')).toBeInTheDocument();
 });
 
-test('a note completed in the mobile editor appears read-only in mobile archive', async () => {
+test('a note completed in the mobile editor can be reopened for editing before desktop transfer', async () => {
   const gateway = new MockOperationsGateway(createMobileDemoState);
   render(<MobileApp gateway={gateway} scanner={scanner} notifications={notifications} share={share} />);
   fireEvent.click(screen.getByRole('button', { name: 'Nota' }));
@@ -64,4 +69,9 @@ test('a note completed in the mobile editor appears read-only in mobile archive'
 
   expect(screen.getByText('Kopi Mobile')).toBeInTheDocument();
   expect(screen.queryByRole('textbox', { name: /Kopi Mobile/ })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Edit nota' }));
+
+  expect(await screen.findByRole('heading', { name: 'Nota Barang' })).toBeInTheDocument();
+  expect(screen.getByLabelText('Nama barang 1A')).toHaveValue('Kopi Mobile');
+  expect(gateway.getSnapshot().notaTransactions.find((item) => item.customerName === '')?.status).toBe('reopened');
 });

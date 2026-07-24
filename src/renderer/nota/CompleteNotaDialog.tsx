@@ -38,8 +38,8 @@ export function CompleteNotaDialog({
       {phase === 'choice' && <>
         <p>Pilih waktu pengiriman. Kedua pilihan langsung memperbarui stok dan omzet demo.</p>
         <div className="chu-nota-workspace__completion-options">
-          <button data-modal-initial-focus aria-label="1. Barang dikirim sekarang" className="chu-nota-workspace__completion-option" onClick={() => onChoose('archive')}><strong>1. Barang dikirim sekarang</strong><span>Simpan ke Arsip</span></button>
-          <button aria-label="2. Barang dikirim nanti" className="chu-nota-workspace__completion-option" onClick={() => onChoose('finished')}><strong>2. Barang dikirim nanti</strong><span>Simpan ke Selesai</span></button>
+          <button data-modal-initial-focus aria-label="1. Barang dikirim sekarang" className="chu-nota-workspace__completion-option" onClick={() => onChoose('finished')}><strong>1. Barang dikirim sekarang</strong><span>Simpan ke Selesai</span></button>
+          <button aria-label="2. Barang dikirim nanti" className="chu-nota-workspace__completion-option" onClick={() => onChoose('archive')}><strong>2. Barang dikirim nanti</strong><span>Simpan ke Arsip</span></button>
         </div>
       </>}
       {phase === 'saving' && <p role="status">Menyimpan nota ke {label}…</p>}

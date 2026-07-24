@@ -4,17 +4,36 @@ import type { OperationsGateway } from '../../src/gateway/operations-gateway';
 import { notaPageTheme } from '../../src/renderer/nota/nota-page-colors';
 import { formatRupiah } from '../format';
 
-export function MobileArchiveView({ gateway }: { gateway: OperationsGateway }) {
+export function MobileArchiveView({ gateway, onEdit }: { gateway: OperationsGateway; onEdit: (transactionId: string) => void }) {
   const snapshot = useSyncExternalStore(gateway.subscribe, gateway.getSnapshot, gateway.getSnapshot);
   const archived = useMemo(() => snapshot.notaTransactions
     .filter((transaction) => transaction.status === 'completed' && (transaction.completionDestination ?? 'archive') === 'archive')
     .sort((a, b) => Date.parse(b.completedAt ?? '') - Date.parse(a.completedAt ?? '')), [snapshot.notaTransactions]);
   const [selectedId, setSelectedId] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [editError, setEditError] = useState('');
   const selected = archived.find((transaction) => transaction.id === selectedId) ?? archived[0];
+
+  async function editSelected() {
+    if (!selected || editing) return;
+    setEditing(true);
+    setEditError('');
+    try {
+      await gateway.reopenNotaTransaction(selected.id);
+      const reopened = gateway.getSnapshot().notaTransactions.find((transaction) => transaction.id === selected.id);
+      if (reopened?.status !== 'reopened') throw new Error('Nota tidak dapat dibuka untuk diedit.');
+      onEdit(selected.id);
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : 'Nota tidak dapat dibuka untuk diedit.');
+    } finally {
+      setEditing(false);
+    }
+  }
 
   return <section className="mobile-archive-view">
     <header className="mobile-header"><div><span className="eyebrow">ARSIP SAJA · SESSION ONLY</span><h1 data-page-heading tabIndex={-1}>Arsip Nota</h1></div></header>
     <p className="mobile-archive-badge">Belum terkirim ke desktop · frontend demo</p>
+    {editError && <p className="mobile-nota-notice mobile-nota-notice--alert" role="alert">{editError}</p>}
     {!archived.length ? <p className="mobile-nota-empty">Arsip mobile belum memiliki nota.</p> : <>
       <div className="mobile-archive-list" aria-label="Daftar arsip nota">{archived.map((transaction) => {
         const total = transaction.pages.filter((page) => page.status === 'active').flatMap((page) => page.lines).reduce((sum, line) => sum + lineTotal(line), 0);
@@ -25,7 +44,7 @@ export function MobileArchiveView({ gateway }: { gateway: OperationsGateway }) {
         </button>;
       })}</div>
       {selected && <section className="mobile-archive-detail" aria-label={`Nota arsip ${selected.baseNumber}`}>
-        <header><span>{selected.baseNumber}</span><strong>Hanya lihat</strong></header>
+        <header><span>{selected.baseNumber}</span><button className="secondary-action" disabled={editing} onClick={() => void editSelected()}>Edit nota</button></header>
         {selected.pages.filter((page) => page.status === 'active').map((page) => {
           const pageIndex = selected.pages.findIndex((candidate) => candidate.id === page.id);
           const theme = notaPageTheme(pageIndex);

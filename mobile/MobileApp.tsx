@@ -26,6 +26,7 @@ export function MobileApp({ gateway, scanner, notifications, share }: {
 }) {
   const snapshot = useSyncExternalStore(gateway.subscribe, gateway.getSnapshot, gateway.getSnapshot);
   const [view, setView] = useState<MainView>('home');
+  const [editingNotaId, setEditingNotaId] = useState<string | null>(null);
   const [focusSearch, setFocusSearch] = useState(false);
   const [selectedSkuId, setSelectedSkuId] = useState<string | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
@@ -45,13 +46,13 @@ export function MobileApp({ gateway, scanner, notifications, share }: {
     : sortedChanges.filter((change) => unreadFeedIds.includes(change.id));
 
   useEffect(() => {
-    const focusTarget = view === 'skus' && !selectedSkuId && !scanOpen
+    const focusTarget = view === 'skus' && !selectedSkuId && !scanOpen && focusSearch
       ? mainContentRef.current?.querySelector<HTMLElement>('[role="searchbox"]')
       : scanOpen
         ? mainContentRef.current?.querySelector<HTMLElement>('#manual-scan-code')
         : mainContentRef.current?.querySelector<HTMLElement>('[data-page-heading]');
     focusTarget?.focus();
-  }, [priceMode, scanOpen, selectedSkuId, view]);
+  }, [focusSearch, priceMode, scanOpen, selectedSkuId, view]);
 
   useEffect(() => {
     if (view !== 'prices' || priceMode !== 'unread' || unreadFeedIds.length === 0) return;
@@ -86,8 +87,17 @@ export function MobileApp({ gateway, scanner, notifications, share }: {
     setSelectedSkuId(null);
     setScanOpen(false);
     setFocusSearch(shouldFocusSearch);
+    setEditingNotaId(null);
     if (next === 'prices') setPriceMode('all');
     setView(next);
+  }
+
+  function editArchivedNota(transactionId: string) {
+    scanRequestToken.current += 1;
+    setSelectedSkuId(null);
+    setScanOpen(false);
+    setEditingNotaId(transactionId);
+    setView('nota');
   }
 
   function openUnreadPrices() {
@@ -192,8 +202,8 @@ export function MobileApp({ gateway, scanner, notifications, share }: {
         onSharePdf={share.sharePdf}
         snapshot={snapshot}
       /> : null}
-      {view === 'nota' && !scanOpen && !selectedSku ? <MobileNotaView gateway={gateway} scanner={scanner} /> : null}
-      {view === 'archive' && !scanOpen && !selectedSku ? <MobileArchiveView gateway={gateway} /> : null}
+      {view === 'nota' && !scanOpen && !selectedSku ? <MobileNotaView gateway={gateway} scanner={scanner} transactionId={editingNotaId ?? undefined} /> : null}
+      {view === 'archive' && !scanOpen && !selectedSku ? <MobileArchiveView gateway={gateway} onEdit={editArchivedNota} /> : null}
       {view === 'more' && !scanOpen && !selectedSku ? <MoreView onOpenPrices={() => navigate('prices')} onOpenRecommendations={() => navigate('recommendations')} /> : null}
     </main>
     <nav aria-label="Navigasi utama" className="bottom-nav">

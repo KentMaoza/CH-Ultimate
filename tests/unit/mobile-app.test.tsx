@@ -107,13 +107,14 @@ test('new pages and SKU detail transitions move focus into the routed content', 
   renderMobile();
 
   fireEvent.click(screen.getByRole('button', { name: 'SKU' }));
-  expect(screen.getByRole('searchbox', { name: 'Cari SKU' })).toHaveFocus();
+  expect(screen.getByRole('heading', { name: 'SKU Gudang' })).toHaveFocus();
+  expect(screen.getByRole('searchbox', { name: 'Cari SKU' })).not.toHaveFocus();
 
   fireEvent.click(screen.getByRole('button', { name: /Beras Hitam Premium 1 kg/ }));
   expect(screen.getByRole('heading', { name: 'Beras Hitam Premium 1 kg' })).toHaveFocus();
 
   fireEvent.click(screen.getByRole('button', { name: 'Kembali' }));
-  expect(screen.getByRole('searchbox', { name: 'Cari SKU' })).toHaveFocus();
+  expect(screen.getByRole('heading', { name: 'SKU Gudang' })).toHaveFocus();
 
   openMoreDestination('Perubahan Harga');
   expect(screen.getByRole('heading', { name: 'Perubahan Harga' })).toHaveFocus();

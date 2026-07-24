@@ -11,7 +11,7 @@ function openNota(gateway: MockOperationsGateway) {
 async function chooseCompletion(destination: NotaCompletionDestination) {
   fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
   const dialog = screen.getByRole('dialog', { name: 'Selesaikan nota?' });
-  const label = destination === 'archive'
+  const label = destination === 'finished'
     ? '1. Barang dikirim sekarang'
     : '2. Barang dikirim nanti';
   fireEvent.click(within(dialog).getByRole('button', { name: label }));
@@ -19,8 +19,8 @@ async function chooseCompletion(destination: NotaCompletionDestination) {
 }
 
 test.each([
-  ['archive' as const, 'Arsip', 'Nota berhasil disimpan di Arsip.'],
   ['finished' as const, 'Selesai', 'Nota berhasil disimpan di Selesai.'],
+  ['archive' as const, 'Arsip', 'Nota berhasil disimpan di Arsip.'],
 ])('completion to %s names the destination and opens its archive bucket', async (destination, tab, message) => {
   const gateway = new MockOperationsGateway();
   openNota(gateway);
@@ -68,5 +68,5 @@ test('archive tabs are ordered Arsip, Selesai, Sampah and finished notes stay ou
   expect(screen.getByText('Arsip belum memiliki nota.')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('tab', { name: 'Selesai' }));
   expect(screen.getByRole('region', { name: 'Preview selesai nota' })).toBeInTheDocument();
-  expect(screen.getByText('SELESAI · BARANG DIKIRIM NANTI')).toBeInTheDocument();
+  expect(screen.getByText('SELESAI · BARANG DIKIRIM SEKARANG')).toBeInTheDocument();
 });

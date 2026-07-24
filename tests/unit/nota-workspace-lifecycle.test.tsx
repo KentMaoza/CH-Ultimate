@@ -73,7 +73,7 @@ test('archive module opens completed nota as inline read-only preview without ch
   const revenueBefore = buildRevenueReport(gateway.getSnapshot()).today;
   openArchive(gateway);
 
-  expect(screen.getByText('ARSIP · HANYA LIHAT')).toBeInTheDocument();
+  expect(screen.getByText('ARSIP · BARANG DIKIRIM NANTI')).toBeInTheDocument();
   expect(screen.getByRole('region', { name: 'Preview arsip nota' })).toBeInTheDocument();
   const collapsePreview = screen.getByRole('button', { name: 'Lipat preview nota' });
   expect(collapsePreview).toHaveAttribute('aria-expanded', 'true');
@@ -290,7 +290,7 @@ test('restoring a completed transaction returns to Arsip rather than the working
   fireEvent.click(screen.getByRole('tab', { name: 'Sampah' }));
   fireEvent.click(screen.getByRole('button', { name: 'Pulihkan' }));
   await waitFor(() => expect(screen.getByRole('tab', { name: 'Arsip' })).toHaveAttribute('aria-selected', 'true'));
-  expect(screen.getByText('ARSIP · HANYA LIHAT')).toBeInTheDocument();
+  expect(screen.getByText('ARSIP · BARANG DIKIRIM NANTI')).toBeInTheDocument();
 });
 
 test.each(['draft', 'reopened'] as const)('restoring a cancelled %s transaction selects its working page', async (status) => {

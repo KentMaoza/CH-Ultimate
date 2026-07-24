@@ -3,6 +3,7 @@ import { lineTotal, noteSuffixFromIndex } from '../../src/domain/nota';
 import { findSkuByScanCode } from '../../src/domain/mobile-demo-state';
 import type { NotaLine, NotaTransaction, Unit } from '../../src/domain/types';
 import type { OperationsGateway } from '../../src/gateway/operations-gateway';
+import { createNotaVoicePlayer, type NotaVoicePlayer } from '../../src/renderer/nota/nota-voice';
 import { notaPageTheme } from '../../src/renderer/nota/nota-page-colors';
 import { formatRupiah } from '../format';
 import type { BarcodeScannerPort } from '../ports';
@@ -15,17 +16,29 @@ function populated(line: NotaLine) {
   return Boolean(line.skuId || line.description.trim() || line.kind.trim() || line.quantity || line.pcsPrice || line.lsnPrice);
 }
 
-function workingTransaction(transactions: NotaTransaction[]) {
-  return transactions.find((transaction) => transaction.status === 'draft' || transaction.status === 'reopened');
+function workingTransaction(transactions: NotaTransaction[], transactionId?: string) {
+  const working = transactions.filter((transaction) => transaction.status === 'draft' || transaction.status === 'reopened');
+  return transactionId ? working.find((transaction) => transaction.id === transactionId) : working[0];
 }
 
 function rowPrice(line: NotaLine) {
   return line.unit === 'lsn' ? line.lsnPrice : line.pcsPrice;
 }
 
-export function MobileNotaView({ gateway, scanner }: { gateway: OperationsGateway; scanner: BarcodeScannerPort }) {
+function availableSlot(transaction: NotaTransaction, preferredPageId?: string) {
+  const active = transaction.pages.filter((page) => page.status === 'active');
+  const preferredIndex = active.findIndex((page) => page.id === preferredPageId);
+  for (let index = Math.max(0, preferredIndex); index < active.length; index += 1) {
+    const page = active[index]!;
+    const line = page.lines.find((candidate) => !populated(candidate));
+    if (line) return { page, line };
+  }
+  return null;
+}
+
+export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: OperationsGateway; scanner: BarcodeScannerPort; transactionId?: string }) {
   const snapshot = useSyncExternalStore(gateway.subscribe, gateway.getSnapshot, gateway.getSnapshot);
-  const transaction = workingTransaction(snapshot.notaTransactions);
+  const transaction = workingTransaction(snapshot.notaTransactions, transactionId);
   const [selectedPageId, setSelectedPageId] = useState('');
   const [manualOpen, setManualOpen] = useState(false);
   const [manual, setManual] = useState<ManualDraft>(emptyManual);
@@ -35,6 +48,7 @@ export function MobileNotaView({ gateway, scanner }: { gateway: OperationsGatewa
   const [busy, setBusy] = useState(false);
   const creating = useRef(false);
   const completionStarted = useRef(false);
+  const voicePlayer = useRef<NotaVoicePlayer | null>(null);
   const activePages = transaction?.pages.filter((page) => page.status === 'active') ?? [];
   const selectedPage = activePages.find((page) => page.id === selectedPageId) ?? activePages[0];
 
@@ -48,24 +62,33 @@ export function MobileNotaView({ gateway, scanner }: { gateway: OperationsGatewa
     if (selectedPage && selectedPage.id !== selectedPageId) setSelectedPageId(selectedPage.id);
   }, [selectedPage, selectedPageId]);
 
+  useEffect(() => {
+    const player = createNotaVoicePlayer({ onPlaybackError: () => {
+      setNoticeKind('alert');
+      setNotice('Suara nota tidak dapat diputar.');
+    } });
+    voicePlayer.current = player;
+    return () => {
+      player.dispose();
+      if (voicePlayer.current === player) voicePlayer.current = null;
+    };
+  }, []);
+
   const transactionTotal = useMemo(() => activePages
     .flatMap((page) => page.lines)
     .reduce((total, line) => total + lineTotal(line), 0), [activePages]);
   const pageTotal = selectedPage?.lines.reduce((total, line) => total + lineTotal(line), 0) ?? 0;
 
   async function findSlot(current: NotaTransaction) {
-    const active = current.pages.filter((page) => page.status === 'active');
-    for (const page of active) {
-      const line = page.lines.find((candidate) => !populated(candidate));
-      if (line) return { page, line };
-    }
+    const existing = availableSlot(current, selectedPage?.id);
+    if (existing) return existing;
     const page = await gateway.addNotaPage(current.id);
     const line = page?.lines[0];
     return page && line ? { page, line } : null;
   }
 
   async function addSkuCode(rawCode: string) {
-    const current = workingTransaction(gateway.getSnapshot().notaTransactions);
+    const current = workingTransaction(gateway.getSnapshot().notaTransactions, transactionId);
     if (!current) return;
     const sku = findSkuByScanCode(gateway.getSnapshot().skus, rawCode);
     if (!sku) {
@@ -127,7 +150,7 @@ export function MobileNotaView({ gateway, scanner }: { gateway: OperationsGatewa
   }
 
   async function addManual() {
-    const current = workingTransaction(gateway.getSnapshot().notaTransactions);
+    const current = workingTransaction(gateway.getSnapshot().notaTransactions, transactionId);
     const quantity = Number(manual.quantity);
     const price = Number(manual.price);
     if (!current || !manual.description.trim()) {
@@ -150,6 +173,13 @@ export function MobileNotaView({ gateway, scanner }: { gateway: OperationsGatewa
       unit: manual.unit,
       pcsPrice: manual.unit === 'pcs' ? price : Math.round(price / 12),
       lsnPrice: manual.unit === 'lsn' ? price : price * 12,
+    });
+    voicePlayer.current?.speak({
+      rowNumber: slot.page.lines.findIndex((line) => line.id === slot.line.id) + 1,
+      suffix: slot.page.suffix,
+      quantity,
+      unit: manual.unit,
+      price,
     });
     setSelectedPageId(slot.page.id);
     setManual(emptyManual);
@@ -191,6 +221,12 @@ export function MobileNotaView({ gateway, scanner }: { gateway: OperationsGatewa
 
   const theme = notaPageTheme(Math.max(0, transaction?.pages.findIndex((page) => page.id === selectedPage?.id) ?? 0));
   const themeStyle = { '--mobile-nota-accent': theme.background, '--mobile-nota-accent-text': theme.foreground } as CSSProperties;
+  const nextSlot = transaction ? availableSlot(transaction, selectedPage?.id) : null;
+  const nextManualLabel = transaction
+    ? nextSlot
+      ? `${nextSlot.page.lines.findIndex((line) => line.id === nextSlot.line.id) + 1}${nextSlot.page.suffix}`
+      : `1${noteSuffixFromIndex(transaction.nextNoteIndex)}`
+    : '';
 
   return <section className="mobile-nota-view" aria-busy={busy || undefined}>
     <header className="mobile-header mobile-nota-header">
@@ -207,8 +243,8 @@ export function MobileNotaView({ gateway, scanner }: { gateway: OperationsGatewa
         <button className="primary-action" disabled={busy} onClick={() => void scan()}><ScanIcon />Scan barcode</button>
         <button className="secondary-action" disabled={busy} onClick={() => setManualOpen((open) => !open)}>Tambah barang tanpa barcode</button>
       </div>
-      {manualOpen && <section className="mobile-nota-manual" aria-label="Barang tanpa barcode">
-        <label><span>Nama barang</span><input aria-label="Nama barang manual" value={manual.description} onChange={(event) => setManual({ ...manual, description: event.target.value })} /></label>
+      {manualOpen && <section className="mobile-nota-manual" aria-label="Barang tanpa barcode" style={themeStyle}>
+        <div className="mobile-nota-manual__name"><strong aria-label={`Nomor barang ${nextManualLabel}`}>{nextManualLabel}</strong><label><span>Nama barang</span><input aria-label="Nama barang manual" value={manual.description} onChange={(event) => setManual({ ...manual, description: event.target.value })} /></label></div>
         <label><span>Jenis</span><input aria-label="Jenis barang manual" value={manual.kind} onChange={(event) => setManual({ ...manual, kind: event.target.value })} /></label>
         <div><label><span>Jumlah</span><input aria-label="Jumlah barang manual" inputMode="numeric" value={manual.quantity} onChange={(event) => setManual({ ...manual, quantity: event.target.value })} /></label><label><span>Unit</span><select aria-label="Unit barang manual" value={manual.unit} onChange={(event) => setManual({ ...manual, unit: event.target.value as Unit })}><option value="pcs">PCS</option><option value="lsn">LSN</option></select></label></div>
         <label><span>Harga</span><input aria-label="Harga barang manual" inputMode="numeric" value={manual.price} onChange={(event) => setManual({ ...manual, price: event.target.value })} /></label>

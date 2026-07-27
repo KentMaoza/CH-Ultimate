@@ -227,10 +227,7 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
 
   async function addPage() {
     if (!transaction) return;
-    const pageRequest = gateway.addNotaPage(transaction.id);
-    const latestPage = workingTransaction(gateway.getSnapshot().notaTransactions, transactionId)?.pages.at(-1);
-    if (latestPage && latestPage.id !== selectedPage?.id) setSelectedPageId(latestPage.id);
-    const page = await pageRequest;
+    const page = await gateway.addNotaPage(transaction.id);
     if (page) setSelectedPageId(page.id);
   }
 
@@ -346,7 +343,7 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
           >
             <span className="mobile-nota-sku-mark">CHU</span>
             <span className="mobile-nota-sku-identity"><strong>{sku.skuNumber}</strong><span>{sku.name}</span></span>
-            <span className="mobile-nota-sku-value"><b>{formatRupiah(sku.referencePrice)}</b><span>{sku.tracked ? `Stok ${sku.stock}` : 'Stok tidak dilacak'}</span></span>
+            <span className="mobile-nota-sku-value"><b>PCS · {formatRupiah(sku.referencePrice)}</b><span>{sku.tracked ? `Stok ${sku.stock}` : 'Stok tidak dilacak'}</span></span>
           </button>)}
           {!skuResults.length && <p className="mobile-nota-empty">Tidak ada SKU aktif yang cocok.</p>}
         </div>

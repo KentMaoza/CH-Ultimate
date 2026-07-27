@@ -17,10 +17,20 @@ beforeEach(() => {
   voice.dispose.mockClear();
 });
 
-function renderNota(scanner: BarcodeScannerPort = { scan: async () => null }, seedFactory: () => DemoState = createMobileDemoState) {
-  const gateway = new MockOperationsGateway(seedFactory);
+function renderNota(
+  scanner: BarcodeScannerPort = { scan: async () => null },
+  seedFactory: () => DemoState = createMobileDemoState,
+  gateway = new MockOperationsGateway(seedFactory),
+) {
   render(<MobileNotaView gateway={gateway} scanner={scanner} />);
   return gateway;
+}
+
+class AsyncAddNotaPageGateway extends MockOperationsGateway {
+  override async addNotaPage(transactionId: string) {
+    await new Promise<void>((resolve) => queueMicrotask(resolve));
+    return super.addNotaPage(transactionId);
+  }
 }
 
 async function addManual(name: string) {
@@ -194,12 +204,15 @@ test('mobile completion has one archive-and-transfer action and records an hones
 });
 
 test('SKU picker adds the selected product to the active B section and keeps the picker open', async () => {
-  const gateway = renderNota();
+  const gateway = renderNota(undefined, createMobileDemoState, new AsyncAddNotaPageGateway(createMobileDemoState));
   await screen.findByRole('heading', { name: 'Nota Barang' });
   fireEvent.click(screen.getByRole('button', { name: 'Tambah Bagian B' }));
+  const sectionB = await screen.findByRole('button', { name: 'Bagian B' });
+  expect(sectionB).toHaveAttribute('aria-pressed', 'true');
   fireEvent.click(screen.getByRole('button', { name: 'Tambah barang dengan SKU' }));
 
   const picker = screen.getByRole('region', { name: 'Tambah barang dengan SKU' });
+  expect(within(picker).getByText('PCS · Rp42.000')).toBeInTheDocument();
   fireEvent.click(within(picker).getByRole('button', { name: 'Tambah Beras Hitam Premium 1 kg (BRS-108-BLK)' }));
 
   const row = await screen.findByRole('region', { name: /Beras Hitam Premium 1 kg/ });

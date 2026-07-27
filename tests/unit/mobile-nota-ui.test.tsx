@@ -192,3 +192,29 @@ test('mobile completion has one archive-and-transfer action and records an hones
     desktopTransferError: 'CH Core API belum tersedia.',
   });
 });
+
+test('SKU picker toggles inline, filters active demo SKUs, and is mutually exclusive with manual entry', async () => {
+  renderNota();
+  await screen.findByRole('heading', { name: 'Nota Barang' });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Tambah barang dengan SKU' }));
+  const picker = screen.getByRole('region', { name: 'Tambah barang dengan SKU' });
+  expect(within(picker).getByText('Target nomor 1A')).toBeInTheDocument();
+  expect(within(picker).getByText('5 SKU aktif')).toBeInTheDocument();
+  expect(within(picker).queryByText('Minuman Serbuk Cokelat')).not.toBeInTheDocument();
+
+  fireEvent.change(within(picker).getByRole('searchbox', { name: 'Cari SKU untuk nota' }), {
+    target: { value: 'DRESS-MERAH' },
+  });
+  expect(within(picker).getByText('Dress Katun Merah')).toBeInTheDocument();
+  expect(within(picker).queryByText('Beras Hitam Premium 1 kg')).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Tambah barang tanpa barcode' }));
+  expect(screen.queryByRole('region', { name: 'Tambah barang dengan SKU' })).not.toBeInTheDocument();
+  expect(screen.getByRole('region', { name: 'Barang tanpa barcode' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Tambah barang dengan SKU' }));
+  expect(screen.queryByRole('region', { name: 'Barang tanpa barcode' })).not.toBeInTheDocument();
+  fireEvent.click(within(screen.getByRole('region', { name: 'Tambah barang dengan SKU' })).getByRole('button', { name: 'Lipat daftar SKU' }));
+  expect(screen.queryByRole('region', { name: 'Tambah barang dengan SKU' })).not.toBeInTheDocument();
+});

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { lineTotal, noteSuffixFromIndex } from '../../src/domain/nota';
-import { findSkuByScanCode } from '../../src/domain/mobile-demo-state';
+import { findSkuByScanCode, searchMobileSkus } from '../../src/domain/mobile-demo-state';
 import type { NotaLine, NotaTransaction, Unit } from '../../src/domain/types';
 import type { OperationsGateway } from '../../src/gateway/operations-gateway';
 import { createNotaVoicePlayer, type NotaVoicePlayer } from '../../src/renderer/nota/nota-voice';
@@ -41,6 +41,8 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
   const transaction = workingTransaction(snapshot.notaTransactions, transactionId);
   const [selectedPageId, setSelectedPageId] = useState('');
   const [manualOpen, setManualOpen] = useState(false);
+  const [skuPickerOpen, setSkuPickerOpen] = useState(false);
+  const [skuQuery, setSkuQuery] = useState('');
   const [manual, setManual] = useState<ManualDraft>(emptyManual);
   const [notice, setNotice] = useState('');
   const [noticeKind, setNoticeKind] = useState<'status' | 'alert'>('status');
@@ -78,6 +80,10 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
     .flatMap((page) => page.lines)
     .reduce((total, line) => total + lineTotal(line), 0), [activePages]);
   const pageTotal = selectedPage?.lines.reduce((total, line) => total + lineTotal(line), 0) ?? 0;
+  const skuResults = useMemo(
+    () => searchMobileSkus(snapshot.skus, skuQuery),
+    [snapshot.skus, skuQuery],
+  );
 
   async function findSlot(current: NotaTransaction) {
     const existing = availableSlot(current, selectedPage?.id);
@@ -254,7 +260,7 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
   const theme = notaPageTheme(Math.max(0, transaction?.pages.findIndex((page) => page.id === selectedPage?.id) ?? 0));
   const themeStyle = { '--mobile-nota-accent': theme.background, '--mobile-nota-accent-text': theme.foreground } as CSSProperties;
   const nextSlot = transaction ? availableSlot(transaction, selectedPage?.id) : null;
-  const nextManualLabel = transaction
+  const nextItemLabel = transaction
     ? nextSlot
       ? `${nextSlot.page.lines.findIndex((line) => line.id === nextSlot.line.id) + 1}${nextSlot.page.suffix}`
       : `1${noteSuffixFromIndex(transaction.nextNoteIndex)}`
@@ -272,11 +278,61 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
         <label><span>Tempat</span><input value={transaction.customerPlace} onChange={(event) => void gateway.updateNotaTransaction(transaction.id, { customerPlace: event.target.value })} /></label>
       </section>
       <div className="mobile-nota-actions">
-        <button className="primary-action" disabled={busy} onClick={() => void scan()}><ScanIcon />Scan barcode</button>
-        <button className="secondary-action" disabled={busy} onClick={() => setManualOpen((open) => !open)}>Tambah barang tanpa barcode</button>
+        <button className="primary-action mobile-nota-actions__scan" disabled={busy} onClick={() => void scan()}>
+          <ScanIcon />Scan barcode
+        </button>
+        <button
+          className="secondary-action"
+          aria-expanded={skuPickerOpen}
+          disabled={busy}
+          onClick={() => {
+            setSkuPickerOpen((open) => !open);
+            setManualOpen(false);
+          }}
+        >
+          Tambah barang dengan SKU
+        </button>
+        <button
+          className="secondary-action"
+          disabled={busy}
+          onClick={() => {
+            setManualOpen((open) => !open);
+            setSkuPickerOpen(false);
+          }}
+        >
+          Tambah barang tanpa barcode
+        </button>
       </div>
+      {skuPickerOpen && <section className="mobile-nota-sku-picker" aria-label="Tambah barang dengan SKU">
+        <header>
+          <div>
+            <strong>SKU GUDANG</strong>
+            <span>Target nomor {nextItemLabel}</span>
+          </div>
+          <button aria-label="Lipat daftar SKU" onClick={() => setSkuPickerOpen(false)}>Lipat</button>
+        </header>
+        <label className="mobile-nota-sku-search">
+          <span>Cari SKU</span>
+          <input
+            aria-label="Cari SKU untuk nota"
+            role="searchbox"
+            placeholder="Cari nama / nomor SKU / alias"
+            value={skuQuery}
+            onChange={(event) => setSkuQuery(event.currentTarget.value)}
+          />
+        </label>
+        <p>{skuResults.length} SKU aktif</p>
+        <div className="mobile-nota-sku-results">
+          {skuResults.map((sku) => <article key={sku.id}>
+            <span className="mobile-nota-sku-mark">CHU</span>
+            <div><strong>{sku.skuNumber}</strong><span>{sku.name}</span></div>
+            <div><b>{formatRupiah(sku.referencePrice)}</b><span>{sku.tracked ? `Stok ${sku.stock}` : 'Stok tidak dilacak'}</span></div>
+          </article>)}
+          {!skuResults.length && <p className="mobile-nota-empty">Tidak ada SKU aktif yang cocok.</p>}
+        </div>
+      </section>}
       {manualOpen && <section className="mobile-nota-manual" aria-label="Barang tanpa barcode" style={themeStyle}>
-        <div className="mobile-nota-manual__name"><strong aria-label={`Nomor barang ${nextManualLabel}`}>{nextManualLabel}</strong><label><span>Nama barang</span><input aria-label="Nama barang manual" value={manual.description} onChange={(event) => setManual({ ...manual, description: event.target.value })} /></label></div>
+        <div className="mobile-nota-manual__name"><strong aria-label={`Nomor barang ${nextItemLabel}`}>{nextItemLabel}</strong><label><span>Nama barang</span><input aria-label="Nama barang manual" value={manual.description} onChange={(event) => setManual({ ...manual, description: event.target.value })} /></label></div>
         <label><span>Jenis</span><input aria-label="Jenis barang manual" value={manual.kind} onChange={(event) => setManual({ ...manual, kind: event.target.value })} /></label>
         <div><label><span>Jumlah</span><input aria-label="Jumlah barang manual" inputMode="numeric" value={manual.quantity} onChange={(event) => setManual({ ...manual, quantity: event.target.value })} /></label><label><span>Unit</span><select aria-label="Unit barang manual" value={manual.unit} onChange={(event) => setManual({ ...manual, unit: event.target.value as Unit })}><option value="pcs">PCS</option><option value="lsn">LSN</option></select></label></div>
         <div><label><span>Harga PCS</span><input aria-label="Harga PCS barang manual" inputMode="numeric" value={manual.pcsPrice} onChange={(event) => setManual({ ...manual, pcsPrice: event.target.value })} /></label><label><span>Harga Lusin</span><input aria-label="Harga Lusin barang manual" inputMode="numeric" value={manual.lsnPrice} onChange={(event) => setManual({ ...manual, lsnPrice: event.target.value })} /></label></div>

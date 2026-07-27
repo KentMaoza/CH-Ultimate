@@ -890,10 +890,11 @@ input:focus-visible,
 .mobile-nota-sku-search input { width: 100%; min-height: 46px; padding: 9px 10px; border: 1px solid #888; border-radius: 9px; font: inherit; }
 .mobile-nota-sku-picker > p { margin: 0; padding: 0 12px; color: #666; font-size: .75rem; font-weight: 750; }
 .mobile-nota-sku-results { display: grid; overflow-y: auto; max-height: 320px; border-top: 1px solid #ddd; }
-.mobile-nota-sku-results article { display: grid; min-height: 72px; padding: 10px 12px; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 9px; border-bottom: 1px solid #ddd; }
-.mobile-nota-sku-results article > div:last-child { text-align: right; }
-.mobile-nota-sku-results strong, .mobile-nota-sku-results span, .mobile-nota-sku-results b { display: block; }
-.mobile-nota-sku-results article span { color: #555; font-size: .74rem; }
+.mobile-nota-sku-card { display: grid; width: 100%; min-height: 72px; margin: 0; padding: 10px 12px; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 9px; border: 0; border-bottom: 1px solid #ddd; border-radius: 0; background: #fff; text-align: left; }
+.mobile-nota-sku-card:active { background: #f1f1f1; }
+.mobile-nota-sku-value { text-align: right; }
+.mobile-nota-sku-identity strong, .mobile-nota-sku-identity span, .mobile-nota-sku-value b, .mobile-nota-sku-value span { display: block; }
+.mobile-nota-sku-identity span, .mobile-nota-sku-value span { color: #555; font-size: .74rem; }
 .mobile-nota-sku-mark { display: grid !important; width: 38px; height: 38px; place-items: center; border: 1px solid #111; color: #111 !important; font-weight: 900; }
 .mobile-nota-manual > div { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .mobile-nota-manual > .mobile-nota-manual__name { grid-template-columns: 48px minmax(0, 1fr); align-items: end; }

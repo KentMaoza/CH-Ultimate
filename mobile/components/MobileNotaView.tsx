@@ -93,7 +93,7 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
     return page && line ? { page, line } : null;
   }
 
-  async function addSkuCode(rawCode: string) {
+  async function addSkuCode(rawCode: string, source: 'barcode' | 'catalogue' = 'barcode') {
     const current = workingTransaction(gateway.getSnapshot().notaTransactions, transactionId);
     if (!current) return;
     const sku = findSkuByScanCode(gateway.getSnapshot().skus, rawCode);
@@ -147,7 +147,18 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
     });
     setSelectedPageId(slot.page.id);
     setNoticeKind('status');
-    setNotice(`${sku.name} ditambahkan dari barcode.`);
+    setNotice(`${sku.name} ditambahkan dari ${source === 'catalogue' ? 'SKU Gudang' : 'barcode'}.`);
+  }
+
+  async function addSkuFromPicker(skuNumber: string) {
+    if (busy) return;
+    setBusy(true);
+    setNotice('');
+    try {
+      await addSkuCode(skuNumber, 'catalogue');
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function scan() {
@@ -216,7 +227,10 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
 
   async function addPage() {
     if (!transaction) return;
-    const page = await gateway.addNotaPage(transaction.id);
+    const pageRequest = gateway.addNotaPage(transaction.id);
+    const latestPage = workingTransaction(gateway.getSnapshot().notaTransactions, transactionId)?.pages.at(-1);
+    if (latestPage && latestPage.id !== selectedPage?.id) setSelectedPageId(latestPage.id);
+    const page = await pageRequest;
     if (page) setSelectedPageId(page.id);
   }
 
@@ -323,11 +337,17 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
         </label>
         <p>{skuResults.length} SKU aktif</p>
         <div className="mobile-nota-sku-results">
-          {skuResults.map((sku) => <article key={sku.id}>
+          {skuResults.map((sku) => <button
+            key={sku.id}
+            className="mobile-nota-sku-card"
+            aria-label={`Tambah ${sku.name} (${sku.skuNumber})`}
+            disabled={busy}
+            onClick={() => void addSkuFromPicker(sku.skuNumber)}
+          >
             <span className="mobile-nota-sku-mark">CHU</span>
-            <div><strong>{sku.skuNumber}</strong><span>{sku.name}</span></div>
-            <div><b>{formatRupiah(sku.referencePrice)}</b><span>{sku.tracked ? `Stok ${sku.stock}` : 'Stok tidak dilacak'}</span></div>
-          </article>)}
+            <span className="mobile-nota-sku-identity"><strong>{sku.skuNumber}</strong><span>{sku.name}</span></span>
+            <span className="mobile-nota-sku-value"><b>{formatRupiah(sku.referencePrice)}</b><span>{sku.tracked ? `Stok ${sku.stock}` : 'Stok tidak dilacak'}</span></span>
+          </button>)}
           {!skuResults.length && <p className="mobile-nota-empty">Tidak ada SKU aktif yang cocok.</p>}
         </div>
       </section>}

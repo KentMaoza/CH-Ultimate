@@ -193,6 +193,56 @@ test('mobile completion has one archive-and-transfer action and records an hones
   });
 });
 
+test('SKU picker adds the selected product to the active B section and keeps the picker open', async () => {
+  const gateway = renderNota();
+  await screen.findByRole('heading', { name: 'Nota Barang' });
+  fireEvent.click(screen.getByRole('button', { name: 'Tambah Bagian B' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Tambah barang dengan SKU' }));
+
+  const picker = screen.getByRole('region', { name: 'Tambah barang dengan SKU' });
+  fireEvent.click(within(picker).getByRole('button', { name: 'Tambah Beras Hitam Premium 1 kg (BRS-108-BLK)' }));
+
+  const row = await screen.findByRole('region', { name: /Beras Hitam Premium 1 kg/ });
+  expect(row).toHaveTextContent('1B');
+  expect(gateway.getSnapshot().notaTransactions[0]?.pages[1]?.lines[0]).toMatchObject({
+    skuId: 'sku-1',
+    quantity: 1,
+    unit: 'pcs',
+    pcsPrice: 42_000,
+    lsnPrice: 504_000,
+  });
+  expect(screen.getByRole('region', { name: 'Tambah barang dengan SKU' })).toBeInTheDocument();
+  expect(voice.speak).toHaveBeenLastCalledWith({
+    rowNumber: 1,
+    suffix: 'B',
+    quantity: 1,
+    unit: 'pcs',
+    price: 42_000,
+  });
+});
+
+test('selecting the same SKU twice increments its existing row and rereads the updated quantity', async () => {
+  const gateway = renderNota();
+  await screen.findByRole('heading', { name: 'Nota Barang' });
+  fireEvent.click(screen.getByRole('button', { name: 'Tambah barang dengan SKU' }));
+  const picker = screen.getByRole('region', { name: 'Tambah barang dengan SKU' });
+  const skuButton = within(picker).getByRole('button', { name: 'Tambah Beras Hitam Premium 1 kg (BRS-108-BLK)' });
+
+  fireEvent.click(skuButton);
+  await screen.findByRole('region', { name: /Beras Hitam Premium 1 kg/ });
+  fireEvent.click(skuButton);
+
+  await waitFor(() => expect(gateway.getSnapshot().notaTransactions[0]?.pages[0]?.lines[0]?.quantity).toBe(2));
+  expect(screen.getAllByRole('region', { name: /Beras Hitam Premium 1 kg/ })).toHaveLength(1);
+  expect(voice.speak).toHaveBeenLastCalledWith({
+    rowNumber: 1,
+    suffix: 'A',
+    quantity: 2,
+    unit: 'pcs',
+    price: 42_000,
+  });
+});
+
 test('SKU picker toggles inline, filters active demo SKUs, and is mutually exclusive with manual entry', async () => {
   renderNota();
   await screen.findByRole('heading', { name: 'Nota Barang' });

@@ -28,6 +28,7 @@ import type { CoreApiTransport } from './core-api-transport';
 export class CorePollingCoordinator {
   private initialization?: Promise<void>;
   private bootstrapped = false;
+  private disposed = false;
   private readonly scheduler: CoreSyncScheduler;
 
   constructor(
@@ -45,13 +46,16 @@ export class CorePollingCoordinator {
   }
 
   initialize = async (): Promise<void> => {
+    if (this.disposed) return;
     this.initialization ??= this.initializeOnce();
     return this.initialization;
   };
 
   private async initializeOnce(): Promise<void> {
+    if (this.disposed) return;
     this.scheduler.start();
     const cached = await this.storage.load();
+    if (this.disposed) return;
     if (hasUnsupportedCacheVersion(cached)) {
       this.state.publishSync({
         phase: 'upgrade-required',
@@ -142,6 +146,8 @@ export class CorePollingCoordinator {
   }
 
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
     this.scheduler.dispose();
   }
 

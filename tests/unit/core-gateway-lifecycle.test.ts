@@ -26,6 +26,29 @@ async function settleUntil(predicate: () => boolean): Promise<void> {
 }
 
 describe('Core gateway lifecycle and Nota flush races', () => {
+  it('keeps disposal terminal when initialize is called afterward', async () => {
+    const clock = new TestClock();
+    const transport = new ScriptedTransport();
+    const gateway = createCoreOperationsGateway(
+      transport,
+      new MemoryStorage(),
+      clock,
+    );
+
+    gateway.dispose();
+    await gateway.initialize();
+    gateway.dispose();
+
+    expect(transport.requests).toEqual([]);
+    expect(clock.pendingDelays()).toEqual([]);
+    expect(clock.resumeListenerCount()).toBe(0);
+    expect(gateway.getSyncSnapshot()).toMatchObject({
+      phase: 'connecting',
+      serverRevision: '0',
+      pendingCount: 0,
+    });
+  });
+
   it('disposes timers and resume listeners idempotently across recreated gateways', async () => {
     const clock = new TestClock();
     const firstTransport = new ScriptedTransport();

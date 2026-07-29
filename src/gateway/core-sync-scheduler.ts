@@ -19,6 +19,7 @@ export class CoreSyncScheduler {
   ) {}
 
   start(): void {
+    if (this.disposed) return;
     this.unsubscribeResume ??= this.clock.subscribeResume(() => {
       if (this.clock.isForeground()) return this.request();
     });

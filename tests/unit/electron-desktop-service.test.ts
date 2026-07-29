@@ -1,0 +1,133 @@
+import type { RequestOptions } from 'node:http';
+import { describe, expect, it, vi } from 'vitest';
+
+import type {
+  CoreCredentialState,
+  CoreCredentialStore,
+} from '../../src/electron/core-credential-store';
+import { createCoreDesktopService } from '../../src/electron/core-desktop-service';
+
+class MemoryCredentialStore implements CoreCredentialStore {
+  constructor(public state?: CoreCredentialState) {}
+  async load() {
+    return this.state;
+  }
+  async save(state: CoreCredentialState) {
+    this.state = state;
+  }
+  async getCurrentToken() {
+    if (!this.state?.current) throw new Error('missing');
+    return this.state.current.token;
+  }
+}
+
+const configPath = '/private/ch-core-config.json';
+const caFile = '/private/ch-core-ca.pem';
+
+describe('CH Core desktop service configuration', () => {
+  it('fails closed with a public setup status when config is missing', async () => {
+    const network = vi.fn();
+    const readFile = vi.fn(async () => {
+      const error = new Error('missing');
+      Object.assign(error, { code: 'ENOENT' });
+      throw error;
+    });
+    const service = await createCoreDesktopService({
+      configPath,
+      production: true,
+      store: new MemoryCredentialStore(),
+      readFile,
+      requestImpl: network,
+      platform: 'macos',
+    });
+
+    await expect(service.credentialStatus()).resolves.toEqual({
+      production: true,
+      configuration: 'missing',
+      credential: 'unpaired',
+      message: 'Konfigurasi CH Core belum tersedia.',
+    });
+    await expect(
+      service.request({ method: 'GET', path: '/v1/bootstrap' }),
+    ).rejects.toThrow('CH Core belum dikonfigurasi.');
+    expect(network).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the configured private CA cannot be loaded', async () => {
+    const network = vi.fn();
+    const readFile = vi.fn(async (filePath: string) => {
+      if (filePath === configPath) {
+        return Buffer.from(
+          JSON.stringify({
+            endpoint: 'https://192.0.2.10:8443',
+            caFile,
+          }),
+        );
+      }
+      throw new Error('CA missing');
+    });
+    const service = await createCoreDesktopService({
+      configPath,
+      production: true,
+      store: new MemoryCredentialStore(),
+      readFile,
+      requestImpl: network,
+      platform: 'macos',
+    });
+
+    await expect(service.credentialStatus()).resolves.toMatchObject({
+      production: true,
+      configuration: 'invalid',
+      credential: 'unpaired',
+      message: 'Sertifikat CH Core tidak dapat dibuka.',
+    });
+    await expect(
+      service.request({ method: 'GET', path: '/v1/bootstrap' }),
+    ).rejects.toThrow('CH Core belum dikonfigurasi.');
+    expect(network).not.toHaveBeenCalled();
+  });
+
+  it('reports only non-secret paired status when config and credentials are ready', async () => {
+    const readFile = vi.fn(async (filePath: string) =>
+      filePath === configPath
+        ? Buffer.from(
+            JSON.stringify({
+              endpoint: 'https://192.0.2.10:8443',
+              caFile,
+            }),
+          )
+        : Buffer.from('private-ca'),
+    );
+    const requestImpl = vi.fn((_options: RequestOptions) => {
+      throw new Error('not called by status');
+    });
+    const store = new MemoryCredentialStore({
+      version: 1,
+      installationId: '11111111-1111-4111-8111-111111111111',
+      current: {
+        deviceId: '22222222-2222-4222-8222-222222222222',
+        token: 'must-never-leave-main',
+      },
+      recoveryCredential: 'also-main-only',
+    });
+    const service = await createCoreDesktopService({
+      configPath,
+      production: true,
+      store,
+      readFile,
+      requestImpl,
+      platform: 'macos',
+    });
+
+    const status = await service.credentialStatus();
+
+    expect(status).toEqual({
+      production: true,
+      configuration: 'ready',
+      credential: 'paired',
+      deviceId: '22222222-2222-4222-8222-222222222222',
+    });
+    expect(JSON.stringify(status)).not.toContain('must-never-leave-main');
+    expect(JSON.stringify(status)).not.toContain('also-main-only');
+  });
+});

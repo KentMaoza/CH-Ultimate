@@ -197,26 +197,6 @@ describe('Core operations gateway bootstrap and polling', () => {
 
   it.each([
     {
-      name: 'a forward sequence gap',
-      response: {
-        status: 200,
-        body: {
-          serverRevision: '4',
-          nextAfter: '4',
-          changes: [
-            {
-              revision: '4',
-              entityType: 'device',
-              entityId: SKU_ID,
-              operation: 'upsert',
-              payload: { id: SKU_ID },
-              createdAt: '2026-07-29T01:00:04.000Z',
-            },
-          ],
-        },
-      },
-    },
-    {
       name: 'an expired cursor',
       response: { status: 410, body: { code: 'CURSOR_EXPIRED' } },
     },

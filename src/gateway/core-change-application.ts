@@ -62,6 +62,11 @@ function applyIdentifier(state: DemoState, change: CoreChange): DemoState {
   }
   const row = coreSkuIdentifierRowSchema.parse(change.payload);
   requireIdentity(change, row.id);
+  if (!state.skus.some((sku) => sku.id === row.skuId)) {
+    throw new CoreChangeRequiresBootstrapError(
+      'Identifier references a missing SKU',
+    );
+  }
   return {
     ...state,
     skus: state.skus.map((sku) => {
@@ -83,6 +88,11 @@ function applyBalance(state: DemoState, change: CoreChange): DemoState {
   }
   const row = coreBalanceRowSchema.parse(change.payload);
   requireIdentity(change, row.skuId);
+  if (!state.skus.some((sku) => sku.id === row.skuId)) {
+    throw new CoreChangeRequiresBootstrapError(
+      'Balance references a missing SKU',
+    );
+  }
   return {
     ...state,
     skus: state.skus.map((sku) =>

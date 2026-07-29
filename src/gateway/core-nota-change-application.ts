@@ -14,11 +14,8 @@ import {
 import {
   blankCoreLine,
   integerFromDecimal,
+  safeIntegerProduct,
 } from './core-bootstrap-mapping';
-import {
-  invoiceTemplateSchema,
-  labelTemplateSchema,
-} from './core-domain-schemas';
 
 export class CoreChangeRequiresBootstrapError extends Error {
   constructor(message: string) {
@@ -97,6 +94,17 @@ export function applyNotaPageChange(
   }
   const row = coreNotaPageRowSchema.parse(change.payload);
   requireIdentity(change, row.id);
+  const owner = state.notaTransactions.find(
+    (nota) => nota.id === row.notaId,
+  );
+  const existingOwner = state.notaTransactions.find((nota) =>
+    nota.pages.some((page) => page.id === row.id),
+  );
+  if (!owner || (existingOwner && existingOwner.id !== row.notaId)) {
+    throw new CoreChangeRequiresBootstrapError(
+      'Nota page does not match an existing Nota',
+    );
+  }
   return {
     ...state,
     notaTransactions: state.notaTransactions.map((nota) => {
@@ -116,8 +124,10 @@ export function applyNotaPageChange(
       };
       return {
         ...nota,
-        pages: [...without, page].sort((left, right) =>
-          left.suffix.localeCompare(right.suffix),
+        pages: [...without, page].sort(
+          (left, right) =>
+            noteIndexFromSuffix(left.suffix) -
+            noteIndexFromSuffix(right.suffix),
         ),
         nextNoteIndex: Math.max(nota.nextNoteIndex, row.pagePosition + 1),
       };
@@ -134,6 +144,25 @@ export function applyNotaLineChange(
   }
   const row = coreNotaLineRowSchema.parse(change.payload);
   requireIdentity(change, row.id);
+  const owner = state.notaTransactions.find(
+    (nota) => nota.id === row.notaId,
+  );
+  const page = owner?.pages.find((candidate) => candidate.id === row.pageId);
+  const existingOwner = state.notaTransactions.find((nota) =>
+    nota.pages.some((candidate) =>
+      candidate.lines.some((line) => line.id === row.id),
+    ),
+  );
+  if (
+    !owner ||
+    !page ||
+    (existingOwner && existingOwner.id !== row.notaId) ||
+    (row.skuId && !state.skus.some((sku) => sku.id === row.skuId))
+  ) {
+    throw new CoreChangeRequiresBootstrapError(
+      'Nota line does not match its related entities',
+    );
+  }
   return {
     ...state,
     notaTransactions: state.notaTransactions.map((nota) => {
@@ -161,7 +190,7 @@ export function applyNotaLineChange(
               quantity: integerFromDecimal(row.quantityPcs, 'quantityPcs'),
               unit: 'pcs',
               pcsPrice: price,
-              lsnPrice: price * 12,
+              lsnPrice: safeIntegerProduct(price, 12, 'lsnPrice'),
             };
           }
           return { ...page, lines };
@@ -180,18 +209,15 @@ export function applyTemplateChange(
   }
   const row = coreTemplateRowSchema.parse(change.payload);
   requireIdentity(change, row.id);
-  if (row.archivedAt) return state;
-  if (row.templateKind === 'label') {
-    return {
-      ...state,
-      labelTemplate: labelTemplateSchema.parse(row.definition),
-    };
+  throw new CoreChangeRequiresBootstrapError(
+    `Template ${row.templateKind} change requires a full bootstrap`,
+  );
+}
+
+function noteIndexFromSuffix(suffix: string): number {
+  let value = 0;
+  for (const character of suffix) {
+    value = value * 26 + character.charCodeAt(0) - 64;
   }
-  if (row.templateKind === 'invoice') {
-    return {
-      ...state,
-      invoiceTemplate: invoiceTemplateSchema.parse(row.definition),
-    };
-  }
-  throw new CoreChangeRequiresBootstrapError('Unknown template kind');
+  return value - 1;
 }

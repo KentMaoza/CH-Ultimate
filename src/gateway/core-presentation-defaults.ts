@@ -21,7 +21,7 @@ export const CORE_INVOICE_TEMPLATE_DEFAULT: InvoiceTemplate = {
   heightMm: 148,
   fontSize: 12,
   logoUrl: '',
-  bankAccount: 'BCA 1234567890',
+  bankAccount: '',
   address: 'Alamat toko belum diatur',
   phone: 'No. Telp belum diatur',
   elements: [

@@ -7,11 +7,13 @@ import {
   type CoreCacheEnvelope,
   type CoreOutboxItem,
 } from './core-cache';
+import { previewOptimisticOutbox } from './core-optimistic-state';
 
 export class CoreGatewayState {
   private state = emptyCoreState();
   private canonicalState = cloneCore(this.state);
   private outbox: CoreOutboxItem[] = [];
+  private outboxVersion = 0;
   private serverRevision = '0';
   private syncSnapshot: SyncSnapshot = {
     phase: 'connecting',
@@ -48,11 +50,16 @@ export class CoreGatewayState {
     return cloneCore(this.outbox);
   }
 
+  getOutboxVersion(): number {
+    return this.outboxVersion;
+  }
+
   restore(envelope: CoreCacheEnvelope): void {
     this.canonicalState = cloneCore(envelope.state);
     this.outbox = cloneCore(envelope.outbox);
+    this.outboxVersion += 1;
     this.serverRevision = envelope.serverRevision;
-    this.publishState(this.canonicalState);
+    this.publishProjectedState();
   }
 
   preview(next: DemoState): void {
@@ -62,19 +69,22 @@ export class CoreGatewayState {
   commitCanonical(next: DemoState, revision: string): void {
     this.canonicalState = cloneCore(next);
     this.serverRevision = revision;
-    this.publishState(next);
+    this.publishProjectedState();
   }
 
   replaceOutbox(outbox: CoreOutboxItem[]): void {
     this.outbox = cloneCore(outbox);
+    this.outboxVersion += 1;
+    this.publishProjectedState();
     this.publishSync({});
   }
 
   envelope(
     state = this.canonicalState,
     revision = this.serverRevision,
+    outbox = this.outbox,
   ): CoreCacheEnvelope {
-    return coreCacheEnvelope(state, revision, this.outbox);
+    return coreCacheEnvelope(state, revision, outbox);
   }
 
   publishSync(patch: Partial<SyncSnapshot>): void {
@@ -91,5 +101,11 @@ export class CoreGatewayState {
   private publishState(next: DemoState): void {
     this.state = cloneCore(next);
     this.listeners.forEach((listener) => listener());
+  }
+
+  private publishProjectedState(): void {
+    this.publishState(
+      previewOptimisticOutbox(this.canonicalState, this.outbox),
+    );
   }
 }

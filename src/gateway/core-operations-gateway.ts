@@ -14,6 +14,7 @@ import {
   type CoreGatewayClock,
   type CoreGatewayStorage,
 } from './core-cache';
+import { CoreEnvelopeCoordinator } from './core-envelope-coordinator';
 import { CoreGatewayState } from './core-gateway-state';
 import { CoreMutationCoordinator } from './core-mutation-coordinator';
 import { CoreMutationQueue } from './core-mutation-queue';
@@ -36,7 +37,11 @@ export type {
 export { CORE_CACHE_VERSION } from './core-cache';
 export { mapCoreBootstrapToDemoState } from './core-bootstrap-mapping';
 
-class CoreOperationsGateway implements OperationsGateway {
+export interface CoreOperationsGateway extends OperationsGateway {
+  dispose(): void;
+}
+
+class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   readonly capabilities: OperationsGatewayCapabilities = {
     canResetDemoData: false,
     canImportInitialCatalogue: true,
@@ -51,16 +56,18 @@ class CoreOperationsGateway implements OperationsGateway {
     storage: CoreGatewayStorage,
     clock: CoreGatewayClock,
   ) {
+    const envelopes = new CoreEnvelopeCoordinator(storage, this.state);
     this.polling = new CorePollingCoordinator(
       transport,
       storage,
       clock,
       this.state,
+      envelopes,
     );
     this.mutations = new CoreMutationCoordinator(
       new CoreMutationQueue(
         transport,
-        storage,
+        envelopes,
         this.state,
         () => this.polling.refreshNow(),
         () => clock.now(),
@@ -75,6 +82,7 @@ class CoreOperationsGateway implements OperationsGateway {
   subscribeSync = (listener: () => void): (() => void) =>
     this.state.subscribeSync(listener);
   initialize = (): Promise<void> => this.polling.initialize();
+  dispose = (): void => this.polling.dispose();
   flushNota = (id: string): Promise<void> => this.mutations.flushNota(id);
   retryPending = (): Promise<void> => this.mutations.retryPending();
   resolveConflict = (
@@ -151,6 +159,6 @@ export function createCoreOperationsGateway(
   transport: CoreApiTransport,
   storage: CoreGatewayStorage,
   clock: CoreGatewayClock,
-): OperationsGateway {
-  return new CoreOperationsGateway(transport, storage, clock);
+): CoreOperationsGateway {
+  return new CoreOperationsGatewayImpl(transport, storage, clock);
 }

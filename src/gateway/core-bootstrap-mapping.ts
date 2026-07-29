@@ -22,6 +22,25 @@ export function integerFromDecimal(value: string, field: string): number {
   return result;
 }
 
+export function safeIntegerProduct(
+  value: number,
+  multiplier: number,
+  field: string,
+): number {
+  return integerFromDecimal(
+    (BigInt(value) * BigInt(multiplier)).toString(),
+    field,
+  );
+}
+
+function safeIntegerIncrement(value: number, field: string): number {
+  return integerFromDecimal((BigInt(value) + 1n).toString(), field);
+}
+
+function requireRelation(condition: boolean, message: string): void {
+  if (!condition) throw new CoreApiSchemaError(message);
+}
+
 export function emptyCoreState(): DemoState {
   return {
     skus: [],
@@ -59,6 +78,42 @@ export function mapCoreBootstrapToDemoState(
    * - Missing label/invoice rows retain only the neutral defaults above.
    */
   const state = emptyCoreState();
+  const skuIds = new Set(bootstrap.skus.map((sku) => sku.id));
+  const notaIds = new Set(bootstrap.notas.map((nota) => nota.id));
+  const pageOwners = new Map<string, string>();
+  for (const page of bootstrap.notaPages) {
+    requireRelation(
+      notaIds.has(page.notaId),
+      `Nota page ${page.id} references a missing Nota`,
+    );
+    requireRelation(
+      !pageOwners.has(page.id),
+      `Nota page ${page.id} is duplicated`,
+    );
+    pageOwners.set(page.id, page.notaId);
+  }
+  for (const identifier of bootstrap.skuIdentifiers) {
+    requireRelation(
+      skuIds.has(identifier.skuId),
+      `SKU identifier ${identifier.id} references a missing SKU`,
+    );
+  }
+  for (const balance of bootstrap.balances) {
+    requireRelation(
+      skuIds.has(balance.skuId),
+      `Balance ${balance.skuId} references a missing SKU`,
+    );
+  }
+  for (const line of bootstrap.notaLines) {
+    requireRelation(
+      pageOwners.get(line.pageId) === line.notaId,
+      `Nota line ${line.id} does not match its page owner`,
+    );
+    requireRelation(
+      line.skuId === null || skuIds.has(line.skuId),
+      `Nota line ${line.id} references a missing SKU`,
+    );
+  }
   const identifiers = new Map<string, string[]>();
   for (const identifier of bootstrap.skuIdentifiers) {
     const values = identifiers.get(identifier.skuId) ?? [];
@@ -122,7 +177,7 @@ export function mapCoreBootstrapToDemoState(
           quantity: integerFromDecimal(line.quantityPcs, 'quantityPcs'),
           unit: 'pcs',
           pcsPrice: unitPrice,
-          lsnPrice: unitPrice * 12,
+          lsnPrice: safeIntegerProduct(unitPrice, 12, 'lsnPrice'),
         };
       }
       return {
@@ -148,7 +203,7 @@ export function mapCoreBootstrapToDemoState(
         ? { completionDestination: row.header.completionDestination }
         : {}),
       ...(row.completedAt ? { completedAt: row.completedAt } : {}),
-      nextNoteIndex: maxPage + 1,
+      nextNoteIndex: safeIntegerIncrement(maxPage, 'nextNoteIndex'),
       pages,
       postedLines: [],
       postedStockEffects: {},
@@ -156,8 +211,20 @@ export function mapCoreBootstrapToDemoState(
     };
   });
 
-  for (const template of bootstrap.templates) {
-    if (template.archivedAt) continue;
+  const activeTemplates = bootstrap.templates.filter(
+    (template) => !template.archivedAt,
+  );
+  for (const kind of ['label', 'invoice']) {
+    if (
+      activeTemplates.filter((template) => template.templateKind === kind)
+        .length > 1
+    ) {
+      throw new CoreApiSchemaError(
+        `Multiple active CH Core ${kind} templates`,
+      );
+    }
+  }
+  for (const template of activeTemplates) {
     if (template.templateKind === 'label') {
       const parsed = labelTemplateSchema.safeParse(template.definition);
       if (!parsed.success) {
@@ -177,6 +244,11 @@ export function mapCoreBootstrapToDemoState(
         );
       }
       state.invoiceTemplate = parsed.data;
+    }
+    if (!['label', 'invoice'].includes(template.templateKind)) {
+      throw new CoreApiSchemaError(
+        `Unknown CH Core template kind ${template.templateKind}`,
+      );
     }
   }
   return state;

@@ -38,6 +38,14 @@ const lifecycleCases = [
   },
 ] as const;
 
+async function settleUntil(predicate: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (predicate()) return;
+    await Promise.resolve();
+  }
+  throw new Error('Expected header request did not start');
+}
+
 describe('Core Nota lifecycle ordering', () => {
   it.each(lifecycleCases)(
     'flushes header writes before $name',
@@ -66,8 +74,7 @@ describe('Core Nota lifecycle ordering', () => {
         customerName: 'Amina',
       });
       const lifecycle = run(gateway);
-      await Promise.resolve();
-      await Promise.resolve();
+      await settleUntil(() => transport.requests.length >= 2);
       expect(transport.requests.map((request) => request.path)).toEqual([
         CORE_API_PATHS.bootstrap,
         CORE_API_PATHS.notaHeader(NOTA_ID),

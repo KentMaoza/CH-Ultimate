@@ -216,6 +216,10 @@ export class TestClock implements CoreGatewayClock {
     this.foreground = true;
     await Promise.all([...this.resumeListeners].map((listener) => listener()));
   }
+
+  resumeListenerCount(): number {
+    return this.resumeListeners.size;
+  }
 }
 
 export class ScriptedTransport implements CoreApiTransport {

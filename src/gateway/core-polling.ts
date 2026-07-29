@@ -20,25 +20,29 @@ import {
   applyCoreChange,
   CoreChangeRequiresBootstrapError,
 } from './core-change-application';
+import { CoreEnvelopeCoordinator } from './core-envelope-coordinator';
 import { CoreGatewayState } from './core-gateway-state';
+import { CoreSyncScheduler } from './core-sync-scheduler';
 import type { CoreApiTransport } from './core-api-transport';
-
-const POLL_INTERVAL_MS = 2_000;
-const MAX_RETRY_MS = 30_000;
 
 export class CorePollingCoordinator {
   private initialization?: Promise<void>;
-  private cancelTimer?: () => void;
-  private resumeSubscribed = false;
   private bootstrapped = false;
-  private offlineFailures = 0;
+  private readonly scheduler: CoreSyncScheduler;
 
   constructor(
     private readonly transport: CoreApiTransport,
     private readonly storage: CoreGatewayStorage,
     private readonly clock: CoreGatewayClock,
     private readonly state: CoreGatewayState,
-  ) {}
+    private readonly envelopes: CoreEnvelopeCoordinator,
+  ) {
+    this.scheduler = new CoreSyncScheduler(
+      clock,
+      state.getSyncSnapshot,
+      () => this.syncNow(),
+    );
+  }
 
   initialize = async (): Promise<void> => {
     this.initialization ??= this.initializeOnce();
@@ -46,10 +50,7 @@ export class CorePollingCoordinator {
   };
 
   private async initializeOnce(): Promise<void> {
-    if (!this.resumeSubscribed) {
-      this.resumeSubscribed = true;
-      this.clock.subscribeResume(() => this.resume());
-    }
+    this.scheduler.start();
     const cached = await this.storage.load();
     if (hasUnsupportedCacheVersion(cached)) {
       this.state.publishSync({
@@ -71,12 +72,12 @@ export class CorePollingCoordinator {
     }
     this.state.publishSync({ phase: 'connecting', message: undefined });
     if (!this.clock.isForeground()) return;
-    await this.bootstrap();
-    this.scheduleAfterAttempt();
+    await this.scheduler.request();
   }
 
   private async bootstrap(): Promise<void> {
     try {
+      const expectedRevision = this.state.getServerRevision();
       const response = await this.transport.request({
         method: 'GET',
         path: CORE_API_PATHS.bootstrap,
@@ -101,10 +102,12 @@ export class CorePollingCoordinator {
       }
       const bootstrap = parseCoreBootstrap(response.body);
       const next = mapCoreBootstrapToDemoState(bootstrap);
-      await this.storage.save(
-        this.state.envelope(next, bootstrap.serverRevision),
+      const committed = await this.envelopes.commitCanonical(
+        expectedRevision,
+        next,
+        bootstrap.serverRevision,
       );
-      this.state.commitCanonical(next, bootstrap.serverRevision);
+      if (committed === 'stale') return;
       this.bootstrapped = true;
       this.state.publishSync({
         phase: 'online',
@@ -131,48 +134,15 @@ export class CorePollingCoordinator {
   }
 
   async retryPending(): Promise<void> {
-    this.cancelScheduled();
-    await this.syncNow();
-    this.scheduleAfterAttempt();
+    await this.scheduler.request();
   }
 
   async refreshNow(): Promise<void> {
-    this.cancelScheduled();
-    await this.syncNow();
-    this.scheduleAfterAttempt();
+    await this.scheduler.request();
   }
 
-  private async resume(): Promise<void> {
-    if (!this.clock.isForeground()) return;
-    this.cancelScheduled();
-    await this.syncNow();
-    this.scheduleAfterAttempt();
-  }
-
-  private cancelScheduled(): void {
-    this.cancelTimer?.();
-    this.cancelTimer = undefined;
-  }
-
-  private scheduleAfterAttempt(): void {
-    this.cancelScheduled();
-    if (!this.clock.isForeground()) return;
-    const phase = this.state.getSyncSnapshot().phase;
-    if (phase === 'revoked' || phase === 'upgrade-required') return;
-    const delay =
-      phase === 'offline'
-        ? Math.min(
-            POLL_INTERVAL_MS * 2 ** this.offlineFailures++,
-            MAX_RETRY_MS,
-          )
-        : POLL_INTERVAL_MS;
-    if (phase !== 'offline') this.offlineFailures = 0;
-    this.cancelTimer = this.clock.schedule(async () => {
-      this.cancelTimer = undefined;
-      if (!this.clock.isForeground()) return;
-      await this.syncNow();
-      this.scheduleAfterAttempt();
-    }, delay);
+  dispose(): void {
+    this.scheduler.dispose();
   }
 
   private async syncNow(): Promise<void> {
@@ -249,20 +219,12 @@ export class CorePollingCoordinator {
     const fresh = page.changes.filter(
       (change) => BigInt(change.revision) > cursorValue,
     );
-    let expected = cursorValue + 1n;
     let candidate = this.state.getCanonicalState();
     try {
       for (const change of fresh) {
-        if (BigInt(change.revision) !== expected) {
-          throw new CoreChangeRequiresBootstrapError(
-            'Forward change sequence gap',
-          );
-        }
         candidate = applyCoreChange(candidate, change);
-        expected += 1n;
       }
-      const expectedCursor =
-        fresh.at(-1)?.revision ?? cursor;
+      const expectedCursor = fresh.at(-1)?.revision ?? cursor;
       if (page.nextAfter !== expectedCursor) {
         throw new CoreChangeRequiresBootstrapError(
           'Change page cursor does not match its complete page',
@@ -281,8 +243,15 @@ export class CorePollingCoordinator {
     }
 
     if (fresh.length > 0) {
-      await this.storage.save(this.state.envelope(candidate, page.nextAfter));
-      this.state.commitCanonical(candidate, page.nextAfter);
+      const committed = await this.envelopes.commitCanonical(
+        cursor,
+        candidate,
+        page.nextAfter,
+      );
+      if (committed === 'stale') {
+        await this.bootstrap();
+        return;
+      }
     }
     this.state.publishSync({
       phase: 'online',

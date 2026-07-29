@@ -173,8 +173,10 @@ describe('Core operations gateway mutation coordination', () => {
       customerName: 'Amina',
     });
     const completion = gateway.completeNotaTransaction(NOTA_ID);
-    await Promise.resolve();
-    await Promise.resolve();
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      if (transport.requests.length >= 2) break;
+      await Promise.resolve();
+    }
 
     expect(transport.requests.map((request) => request.path)).toEqual([
       '/v1/bootstrap',

@@ -1,11 +1,14 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
-export const LATEST_SCHEMA_VERSION = 1;
+export const LATEST_SCHEMA_VERSION = 2;
 export const MIGRATION_LOCK_NAME = 'ch-core-schema-migrations';
 
 const MIGRATION_LOCK_TIMEOUT_SECONDS = 30;
-const migrations = [{ version: 1, name: '001_initial.sql' }] as const;
+const migrations = [
+  { version: 1, name: '001_initial.sql' },
+  { version: 2, name: '002_nota_line_page_ownership.sql' },
+] as const;
 
 export interface SchemaQueryPool {
   query<T = unknown>(sql: string, values?: readonly unknown[]): Promise<T>;

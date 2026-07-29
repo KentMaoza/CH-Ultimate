@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
 import { describe, expect, it } from 'vitest';
@@ -15,6 +16,9 @@ interface AppliedMigration {
   name: string;
   checksum: Buffer;
 }
+
+const ORIGINAL_V1_CHECKSUM =
+  'e22cfbbf1af7b72e0091c9bf8a399ac2570fc6f971723330d085d0954cf68b69';
 
 class FakeMigrationPool implements MigrationPool {
   readonly applied = new Map<number, AppliedMigration>();
@@ -100,8 +104,16 @@ class FakeMigrationPool implements MigrationPool {
   }
 }
 
+function seedOriginalVersionOne(pool: FakeMigrationPool): void {
+  pool.applied.set(1, {
+    version: 1,
+    name: '001_initial.sql',
+    checksum: Buffer.from(ORIGINAL_V1_CHECKSUM, 'hex'),
+  });
+}
+
 describe('runMigrations', () => {
-  it('applies the initial migration once and makes the second run a no-op', async () => {
+  it('applies versions 1 and 2 once and makes the second run a no-op', async () => {
     const pool = new FakeMigrationPool();
 
     const first = await runMigrations(pool);
@@ -110,15 +122,15 @@ describe('runMigrations', () => {
 
     expect(first).toEqual({
       fromVersion: 0,
-      toVersion: 1,
-      appliedVersions: [1],
+      toVersion: 2,
+      appliedVersions: [1, 2],
     });
     expect(second).toEqual({
-      fromVersion: 1,
-      toVersion: 1,
+      fromVersion: 2,
+      toVersion: 2,
       appliedVersions: [],
     });
-    expect(pool.applied.size).toBe(1);
+    expect(pool.applied.size).toBe(2);
     expect(pool.migrationStatementCount).toBe(statementsAfterFirstRun);
   });
 
@@ -138,16 +150,16 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 0,
-      toVersion: 1,
-      appliedVersions: [1],
+      toVersion: 2,
+      appliedVersions: [1, 2],
     });
   });
 
   it('refuses a database schema newer than this binary and releases the lock', async () => {
-    const pool = new FakeMigrationPool(2);
+    const pool = new FakeMigrationPool(3);
 
     await expect(runMigrations(pool)).rejects.toThrow(
-      'Database schema version 2 is newer than supported version 1',
+      'Database schema version 3 is newer than supported version 2',
     );
 
     expect(pool.lockHeld).toBe(false);
@@ -183,6 +195,38 @@ describe('runMigrations', () => {
     expect(pool.releaseConnectionCalls).toBe(0);
     expect(pool.lockHeld).toBe(false);
   });
+
+  it('upgrades an original version 1 receipt by applying only version 2', async () => {
+    const pool = new FakeMigrationPool();
+    seedOriginalVersionOne(pool);
+
+    await expect(runMigrations(pool)).resolves.toEqual({
+      fromVersion: 1,
+      toVersion: 2,
+      appliedVersions: [2],
+    });
+
+    expect(pool.applied.size).toBe(2);
+    expect(pool.migrationStatementCount).toBe(2);
+  });
+
+  it('reruns version 2 after its first DDL statement committed', async () => {
+    const pool = new FakeMigrationPool();
+    seedOriginalVersionOne(pool);
+    pool.failOn = /ALTER TABLE nota_lines/;
+
+    await expect(runMigrations(pool)).rejects.toThrow(
+      'deliberate migration failure',
+    );
+    expect([...pool.applied.keys()]).toEqual([1]);
+
+    pool.failOn = undefined;
+    await expect(runMigrations(pool)).resolves.toEqual({
+      fromVersion: 1,
+      toVersion: 2,
+      appliedVersions: [2],
+    });
+  });
 });
 
 describe('splitMariaDbStatements', () => {
@@ -215,6 +259,16 @@ second', "third;fourth");
 });
 
 describe('initial schema', () => {
+  it('preserves the exact published version 1 checksum', async () => {
+    const sql = await readFile(
+      new URL('../migrations/001_initial.sql', import.meta.url),
+    );
+
+    expect(createHash('sha256').update(sql).digest('hex')).toBe(
+      ORIGINAL_V1_CHECKSUM,
+    );
+  });
+
   it('declares every foundation table needed by later CH Core slices', async () => {
     const sql = await readFile(
       new URL('../migrations/001_initial.sql', import.meta.url),
@@ -264,18 +318,20 @@ describe('initial schema', () => {
 
   it('rejects a Nota line whose page belongs to another Nota', async () => {
     const sql = await readFile(
-      new URL('../migrations/001_initial.sql', import.meta.url),
+      new URL(
+        '../migrations/002_nota_line_page_ownership.sql',
+        import.meta.url,
+      ),
       'utf8',
     );
+    const statements = splitMariaDbStatements(sql);
 
+    expect(statements).toHaveLength(2);
     expect(sql).toMatch(
-      /UNIQUE KEY uq_nota_pages_id_nota \(id, nota_id\)/,
+      /ADD UNIQUE INDEX IF NOT EXISTS uq_nota_pages_id_nota \(id, nota_id\)/,
     );
     expect(sql).toMatch(
-      /FOREIGN KEY \(page_id, nota_id\) REFERENCES nota_pages \(id, nota_id\)/,
-    );
-    expect(sql).not.toMatch(
-      /FOREIGN KEY \(page_id\) REFERENCES nota_pages \(id\)/,
+      /ADD CONSTRAINT fk_nota_lines_page_nota\s+FOREIGN KEY IF NOT EXISTS \(page_id, nota_id\)\s+REFERENCES nota_pages \(id, nota_id\)/,
     );
   });
 });

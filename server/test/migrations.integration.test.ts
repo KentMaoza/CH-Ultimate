@@ -1,4 +1,5 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 
 import type { PoolConnection } from 'mariadb';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
@@ -6,6 +7,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { loadServerConfig } from '../src/config.js';
 import {
   runMigrations,
+  splitMariaDbStatements,
   type MigrationConnection,
   type MigrationPool,
 } from '../src/db/migrate.js';
@@ -26,6 +28,8 @@ if (parsedDatabaseUrl.pathname !== '/chu_test') {
 const pool = createPool(
   loadServerConfig({ CH_CORE_DATABASE_URL: databaseUrl }),
 );
+const originalVersionOneChecksum =
+  'e22cfbbf1af7b72e0091c9bf8a399ac2570fc6f971723330d085d0954cf68b69';
 
 const tables = [
   'change_log',
@@ -62,7 +66,32 @@ async function resetIsolatedSchema(): Promise<void> {
   }
 }
 
-function interruptMigrationOnce(): MigrationPool {
+async function applyOriginalVersionOne(): Promise<void> {
+  const sql = await readFile(
+    new URL('../migrations/001_initial.sql', import.meta.url),
+    'utf8',
+  );
+  const checksum = createHash('sha256').update(sql).digest('hex');
+  if (checksum !== originalVersionOneChecksum) {
+    throw new Error('Version 1 migration bytes do not match the published checksum');
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    for (const statement of splitMariaDbStatements(sql)) {
+      await connection.query(statement);
+    }
+    await connection.query(
+      `INSERT INTO schema_migrations (version, name, checksum)
+       VALUES (1, '001_initial.sql', UNHEX(?))`,
+      [originalVersionOneChecksum],
+    );
+  } finally {
+    await connection.release();
+  }
+}
+
+function interruptMigrationOnce(sqlFragment: string): MigrationPool {
   let interrupted = false;
 
   return {
@@ -75,7 +104,7 @@ function interruptMigrationOnce(): MigrationPool {
         ): Promise<T> => {
           if (
             !interrupted &&
-            sql.includes('CREATE TABLE IF NOT EXISTS pairings')
+            sql.includes(sqlFragment)
           ) {
             interrupted = true;
             throw new Error('deliberate mid-migration interruption');
@@ -107,16 +136,18 @@ describe('MariaDB migrations against isolated chu_test', () => {
       ['ch-core-schema-migrations'],
     );
 
-    expect(first.appliedVersions).toEqual([1]);
+    expect(first.appliedVersions).toEqual([1, 2]);
     expect(second.appliedVersions).toEqual([]);
-    expect(Number(rows[0]?.migration_count)).toBe(1);
+    expect(Number(rows[0]?.migration_count)).toBe(2);
     expect(Number(lockRows[0]?.is_free)).toBe(1);
   });
 
   it('reruns to completion after real DDL commits before an interruption', async () => {
-    await expect(runMigrations(interruptMigrationOnce())).rejects.toThrow(
-      'deliberate mid-migration interruption',
-    );
+    await expect(
+      runMigrations(
+        interruptMigrationOnce('CREATE TABLE IF NOT EXISTS pairings'),
+      ),
+    ).rejects.toThrow('deliberate mid-migration interruption');
 
     const partialTables = await pool.query<Array<{ table_count: bigint }>>(
       `SELECT COUNT(*) AS table_count
@@ -140,9 +171,28 @@ describe('MariaDB migrations against isolated chu_test', () => {
       'SELECT COUNT(*) AS migration_count FROM schema_migrations',
     );
 
-    expect(recovered.appliedVersions).toEqual([1]);
+    expect(recovered.appliedVersions).toEqual([1, 2]);
     expect(Number(finalTables[0]?.table_count)).toBe(1);
-    expect(Number(finalReceipts[0]?.migration_count)).toBe(1);
+    expect(Number(finalReceipts[0]?.migration_count)).toBe(2);
+  });
+
+  it('reruns version 2 after its first real ALTER TABLE committed', async () => {
+    await applyOriginalVersionOne();
+
+    await expect(
+      runMigrations(interruptMigrationOnce('ALTER TABLE nota_lines')),
+    ).rejects.toThrow('deliberate mid-migration interruption');
+
+    const partialReceipts = await pool.query<
+      Array<{ migration_count: bigint }>
+    >('SELECT COUNT(*) AS migration_count FROM schema_migrations');
+    expect(Number(partialReceipts[0]?.migration_count)).toBe(1);
+
+    await expect(runMigrations(pool)).resolves.toEqual({
+      fromVersion: 1,
+      toVersion: 2,
+      appliedVersions: [2],
+    });
   });
 
   it('rolls back a deliberately failing transaction without partial rows', async () => {
@@ -179,8 +229,13 @@ describe('MariaDB migrations against isolated chu_test', () => {
     expect(Number(rows[0]?.device_count)).toBe(0);
   });
 
-  it('rejects a line whose page belongs to a different Nota', async () => {
-    await runMigrations(pool);
+  it('upgrades an original v1 schema with only v2 and rejects a cross-Nota line', async () => {
+    await applyOriginalVersionOne();
+    await expect(runMigrations(pool)).resolves.toEqual({
+      fromVersion: 1,
+      toVersion: 2,
+      appliedVersions: [2],
+    });
     const deviceId = randomUUID().replaceAll('-', '');
     const notaAId = randomUUID().replaceAll('-', '');
     const notaBId = randomUUID().replaceAll('-', '');

@@ -3,8 +3,6 @@ import {
   timingSafeEqual,
 } from 'node:crypto';
 
-import type { IdentityRuntime } from './identity-types.js';
-
 export const TOKEN_BYTES = 32;
 export const TOKEN_LIFETIME_MS = 180 * 24 * 60 * 60 * 1_000;
 export const PREVIOUS_TOKEN_OVERLAP_MS = 7 * 24 * 60 * 60 * 1_000;
@@ -41,17 +39,4 @@ export function decodeOpaqueSecret(value: string): Buffer | null {
     return null;
   }
   return decoded;
-}
-
-export function issueOpaqueSecret(
-  runtime: IdentityRuntime,
-): { value: string; hash: Buffer } {
-  const bytes = runtime.randomBytes(TOKEN_BYTES);
-  if (bytes.length !== TOKEN_BYTES) {
-    throw new Error('Random source returned an invalid secret length');
-  }
-  return {
-    value: bytes.toString('base64url'),
-    hash: hashSecret(bytes),
-  };
 }

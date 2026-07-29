@@ -33,7 +33,7 @@ describe('health routes', () => {
 
   it('reports readiness when the database schema matches the binary', async () => {
     const app = buildApp({
-      pool: poolReturning([{ version: 3 }]),
+      pool: poolReturning([{ version: 4 }]),
     });
 
     const response = await app.inject({ method: 'GET', url: '/health/ready' });
@@ -65,7 +65,7 @@ describe('health routes', () => {
 
   it('is not ready when the database schema is newer than the binary', async () => {
     const app = buildApp({
-      pool: poolReturning([{ version: 4 }]),
+      pool: poolReturning([{ version: 5 }]),
     });
 
     const response = await app.inject({ method: 'GET', url: '/health/ready' });

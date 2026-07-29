@@ -1,12 +1,13 @@
 import {
   IdentityError,
   type DeviceRecord,
+  type DeviceResult,
   type IdentityRuntime,
-  type IssuedDevice,
   type OwnerBootstrapInput,
   publicDevice,
   requireInstallation,
 } from './identity-types.js';
+import { writeDeviceChange } from './identity-events.js';
 import {
   TOKEN_BYTES,
   TOKEN_LIFETIME_MS,
@@ -15,13 +16,12 @@ import {
   decodeOpaqueSecret,
   hashesEqual,
   hashSecret,
-  issueOpaqueSecret,
 } from './secrets.js';
 
 export async function bootstrapOwner(
   runtime: IdentityRuntime,
   input: OwnerBootstrapInput,
-): Promise<IssuedDevice & { recoveryCredential: string }> {
+): Promise<DeviceResult> {
   requireInstallation(input);
   if (input.mode === 'bootstrap') {
     return initialBootstrap(runtime, input);
@@ -32,7 +32,7 @@ export async function bootstrapOwner(
 async function initialBootstrap(
   runtime: IdentityRuntime,
   input: Extract<OwnerBootstrapInput, { mode: 'bootstrap' }>,
-): Promise<IssuedDevice & { recoveryCredential: string }> {
+): Promise<DeviceResult> {
   const configuredSecret = runtime.bootstrapSecret;
   if (
     configuredSecret === undefined ||
@@ -52,28 +52,48 @@ async function initialBootstrap(
     );
   }
 
+  const token = decodeOpaqueSecret(input.deviceToken);
+  const recoveryCredential = decodeOpaqueSecret(input.recoveryCredential);
+  if (!token || !recoveryCredential) {
+    throw new IdentityError('INVALID_REQUEST', 400, 'Invalid request');
+  }
+  const tokenHash = hashSecret(token);
+  const recoveryHash = hashSecret(recoveryCredential);
   const now = runtime.now();
-  const token = issueOpaqueSecret(runtime);
-  const recovery = issueOpaqueSecret(runtime);
-  const device: DeviceRecord = {
-    id: runtime.randomUuid(),
-    installationId: input.installationId,
-    role: 'owner',
-    displayName: input.displayName.trim(),
-    platform: input.platform.trim(),
-    tokenHash: token.hash,
-    tokenExpiresAt: addMilliseconds(now, TOKEN_LIFETIME_MS),
-    previousTokenHash: null,
-    previousTokenExpiresAt: null,
-    approvedAt: now,
-    revokedAt: null,
-    createdAt: now,
-  };
 
-  await runtime.store.transaction(async (session) => {
-    if (await session.findOwner()) {
+  return runtime.store.transaction(async (session) => {
+    const owner = await session.findOwner();
+    const recovery = await session.findRecovery();
+    if (owner || recovery) {
+      if (
+        owner &&
+        recovery &&
+        owner.installationId === input.installationId &&
+        owner.displayName === input.displayName.trim() &&
+        owner.platform === input.platform.trim() &&
+        owner.revokedAt === null &&
+        hashesEqual(owner.tokenHash, tokenHash) &&
+        hashesEqual(recovery.credentialHash, recoveryHash)
+      ) {
+        return { device: publicDevice(owner) };
+      }
       throw new IdentityError('OWNER_EXISTS', 409, 'Owner already exists');
     }
+
+    const device: DeviceRecord = {
+      id: runtime.randomUuid(),
+      installationId: input.installationId,
+      role: 'owner',
+      displayName: input.displayName.trim(),
+      platform: input.platform.trim(),
+      tokenHash,
+      tokenExpiresAt: addMilliseconds(now, TOKEN_LIFETIME_MS),
+      previousTokenHash: null,
+      previousTokenExpiresAt: null,
+      approvedAt: now,
+      revokedAt: null,
+      createdAt: now,
+    };
     if (!(await session.insertDevice(device))) {
       throw new IdentityError(
         'BOOTSTRAP_REJECTED',
@@ -82,53 +102,69 @@ async function initialBootstrap(
       );
     }
     await session.saveRecovery({
-      credentialHash: recovery.hash,
+      credentialHash: recoveryHash,
       credentialVersion: 1n,
       createdAt: now,
       rotatedAt: null,
     });
+    await session.writeAudit({
+      deviceId: null,
+      action: 'owner.bootstrap',
+      entityType: 'device',
+      entityId: device.id,
+      detail: { installationId: device.installationId },
+    });
+    await writeDeviceChange(session, device);
+    return { device: publicDevice(device) };
   });
-
-  return {
-    device: publicDevice(device),
-    deviceToken: token.value,
-    recoveryCredential: recovery.value,
-  };
 }
 
 async function recoverOwner(
   runtime: IdentityRuntime,
   input: Extract<OwnerBootstrapInput, { mode: 'recovery' }>,
-): Promise<IssuedDevice & { recoveryCredential: string }> {
-  const presentedRecovery = decodeOpaqueSecret(input.recoveryCredential);
-  if (!presentedRecovery) {
+): Promise<DeviceResult> {
+  const currentRecovery = decodeOpaqueSecret(input.recoveryCredential);
+  const nextRecovery = decodeOpaqueSecret(input.nextRecoveryCredential);
+  const token = decodeOpaqueSecret(input.deviceToken);
+  if (!currentRecovery || !nextRecovery || !token) {
     throw recoveryRejected();
   }
-
+  const currentRecoveryHash = hashSecret(currentRecovery);
+  const nextRecoveryHash = hashSecret(nextRecovery);
+  const tokenHash = hashSecret(token);
   const now = runtime.now();
-  const token = issueOpaqueSecret(runtime);
-  const nextRecovery = issueOpaqueSecret(runtime);
-  let recoveredDevice: DeviceRecord | undefined;
 
-  await runtime.store.transaction(async (session) => {
+  return runtime.store.transaction(async (session) => {
     const recovery = await session.findRecovery();
+    const existing = await session.findDeviceByInstallationId(
+      input.installationId,
+    );
+    if (
+      recovery &&
+      existing &&
+      existing.role === 'owner' &&
+      existing.revokedAt === null &&
+      existing.displayName === input.displayName.trim() &&
+      existing.platform === input.platform.trim() &&
+      hashesEqual(recovery.credentialHash, nextRecoveryHash) &&
+      hashesEqual(existing.tokenHash, tokenHash)
+    ) {
+      return { device: publicDevice(existing) };
+    }
     if (
       !recovery ||
-      !hashesEqual(recovery.credentialHash, hashSecret(presentedRecovery))
+      !hashesEqual(recovery.credentialHash, currentRecoveryHash)
     ) {
       throw recoveryRejected();
     }
 
-    const existing = await session.findDeviceByInstallationId(
-      input.installationId,
-    );
     const device: DeviceRecord = {
       id: existing?.id ?? runtime.randomUuid(),
       installationId: input.installationId,
       role: 'owner',
       displayName: input.displayName.trim(),
       platform: input.platform.trim(),
-      tokenHash: token.hash,
+      tokenHash,
       tokenExpiresAt: addMilliseconds(now, TOKEN_LIFETIME_MS),
       previousTokenHash: null,
       previousTokenExpiresAt: null,
@@ -136,7 +172,12 @@ async function recoverOwner(
       revokedAt: null,
       createdAt: existing?.createdAt ?? now,
     };
-
+    const previousOwners = (await session.listDevices()).filter(
+      (candidate) =>
+        candidate.role === 'owner' &&
+        candidate.id !== device.id &&
+        candidate.revokedAt === null,
+    );
     await session.revokeOtherOwners(device.id, now);
     if (existing) {
       await session.saveDevice(device);
@@ -144,22 +185,25 @@ async function recoverOwner(
       throw recoveryRejected(409);
     }
     await session.saveRecovery({
-      credentialHash: nextRecovery.hash,
+      credentialHash: nextRecoveryHash,
       credentialVersion: recovery.credentialVersion + 1n,
       createdAt: recovery.createdAt,
       rotatedAt: now,
     });
-    recoveredDevice = device;
+    await session.writeAudit({
+      deviceId: null,
+      action: 'owner.recover',
+      entityType: 'device',
+      entityId: device.id,
+      detail: { installationId: device.installationId },
+    });
+    for (const previousOwner of previousOwners) {
+      const revokedOwner = { ...previousOwner, revokedAt: now };
+      await writeDeviceChange(session, revokedOwner, 'revoke');
+    }
+    await writeDeviceChange(session, device);
+    return { device: publicDevice(device) };
   });
-
-  if (!recoveredDevice) {
-    throw new Error('Owner recovery transaction returned no device');
-  }
-  return {
-    device: publicDevice(recoveredDevice),
-    deviceToken: token.value,
-    recoveryCredential: nextRecovery.value,
-  };
 }
 
 function recoveryRejected(statusCode = 403): IdentityError {

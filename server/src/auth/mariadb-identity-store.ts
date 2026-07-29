@@ -3,6 +3,7 @@ import type {
   IdentityStore,
 } from './identity-types.js';
 import { MariaDbDeviceQueries } from './mariadb-device-queries.js';
+import { MariaDbIdentityEvents } from './mariadb-identity-events.js';
 import { MariaDbPairingQueries } from './mariadb-pairing-queries.js';
 import type {
   ProtocolConnection,
@@ -12,6 +13,7 @@ import type {
 function createSession(connection: ProtocolConnection): IdentitySession {
   const devices = new MariaDbDeviceQueries(connection);
   const pairings = new MariaDbPairingQueries(connection);
+  const events = new MariaDbIdentityEvents(connection);
   return {
     findOwner: () => devices.findOwner(),
     findRecovery: () => devices.findRecovery(),
@@ -31,6 +33,8 @@ function createSession(connection: ProtocolConnection): IdentitySession {
       pairings.findPairingByCodeHash(codeHash),
     insertPairing: (pairing) => pairings.insertPairing(pairing),
     savePairing: (pairing) => pairings.savePairing(pairing),
+    writeAudit: (event) => events.writeAudit(event),
+    writeChange: (event) => events.writeChange(event),
   };
 }
 

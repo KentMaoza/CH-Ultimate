@@ -74,6 +74,32 @@ function startupScenario(scenario: StartupScenario): {
 }
 
 describe('startServer', () => {
+  it('starts and stops protocol maintenance with the server lifecycle', async () => {
+    const { deps, events } = startupScenario({});
+    deps.createMaintenance = () => ({
+      start() {
+        events.push('maintenance.start');
+      },
+      stop() {
+        events.push('maintenance.stop');
+      },
+    });
+
+    const running = await startServer({}, deps);
+    await running.shutdown();
+
+    expect(events).toEqual([
+      'createPool',
+      'migrate',
+      'buildApp',
+      'app.listen',
+      'maintenance.start',
+      'maintenance.stop',
+      'app.close',
+      'pool.end',
+    ]);
+  });
+
   it('passes startup security configuration into app construction', async () => {
     const { deps } = startupScenario({});
     const originalBuildApp = deps.buildApp;

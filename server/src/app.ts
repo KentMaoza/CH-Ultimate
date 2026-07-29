@@ -15,7 +15,8 @@ export interface AppDependencies {
 }
 
 export function buildApp(deps: AppDependencies): FastifyInstance {
-  const app = Fastify({ logger: false });
+  // Pairing rate limits use the directly connected peer, never forwarded IPs.
+  const app = Fastify({ logger: false, trustProxy: false });
 
   app.get('/health/live', async () => ({ status: 'ok' }));
 

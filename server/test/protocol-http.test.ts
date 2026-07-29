@@ -16,13 +16,15 @@ const owner = {
   tokenKind: 'current' as const,
 };
 
+function opaqueSecret(byte: number): string {
+  return Buffer.alloc(32, byte).toString('base64url');
+}
+
 function createProtocol() {
   return {
     identity: {
       bootstrapOwner: vi.fn(async () => ({
         device: owner,
-        deviceToken: 'device-token',
-        recoveryCredential: 'recovery-credential',
       })),
       authenticate: vi.fn(async (token: string) => {
         if (token === 'owner-token') {
@@ -40,19 +42,16 @@ function createProtocol() {
       })),
       claimPairing: vi.fn(async () => ({
         pairingId: '33333333-3333-4333-8333-333333333333',
-        claimSecret: 'claim-secret',
         status: 'pending' as const,
       })),
       approvePairing: vi.fn(async () => ({ status: 'approved' as const })),
       completePairing: vi.fn(async () => ({
         device: { ...owner, role: 'client' as const },
-        deviceToken: 'client-device-token',
       })),
       listDevices: vi.fn(async () => [owner]),
       revokeDevice: vi.fn(async () => ({ status: 'revoked' as const })),
       rotateDeviceToken: vi.fn(async () => ({
         device: owner,
-        deviceToken: 'rotated-token',
       })),
     },
     sync: {
@@ -80,7 +79,7 @@ function appWithProtocol(protocol = createProtocol()) {
     app: buildApp({
       pool: {
         async query<T>() {
-          return [{ version: 3 }] as T;
+          return [{ version: 4 }] as T;
         },
       },
       protocol,
@@ -116,7 +115,10 @@ describe('CH Core protocol routes', () => {
       method: 'POST',
       url: '/v1/pairings/redeem',
       payload: {
+        phase: 'claim',
         code: '12345678',
+        requestId: '55555555-5555-4555-8555-555555555555',
+        claimSecret: opaqueSecret(1),
         installationId: '44444444-4444-4444-8444-444444444444',
         displayName: 'Client Phone',
         platform: 'android',
@@ -126,8 +128,10 @@ describe('CH Core protocol routes', () => {
       method: 'POST',
       url: '/v1/pairings/redeem',
       payload: {
+        phase: 'complete',
         pairingId: '33333333-3333-4333-8333-333333333333',
-        claimSecret: 'claim-secret',
+        claimSecret: opaqueSecret(1),
+        deviceToken: opaqueSecret(2),
       },
     });
 
@@ -141,7 +145,8 @@ describe('CH Core protocol routes', () => {
     );
     expect(protocol.identity.completePairing).toHaveBeenCalledWith({
       pairingId: '33333333-3333-4333-8333-333333333333',
-      claimSecret: 'claim-secret',
+      claimSecret: opaqueSecret(1),
+      deviceToken: opaqueSecret(2),
     });
     await app.close();
   });
@@ -181,12 +186,14 @@ describe('CH Core protocol routes', () => {
       method: 'POST',
       url: '/v1/auth/token/rotate',
       headers: { authorization: 'Bearer owner-token' },
+      payload: { nextDeviceToken: opaqueSecret(3) },
     });
 
     expect(response.statusCode).toBe(200);
     expect(protocol.identity.rotateDeviceToken).toHaveBeenCalledWith(
       owner.id,
       'owner-token',
+      opaqueSecret(3),
     );
     await app.close();
   });
@@ -215,13 +222,43 @@ describe('CH Core protocol routes', () => {
     await app.close();
   });
 
+  it('preserves the bootstrap instruction for a cursor ahead error', async () => {
+    const protocol = createProtocol();
+    protocol.sync.changes.mockRejectedValueOnce(
+      new SyncError(
+        'CURSOR_AHEAD',
+        409,
+        'sensitive database detail',
+        true,
+      ),
+    );
+    const { app } = appWithProtocol(protocol);
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/changes?after=9&limit=100',
+      headers: { authorization: 'Bearer owner-token' },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({
+      code: 'CURSOR_AHEAD',
+      bootstrapRequired: true,
+    });
+    expect(response.body).not.toContain('sensitive');
+    await app.close();
+  });
+
   it('exposes initial owner bootstrap without logging or echoing its secret', async () => {
     const { app, protocol } = appWithProtocol();
     const response = await app.inject({
       method: 'POST',
       url: '/v1/owner/bootstrap',
       payload: {
+        mode: 'bootstrap',
         bootstrapSecret: 'b'.repeat(32),
+        deviceToken: opaqueSecret(4),
+        recoveryCredential: opaqueSecret(5),
         installationId: '22222222-2222-4222-8222-222222222222',
         displayName: 'Owner Mac',
         platform: 'macos',
@@ -232,6 +269,97 @@ describe('CH Core protocol routes', () => {
     expect(response.body).not.toContain('b'.repeat(32));
     expect(protocol.identity.bootstrapOwner).toHaveBeenCalledWith(
       expect.objectContaining({ mode: 'bootstrap' }),
+    );
+    await app.close();
+  });
+
+  it.each([
+    {
+      name: 'claim without an explicit phase',
+      request: {
+        method: 'POST' as const,
+        url: '/v1/pairings/redeem',
+        payload: {
+          code: '12345678',
+          requestId: '55555555-5555-4555-8555-555555555555',
+          claimSecret: opaqueSecret(1),
+          installationId: '44444444-4444-4444-8444-444444444444',
+          displayName: 'Client Phone',
+          platform: 'android',
+        },
+      },
+      call: 'claimPairing' as const,
+    },
+    {
+      name: 'mixed pairing phases',
+      request: {
+        method: 'POST' as const,
+        url: '/v1/pairings/redeem',
+        payload: {
+          phase: 'complete',
+          pairingId: '33333333-3333-4333-8333-333333333333',
+          claimSecret: opaqueSecret(1),
+          deviceToken: opaqueSecret(2),
+          code: '12345678',
+        },
+      },
+      call: 'completePairing' as const,
+    },
+    {
+      name: 'non-decimal change limit',
+      request: {
+        method: 'GET' as const,
+        url: '/v1/changes?after=0&limit=1e2',
+        headers: { authorization: 'Bearer owner-token' },
+      },
+      call: null,
+    },
+    {
+      name: 'invalid approval path UUID',
+      request: {
+        method: 'POST' as const,
+        url: '/v1/pairings/not-a-uuid/approve',
+        headers: { authorization: 'Bearer owner-token' },
+      },
+      call: 'approvePairing' as const,
+    },
+  ])('rejects $name with a generic code-only body', async ({ request, call }) => {
+    const { app, protocol } = appWithProtocol();
+
+    const response = await app.inject(request);
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ code: 'INVALID_REQUEST' });
+    if (call) {
+      expect(protocol.identity[call]).not.toHaveBeenCalled();
+    } else {
+      expect(protocol.sync.changes).not.toHaveBeenCalled();
+    }
+    await app.close();
+  });
+
+  it('does not trust a forwarded address for pairing rate-limit identity', async () => {
+    const { app, protocol } = appWithProtocol();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/pairings/redeem',
+      headers: { 'x-forwarded-for': '203.0.113.90' },
+      payload: {
+        phase: 'claim',
+        code: '12345678',
+        requestId: '55555555-5555-4555-8555-555555555555',
+        claimSecret: opaqueSecret(1),
+        installationId: '44444444-4444-4444-8444-444444444444',
+        displayName: 'Client Phone',
+        platform: 'android',
+      },
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(protocol.identity.claimPairing).toHaveBeenCalledWith(
+      '127.0.0.1',
+      expect.any(Object),
     );
     await app.close();
   });

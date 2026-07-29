@@ -11,6 +11,7 @@ import type { ProtocolConnection } from '../sync/idempotency.js';
 interface PairingRow {
   id_hex: unknown;
   code_hash: unknown;
+  request_id_hex: unknown;
   requested_display_name: unknown;
   requested_platform: unknown;
   requested_installation_id_hex: unknown;
@@ -27,6 +28,7 @@ interface PairingRow {
 const PAIRING_COLUMNS = `
   HEX(id) AS id_hex,
   code_hash,
+  HEX(request_id) AS request_id_hex,
   requested_display_name,
   requested_platform,
   HEX(requested_installation_id) AS requested_installation_id_hex,
@@ -44,6 +46,7 @@ function mapPairing(row: PairingRow): PairingRecord {
   return {
     id: hexToUuid(row.id_hex),
     codeHash: Buffer.from(row.code_hash as Uint8Array),
+    requestId: nullableHexToUuid(row.request_id_hex),
     requestedDisplayName:
       row.requested_display_name === null
         ? null
@@ -98,12 +101,13 @@ export class MariaDbPairingQueries {
     try {
       await this.connection.query(
         `INSERT INTO pairings
-           (id, code_hash, requested_installation_id, claim_hash,
+           (id, code_hash, request_id, requested_installation_id, claim_hash,
             requested_display_name, requested_platform, expires_at,
             redeemed_at, approved_at, approved_by_device_id,
             paired_device_id, consumed_at, created_at)
          VALUES
            (UNHEX(REPLACE(?, '-', '')), ?,
+            CASE WHEN ? IS NULL THEN NULL ELSE UNHEX(REPLACE(?, '-', '')) END,
             CASE WHEN ? IS NULL THEN NULL ELSE UNHEX(REPLACE(?, '-', '')) END,
             ?, ?, ?, ?, ?, ?,
             CASE WHEN ? IS NULL THEN NULL ELSE UNHEX(REPLACE(?, '-', '')) END,
@@ -112,6 +116,8 @@ export class MariaDbPairingQueries {
         [
           pairing.id,
           pairing.codeHash,
+          pairing.requestId,
+          pairing.requestId,
           pairing.requestedInstallationId,
           pairing.requestedInstallationId,
           pairing.claimHash,
@@ -140,7 +146,10 @@ export class MariaDbPairingQueries {
   async savePairing(pairing: PairingRecord): Promise<void> {
     await this.connection.query(
       `UPDATE pairings
-       SET requested_installation_id =
+       SET request_id =
+             CASE WHEN ? IS NULL THEN NULL
+                  ELSE UNHEX(REPLACE(?, '-', '')) END,
+           requested_installation_id =
              CASE WHEN ? IS NULL THEN NULL
                   ELSE UNHEX(REPLACE(?, '-', '')) END,
            claim_hash = ?,
@@ -158,6 +167,8 @@ export class MariaDbPairingQueries {
            consumed_at = ?
        WHERE id = UNHEX(REPLACE(?, '-', ''))`,
       [
+        pairing.requestId,
+        pairing.requestId,
         pairing.requestedInstallationId,
         pairing.requestedInstallationId,
         pairing.claimHash,

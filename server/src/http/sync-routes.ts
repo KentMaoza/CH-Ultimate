@@ -1,6 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 
 import { authenticateRequest } from './request-auth.js';
+import {
+  changesQuery,
+  parseRequest,
+  requireEmptyQuery,
+} from './request-validation.js';
 import type { ProtocolServices } from './protocol-types.js';
 
 export function registerSyncRoutes(
@@ -8,20 +13,14 @@ export function registerSyncRoutes(
   services: ProtocolServices,
 ): void {
   app.get('/v1/bootstrap', async (request) => {
+    requireEmptyQuery(request.query);
     await authenticateRequest(services.identity, request);
     return services.sync.bootstrap();
   });
 
-  app.get<{
-    Querystring: { after?: string; limit?: string };
-  }>('/v1/changes', async (request) => {
+  app.get('/v1/changes', async (request) => {
+    const query = parseRequest(changesQuery, request.query);
     await authenticateRequest(services.identity, request);
-    return services.sync.changes({
-      after: request.query.after ?? '',
-      limit:
-        request.query.limit === undefined
-          ? 100
-          : Number(request.query.limit),
-    });
+    return services.sync.changes(query);
   });
 }

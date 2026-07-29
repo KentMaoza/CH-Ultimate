@@ -24,6 +24,7 @@ export interface DeviceRecord {
 export interface PairingRecord {
   id: string;
   codeHash: Buffer;
+  requestId: string | null;
   requestedDisplayName: string | null;
   requestedPlatform: string | null;
   requestedInstallationId: string | null;
@@ -49,6 +50,21 @@ export interface TokenMatch {
   tokenKind: TokenKind;
 }
 
+export interface IdentityAuditEvent {
+  deviceId: string | null;
+  action: string;
+  entityType: 'device' | 'pairing';
+  entityId: string;
+  detail: unknown;
+}
+
+export interface IdentityChangeEvent {
+  entityType: 'device' | 'pairing';
+  entityId: string;
+  operation: 'upsert' | 'revoke';
+  payload: unknown;
+}
+
 export interface IdentitySession {
   findOwner(): Promise<DeviceRecord | null>;
   findRecovery(): Promise<RecoveryRecord | null>;
@@ -66,6 +82,8 @@ export interface IdentitySession {
   findPairingByCodeHash(codeHash: Buffer): Promise<PairingRecord | null>;
   insertPairing(pairing: PairingRecord): Promise<boolean>;
   savePairing(pairing: PairingRecord): Promise<void>;
+  writeAudit(event: IdentityAuditEvent): Promise<void>;
+  writeChange(event: IdentityChangeEvent): Promise<void>;
 }
 
 export interface IdentityStore {
@@ -89,7 +107,6 @@ export interface IdentityServiceOptions {
   store: IdentityStore;
   bootstrapSecret?: string;
   now?: () => Date;
-  randomBytes?: (size: number) => Buffer;
   randomInt?: (maximum: number) => number;
   randomUuid?: () => string;
   redeemLimiter: RedeemRateLimiter;
@@ -99,7 +116,6 @@ export interface IdentityRuntime {
   store: IdentityStore;
   bootstrapSecret: string | undefined;
   now: () => Date;
-  randomBytes: (size: number) => Buffer;
   randomInt: (maximum: number) => number;
   randomUuid: () => string;
   redeemLimiter: RedeemRateLimiter;
@@ -115,10 +131,14 @@ export type OwnerBootstrapInput =
   | (InstallationInput & {
       mode: 'bootstrap';
       bootstrapSecret: string;
+      deviceToken: string;
+      recoveryCredential: string;
     })
   | (InstallationInput & {
       mode: 'recovery';
       recoveryCredential: string;
+      nextRecoveryCredential: string;
+      deviceToken: string;
     });
 
 export interface PublicDevice {
@@ -132,9 +152,8 @@ export interface PublicDevice {
   revokedAt: string | null;
 }
 
-export interface IssuedDevice {
+export interface DeviceResult {
   device: PublicDevice;
-  deviceToken: string;
 }
 
 export interface AuthenticatedDevice extends PublicDevice {

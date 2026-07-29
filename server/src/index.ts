@@ -13,6 +13,10 @@ import {
 } from './db/migrate.js';
 import { createPool } from './db/pool.js';
 import { createProtocolServices } from './http/create-protocol.js';
+import {
+  ProtocolMaintenance,
+  type MaintenanceLifecycle,
+} from './maintenance.js';
 import type {
   ProtocolConnection,
   ProtocolPool,
@@ -36,6 +40,9 @@ export interface StartupDependencies {
   createPool(config: ServerConfig): RuntimePool;
   migrate(pool: MigrationPool): Promise<unknown>;
   buildApp(deps: { pool: RuntimePool; config: ServerConfig }): RuntimeApp;
+  createMaintenance?(
+    pool: RuntimePool,
+  ): MaintenanceLifecycle;
 }
 
 export interface RunningServer {
@@ -54,6 +61,7 @@ const defaultDependencies: StartupDependencies = {
         config.ownerBootstrapSecret,
       ),
     }),
+  createMaintenance: (pool) => new ProtocolMaintenance(pool),
 };
 
 export async function startServer(
@@ -63,12 +71,16 @@ export async function startServer(
   const config = dependencies.loadConfig(env);
   const pool = dependencies.createPool(config);
   let app: RuntimeApp | undefined;
+  let maintenance: MaintenanceLifecycle | undefined;
 
   try {
     await dependencies.migrate(pool);
     app = dependencies.buildApp({ pool, config });
+    maintenance = dependencies.createMaintenance?.(pool);
     await app.listen({ host: config.host, port: config.port });
+    maintenance?.start();
   } catch (startupError) {
+    maintenance?.stop();
     try {
       await app?.close();
     } catch {
@@ -89,6 +101,7 @@ export async function startServer(
         return;
       }
       shuttingDown = true;
+      maintenance?.stop();
       try {
         await app.close();
       } finally {

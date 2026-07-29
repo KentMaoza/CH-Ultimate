@@ -69,7 +69,6 @@ describe('identity and sync protocol against isolated chu_test', () => {
         deviceId,
         idempotencyKey,
         payload: { skuId, priceRupiah: '25000' },
-        receiptExpiresAt: new Date('2027-07-29T00:00:00.000Z'),
       },
       async (connection) => {
         await connection.query(
@@ -148,7 +147,6 @@ describe('identity and sync protocol against isolated chu_test', () => {
           deviceId,
           idempotencyKey,
           payload: { skuId },
-          receiptExpiresAt: new Date('2027-07-29T00:00:00.000Z'),
         },
         async (connection) => {
           await connection.query(
@@ -176,6 +174,54 @@ describe('identity and sync protocol against isolated chu_test', () => {
       sku_count: 0n,
       receipt_count: 0n,
     });
+  });
+
+  it('serializes concurrent first use of one idempotency key', async () => {
+    const deviceId = randomUUID();
+    const skuId = randomUUID();
+    const idempotencyKey = randomUUID();
+    await insertDevice(deviceId, randomUUID());
+    let callbackCalls = 0;
+    const executeConcurrent = () =>
+      executeIdempotent(
+        pool,
+        {
+          deviceId,
+          idempotencyKey,
+          payload: { skuId },
+        },
+        async (connection) => {
+          callbackCalls += 1;
+          await connection.query(
+            `INSERT INTO skus
+               (id, primary_identifier, name, price_rupiah)
+             VALUES (UNHEX(?), ?, 'Concurrent SKU', 25000)`,
+            [uuidHex(skuId), `CONCURRENT-${skuId}`],
+          );
+          return {
+            statusCode: 201,
+            body: { id: skuId },
+            audits: [],
+            changes: [],
+          };
+        },
+      );
+
+    const results = await Promise.all([
+      executeConcurrent(),
+      executeConcurrent(),
+    ]);
+    const rows = await pool.query<Array<{ sku_count: bigint }>>(
+      'SELECT COUNT(*) AS sku_count FROM skus WHERE id = UNHEX(?)',
+      [uuidHex(skuId)],
+    );
+
+    expect(results.map((result) => result.replayed).sort()).toEqual([
+      false,
+      true,
+    ]);
+    expect(callbackCalls).toBe(1);
+    expect(rows[0]?.sku_count).toBe(1n);
   });
 
   it('keeps bootstrap rows aligned with the real snapshot watermark', async () => {

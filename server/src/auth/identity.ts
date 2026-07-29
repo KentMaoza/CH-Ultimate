@@ -1,5 +1,4 @@
 import {
-  randomBytes as cryptoRandomBytes,
   randomInt as cryptoRandomInt,
   randomUUID,
 } from 'node:crypto';
@@ -12,9 +11,9 @@ import {
 } from './device-auth.js';
 import type {
   AuthenticatedDevice,
+  DeviceResult,
   IdentityRuntime,
   IdentityServiceOptions,
-  IssuedDevice,
   OwnerBootstrapInput,
   PublicDevice,
 } from './identity-types.js';
@@ -31,9 +30,11 @@ export {
   type AuthenticatedDevice,
   type DeviceRecord,
   type DeviceRole,
+  type DeviceResult,
+  type IdentityAuditEvent,
+  type IdentityChangeEvent,
   type IdentitySession,
   type IdentityStore,
-  type IssuedDevice,
   type OwnerBootstrapInput,
   type PairingRecord,
   type PublicDevice,
@@ -49,7 +50,6 @@ export class IdentityService {
       store: options.store,
       bootstrapSecret: options.bootstrapSecret,
       now: options.now ?? (() => new Date()),
-      randomBytes: options.randomBytes ?? cryptoRandomBytes,
       randomInt:
         options.randomInt ?? ((maximum) => cryptoRandomInt(0, maximum)),
       randomUuid: options.randomUuid ?? randomUUID,
@@ -59,7 +59,7 @@ export class IdentityService {
 
   bootstrapOwner(
     input: OwnerBootstrapInput,
-  ): Promise<IssuedDevice & { recoveryCredential: string }> {
+  ): Promise<DeviceResult> {
     return bootstrapOwner(this.runtime, input);
   }
 
@@ -73,11 +73,13 @@ export class IdentityService {
     sourceKey: string,
     input: {
       code: string;
+      requestId: string;
+      claimSecret: string;
       installationId: string;
       displayName: string;
       platform: string;
     },
-  ): Promise<{ pairingId: string; claimSecret: string; status: 'pending' }> {
+  ): Promise<{ pairingId: string; status: 'pending' }> {
     return claimPairing(this.runtime, sourceKey, input);
   }
 
@@ -91,7 +93,8 @@ export class IdentityService {
   completePairing(input: {
     pairingId: string;
     claimSecret: string;
-  }): Promise<IssuedDevice> {
+    deviceToken: string;
+  }): Promise<DeviceResult> {
     return completePairing(this.runtime, input);
   }
 
@@ -102,8 +105,14 @@ export class IdentityService {
   rotateDeviceToken(
     deviceId: string,
     presentedToken: string,
-  ): Promise<IssuedDevice> {
-    return rotateDeviceToken(this.runtime, deviceId, presentedToken);
+    nextDeviceToken: string,
+  ): Promise<DeviceResult> {
+    return rotateDeviceToken(
+      this.runtime,
+      deviceId,
+      presentedToken,
+      nextDeviceToken,
+    );
   }
 
   listDevices(ownerDeviceId: string): Promise<PublicDevice[]> {

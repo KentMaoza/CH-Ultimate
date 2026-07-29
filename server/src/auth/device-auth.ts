@@ -1,13 +1,13 @@
 import {
   IdentityError,
   type AuthenticatedDevice,
-  type DeviceRecord,
+  type DeviceResult,
   type IdentityRuntime,
-  type IssuedDevice,
   type PublicDevice,
   publicDevice,
   requireOwner,
 } from './identity-types.js';
+import { writeDeviceChange } from './identity-events.js';
 import {
   PREVIOUS_TOKEN_OVERLAP_MS,
   TOKEN_LIFETIME_MS,
@@ -15,7 +15,6 @@ import {
   decodeOpaqueSecret,
   hashesEqual,
   hashSecret,
-  issueOpaqueSecret,
 } from './secrets.js';
 
 export async function authenticate(
@@ -50,28 +49,42 @@ export async function rotateDeviceToken(
   runtime: IdentityRuntime,
   deviceId: string,
   presentedToken: string,
-): Promise<IssuedDevice> {
+  nextTokenValue: string,
+): Promise<DeviceResult> {
   const presented = decodeOpaqueSecret(presentedToken);
-  if (!presented) {
+  const next = decodeOpaqueSecret(nextTokenValue);
+  if (!presented || !next) {
     throw unauthorized();
   }
+  const presentedHash = hashSecret(presented);
+  const nextHash = hashSecret(next);
   const now = runtime.now();
-  const next = issueOpaqueSecret(runtime);
-  let updated: DeviceRecord | undefined;
 
-  await runtime.store.transaction(async (session) => {
+  return runtime.store.transaction(async (session) => {
     const device = await session.findDeviceById(deviceId);
+    if (!device || device.revokedAt !== null) {
+      throw unauthorized();
+    }
     if (
-      !device ||
-      device.revokedAt !== null ||
+      hashesEqual(device.tokenHash, nextHash) &&
+      (hashesEqual(device.tokenHash, presentedHash) ||
+        (device.previousTokenHash !== null &&
+          device.previousTokenExpiresAt !== null &&
+          now.getTime() < device.previousTokenExpiresAt.getTime() &&
+          hashesEqual(device.previousTokenHash, presentedHash)))
+    ) {
+      return { device: publicDevice(device) };
+    }
+    if (
       now.getTime() >= device.tokenExpiresAt.getTime() ||
-      !hashesEqual(device.tokenHash, hashSecret(presented))
+      !hashesEqual(device.tokenHash, presentedHash)
     ) {
       throw unauthorized();
     }
-    updated = {
+
+    const updated = {
       ...device,
-      tokenHash: next.hash,
+      tokenHash: nextHash,
       tokenExpiresAt: addMilliseconds(now, TOKEN_LIFETIME_MS),
       previousTokenHash: device.tokenHash,
       previousTokenExpiresAt: addMilliseconds(
@@ -80,12 +93,16 @@ export async function rotateDeviceToken(
       ),
     };
     await session.saveDevice(updated);
+    await session.writeAudit({
+      deviceId,
+      action: 'device.token.rotate',
+      entityType: 'device',
+      entityId: deviceId,
+      detail: {},
+    });
+    await writeDeviceChange(session, updated);
+    return { device: publicDevice(updated) };
   });
-
-  if (!updated) {
-    throw new Error('Token rotation transaction returned no device');
-  }
-  return { device: publicDevice(updated), deviceToken: next.value };
 }
 
 export async function listDevices(
@@ -110,7 +127,16 @@ export async function revokeDevice(
     if (!target) {
       throw new IdentityError('NOT_FOUND', 404, 'Device not found');
     }
-    await session.saveDevice({ ...target, revokedAt: now });
+    const revoked = { ...target, revokedAt: now };
+    await session.saveDevice(revoked);
+    await session.writeAudit({
+      deviceId: ownerDeviceId,
+      action: 'device.revoke',
+      entityType: 'device',
+      entityId: targetDeviceId,
+      detail: {},
+    });
+    await writeDeviceChange(session, revoked, 'revoke');
     return { status: 'revoked' as const };
   });
 }

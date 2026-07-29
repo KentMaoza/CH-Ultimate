@@ -6,10 +6,16 @@ import { SyncError } from '../sync/service.js';
 
 export function installProtocolErrorHandler(app: FastifyInstance): void {
   app.setErrorHandler((error, _request, reply) => {
+    if (error instanceof SyncError) {
+      return reply.code(error.statusCode).send(
+        error.code === 'CURSOR_AHEAD' && error.bootstrapRequired
+          ? { code: error.code, bootstrapRequired: true }
+          : { code: error.code },
+      );
+    }
     if (
       error instanceof IdentityError ||
-      error instanceof IdempotencyError ||
-      error instanceof SyncError
+      error instanceof IdempotencyError
     ) {
       return reply.code(error.statusCode).send({ code: error.code });
     }

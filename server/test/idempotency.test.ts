@@ -12,6 +12,7 @@ interface Receipt {
   payloadHash: Buffer;
   status: number;
   body: string;
+  expiresAt: Date;
 }
 
 interface FakeState {
@@ -33,6 +34,7 @@ function cloneState(state: FakeState): FakeState {
           payloadHash: Buffer.from(receipt.payloadHash),
           status: receipt.status,
           body: receipt.body,
+          expiresAt: new Date(receipt.expiresAt),
         },
       ]),
     ),
@@ -83,6 +85,19 @@ class FakeProtocolPool implements ProtocolPool {
               : []
           ) as T;
         }
+        if (sql.startsWith('DELETE FROM idempotency_receipts')) {
+          const key = `${String(values[0])}:${String(values[1])}`;
+          const receipt = this.state.receipts.get(key);
+          if (
+            receipt &&
+            receipt.expiresAt.getTime() <=
+              new Date(values[2] as Date).getTime()
+          ) {
+            this.state.receipts.delete(key);
+            return { affectedRows: 1 } as T;
+          }
+          return { affectedRows: 0 } as T;
+        }
         if (sql.startsWith('INSERT INTO business_probe')) {
           this.state.businessRows.push(String(values[0]));
           return { affectedRows: 1 } as T;
@@ -100,11 +115,27 @@ class FakeProtocolPool implements ProtocolPool {
         }
         if (sql.startsWith('INSERT INTO idempotency_receipts')) {
           const key = `${String(values[0])}:${String(values[1])}`;
+          if (this.state.receipts.has(key)) {
+            throw Object.assign(new Error('duplicate'), {
+              code: 'ER_DUP_ENTRY',
+            });
+          }
           this.state.receipts.set(key, {
             payloadHash: Buffer.from(values[2] as Buffer),
             status: Number(values[3]),
             body: String(values[4]),
+            expiresAt: new Date(values[5] as Date),
           });
+          return { affectedRows: 1 } as T;
+        }
+        if (sql.startsWith('UPDATE idempotency_receipts')) {
+          const key = `${String(values[2])}:${String(values[3])}`;
+          const receipt = this.state.receipts.get(key);
+          if (!receipt) {
+            throw new Error('No reserved receipt');
+          }
+          receipt.status = Number(values[0]);
+          receipt.body = String(values[1]);
           return { affectedRows: 1 } as T;
         }
         throw new Error(`Unexpected SQL: ${sql}`);
@@ -156,7 +187,6 @@ function execute(
       deviceId,
       idempotencyKey,
       payload,
-      receiptExpiresAt: new Date('2027-01-01T00:00:00.000Z'),
     },
     callback,
   );
@@ -232,6 +262,21 @@ describe('executeIdempotent', () => {
     expect(pool.state.receipts).toHaveLength(0);
   });
 
+  it('does not mistake a business duplicate for a receipt race', async () => {
+    const pool = new FakeProtocolPool();
+    const businessError = Object.assign(new Error('business duplicate'), {
+      code: 'ER_DUP_ENTRY',
+    });
+
+    await expect(
+      execute(pool, { amount: '1000' }, async () => {
+        throw businessError;
+      }),
+    ).rejects.toBe(businessError);
+
+    expect(pool.state.receipts).toHaveLength(0);
+  });
+
   it('requires the idempotency key to be a UUID', async () => {
     const pool = new FakeProtocolPool();
 
@@ -242,7 +287,6 @@ describe('executeIdempotent', () => {
           deviceId,
           idempotencyKey: 'not-a-uuid',
           payload: {},
-          receiptExpiresAt: new Date('2027-01-01T00:00:00.000Z'),
         },
         async () => ({
           statusCode: 200,
@@ -253,5 +297,21 @@ describe('executeIdempotent', () => {
       ),
     ).rejects.toBeInstanceOf(IdempotencyError);
     expect(pool.state.receipts).toHaveLength(0);
+  });
+
+  it('prunes an expired receipt before reusing its key', async () => {
+    const pool = new FakeProtocolPool();
+    pool.state.receipts.set(`${deviceId}:${idempotencyKey}`, {
+      payloadHash: Buffer.alloc(32, 9),
+      status: 200,
+      body: '{"stale":true}',
+      expiresAt: new Date(0),
+    });
+
+    await expect(execute(pool, { amount: '1000' })).resolves.toMatchObject({
+      replayed: false,
+    });
+    expect(pool.state.businessRows).toEqual([entityId]);
+    expect(pool.state.receipts).toHaveLength(1);
   });
 });

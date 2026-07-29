@@ -21,6 +21,8 @@ const ORIGINAL_V1_CHECKSUM =
   'e22cfbbf1af7b72e0091c9bf8a399ac2570fc6f971723330d085d0954cf68b69';
 const ORIGINAL_V2_CHECKSUM =
   '39fd3afbe56aef8fa4b5c317753622998f73877925f1eed24996686721f17923';
+const ORIGINAL_V3_CHECKSUM =
+  'cb1ab6f8382317cf9e3abfde5f9f4edf6883eea75f06cc0c6b1d4ac54dbde581';
 
 class FakeMigrationPool implements MigrationPool {
   readonly applied = new Map<number, AppliedMigration>();
@@ -123,8 +125,17 @@ function seedOriginalVersionTwo(pool: FakeMigrationPool): void {
   });
 }
 
+function seedOriginalVersionThree(pool: FakeMigrationPool): void {
+  seedOriginalVersionTwo(pool);
+  pool.applied.set(3, {
+    version: 3,
+    name: '003_identity_sync_protocol.sql',
+    checksum: Buffer.from(ORIGINAL_V3_CHECKSUM, 'hex'),
+  });
+}
+
 describe('runMigrations', () => {
-  it('applies versions 1 through 3 once and makes the second run a no-op', async () => {
+  it('applies versions 1 through 4 once and makes the second run a no-op', async () => {
     const pool = new FakeMigrationPool();
 
     const first = await runMigrations(pool);
@@ -133,15 +144,15 @@ describe('runMigrations', () => {
 
     expect(first).toEqual({
       fromVersion: 0,
-      toVersion: 3,
-      appliedVersions: [1, 2, 3],
+      toVersion: 4,
+      appliedVersions: [1, 2, 3, 4],
     });
     expect(second).toEqual({
-      fromVersion: 3,
-      toVersion: 3,
+      fromVersion: 4,
+      toVersion: 4,
       appliedVersions: [],
     });
-    expect(pool.applied.size).toBe(3);
+    expect(pool.applied.size).toBe(4);
     expect(pool.migrationStatementCount).toBe(statementsAfterFirstRun);
   });
 
@@ -161,16 +172,16 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 0,
-      toVersion: 3,
-      appliedVersions: [1, 2, 3],
+      toVersion: 4,
+      appliedVersions: [1, 2, 3, 4],
     });
   });
 
   it('refuses a database schema newer than this binary and releases the lock', async () => {
-    const pool = new FakeMigrationPool(4);
+    const pool = new FakeMigrationPool(5);
 
     await expect(runMigrations(pool)).rejects.toThrow(
-      'Database schema version 4 is newer than supported version 3',
+      'Database schema version 5 is newer than supported version 4',
     );
 
     expect(pool.lockHeld).toBe(false);
@@ -207,17 +218,17 @@ describe('runMigrations', () => {
     expect(pool.lockHeld).toBe(false);
   });
 
-  it('upgrades an original version 1 receipt by applying versions 2 and 3', async () => {
+  it('upgrades an original version 1 receipt by applying versions 2 through 4', async () => {
     const pool = new FakeMigrationPool();
     seedOriginalVersionOne(pool);
 
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 1,
-      toVersion: 3,
-      appliedVersions: [2, 3],
+      toVersion: 4,
+      appliedVersions: [2, 3, 4],
     });
 
-    expect(pool.applied.size).toBe(3);
+    expect(pool.applied.size).toBe(4);
     expect(pool.migrationStatementCount).toBeGreaterThan(2);
   });
 
@@ -234,19 +245,19 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 1,
-      toVersion: 3,
-      appliedVersions: [2, 3],
+      toVersion: 4,
+      appliedVersions: [2, 3, 4],
     });
   });
 
-  it('upgrades an original version 2 receipt with only version 3', async () => {
+  it('upgrades an original version 2 receipt with versions 3 and 4', async () => {
     const pool = new FakeMigrationPool();
     seedOriginalVersionTwo(pool);
 
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 2,
-      toVersion: 3,
-      appliedVersions: [3],
+      toVersion: 4,
+      appliedVersions: [3, 4],
     });
   });
 
@@ -263,8 +274,26 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 2,
-      toVersion: 3,
-      appliedVersions: [3],
+      toVersion: 4,
+      appliedVersions: [3, 4],
+    });
+  });
+
+  it('reruns version 4 after its approval backfill committed', async () => {
+    const pool = new FakeMigrationPool();
+    seedOriginalVersionThree(pool);
+    pool.failOn = /ALTER TABLE devices/;
+
+    await expect(runMigrations(pool)).rejects.toThrow(
+      'deliberate migration failure',
+    );
+    expect([...pool.applied.keys()]).toEqual([1, 2, 3]);
+
+    pool.failOn = undefined;
+    await expect(runMigrations(pool)).resolves.toEqual({
+      fromVersion: 3,
+      toVersion: 4,
+      appliedVersions: [4],
     });
   });
 });
@@ -316,6 +345,34 @@ describe('initial schema', () => {
 
     expect(createHash('sha256').update(sql).digest('hex')).toBe(
       ORIGINAL_V2_CHECKSUM,
+    );
+  });
+
+  it('preserves the exact published version 3 checksum', async () => {
+    const sql = await readFile(
+      new URL('../migrations/003_identity_sync_protocol.sql', import.meta.url),
+    );
+
+    expect(createHash('sha256').update(sql).digest('hex')).toBe(
+      ORIGINAL_V3_CHECKSUM,
+    );
+  });
+
+  it('adds replay-safe identity fields and backfills device approval in v4', async () => {
+    const sql = await readFile(
+      new URL('../migrations/004_replay_safe_protocol.sql', import.meta.url),
+      'utf8',
+    );
+
+    expect(sql).toMatch(
+      /UPDATE devices[\s\S]*SET approved_at = created_at[\s\S]*WHERE approved_at IS NULL/,
+    );
+    expect(sql).toMatch(/MODIFY approved_at TIMESTAMP\(6\) NOT NULL/);
+    expect(sql).toMatch(
+      /ADD COLUMN IF NOT EXISTS request_id BINARY\(16\) NULL/,
+    );
+    expect(sql).toMatch(
+      /ADD UNIQUE INDEX IF NOT EXISTS uq_pairings_request_id \(request_id\)/,
     );
   });
 

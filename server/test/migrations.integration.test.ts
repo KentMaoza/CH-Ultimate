@@ -136,9 +136,9 @@ describe('MariaDB migrations against isolated chu_test', () => {
       ['ch-core-schema-migrations'],
     );
 
-    expect(first.appliedVersions).toEqual([1, 2]);
+    expect(first.appliedVersions).toEqual([1, 2, 3]);
     expect(second.appliedVersions).toEqual([]);
-    expect(Number(rows[0]?.migration_count)).toBe(2);
+    expect(Number(rows[0]?.migration_count)).toBe(3);
     expect(Number(lockRows[0]?.is_free)).toBe(1);
   });
 
@@ -171,9 +171,9 @@ describe('MariaDB migrations against isolated chu_test', () => {
       'SELECT COUNT(*) AS migration_count FROM schema_migrations',
     );
 
-    expect(recovered.appliedVersions).toEqual([1, 2]);
+    expect(recovered.appliedVersions).toEqual([1, 2, 3]);
     expect(Number(finalTables[0]?.table_count)).toBe(1);
-    expect(Number(finalReceipts[0]?.migration_count)).toBe(2);
+    expect(Number(finalReceipts[0]?.migration_count)).toBe(3);
   });
 
   it('reruns version 2 after its first real ALTER TABLE committed', async () => {
@@ -190,8 +190,8 @@ describe('MariaDB migrations against isolated chu_test', () => {
 
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 1,
-      toVersion: 2,
-      appliedVersions: [2],
+      toVersion: 3,
+      appliedVersions: [2, 3],
     });
   });
 
@@ -206,9 +206,13 @@ describe('MariaDB migrations against isolated chu_test', () => {
       connection = await pool.getConnection();
       await connection.beginTransaction();
       await connection.query(
-        `INSERT INTO devices (id, display_name, platform, token_hash, token_expires_at)
-         VALUES (UNHEX(?), ?, ?, UNHEX(SHA2(?, 256)), UTC_TIMESTAMP(6))`,
-        [deviceId, 'Rollback probe', 'test', 'temporary-token'],
+        `INSERT INTO devices
+           (id, installation_id, display_name, platform, token_hash,
+            token_expires_at)
+         VALUES
+           (UNHEX(?), UNHEX(?), ?, ?, UNHEX(SHA2(?, 256)),
+            UTC_TIMESTAMP(6))`,
+        [deviceId, deviceId, 'Rollback probe', 'test', 'temporary-token'],
       );
       insertedBeforeFailure = true;
       await connection.query('INSERT INTO table_that_does_not_exist VALUES (1)');
@@ -229,12 +233,12 @@ describe('MariaDB migrations against isolated chu_test', () => {
     expect(Number(rows[0]?.device_count)).toBe(0);
   });
 
-  it('upgrades an original v1 schema with only v2 and rejects a cross-Nota line', async () => {
+  it('upgrades an original v1 schema with v2 and v3 and rejects a cross-Nota line', async () => {
     await applyOriginalVersionOne();
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 1,
-      toVersion: 2,
-      appliedVersions: [2],
+      toVersion: 3,
+      appliedVersions: [2, 3],
     });
     const deviceId = randomUUID().replaceAll('-', '');
     const notaAId = randomUUID().replaceAll('-', '');
@@ -244,11 +248,12 @@ describe('MariaDB migrations against isolated chu_test', () => {
 
     await pool.query(
       `INSERT INTO devices
-         (id, display_name, platform, token_hash, token_expires_at)
+         (id, installation_id, display_name, platform, token_hash,
+          token_expires_at)
        VALUES
-         (UNHEX(?), 'Constraint probe', 'test', UNHEX(SHA2(?, 256)),
-          DATE_ADD(UTC_TIMESTAMP(6), INTERVAL 1 DAY))`,
-      [deviceId, randomUUID()],
+         (UNHEX(?), UNHEX(?), 'Constraint probe', 'test',
+          UNHEX(SHA2(?, 256)), DATE_ADD(UTC_TIMESTAMP(6), INTERVAL 1 DAY))`,
+      [deviceId, deviceId, randomUUID()],
     );
     await pool.query(
       `INSERT INTO notas

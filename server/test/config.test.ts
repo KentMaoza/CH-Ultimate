@@ -46,4 +46,34 @@ describe('loadServerConfig', () => {
       }),
     );
   });
+
+  it('accepts an optional minimum-32-byte owner bootstrap secret', () => {
+    const config = loadServerConfig({
+      CH_CORE_DATABASE_URL:
+        'mariadb://chu_app:secret@192.0.2.10:3306/chu_test',
+      CH_CORE_OWNER_BOOTSTRAP_SECRET: 'b'.repeat(32),
+    });
+
+    expect(config.ownerBootstrapSecret).toBe('b'.repeat(32));
+  });
+
+  it('treats an empty optional bootstrap secret as disabled', () => {
+    const config = loadServerConfig({
+      CH_CORE_DATABASE_URL:
+        'mariadb://chu_app:secret@192.0.2.10:3306/chu_test',
+      CH_CORE_OWNER_BOOTSTRAP_SECRET: '',
+    });
+
+    expect(config).not.toHaveProperty('ownerBootstrapSecret');
+  });
+
+  it('rejects a configured owner bootstrap secret shorter than 32 bytes', () => {
+    expect(() =>
+      loadServerConfig({
+        CH_CORE_DATABASE_URL:
+          'mariadb://chu_app:secret@192.0.2.10:3306/chu_test',
+        CH_CORE_OWNER_BOOTSTRAP_SECRET: 'short-secret',
+      }),
+    ).toThrow('Invalid CH Core server configuration');
+  });
 });

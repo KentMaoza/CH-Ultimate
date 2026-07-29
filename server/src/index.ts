@@ -1,6 +1,6 @@
 import { pathToFileURL } from 'node:url';
 
-import { buildApp } from './app.js';
+import { buildApp as buildFastifyApp } from './app.js';
 import {
   loadServerConfig,
   type ServerConfig,
@@ -8,11 +8,21 @@ import {
 import {
   runMigrations,
   type MigrationPool,
+  type MigrationConnection,
   type SchemaQueryPool,
 } from './db/migrate.js';
 import { createPool } from './db/pool.js';
+import { createProtocolServices } from './http/create-protocol.js';
+import type {
+  ProtocolConnection,
+  ProtocolPool,
+} from './sync/idempotency.js';
 
-export interface RuntimePool extends MigrationPool, SchemaQueryPool {
+export interface RuntimeConnection
+  extends MigrationConnection, ProtocolConnection {}
+
+export interface RuntimePool extends SchemaQueryPool, ProtocolPool {
+  getConnection(): Promise<RuntimeConnection>;
   end(): Promise<void>;
 }
 
@@ -25,7 +35,7 @@ export interface StartupDependencies {
   loadConfig(env: Record<string, string | undefined>): ServerConfig;
   createPool(config: ServerConfig): RuntimePool;
   migrate(pool: MigrationPool): Promise<unknown>;
-  buildApp(deps: { pool: SchemaQueryPool }): RuntimeApp;
+  buildApp(deps: { pool: RuntimePool; config: ServerConfig }): RuntimeApp;
 }
 
 export interface RunningServer {
@@ -36,7 +46,14 @@ const defaultDependencies: StartupDependencies = {
   loadConfig: loadServerConfig,
   createPool,
   migrate: runMigrations,
-  buildApp,
+  buildApp: ({ pool, config }) =>
+    buildFastifyApp({
+      pool,
+      protocol: createProtocolServices(
+        pool,
+        config.ownerBootstrapSecret,
+      ),
+    }),
 };
 
 export async function startServer(
@@ -49,7 +66,7 @@ export async function startServer(
 
   try {
     await dependencies.migrate(pool);
-    app = dependencies.buildApp({ pool });
+    app = dependencies.buildApp({ pool, config });
     await app.listen({ host: config.host, port: config.port });
   } catch (startupError) {
     try {

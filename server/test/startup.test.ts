@@ -74,6 +74,35 @@ function startupScenario(scenario: StartupScenario): {
 }
 
 describe('startServer', () => {
+  it('passes startup security configuration into app construction', async () => {
+    const { deps } = startupScenario({});
+    const originalBuildApp = deps.buildApp;
+    let received:
+      | {
+          pool: RuntimePool;
+          config: {
+            ownerBootstrapSecret?: string;
+          };
+        }
+      | undefined;
+    deps.loadConfig = () => ({
+      host: '0.0.0.0',
+      port: 3000,
+      databaseUrl: 'mariadb://user:password@db.internal/chu_test',
+      dbPoolMax: 4,
+      ownerBootstrapSecret: 'b'.repeat(32),
+    });
+    deps.buildApp = (buildDependencies) => {
+      received = buildDependencies;
+      return originalBuildApp(buildDependencies);
+    };
+
+    const running = await startServer({}, deps);
+
+    expect(received?.config.ownerBootstrapSecret).toBe('b'.repeat(32));
+    await running.shutdown();
+  });
+
   it('ends the pool when migration startup fails before the app exists', async () => {
     const startupError = new Error('migration failed');
     const { deps, events } = startupScenario({ migrationError: startupError });

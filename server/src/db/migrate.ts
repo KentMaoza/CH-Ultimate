@@ -1,13 +1,14 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
-export const LATEST_SCHEMA_VERSION = 2;
+export const LATEST_SCHEMA_VERSION = 3;
 export const MIGRATION_LOCK_NAME = 'ch-core-schema-migrations';
 
 const MIGRATION_LOCK_TIMEOUT_SECONDS = 30;
 const migrations = [
   { version: 1, name: '001_initial.sql' },
   { version: 2, name: '002_nota_line_page_ownership.sql' },
+  { version: 3, name: '003_identity_sync_protocol.sql' },
 ] as const;
 
 export interface SchemaQueryPool {

@@ -4,9 +4,14 @@ import {
   assertSchemaCompatible,
   type SchemaQueryPool,
 } from './db/migrate.js';
+import {
+  registerProtocolRoutes,
+  type ProtocolServices,
+} from './http/routes.js';
 
 export interface AppDependencies {
   pool: SchemaQueryPool;
+  protocol?: ProtocolServices;
 }
 
 export function buildApp(deps: AppDependencies): FastifyInstance {
@@ -22,6 +27,10 @@ export function buildApp(deps: AppDependencies): FastifyInstance {
       return reply.code(503).send({ status: 'not_ready' });
     }
   });
+
+  if (deps.protocol) {
+    registerProtocolRoutes(app, deps.protocol);
+  }
 
   return app;
 }

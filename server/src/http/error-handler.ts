@@ -1,0 +1,28 @@
+import type { FastifyInstance } from 'fastify';
+
+import { IdentityError } from '../auth/identity.js';
+import { IdempotencyError } from '../sync/idempotency.js';
+import { SyncError } from '../sync/service.js';
+
+export function installProtocolErrorHandler(app: FastifyInstance): void {
+  app.setErrorHandler((error, _request, reply) => {
+    if (
+      error instanceof IdentityError ||
+      error instanceof IdempotencyError ||
+      error instanceof SyncError
+    ) {
+      return reply.code(error.statusCode).send({ code: error.code });
+    }
+    const errorStatusCode =
+      typeof error === 'object' &&
+      error !== null &&
+      'statusCode' in error &&
+      typeof error.statusCode === 'number'
+        ? error.statusCode
+        : 500;
+    const statusCode = errorStatusCode < 500 ? errorStatusCode : 500;
+    return reply
+      .code(statusCode)
+      .send({ code: statusCode === 500 ? 'INTERNAL_ERROR' : 'INVALID_REQUEST' });
+  });
+}

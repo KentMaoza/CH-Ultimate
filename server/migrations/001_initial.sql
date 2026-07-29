@@ -119,6 +119,7 @@ CREATE TABLE IF NOT EXISTS nota_pages (
   created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   UNIQUE KEY uq_nota_pages_position (nota_id, page_position),
+  UNIQUE KEY uq_nota_pages_id_nota (id, nota_id),
   CONSTRAINT fk_nota_pages_nota
     FOREIGN KEY (nota_id) REFERENCES notas (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -140,10 +141,8 @@ CREATE TABLE IF NOT EXISTS nota_lines (
   updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   UNIQUE KEY uq_nota_lines_position (page_id, line_position),
   KEY idx_nota_lines_nota (nota_id),
-  CONSTRAINT fk_nota_lines_nota
-    FOREIGN KEY (nota_id) REFERENCES notas (id),
-  CONSTRAINT fk_nota_lines_page
-    FOREIGN KEY (page_id) REFERENCES nota_pages (id),
+  CONSTRAINT fk_nota_lines_page_nota
+    FOREIGN KEY (page_id, nota_id) REFERENCES nota_pages (id, nota_id),
   CONSTRAINT fk_nota_lines_sku
     FOREIGN KEY (sku_id) REFERENCES skus (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -1,32 +1,102 @@
+import { pathToFileURL } from 'node:url';
+
 import { buildApp } from './app.js';
-import { loadServerConfig } from './config.js';
-import { runMigrations } from './db/migrate.js';
+import {
+  loadServerConfig,
+  type ServerConfig,
+} from './config.js';
+import {
+  runMigrations,
+  type MigrationPool,
+  type SchemaQueryPool,
+} from './db/migrate.js';
 import { createPool } from './db/pool.js';
 
-async function main(): Promise<void> {
-  const config = loadServerConfig(process.env);
-  const pool = createPool(config);
-
-  await runMigrations(pool);
-  const app = buildApp({ pool });
-  let shuttingDown = false;
-
-  const shutdown = async (): Promise<void> => {
-    if (shuttingDown) {
-      return;
-    }
-    shuttingDown = true;
-    await app.close();
-    await pool.end();
-  };
-
-  process.once('SIGINT', () => void shutdown());
-  process.once('SIGTERM', () => void shutdown());
-
-  await app.listen({ host: config.host, port: config.port });
+export interface RuntimePool extends MigrationPool, SchemaQueryPool {
+  end(): Promise<void>;
 }
 
-void main().catch(() => {
-  console.error('CH Core failed to start');
-  process.exitCode = 1;
-});
+export interface RuntimeApp {
+  listen(options: { host: string; port: number }): Promise<unknown>;
+  close(): Promise<void>;
+}
+
+export interface StartupDependencies {
+  loadConfig(env: Record<string, string | undefined>): ServerConfig;
+  createPool(config: ServerConfig): RuntimePool;
+  migrate(pool: MigrationPool): Promise<unknown>;
+  buildApp(deps: { pool: SchemaQueryPool }): RuntimeApp;
+}
+
+export interface RunningServer {
+  shutdown(): Promise<void>;
+}
+
+const defaultDependencies: StartupDependencies = {
+  loadConfig: loadServerConfig,
+  createPool,
+  migrate: runMigrations,
+  buildApp,
+};
+
+export async function startServer(
+  env: Record<string, string | undefined>,
+  dependencies: StartupDependencies = defaultDependencies,
+): Promise<RunningServer> {
+  const config = dependencies.loadConfig(env);
+  const pool = dependencies.createPool(config);
+  let app: RuntimeApp | undefined;
+
+  try {
+    await dependencies.migrate(pool);
+    app = dependencies.buildApp({ pool });
+    await app.listen({ host: config.host, port: config.port });
+  } catch (startupError) {
+    try {
+      await app?.close();
+    } catch {
+      // Preserve the startup error after making the remaining cleanup attempt.
+    }
+    try {
+      await pool.end();
+    } catch {
+      // Preserve the startup error after the pool cleanup attempt.
+    }
+    throw startupError;
+  }
+
+  let shuttingDown = false;
+  return {
+    async shutdown() {
+      if (shuttingDown) {
+        return;
+      }
+      shuttingDown = true;
+      try {
+        await app.close();
+      } finally {
+        await pool.end();
+      }
+    },
+  };
+}
+
+async function main(): Promise<void> {
+  const running = await startServer(process.env);
+  const shutdown = (): void => {
+    void running.shutdown().catch(() => {
+      process.exitCode = 1;
+    });
+  };
+
+  process.once('SIGINT', shutdown);
+  process.once('SIGTERM', shutdown);
+}
+
+const entrypoint = process.argv[1];
+if (entrypoint && import.meta.url === pathToFileURL(entrypoint).href) {
+  void main().catch(() => {
+    console.error('CH Core failed to start');
+    process.exitCode = 1;
+  });
+}

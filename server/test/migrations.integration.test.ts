@@ -1,10 +1,14 @@
 import { randomUUID } from 'node:crypto';
 
 import type { PoolConnection } from 'mariadb';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadServerConfig } from '../src/config.js';
-import { runMigrations } from '../src/db/migrate.js';
+import {
+  runMigrations,
+  type MigrationConnection,
+  type MigrationPool,
+} from '../src/db/migrate.js';
 import { createPool } from '../src/db/pool.js';
 
 const databaseUrl = process.env.CH_CORE_TEST_DATABASE_URL;
@@ -54,12 +58,39 @@ async function resetIsolatedSchema(): Promise<void> {
     }
   } finally {
     await connection.query('SET FOREIGN_KEY_CHECKS = 1');
-    connection.release();
+    await connection.release();
   }
 }
 
+function interruptMigrationOnce(): MigrationPool {
+  let interrupted = false;
+
+  return {
+    async getConnection(): Promise<MigrationConnection> {
+      const connection = await pool.getConnection();
+      return {
+        query: async <T>(
+          sql: string,
+          values: readonly unknown[] = [],
+        ): Promise<T> => {
+          if (
+            !interrupted &&
+            sql.includes('CREATE TABLE IF NOT EXISTS pairings')
+          ) {
+            interrupted = true;
+            throw new Error('deliberate mid-migration interruption');
+          }
+          return connection.query<T, readonly unknown[]>(sql, values);
+        },
+        release: () => connection.release(),
+        destroy: () => connection.destroy(),
+      };
+    },
+  };
+}
+
 describe('MariaDB migrations against isolated chu_test', () => {
-  beforeAll(resetIsolatedSchema);
+  beforeEach(resetIsolatedSchema);
 
   afterAll(async () => {
     await pool.end();
@@ -82,7 +113,40 @@ describe('MariaDB migrations against isolated chu_test', () => {
     expect(Number(lockRows[0]?.is_free)).toBe(1);
   });
 
+  it('reruns to completion after real DDL commits before an interruption', async () => {
+    await expect(runMigrations(interruptMigrationOnce())).rejects.toThrow(
+      'deliberate mid-migration interruption',
+    );
+
+    const partialTables = await pool.query<Array<{ table_count: bigint }>>(
+      `SELECT COUNT(*) AS table_count
+       FROM information_schema.tables
+       WHERE table_schema = DATABASE() AND table_name = 'devices'`,
+    );
+    const partialReceipts = await pool.query<
+      Array<{ migration_count: bigint }>
+    >('SELECT COUNT(*) AS migration_count FROM schema_migrations');
+
+    expect(Number(partialTables[0]?.table_count)).toBe(1);
+    expect(Number(partialReceipts[0]?.migration_count)).toBe(0);
+
+    const recovered = await runMigrations(pool);
+    const finalTables = await pool.query<Array<{ table_count: bigint }>>(
+      `SELECT COUNT(*) AS table_count
+       FROM information_schema.tables
+       WHERE table_schema = DATABASE() AND table_name = 'change_log'`,
+    );
+    const finalReceipts = await pool.query<Array<{ migration_count: bigint }>>(
+      'SELECT COUNT(*) AS migration_count FROM schema_migrations',
+    );
+
+    expect(recovered.appliedVersions).toEqual([1]);
+    expect(Number(finalTables[0]?.table_count)).toBe(1);
+    expect(Number(finalReceipts[0]?.migration_count)).toBe(1);
+  });
+
   it('rolls back a deliberately failing transaction without partial rows', async () => {
+    await runMigrations(pool);
     const deviceId = randomUUID().replaceAll('-', '');
     let connection: PoolConnection | undefined;
     let insertedBeforeFailure = false;
@@ -113,5 +177,58 @@ describe('MariaDB migrations against isolated chu_test', () => {
     expect(insertedBeforeFailure).toBe(true);
     expect(transactionError).toBeInstanceOf(Error);
     expect(Number(rows[0]?.device_count)).toBe(0);
+  });
+
+  it('rejects a line whose page belongs to a different Nota', async () => {
+    await runMigrations(pool);
+    const deviceId = randomUUID().replaceAll('-', '');
+    const notaAId = randomUUID().replaceAll('-', '');
+    const notaBId = randomUUID().replaceAll('-', '');
+    const pageAId = randomUUID().replaceAll('-', '');
+    const lineId = randomUUID().replaceAll('-', '');
+
+    await pool.query(
+      `INSERT INTO devices
+         (id, display_name, platform, token_hash, token_expires_at)
+       VALUES
+         (UNHEX(?), 'Constraint probe', 'test', UNHEX(SHA2(?, 256)),
+          DATE_ADD(UTC_TIMESTAMP(6), INTERVAL 1 DAY))`,
+      [deviceId, randomUUID()],
+    );
+    await pool.query(
+      `INSERT INTO notas
+         (id, nota_number, business_date, status, header_json, field_versions,
+          created_by_device_id)
+       VALUES
+         (UNHEX(?), 'TEST-A', UTC_DATE(), 'draft', JSON_OBJECT(), JSON_OBJECT(),
+          UNHEX(?)),
+         (UNHEX(?), 'TEST-B', UTC_DATE(), 'draft', JSON_OBJECT(), JSON_OBJECT(),
+          UNHEX(?))`,
+      [notaAId, deviceId, notaBId, deviceId],
+    );
+    await pool.query(
+      `INSERT INTO nota_pages (id, nota_id, page_position)
+       VALUES (UNHEX(?), UNHEX(?), 1)`,
+      [pageAId, notaAId],
+    );
+
+    await expect(
+      pool.query(
+        `INSERT INTO nota_lines
+           (id, nota_id, page_id, line_position, sku_identifier_snapshot,
+            sku_name_snapshot, quantity_pcs, unit_price_rupiah,
+            line_total_rupiah)
+         VALUES
+           (UNHEX(?), UNHEX(?), UNHEX(?), 1, 'TEST-SKU', 'Test SKU', 1, 1000,
+            1000)`,
+        [lineId, notaBId, pageAId],
+      ),
+    ).rejects.toThrow();
+
+    const rows = await pool.query<Array<{ line_count: bigint }>>(
+      'SELECT COUNT(*) AS line_count FROM nota_lines WHERE id = UNHEX(?)',
+      [lineId],
+    );
+    expect(Number(rows[0]?.line_count)).toBe(0);
   });
 });

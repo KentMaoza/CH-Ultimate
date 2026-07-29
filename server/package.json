@@ -1,0 +1,26 @@
+{
+  "name": "@ch-ultimate/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "vitest run --config vitest.config.ts",
+    "test:integration": "CH_CORE_INTEGRATION=1 vitest run --config vitest.config.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "build": "tsc",
+    "start": "node --max-old-space-size=160 dist/index.js"
+  },
+  "dependencies": {
+    "fastify": "^5.0.0",
+    "mariadb": "^3.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.0"
+  }
+}

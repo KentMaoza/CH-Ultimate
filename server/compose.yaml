@@ -1,0 +1,25 @@
+services:
+  ch-core:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    env_file:
+      - .env
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18080:3000"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 256m
+    cpus: 0.75
+    pids_limit: 128
+    tmpfs:
+      - /tmp:size=16m,mode=1777,noexec,nosuid,nodev
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

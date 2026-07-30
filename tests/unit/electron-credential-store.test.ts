@@ -1,4 +1,11 @@
-import { mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
+import {
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -38,23 +45,114 @@ function encryptedSafeStorage(): SafeStoragePort {
   };
 }
 
+const currentToken = Buffer.alloc(32, 1).toString('base64url');
+const recoveryCredential = Buffer.alloc(32, 2).toString('base64url');
+const claimSecret = Buffer.alloc(32, 3).toString('base64url');
+const pendingDeviceToken = Buffer.alloc(32, 4).toString('base64url');
+const replacementToken = Buffer.alloc(32, 6).toString('base64url');
+
 const credentialState: CoreCredentialState = {
   version: 1,
   installationId: '11111111-1111-4111-8111-111111111111',
   current: {
     deviceId: '22222222-2222-4222-8222-222222222222',
-    token: 'current-device-token',
+    token: currentToken,
   },
-  recoveryCredential: 'owner-recovery-credential',
+  recoveryCredential,
   pendingPairing: {
     code: '12345678',
     requestId: '33333333-3333-4333-8333-333333333333',
-    claimSecret: 'pending-claim-secret',
+    claimSecret,
     displayName: 'Mac Gudang',
   },
 };
 
 describe('safeStorage credential persistence', () => {
+  it('rejects malformed decrypted credential states with strict nested validation', async () => {
+    const invalidStates: unknown[] = [
+      { ...credentialState, unexpected: true },
+      { ...credentialState, installationId: 'not-a-uuid' },
+      {
+        ...credentialState,
+        current: { ...credentialState.current, role: 'owner' },
+      },
+      {
+        ...credentialState,
+        current: {
+          ...credentialState.current,
+          token: 'structurally-plausible-secret',
+        },
+      },
+      {
+        version: 1,
+        installationId: credentialState.installationId,
+        pendingPairing: {
+          ...credentialState.pendingPairing,
+          deviceToken: pendingDeviceToken,
+        },
+      },
+      {
+        version: 1,
+        installationId: credentialState.installationId,
+        pendingEnrollment: {
+          mode: 'recovery',
+          deviceToken: pendingDeviceToken,
+          recoveryCredential,
+          displayName: 'Perangkat Gudang',
+        },
+      },
+    ];
+
+    for (const state of invalidStates) {
+      const userDataPath = await temporaryDirectory();
+      const safeStorage = encryptedSafeStorage();
+      await writeFile(
+        path.join(userDataPath, 'ch-core-credentials.bin'),
+        safeStorage.encryptString(JSON.stringify(state)),
+      );
+      const store = createCoreCredentialStore({ safeStorage, userDataPath });
+
+      await expect(store.load()).rejects.toThrow(
+        'Kredensial CH Core tidak dapat dibuka.',
+      );
+    }
+  });
+
+  it('refuses to persist a malformed credential state', async () => {
+    const userDataPath = await temporaryDirectory();
+    const store = createCoreCredentialStore({
+      safeStorage: encryptedSafeStorage(),
+      userDataPath,
+    });
+
+    await expect(
+      store.save({
+        ...credentialState,
+        current: {
+          ...credentialState.current!,
+          token: '',
+        },
+      }),
+    ).rejects.toThrow('Kredensial CH Core tidak dapat disimpan.');
+    expect(await readdir(userDataPath)).toEqual([]);
+  });
+
+  it('rejects an oversized encrypted credential before decryption', async () => {
+    const userDataPath = await temporaryDirectory();
+    const safeStorage = encryptedSafeStorage();
+    safeStorage.decryptString = vi.fn(() => JSON.stringify(credentialState));
+    await writeFile(
+      path.join(userDataPath, 'ch-core-credentials.bin'),
+      Buffer.alloc(1024 * 1024, 1),
+    );
+    const store = createCoreCredentialStore({ safeStorage, userDataPath });
+
+    await expect(store.load()).rejects.toThrow(
+      'Kredensial CH Core tidak dapat dibuka.',
+    );
+    expect(safeStorage.decryptString).not.toHaveBeenCalled();
+  });
+
   it('fails enrollment when safeStorage is unavailable or encryption is disabled', async () => {
     for (const safeStorage of [
       undefined,
@@ -115,7 +213,7 @@ describe('safeStorage credential persistence', () => {
         ...credentialState,
         current: {
           ...credentialState.current!,
-          token: 'replacement-device-token',
+          token: replacementToken,
         },
       }),
     ).rejects.toThrow('Kredensial CH Core tidak dapat disimpan.');

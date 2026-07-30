@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto';
+import { z } from 'zod';
 
 import type {
   CoreApiRequest,
@@ -31,6 +32,8 @@ export interface CoreIdentityMainDependencies {
   platform: string;
 }
 
+const uuidSchema = z.string().uuid();
+
 function requireDisplayName(displayName: string): string {
   const value = displayName.trim();
   if (value.length === 0 || value.length > 160) {
@@ -51,7 +54,7 @@ function requireSuccessfulDevice(response: CoreApiResponse): string {
   if (
     response.status < 200 ||
     response.status >= 300 ||
-    typeof deviceId !== 'string'
+    !uuidSchema.safeParse(deviceId).success
   ) {
     throw new Error('Respons identitas CH Core tidak valid.');
   }
@@ -69,7 +72,7 @@ function requirePendingPairing(response: CoreApiResponse) {
       : undefined;
   if (
     response.status !== 202 ||
-    typeof pairingId !== 'string' ||
+    !uuidSchema.safeParse(pairingId).success ||
     status !== 'pending'
   ) {
     throw new Error('Respons pemasangan CH Core tidak valid.');

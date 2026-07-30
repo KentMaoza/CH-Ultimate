@@ -6,6 +6,7 @@ import {
 } from 'electron';
 import started from 'electron-squirrel-startup';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { createCoreCredentialStore } from './electron/core-credential-store';
 import { createCoreDesktopService } from './electron/core-desktop-service';
@@ -42,22 +43,29 @@ async function createWindow(): Promise<void> {
     store,
     platform: process.platform,
   });
+  const rendererPath = path.join(
+    __dirname,
+    `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`,
+  );
+  const rendererUrl = MAIN_WINDOW_VITE_DEV_SERVER_URL
+    ? new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL).href
+    : pathToFileURL(rendererPath).href;
   const unregister = registerCoreIpcHandlers(
     ipcMain,
     service,
     window.webContents,
+    rendererUrl,
   );
   window.on('closed', unregister);
+  window.webContents.on('will-navigate', (event, url) => {
+    if (url !== rendererUrl) event.preventDefault();
+  });
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    void window.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+    void window.loadURL(rendererUrl);
   } else {
-    void window.loadFile(
-      path.join(
-        __dirname,
-        `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`,
-      ),
-    );
+    void window.loadFile(rendererPath);
   }
 }
 

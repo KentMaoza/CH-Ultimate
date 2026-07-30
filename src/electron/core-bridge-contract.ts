@@ -16,6 +16,9 @@ export const CH_CORE_IPC_CHANNELS = {
   rotateToken: 'ch-core:rotate-token',
 } as const;
 
+export const CORE_SAFE_STORAGE_UNAVAILABLE_MESSAGE =
+  'Penyimpanan aman tidak tersedia. Perangkat tidak dapat dipasangkan.';
+
 export interface CoreCredentialStatus {
   production: boolean;
   configuration: 'ready' | 'missing' | 'invalid';

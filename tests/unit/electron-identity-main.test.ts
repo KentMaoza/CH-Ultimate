@@ -37,10 +37,10 @@ class MemoryCredentialStore implements CoreCredentialStore {
   }
 }
 
-function publicDevice() {
+function publicDevice(id = deviceId) {
   return {
     device: {
-      id: deviceId,
+      id,
       installationId,
       role: 'client',
       displayName: 'Mac Gudang',
@@ -53,6 +53,59 @@ function publicDevice() {
 }
 
 describe('caller-held Electron pairing credentials', () => {
+  it('rejects a non-UUID pairing ID before persisting it', async () => {
+    const store = new MemoryCredentialStore();
+    const identity = createCoreIdentityMain({
+      store,
+      send: vi.fn().mockResolvedValue({
+        status: 202,
+        body: { pairingId: '', status: 'pending' },
+      }),
+      randomUuid: vi
+        .fn()
+        .mockReturnValueOnce(installationId)
+        .mockReturnValueOnce(requestId),
+      randomSecret: () => firstSecret,
+      platform: 'macos',
+    });
+
+    await expect(
+      identity.claimPairing({
+        code: '12345678',
+        displayName: 'Perangkat Gudang',
+      }),
+    ).rejects.toThrow('Respons pemasangan CH Core tidak valid.');
+    expect(store.state?.pendingPairing?.pairingId).toBeUndefined();
+  });
+
+  it('rejects a non-UUID device ID before persisting current credentials', async () => {
+    const store = new MemoryCredentialStore({
+      version: 1,
+      installationId,
+      pendingPairing: {
+        code: '12345678',
+        requestId,
+        claimSecret: firstSecret,
+        pairingId,
+        displayName: 'Perangkat Gudang',
+      },
+    });
+    const identity = createCoreIdentityMain({
+      store,
+      send: vi.fn().mockResolvedValue({
+        status: 200,
+        body: publicDevice('not-a-device-uuid'),
+      }),
+      randomSecret: () => secondSecret,
+      platform: 'macos',
+    });
+
+    await expect(identity.completePairing()).rejects.toThrow(
+      'Respons identitas CH Core tidak valid.',
+    );
+    expect(store.state?.current).toBeUndefined();
+  });
+
   it('saves and reuses claim credentials after a lost response', async () => {
     const store = new MemoryCredentialStore();
     const requests: CoreApiRequest[] = [];

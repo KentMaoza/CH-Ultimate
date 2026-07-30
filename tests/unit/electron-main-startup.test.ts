@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { pathToFileURL } from 'node:url';
 
 afterEach(() => {
   vi.doUnmock('electron');
@@ -17,7 +18,13 @@ describe('Electron CH Core startup', () => {
       resolveReady = resolve;
     });
     const callOrder: string[] = [];
-    const trustedContents = { mainFrame: {} };
+    const webContentsOn = vi.fn();
+    const setWindowOpenHandler = vi.fn();
+    const trustedContents = {
+      mainFrame: {},
+      on: webContentsOn,
+      setWindowOpenHandler,
+    };
     const windowOn = vi.fn();
     const windowInstance = {
       webContents: trustedContents,
@@ -112,7 +119,32 @@ describe('Electron CH Core startup', () => {
       ipcMain,
       service,
       trustedContents,
+      expect.stringMatching(/^file:.*[/\\]renderer[/\\]main_window[/\\]index\.html$/),
     );
+    const rendererPath = windowInstance.loadFile.mock.calls[0]?.[0];
+    const rendererUrl = pathToFileURL(rendererPath).href;
+    expect(registerCoreIpcHandlers).toHaveBeenCalledWith(
+      ipcMain,
+      service,
+      trustedContents,
+      rendererUrl,
+    );
+
+    const willNavigate = webContentsOn.mock.calls.find(
+      ([event]) => event === 'will-navigate',
+    )?.[1];
+    expect(willNavigate).toEqual(expect.any(Function));
+    const allowedEvent = { preventDefault: vi.fn() };
+    willNavigate(allowedEvent, rendererUrl);
+    expect(allowedEvent.preventDefault).not.toHaveBeenCalled();
+    const deniedEvent = { preventDefault: vi.fn() };
+    willNavigate(deniedEvent, 'https://penyerang.example/');
+    expect(deniedEvent.preventDefault).toHaveBeenCalledTimes(1);
+
+    expect(setWindowOpenHandler).toHaveBeenCalledTimes(1);
+    expect(setWindowOpenHandler.mock.calls[0]?.[0]()).toEqual({
+      action: 'deny',
+    });
 
     const closed = windowOn.mock.calls.find(
       ([event]) => event === 'closed',

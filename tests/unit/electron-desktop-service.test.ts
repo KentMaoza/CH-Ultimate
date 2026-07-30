@@ -23,8 +23,47 @@ class MemoryCredentialStore implements CoreCredentialStore {
 
 const configPath = '/private/ch-core-config.json';
 const caFile = '/private/ch-core-ca.pem';
+const currentToken = Buffer.alloc(32, 1).toString('base64url');
+const recoveryCredential = Buffer.alloc(32, 2).toString('base64url');
 
 describe('CH Core desktop service configuration', () => {
+  it('fails closed when the config or private CA exceeds its bounded read limit', async () => {
+    const validConfig = JSON.stringify({
+      endpoint: 'https://192.168.1.14:8443',
+      caFile,
+    });
+    const oversizedConfig = Buffer.from(
+      `${validConfig}${' '.repeat(64 * 1024)}`,
+    );
+    const oversizedCa = Buffer.alloc(1024 * 1024, 1);
+
+    for (const [oversizedPath, oversizedBytes, expectedMessage] of [
+      [
+        configPath,
+        oversizedConfig,
+        'Konfigurasi CH Core tidak dapat dibuka.',
+      ],
+      [caFile, oversizedCa, 'Sertifikat CH Core tidak dapat dibuka.'],
+    ] as const) {
+      const readFile = vi.fn(async (filePath: string) => {
+        if (filePath === oversizedPath) return oversizedBytes;
+        return Buffer.from(validConfig);
+      });
+      const service = await createCoreDesktopService({
+        configPath,
+        production: true,
+        store: new MemoryCredentialStore(),
+        readFile,
+        platform: 'macos',
+      });
+
+      await expect(service.credentialStatus()).resolves.toMatchObject({
+        configuration: 'invalid',
+        message: expectedMessage,
+      });
+    }
+  });
+
   it('fails closed with a public setup status when config is missing', async () => {
     const network = vi.fn();
     const readFile = vi.fn(async () => {
@@ -59,7 +98,7 @@ describe('CH Core desktop service configuration', () => {
       if (filePath === configPath) {
         return Buffer.from(
           JSON.stringify({
-            endpoint: 'https://192.0.2.10:8443',
+            endpoint: 'https://192.168.1.14:8443',
             caFile,
           }),
         );
@@ -92,7 +131,7 @@ describe('CH Core desktop service configuration', () => {
       filePath === configPath
         ? Buffer.from(
             JSON.stringify({
-              endpoint: 'https://192.0.2.10:8443',
+              endpoint: 'https://192.168.1.14:8443',
               caFile,
             }),
           )
@@ -106,9 +145,9 @@ describe('CH Core desktop service configuration', () => {
       installationId: '11111111-1111-4111-8111-111111111111',
       current: {
         deviceId: '22222222-2222-4222-8222-222222222222',
-        token: 'must-never-leave-main',
+        token: currentToken,
       },
-      recoveryCredential: 'also-main-only',
+      recoveryCredential,
     });
     const service = await createCoreDesktopService({
       configPath,
@@ -127,7 +166,7 @@ describe('CH Core desktop service configuration', () => {
       credential: 'paired',
       deviceId: '22222222-2222-4222-8222-222222222222',
     });
-    expect(JSON.stringify(status)).not.toContain('must-never-leave-main');
-    expect(JSON.stringify(status)).not.toContain('also-main-only');
+    expect(JSON.stringify(status)).not.toContain(currentToken);
+    expect(JSON.stringify(status)).not.toContain(recoveryCredential);
   });
 });

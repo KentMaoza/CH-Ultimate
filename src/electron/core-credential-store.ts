@@ -1,17 +1,17 @@
 import {
   chmod,
   mkdir,
-  readFile,
   rename,
   unlink,
   writeFile,
 } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
+import { readBoundedFile } from './bounded-file-read';
+import { CORE_SAFE_STORAGE_UNAVAILABLE_MESSAGE } from './core-bridge-contract';
 
 const FILE_NAME = 'ch-core-credentials.bin';
-const STORAGE_UNAVAILABLE =
-  'Penyimpanan aman tidak tersedia. Perangkat tidak dapat dipasangkan.';
 const SAVE_ERROR = 'Kredensial CH Core tidak dapat disimpan.';
 const LOAD_ERROR = 'Kredensial CH Core tidak dapat dibuka.';
 
@@ -47,7 +47,6 @@ export interface CoreCredentialState {
 
 interface CredentialFileSystem {
   mkdir: typeof mkdir;
-  readFile: typeof readFile;
   writeFile: typeof writeFile;
   rename: typeof rename;
   chmod: typeof chmod;
@@ -58,6 +57,7 @@ export interface CoreCredentialStoreOptions {
   safeStorage?: SafeStoragePort;
   userDataPath: string;
   fileSystem?: CredentialFileSystem;
+  readFile?: (filePath: string, maxBytes: number) => Promise<Buffer>;
 }
 
 export interface CoreCredentialStore {
@@ -68,12 +68,97 @@ export interface CoreCredentialStore {
 
 const defaultFileSystem: CredentialFileSystem = {
   mkdir,
-  readFile,
   writeFile,
   rename,
   chmod,
   unlink,
 };
+
+const CREDENTIAL_MAX_BYTES = 256 * 1024;
+const opaqueSecretSchema = z.string().refine((value) => {
+  try {
+    const decoded = Buffer.from(value, 'base64url');
+    return decoded.length === 32 && decoded.toString('base64url') === value;
+  } catch {
+    return false;
+  }
+}, 'Secret must be canonical 32-byte base64url.');
+const displayNameSchema = z
+  .string()
+  .min(1)
+  .max(160)
+  .refine(
+    (value) =>
+      value.trim() === value && !/[\u0000-\u001f\u007f]/.test(value),
+  );
+const currentCredentialSchema = z
+  .object({
+    deviceId: z.string().uuid(),
+    token: opaqueSecretSchema,
+  })
+  .strict();
+const bootstrapEnrollmentSchema = z
+  .object({
+    mode: z.literal('bootstrap'),
+    deviceToken: opaqueSecretSchema,
+    recoveryCredential: opaqueSecretSchema,
+    nextRecoveryCredential: z.undefined().optional(),
+    displayName: displayNameSchema,
+  })
+  .strict();
+const recoveryEnrollmentSchema = z
+  .object({
+    mode: z.literal('recovery'),
+    deviceToken: opaqueSecretSchema,
+    recoveryCredential: opaqueSecretSchema,
+    nextRecoveryCredential: opaqueSecretSchema,
+    displayName: displayNameSchema,
+  })
+  .strict();
+const pairingBase = {
+  code: z.string().regex(/^\d{8}$/),
+  requestId: z.string().uuid(),
+  claimSecret: opaqueSecretSchema,
+  displayName: displayNameSchema,
+};
+const pendingPairingSchema = z.union([
+  z.object(pairingBase).strict(),
+  z
+    .object({
+      ...pairingBase,
+      pairingId: z.string().uuid(),
+      deviceToken: opaqueSecretSchema.optional(),
+    })
+    .strict(),
+]);
+const credentialStateSchema = z
+  .object({
+    version: z.literal(1),
+    installationId: z.string().uuid(),
+    current: currentCredentialSchema.optional(),
+    previousToken: opaqueSecretSchema.optional(),
+    recoveryCredential: opaqueSecretSchema.optional(),
+    pendingEnrollment: z
+      .discriminatedUnion('mode', [
+        bootstrapEnrollmentSchema,
+        recoveryEnrollmentSchema,
+      ])
+      .optional(),
+    pendingPairing: pendingPairingSchema.optional(),
+    pendingRotation: z
+      .object({ nextToken: opaqueSecretSchema })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .superRefine((state, context) => {
+    if ((state.previousToken || state.pendingRotation) && !state.current) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Credential rotation requires a current credential.',
+      });
+    }
+  });
 
 function isMissingFile(error: unknown): boolean {
   return (
@@ -84,16 +169,9 @@ function isMissingFile(error: unknown): boolean {
 }
 
 function parseCredentialState(plaintext: string): CoreCredentialState {
-  const value = JSON.parse(plaintext) as unknown;
-  if (
-    typeof value !== 'object' ||
-    value === null ||
-    Reflect.get(value, 'version') !== 1 ||
-    typeof Reflect.get(value, 'installationId') !== 'string'
-  ) {
-    throw new Error(LOAD_ERROR);
-  }
-  return value as CoreCredentialState;
+  return credentialStateSchema.parse(
+    JSON.parse(plaintext) as unknown,
+  ) as CoreCredentialState;
 }
 
 export function createCoreCredentialStore(
@@ -101,10 +179,11 @@ export function createCoreCredentialStore(
 ): CoreCredentialStore {
   const fileSystem = options.fileSystem ?? defaultFileSystem;
   const filePath = path.join(options.userDataPath, FILE_NAME);
+  const readFile = options.readFile ?? readBoundedFile;
 
   const requireSafeStorage = (): SafeStoragePort => {
     if (!options.safeStorage?.isEncryptionAvailable()) {
-      throw new Error(STORAGE_UNAVAILABLE);
+      throw new Error(CORE_SAFE_STORAGE_UNAVAILABLE_MESSAGE);
     }
     return options.safeStorage;
   };
@@ -113,7 +192,8 @@ export function createCoreCredentialStore(
     async load(): Promise<CoreCredentialState | undefined> {
       let ciphertext: Buffer;
       try {
-        ciphertext = await fileSystem.readFile(filePath);
+        ciphertext = await readFile(filePath, CREDENTIAL_MAX_BYTES);
+        if (ciphertext.length > CREDENTIAL_MAX_BYTES) throw new Error();
       } catch (error) {
         if (isMissingFile(error)) return undefined;
         throw new Error(LOAD_ERROR);
@@ -130,7 +210,14 @@ export function createCoreCredentialStore(
       const safeStorage = requireSafeStorage();
       let ciphertext: Buffer;
       try {
-        ciphertext = safeStorage.encryptString(JSON.stringify(state));
+        const validated = credentialStateSchema.parse(state);
+        ciphertext = safeStorage.encryptString(JSON.stringify(validated));
+        if (
+          ciphertext.length === 0 ||
+          ciphertext.length > CREDENTIAL_MAX_BYTES
+        ) {
+          throw new Error();
+        }
       } catch {
         throw new Error(SAVE_ERROR);
       }

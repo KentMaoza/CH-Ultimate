@@ -10,12 +10,16 @@ interface IpcMainPort {
 }
 
 interface TrustedWebContents {
-  mainFrame?: unknown;
+  mainFrame?: {
+    url?: string;
+  };
 }
 
 interface IpcInvokeEvent {
   sender?: unknown;
-  senderFrame?: unknown;
+  senderFrame?: {
+    url?: string;
+  };
 }
 
 const invalidRequest = (): never => {
@@ -82,15 +86,19 @@ export function registerCoreIpcHandlers(
   ipcMain: IpcMainPort,
   service: ChCoreBridge,
   trustedSender: TrustedWebContents,
+  expectedRendererUrl: string,
 ): () => void {
   const authorized =
     <T>(handler: (input?: unknown) => T) =>
     async (event: unknown, input?: unknown): Promise<T> => {
       const invokeEvent = event as IpcInvokeEvent;
-      const wrongFrame =
-        trustedSender.mainFrame !== undefined &&
-        invokeEvent.senderFrame !== trustedSender.mainFrame;
-      if (invokeEvent.sender !== trustedSender || wrongFrame) {
+      const trustedFrame = trustedSender.mainFrame;
+      if (
+        invokeEvent.sender !== trustedSender ||
+        trustedFrame === undefined ||
+        invokeEvent.senderFrame !== trustedFrame ||
+        invokeEvent.senderFrame.url !== expectedRendererUrl
+      ) {
         throw new Error('Akses CH Core tidak diizinkan.');
       }
       return handler(input);

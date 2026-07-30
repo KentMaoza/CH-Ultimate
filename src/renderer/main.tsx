@@ -49,7 +49,25 @@ export function mountDesktopRenderer(
       />,
     );
 
-    const next = await bootstrapDesktopGateway(options);
+    let next: DesktopBootstrapResult;
+    try {
+      next = await bootstrapDesktopGateway(options);
+    } catch {
+      if (activeGeneration !== generation) return;
+      render(
+        <CoreConnectionScreen
+          status={{
+            production: options.mode === 'production',
+            configuration: 'invalid',
+            credential: 'unpaired',
+            message: 'CH Core tidak dapat dimulai. Coba lagi.',
+          }}
+          bridge={options.bridge}
+          onRetry={retry}
+        />,
+      );
+      return;
+    }
     if (activeGeneration !== generation) {
       disposeGateway(next);
       return;

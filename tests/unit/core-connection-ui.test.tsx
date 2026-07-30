@@ -1,7 +1,10 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { CoreCredentialStatus } from '../../src/electron/core-bridge-contract';
+import type {
+  ChCoreBridge,
+  CoreCredentialStatus,
+} from '../../src/electron/core-bridge-contract';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 import type { SyncPhase } from '../../src/gateway/operations-gateway-contract';
 import { CoreConnectionScreen } from '../../src/renderer/CoreConnectionScreen';
@@ -51,6 +54,84 @@ describe('desktop connection screen', () => {
     ).toBeInTheDocument();
     expect(container.textContent).not.toContain('claimSecret');
     expect(container.textContent).not.toContain('deviceToken');
+  });
+
+  it('uses a neutral device name and preserves the safe-storage enrollment error', async () => {
+    const safeStorageMessage =
+      'Penyimpanan aman tidak tersedia. Perangkat tidak dapat dipasangkan.';
+    const bridge = {
+      request: vi.fn(),
+      credentialStatus: vi.fn(),
+      enrollOwner: vi.fn(),
+      claimPairing: vi.fn().mockRejectedValue(
+        new Error(
+          `Error invoking remote method 'ch-core:claim-pairing': Error: ${safeStorageMessage}`,
+        ),
+      ),
+      completePairing: vi.fn(),
+      rotateToken: vi.fn(),
+    } as ChCoreBridge;
+    const status: CoreCredentialStatus = {
+      production: true,
+      configuration: 'ready',
+      credential: 'unpaired',
+    };
+
+    render(
+      <CoreConnectionScreen
+        status={status}
+        bridge={bridge}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText('Nama perangkat')).toHaveValue(
+      'Perangkat Gudang',
+    );
+    fireEvent.change(screen.getByLabelText('Kode pemasangan 8 angka'), {
+      target: { value: '12345678' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Pasangkan' }));
+
+    expect(await screen.findByText(safeStorageMessage)).toBeInTheDocument();
+    expect(bridge.claimPairing).toHaveBeenCalledWith({
+      code: '12345678',
+      displayName: 'Perangkat Gudang',
+    });
+  });
+
+  it('does not echo arbitrary main-process errors into the renderer', async () => {
+    const privateFailure = 'server gagal dengan token rahasia-123';
+    const bridge = {
+      request: vi.fn(),
+      credentialStatus: vi.fn(),
+      enrollOwner: vi.fn(),
+      claimPairing: vi.fn().mockRejectedValue(new Error(privateFailure)),
+      completePairing: vi.fn(),
+      rotateToken: vi.fn(),
+    } as ChCoreBridge;
+
+    render(
+      <CoreConnectionScreen
+        status={{
+          production: true,
+          configuration: 'ready',
+          credential: 'unpaired',
+        }}
+        bridge={bridge}
+        onRetry={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('Kode pemasangan 8 angka'), {
+      target: { value: '12345678' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Pasangkan' }));
+
+    expect(
+      await screen.findByText('CH Core belum dapat dihubungkan. Coba lagi.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(privateFailure)).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('rahasia-123');
   });
 });
 

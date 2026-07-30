@@ -124,4 +124,39 @@ describe('desktop CH Core bootstrap', () => {
     });
     if (result.source === 'core') result.gateway.dispose();
   });
+
+  it('disposes a partially initialized Core gateway and returns an actionable state', async () => {
+    const chCore = bridge({
+      production: true,
+      configuration: 'ready',
+      credential: 'paired',
+      deviceId: '11111111-1111-4111-8111-111111111111',
+    });
+    const clock = new TestClock();
+    const storage = {
+      load: vi.fn().mockRejectedValue(new Error('IndexedDB gagal')),
+      save: vi.fn(),
+    };
+
+    const result = await bootstrapDesktopGateway({
+      bridge: chCore,
+      mode: 'production',
+      storage,
+      clock,
+    });
+
+    expect(result).toEqual({
+      kind: 'connection',
+      status: {
+        production: true,
+        configuration: 'ready',
+        credential: 'paired',
+        deviceId: '11111111-1111-4111-8111-111111111111',
+        message: 'CH Core tidak dapat dimulai. Coba lagi.',
+      },
+    });
+    expect(clock.pendingDelays()).toEqual([]);
+    expect(clock.resumeListenerCount()).toBe(0);
+    expect(chCore.request).not.toHaveBeenCalled();
+  });
 });

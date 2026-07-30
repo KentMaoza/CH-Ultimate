@@ -97,6 +97,17 @@ export async function bootstrapDesktopGateway(
     options.storage ?? createCoreGatewayStorage(),
     options.clock ?? createCoreGatewayClock(),
   );
-  await gateway.initialize();
+  try {
+    await gateway.initialize();
+  } catch {
+    gateway.dispose();
+    return {
+      kind: 'connection',
+      status: {
+        ...status,
+        message: 'CH Core tidak dapat dimulai. Coba lagi.',
+      },
+    };
+  }
   return { kind: 'gateway', source: 'core', gateway };
 }

@@ -386,3 +386,126 @@ Built-file inspection confirmed:
 - `/Users/hamlet/Documents/CH Nota` was not accessed or modified.
 
 No known Task 5 blocker remains at the local packaged-Electron boundary.
+
+---
+
+# Task 5 Fix Round 1/5: Desktop Boundary Hardening
+
+## Status
+
+The seven requested desktop security/startup findings are fixed at the local
+Electron boundary. The endpoint parser now accepts only usable hosts in the
+approved `192.168.1.0/24` subnet, persisted artifacts are read with explicit
+size bounds, durable credential state and server-returned IDs are strictly
+validated, IPC authorization includes the exact renderer URL, unexpected
+navigation and window creation are denied, partial gateway startup is disposed
+on failure, and the connection UI is actionable without echoing arbitrary
+main/server errors.
+
+The neutral default device name is `Perangkat Gudang`. The only detailed
+credential error surfaced by the renderer is the known safe-storage-unavailable
+message, either directly or inside Electron's exact fixed identity-channel
+invoke wrapper. Other errors retain the generic Indonesian copy.
+
+## RED/GREEN evidence
+
+### Approved desktop subnet
+
+RED: endpoint cases outside the approved subnet, including another private
+subnet, public, loopback, link-local, multicast, CGNAT/Tailscale, and unusable
+network/broadcast addresses, were accepted (`1 failed | 4 passed`).
+
+GREEN: `parseCoreEndpointConfig` now accepts only
+`192.168.1.1` through `192.168.1.254` on HTTPS port 8443
+(`1 file, 5 passed`).
+
+### Bounded local artifact reads
+
+RED: oversized config/CA fixtures and an oversized encrypted credential
+artifact were accepted; the credential artifact reached decryption.
+
+GREEN: a shared file-handle reader rejects non-files, pre-existing oversized
+files, and growth during the bounded read. Config is capped at 16 KiB; CA and
+encrypted credential artifacts are capped at 256 KiB. The oversized credential
+test also proves decryption is not called (`2 files, 9 passed` at this slice).
+
+### Strict durable credentials and server IDs
+
+RED: unknown fields, malformed UUIDs, impossible pending-state combinations,
+and structurally plausible but noncanonical secrets were accepted. Separate
+server-response tests accepted an empty pairing ID and a non-UUID device ID
+(`2 failed | 4 passed` for the server-ID slice).
+
+GREEN: Zod strict schemas now enforce exact state shape, valid UUIDs, valid
+pending enrollment/pairing/rotation combinations, and canonical 32-byte
+base64url persisted device, claim, recovery, and rotation secrets. Pairing and
+device IDs are validated before persistence (`3 files, 17 passed`).
+
+### Renderer-origin IPC and navigation boundary
+
+RED: the trusted `webContents` could invoke CH Core handlers after its top
+frame URL changed, and Electron startup supplied no expected renderer URL or
+navigation/window denial (`2 failed | 6 passed`).
+
+GREEN: every invoke now requires the intended sender, exact current top frame,
+and exact normalized packaged or development renderer URL. Main denies
+unexpected `will-navigate` destinations and all window-open requests
+(`2 files, 8 passed`).
+
+### Gateway initialization failure
+
+RED: a rejected cache load escaped bootstrap with an active scheduler/resume
+subscription, while an unexpected bootstrap rejection left the renderer on
+`Menghubungkan` and produced an unhandled rejection (`2 failed | 5 passed`).
+
+GREEN: bootstrap disposes a partially initialized Core gateway and returns
+`CH Core tidak dapat dimulai. Coba lagi.`. The renderer also catches unexpected
+rejections and renders an actionable fail-closed state (`2 files, 7 passed`).
+
+### Connection UI error safety and neutral naming
+
+RED: the form defaulted to `Mac Gudang`, hid the safe-storage enrollment cause,
+and an intermediate broad fix echoed arbitrary secret-bearing process errors.
+The negative error-safety run failed both the wrapped safe-storage mapping and
+generic fallback assertions (`2 failed | 10 passed`).
+
+GREEN: the form defaults to `Perangkat Gudang`; the known safe-storage message
+is mapped through the exact identity-channel wrapper; arbitrary errors render
+only `CH Core belum dapat dihubungkan. Coba lagi.` and the secret-leak
+assertion remains negative (`2 files, 19 passed` with credential-store coverage).
+
+## Fresh verification
+
+```text
+$ npm test -- <11 focused Task 5 files>
+Test Files  11 passed (11)
+Tests       58 passed (58)
+
+$ npm test
+Test Files  49 passed (49)
+Tests       355 passed (355)
+
+$ npm run typecheck
+> tsc --noEmit
+exit 0
+
+$ npm run package
+✔ Building src/preload.ts target
+✔ Building src/main.ts target
+✔ Built target main_window
+✔ Packaging for arm64 on darwin
+✔ Packaging application
+exit 0
+
+$ git diff --check
+exit 0
+```
+
+Packaged artifact inspection found the placeholder-only
+`ch-core-config.example.json` in the app resources and the production bundles
+contain the bounded reader, approved-subnet check, normalized renderer URL,
+navigation/window denial, and neutral device copy.
+
+No NAS or live CH Core endpoint was contacted. `/Users/hamlet/Documents/CH Nota`
+was not accessed or modified. No production NAS, physical-device, or live TLS
+claim is made.

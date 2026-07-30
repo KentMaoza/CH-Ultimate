@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from 'react';
 
-import type {
-  ChCoreBridge,
-  CoreCredentialStatus,
+import {
+  CH_CORE_IPC_CHANNELS,
+  CORE_SAFE_STORAGE_UNAVAILABLE_MESSAGE,
+  type ChCoreBridge,
+  type CoreCredentialStatus,
 } from '../electron/core-bridge-contract';
 
 export interface CoreConnectionScreenProps {
@@ -11,12 +13,41 @@ export interface CoreConnectionScreenProps {
   onRetry(): void | Promise<void>;
 }
 
+const GENERIC_CONNECTION_ERROR =
+  'CH Core belum dapat dihubungkan. Coba lagi.';
+
+function userFacingConnectionError(caught: unknown): string {
+  if (!(caught instanceof Error)) return GENERIC_CONNECTION_ERROR;
+  const message = caught.message.trim();
+  if (message === CORE_SAFE_STORAGE_UNAVAILABLE_MESSAGE) {
+    return CORE_SAFE_STORAGE_UNAVAILABLE_MESSAGE;
+  }
+  const identityChannels = [
+    CH_CORE_IPC_CHANNELS.enrollOwner,
+    CH_CORE_IPC_CHANNELS.claimPairing,
+    CH_CORE_IPC_CHANNELS.completePairing,
+    CH_CORE_IPC_CHANNELS.rotateToken,
+  ];
+  if (
+    identityChannels.some(
+      (channel) =>
+        message ===
+          `Error invoking remote method '${channel}': ${CORE_SAFE_STORAGE_UNAVAILABLE_MESSAGE}` ||
+        message ===
+          `Error invoking remote method '${channel}': Error: ${CORE_SAFE_STORAGE_UNAVAILABLE_MESSAGE}`,
+    )
+  ) {
+    return CORE_SAFE_STORAGE_UNAVAILABLE_MESSAGE;
+  }
+  return GENERIC_CONNECTION_ERROR;
+}
+
 export function CoreConnectionScreen({
   status,
   bridge,
   onRetry,
 }: CoreConnectionScreenProps) {
-  const [displayName, setDisplayName] = useState('Mac Gudang');
+  const [displayName, setDisplayName] = useState('Perangkat Gudang');
   const [pairingCode, setPairingCode] = useState('');
   const [bootstrapSecret, setBootstrapSecret] = useState('');
   const [busy, setBusy] = useState(false);
@@ -30,8 +61,8 @@ export function CoreConnectionScreen({
     try {
       await operation();
       await onRetry();
-    } catch {
-      setError('CH Core belum dapat dihubungkan. Coba lagi.');
+    } catch (caught) {
+      setError(userFacingConnectionError(caught));
     } finally {
       setBusy(false);
     }

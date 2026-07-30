@@ -1,6 +1,5 @@
-import { readFile as nodeReadFile } from 'node:fs/promises';
-
 import type { CoreApiRequest } from '../gateway/core-api-transport';
+import { readBoundedFile } from './bounded-file-read';
 import {
   createCoreApiMain,
   parseCoreEndpointConfig,
@@ -23,13 +22,16 @@ export interface CoreDesktopServiceOptions {
   production: boolean;
   store: CoreCredentialStore;
   platform: string;
-  readFile?: (filePath: string) => Promise<Buffer>;
+  readFile?: (filePath: string, maxBytes: number) => Promise<Buffer>;
   requestImpl?: CoreHttpsClientOptions['requestImpl'];
 }
 
 type ConfigResult =
   | { status: 'ready'; config: CoreEndpointConfig; ca: Buffer }
   | { status: 'missing' | 'invalid'; message: string };
+
+const CONFIG_MAX_BYTES = 16 * 1024;
+const CA_MAX_BYTES = 256 * 1024;
 
 function isMissingFile(error: unknown): boolean {
   return (
@@ -42,10 +44,11 @@ function isMissingFile(error: unknown): boolean {
 async function loadConfig(
   options: CoreDesktopServiceOptions,
 ): Promise<ConfigResult> {
-  const readFile = options.readFile ?? ((filePath) => nodeReadFile(filePath));
+  const readFile = options.readFile ?? readBoundedFile;
   let encoded: Buffer;
   try {
-    encoded = await readFile(options.configPath);
+    encoded = await readFile(options.configPath, CONFIG_MAX_BYTES);
+    if (encoded.length > CONFIG_MAX_BYTES) throw new Error();
   } catch (error) {
     return isMissingFile(error)
       ? {
@@ -61,8 +64,8 @@ async function loadConfig(
     return { status: 'invalid', message: 'Konfigurasi CH Core tidak valid.' };
   }
   try {
-    const ca = await readFile(config.caFile);
-    if (ca.length === 0) throw new Error();
+    const ca = await readFile(config.caFile, CA_MAX_BYTES);
+    if (ca.length === 0 || ca.length > CA_MAX_BYTES) throw new Error();
     return { status: 'ready', config, ca };
   } catch {
     return {

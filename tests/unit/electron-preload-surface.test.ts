@@ -81,6 +81,8 @@ describe('CH Core preload surface', () => {
 });
 
 describe('CH Core main IPC registration', () => {
+  const rendererUrl = 'file:///Applications/CH%20Ultimate/index.html';
+
   it('returns cleanup for the fixed handlers when the trusted window closes', () => {
     const removeHandler = vi.fn();
     const ipcMain = {
@@ -99,7 +101,8 @@ describe('CH Core main IPC registration', () => {
     const unregister = registerCoreIpcHandlers(
       ipcMain,
       service,
-      { mainFrame: {} },
+      { mainFrame: { url: rendererUrl } },
+      rendererUrl,
     );
     unregister();
 
@@ -129,10 +132,10 @@ describe('CH Core main IPC registration', () => {
       completePairing: vi.fn().mockResolvedValue({ status: 'paired' }),
       rotateToken: vi.fn().mockResolvedValue({ status: 'rotated' }),
     };
-    const mainFrame = {};
+    const mainFrame = { url: rendererUrl };
     const trustedSender = { mainFrame };
 
-    registerCoreIpcHandlers(ipcMain, service, trustedSender);
+    registerCoreIpcHandlers(ipcMain, service, trustedSender, rendererUrl);
 
     expect([...handlers.keys()].sort()).toEqual(
       Object.values(CH_CORE_IPC_CHANNELS).sort(),
@@ -162,8 +165,8 @@ describe('CH Core main IPC registration', () => {
       completePairing: vi.fn(),
       rotateToken: vi.fn(),
     };
-    const trustedSender = { mainFrame: {} };
-    registerCoreIpcHandlers(ipcMain, service, trustedSender);
+    const trustedSender = { mainFrame: { url: rendererUrl } };
+    registerCoreIpcHandlers(ipcMain, service, trustedSender, rendererUrl);
 
     await expect(
       Promise.resolve().then(() =>
@@ -194,6 +197,36 @@ describe('CH Core main IPC registration', () => {
     ).rejects.toThrow('Akses CH Core tidak diizinkan.');
   });
 
+  it('rejects the trusted sender when its top frame URL is unexpected', async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const ipcMain = {
+      handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
+        handlers.set(channel, handler);
+      },
+    };
+    const service = {
+      request: vi.fn(),
+      credentialStatus: vi.fn(),
+      enrollOwner: vi.fn(),
+      claimPairing: vi.fn(),
+      completePairing: vi.fn(),
+      rotateToken: vi.fn(),
+    };
+    const mainFrame = { url: 'https://penyerang.example/' };
+    const trustedSender = { mainFrame };
+    registerCoreIpcHandlers(ipcMain, service, trustedSender, rendererUrl);
+
+    await expect(
+      Promise.resolve().then(() =>
+        handlers.get(CH_CORE_IPC_CHANNELS.credentialStatus)!({
+          sender: trustedSender,
+          senderFrame: mainFrame,
+        }),
+      ),
+    ).rejects.toThrow('Akses CH Core tidak diizinkan.');
+    expect(service.credentialStatus).not.toHaveBeenCalled();
+  });
+
   it('rejects malformed identity input before calling the credential service', async () => {
     const handlers = new Map<string, (...args: unknown[]) => unknown>();
     const ipcMain = {
@@ -209,10 +242,10 @@ describe('CH Core main IPC registration', () => {
       completePairing: vi.fn(),
       rotateToken: vi.fn(),
     };
-    const mainFrame = {};
+    const mainFrame = { url: rendererUrl };
     const trustedSender = { mainFrame };
     const event = { sender: trustedSender, senderFrame: mainFrame };
-    registerCoreIpcHandlers(ipcMain, service, trustedSender);
+    registerCoreIpcHandlers(ipcMain, service, trustedSender, rendererUrl);
 
     await expect(
       Promise.resolve().then(() =>

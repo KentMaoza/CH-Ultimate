@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createCoreHttpsClient } from '../../src/electron/core-https-client';
 
-const endpoint = 'https://192.0.2.10:8443';
+const endpoint = 'https://192.168.1.14:8443';
 const ca = Buffer.from('private-ca');
 const authorization = 'Bearer caller-held-token';
 
@@ -76,7 +76,7 @@ describe('main-process CH Core HTTPS client', () => {
     expect(fake.calls).toHaveLength(1);
     expect(fake.calls[0]).toMatchObject({
       protocol: 'https:',
-      hostname: '192.0.2.10',
+      hostname: '192.168.1.14',
       port: 8443,
       method: 'PATCH',
       path: '/v1/templates/label',

@@ -195,3 +195,8 @@ Task 11 approval gate: reviewer reran UI 24/24, deployment artifacts 15/15,
 root typecheck, all shell syntax checks, and the full Task 11 diff check.
 Docker/Compose, exact isolated `/chu_test`, NAS, certificate, and physical
 client gates remain environmental and no deployment occurred.
+Task 11 controller final gate after approval: 56 root files / 453 tests;
+9 mobile files / 88 tests; 43 server files / 295 tests plus 1 intentional
+workbook skip; exact approved workbook 1/1; mobile build; Electron package;
+Playwright 8/8; Android sync/debug+release unit tests/lint with Android Studio
+JDK 21; diff check; clean worktree before this receipt.

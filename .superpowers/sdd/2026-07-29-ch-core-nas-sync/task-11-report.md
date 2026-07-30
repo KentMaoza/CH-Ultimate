@@ -200,12 +200,12 @@ check. The worktree remained clean.
 | Gate | Result |
 | --- | --- |
 | Exact approved workbook acceptance | PASS — 1/1; SHA-256 and exact 3,144 / 2,786 / 358 / 3 / Rp276,267,011 / 4,115 PCS |
-| `npm run verify` | PASS — 56 files / 452 tests |
-| `npm run test:mobile` | PASS — 9 files / 87 tests |
+| `npm run verify` | PASS — 56 files / 453 tests |
+| `npm run test:mobile` | PASS — 9 files / 88 tests |
 | `npm run mobile:build` | PASS — 589 modules |
 | `npm run package` | PASS — Electron darwin-arm64 package |
 | `npm run test:e2e` | PASS — 8/8 |
-| `npm run server:test` | PASS — 43 files / 293 tests, 1 intentional workbook skip |
+| `npm run server:test` | PASS — 43 files / 295 tests, 1 intentional workbook skip |
 | `npm run server:test:integration` | FAIL-CLOSED — no exact isolated `/chu_test`; 3 suites rejected configuration and 10 tests skipped |
 | `npm run android:sync` | PASS with Android Studio JDK 21 and local SDK |
 | `npm run android:test` | PASS — debug and release JVM tests |

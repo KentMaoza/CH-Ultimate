@@ -23,6 +23,7 @@ import type {
   ProtocolConnection,
   ProtocolPool,
 } from './sync/idempotency.js';
+import { NotaOperationsService } from './nota/service.js';
 
 export interface RuntimeConnection
   extends MigrationConnection, ProtocolConnection {}
@@ -68,6 +69,7 @@ const defaultDependencies: StartupDependencies = {
       operations: new CatalogueOperationsService(pool, {
         images: catalogue.imageOperations,
       }),
+      nota: new NotaOperationsService(pool),
     });
   },
   createMaintenance: (pool, config) => {

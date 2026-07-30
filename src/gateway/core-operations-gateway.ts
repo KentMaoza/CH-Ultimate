@@ -23,7 +23,6 @@ import type {
   CatalogueCommitReceipt,
   CatalogueValidationResult,
   CreateSkuInput,
-  NotaDesktopTransferResult,
   OperationsGateway,
   OperationsGatewayCapabilities,
   SyncSnapshot,
@@ -107,6 +106,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   subscribe = (listener: () => void): (() => void) =>
     this.state.subscribe(listener);
   getSyncSnapshot = (): SyncSnapshot => this.state.getSyncSnapshot();
+  getConflicts = () => this.state.getConflicts();
   subscribeSync = (listener: () => void): (() => void) =>
     this.state.subscribeSync(listener);
   initialize = (): Promise<void> => this.polling.initialize();
@@ -223,10 +223,6 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     id: string,
     destination: NotaCompletionDestination = 'archive',
   ): Promise<void> => this.mutations.completeNotaTransaction(id, destination);
-  transferNotaToDesktop = (
-    id: string,
-  ): Promise<NotaDesktopTransferResult> =>
-    this.mutations.transferNotaToDesktop(id);
   reopenNotaTransaction = (id: string): Promise<void> =>
     this.mutations.reopenNotaTransaction(id);
   cancelNotaTransaction = (id: string): Promise<void> =>

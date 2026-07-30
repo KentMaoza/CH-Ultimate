@@ -10,6 +10,10 @@ import {
 } from '../catalogue/mariadb-sku-operations-repository.js';
 import { IdempotencyError } from '../sync/idempotency.js';
 import { SyncError } from '../sync/service.js';
+import {
+  NotaConflictError,
+  NotaOperationError,
+} from '../nota/service.js';
 
 export function installProtocolErrorHandler(app: FastifyInstance): void {
   app.setErrorHandler((error, _request, reply) => {
@@ -38,6 +42,15 @@ export function installProtocolErrorHandler(app: FastifyInstance): void {
         code: 'CONFLICT',
         conflict: error.conflict,
       });
+    }
+    if (error instanceof NotaConflictError) {
+      return reply.code(409).send({
+        code: 'CONFLICT',
+        conflict: error.conflict,
+      });
+    }
+    if (error instanceof NotaOperationError) {
+      return reply.code(error.statusCode).send({ code: error.code });
     }
     if (error instanceof CatalogueOperationError) {
       return reply.code(error.statusCode).send({ code: error.code });

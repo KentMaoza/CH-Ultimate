@@ -263,7 +263,6 @@ export const CORE_API_PATHS = {
   notaReopen: (id: string) => `/v1/notas/${encodeId(id)}/reopen`,
   notaCancel: (id: string) => `/v1/notas/${encodeId(id)}/cancel`,
   notaRestore: (id: string) => `/v1/notas/${encodeId(id)}/restore`,
-  notaTransfer: (id: string) => `/v1/notas/${encodeId(id)}/transfer`,
   resolveConflict: (id: string) =>
     `/v1/conflicts/${encodeId(id)}/resolve`,
 } as const;

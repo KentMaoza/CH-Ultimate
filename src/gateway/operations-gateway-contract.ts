@@ -11,6 +11,16 @@ export interface SyncSnapshot {
   message?: string;
 }
 
+export interface SyncConflict {
+  id: string;
+  entityType: string;
+  entityId: string;
+  field?: string;
+  base: unknown;
+  mine: unknown;
+  server: unknown;
+}
+
 export interface OperationsGatewayCapabilities {
   canResetDemoData: boolean;
   canImportInitialCatalogue: boolean;
@@ -66,16 +76,12 @@ export interface CreateSkuInput {
   imageUrl?: string;
 }
 
-export interface NotaDesktopTransferResult {
-  sent: boolean;
-  reason?: string;
-}
-
 export interface OperationsGateway {
   readonly capabilities: OperationsGatewayCapabilities;
   getSnapshot(): DemoState;
   subscribe(listener: () => void): () => void;
   getSyncSnapshot(): SyncSnapshot;
+  getConflicts(): SyncConflict[];
   subscribeSync(listener: () => void): () => void;
   initialize(): Promise<void>;
   flushNota(id: string): Promise<void>;
@@ -105,7 +111,6 @@ export interface OperationsGateway {
   updateNotaLine(transactionId: string, pageId: string, lineId: string, patch: Partial<NotaLine>): Promise<void>;
   deleteNotaLine(transactionId: string, pageId: string, lineId: string): Promise<void>;
   completeNotaTransaction(id: string, destination?: NotaCompletionDestination): Promise<void>;
-  transferNotaToDesktop(id: string): Promise<NotaDesktopTransferResult>;
   reopenNotaTransaction(id: string): Promise<void>;
   cancelNotaTransaction(id: string): Promise<void>;
   restoreNotaTransaction(id: string): Promise<void>;

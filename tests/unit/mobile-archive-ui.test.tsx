@@ -31,7 +31,7 @@ async function createCompleted(gateway: MockOperationsGateway, customerName: str
   return transaction;
 }
 
-test('mobile archive shows only archived completed notes with a frontend-demo transfer badge', async () => {
+test('mobile archive shows only archived completed notes with shared-sync copy', async () => {
   const gateway = new MockOperationsGateway(createMobileDemoState);
   await createCompleted(gateway, 'Pelanggan Arsip', 'archive');
   await createCompleted(gateway, 'Pelanggan Selesai', 'finished');
@@ -46,7 +46,7 @@ test('mobile archive shows only archived completed notes with a frontend-demo tr
   expect(screen.queryByText('Pelanggan Selesai')).not.toBeInTheDocument();
   expect(screen.queryByText('Pelanggan Sampah')).not.toBeInTheDocument();
   expect(screen.queryByRole('tab')).not.toBeInTheDocument();
-  expect(screen.getByText('Belum terkirim ke desktop · frontend demo')).toBeInTheDocument();
+  expect(screen.getByText('Tersedia di semua perangkat yang tersinkronisasi')).toBeInTheDocument();
 });
 
 test('archived note details open inline below the customer and close when tapped again', async () => {
@@ -91,30 +91,7 @@ test('opening another archived customer closes the current detail', async () => 
   expect(ferdianButton.parentElement).toContainElement(screen.getByRole('region', { name: `Nota arsip ${ferdian.baseNumber}` }));
 });
 
-test('a failed desktop transfer shows its reason and can be retried without reposting stock', async () => {
-  const gateway = new MockOperationsGateway(createMobileDemoState);
-  const transaction = await createCompleted(gateway, 'Amelia Gagal', 'archive');
-  await gateway.transferNotaToDesktop(transaction.id);
-  const stockBefore = gateway.getSnapshot().skus.map((sku) => ({ id: sku.id, stock: sku.stock }));
-  render(<MobileApp gateway={gateway} scanner={scanner} notifications={notifications} share={share} />);
-
-  fireEvent.click(screen.getByRole('button', { name: 'Arsip' }));
-  fireEvent.click(screen.getByRole('button', { name: /Amelia Gagal/ }));
-
-  expect(screen.getByText('Gagal terkirim ke desktop · frontend demo')).toBeInTheDocument();
-  expect(screen.getByText('CH Core API belum tersedia.')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: `Sinkronisasi ulang ${transaction.baseNumber}` }));
-
-  expect(await screen.findByRole('alert')).toHaveTextContent('Sinkronisasi ulang gagal: CH Core API belum tersedia.');
-  expect(gateway.getSnapshot().notaTransactions.find((item) => item.id === transaction.id)).toMatchObject({
-    status: 'completed',
-    completionDestination: 'archive',
-    desktopTransferStatus: 'failed',
-  });
-  expect(gateway.getSnapshot().skus.map((sku) => ({ id: sku.id, stock: sku.stock }))).toEqual(stockBefore);
-});
-
-test('a note completed in the mobile editor can be reopened for editing before desktop transfer', async () => {
+test('a note completed in the mobile editor can be reopened for editing', async () => {
   const gateway = new MockOperationsGateway(createMobileDemoState);
   render(<MobileApp gateway={gateway} scanner={scanner} notifications={notifications} share={share} />);
   fireEvent.click(screen.getByRole('button', { name: 'Nota' }));
@@ -128,7 +105,7 @@ test('a note completed in the mobile editor can be reopened for editing before d
   await screen.findByRole('region', { name: /Kopi Mobile/ });
   fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
   await act(async () => {
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Selesaikan nota mobile?' })).getByRole('button', { name: 'Simpan ke Arsip dan kirim ke desktop' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Selesaikan nota mobile?' })).getByRole('button', { name: 'Simpan ke Arsip' }));
   });
   await waitFor(() => expect(gateway.getSnapshot().notaTransactions.some((item) => item.status === 'completed')).toBe(true));
   fireEvent.click(screen.getByRole('button', { name: 'Arsip' }));

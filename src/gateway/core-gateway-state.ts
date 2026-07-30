@@ -2,9 +2,14 @@ import type {
   DemoState,
   InvoiceTemplate,
   LabelTemplate,
+  NotaLine,
+  NotaTransaction,
   Sku,
 } from '../domain/types';
-import type { SyncSnapshot } from './operations-gateway-contract';
+import type {
+  SyncConflict,
+  SyncSnapshot,
+} from './operations-gateway-contract';
 import type {
   CoreBootstrap,
   CoreChange,
@@ -30,6 +35,8 @@ import {
 import {
   invoiceTemplateSchema,
   labelTemplateSchema,
+  notaPageSchema,
+  notaTransactionSchema,
 } from './core-domain-schemas';
 
 export class CoreGatewayState {
@@ -42,6 +49,12 @@ export class CoreGatewayState {
   private balanceVersions = new Map<string, string>();
   private templateVersions = new Map<'label' | 'invoice', string>();
   private templateVersionKnowledge = new Set<'label' | 'invoice'>();
+  private notaFieldVersions = new Map<string, Record<string, string>>();
+  private notaStructureVersions = new Map<string, string>();
+  private notaLifecycleVersions = new Map<string, string>();
+  private notaPageVersions = new Map<string, string>();
+  private notaPageLifecycleVersions = new Map<string, string>();
+  private notaLineVersions = new Map<string, string>();
   private syncSnapshot: SyncSnapshot = {
     phase: 'connecting',
     serverRevision: '0',
@@ -59,6 +72,11 @@ export class CoreGatewayState {
   };
 
   getSyncSnapshot = (): SyncSnapshot => ({ ...this.syncSnapshot });
+
+  getConflicts = (): SyncConflict[] =>
+    this.outbox.flatMap((item) =>
+      item.conflict ? [cloneCore(item.conflict)] : [],
+    );
 
   subscribeSync = (listener: () => void): (() => void) => {
     this.syncListeners.add(listener);
@@ -90,6 +108,143 @@ export class CoreGatewayState {
         this.templateVersions.set(row.templateKind, row.rowVersion);
       }
     }
+    this.notaFieldVersions = new Map(
+      bootstrap.notas.map((row) => [row.id, { ...row.fieldVersions }]),
+    );
+    this.notaStructureVersions = new Map(
+      bootstrap.notas.map((row) => [row.id, row.structureVersion]),
+    );
+    this.notaLifecycleVersions = new Map(
+      bootstrap.notas.map((row) => [row.id, row.lifecycleVersion]),
+    );
+    this.notaPageVersions = new Map(
+      bootstrap.notaPages.map((row) => [row.id, row.rowVersion]),
+    );
+    this.notaPageLifecycleVersions = new Map(
+      bootstrap.notaPages.map((row) => [row.id, row.lifecycleVersion]),
+    );
+    this.notaLineVersions = new Map(
+      bootstrap.notaLines.map((row) => [row.id, row.rowVersion]),
+    );
+  }
+
+  requireNotaHeaderWriteContext(
+    id: string,
+    patch: Partial<NotaTransaction>,
+  ): {
+    fields: Record<
+      string,
+      { version: string; base: unknown; mine: unknown }
+    >;
+  } {
+    const versions = this.notaFieldVersions.get(id);
+    const canonical = this.canonicalState.notaTransactions.find(
+      (nota) => nota.id === id,
+    );
+    if (!versions || !canonical) {
+      throw new Error('Versi Nota belum tersedia. Sinkronkan ulang lalu coba lagi.');
+    }
+    const allowed = new Set([
+      'customerName',
+      'customerPlace',
+      'transactionDate',
+      'payment',
+    ]);
+    const fields: Record<
+      string,
+      { version: string; base: unknown; mine: unknown }
+    > = {};
+    for (const [field, mine] of Object.entries(patch)) {
+      if (!allowed.has(field) || !versions[field]) {
+        throw new Error(`Field Nota ${field} tidak dapat diubah.`);
+      }
+      fields[field] = {
+        version: versions[field],
+        base: canonical[field as keyof NotaTransaction],
+        mine,
+      };
+    }
+    return { fields };
+  }
+
+  requireNotaLineWriteContext(
+    notaId: string,
+    pageId: string,
+    lineId: string,
+    patch: Partial<NotaLine>,
+  ): {
+    pageVersion: string;
+    lineVersion: string;
+    base: Record<string, unknown>;
+    mine: Record<string, unknown>;
+  } {
+    const pageVersion = this.notaPageVersions.get(pageId);
+    const lineVersion = this.notaLineVersions.get(lineId);
+    const canonicalPage = this.canonicalState.notaTransactions
+      .find((nota) => nota.id === notaId)
+      ?.pages.find((page) => page.id === pageId);
+    const canonical = canonicalPage?.lines.find((line) => line.id === lineId);
+    const projected = this.state.notaTransactions
+      .find((nota) => nota.id === notaId)
+      ?.pages.find((page) => page.id === pageId)
+      ?.lines.find((line) => line.id === lineId);
+    if (!pageVersion || !lineVersion || !canonical || !projected) {
+      throw new Error('Versi baris Nota belum tersedia. Sinkronkan ulang lalu coba lagi.');
+    }
+    return {
+      pageVersion,
+      lineVersion,
+      base: notaLineMaterial(canonical, canonicalPage!.lines.indexOf(canonical)),
+      mine: notaLineMaterial(
+        { ...projected, ...patch },
+        canonicalPage!.lines.indexOf(canonical),
+      ),
+    };
+  }
+
+  requireNotaDeleteContext(
+    notaId: string,
+    pageId: string,
+    lineId: string,
+  ): {
+    pageVersion: string;
+    lineVersion: string;
+    base: Record<string, unknown>;
+  } {
+    const context = this.requireNotaLineWriteContext(
+      notaId,
+      pageId,
+      lineId,
+      {},
+    );
+    return {
+      pageVersion: context.pageVersion,
+      lineVersion: context.lineVersion,
+      base: context.base,
+    };
+  }
+
+  requireNotaStructureContext(id: string): { structureVersion: string } {
+    const structureVersion = this.notaStructureVersions.get(id);
+    if (!structureVersion) {
+      throw new Error('Versi struktur Nota belum tersedia.');
+    }
+    return { structureVersion };
+  }
+
+  requireNotaPageLifecycleContext(
+    id: string,
+    pageId: string,
+  ): { structureVersion: string; pageVersion: string } {
+    const pageVersion = this.notaPageLifecycleVersions.get(pageId);
+    if (!pageVersion) throw new Error('Versi halaman Nota belum tersedia.');
+    return { ...this.requireNotaStructureContext(id), pageVersion };
+  }
+
+  requireNotaLifecycleContext(id: string): { lifecycleVersion: string } {
+    const lifecycleVersion = this.notaLifecycleVersions.get(id);
+    if (!lifecycleVersion) throw new Error('Versi lifecycle Nota belum tersedia.');
+    return { lifecycleVersion };
   }
 
   requireSkuWriteContext(
@@ -181,6 +336,38 @@ export class CoreGatewayState {
         if (kind === 'label' || kind === 'invoice') {
           this.templateVersions.set(kind, version);
         }
+      } else if (change.entityType === 'nota') {
+        const structureVersion = payload?.structureVersion;
+        const lifecycleVersion = payload?.lifecycleVersion;
+        const fieldVersions = payload?.fieldVersions;
+        if (typeof structureVersion === 'string') {
+          this.notaStructureVersions.set(change.entityId, structureVersion);
+        }
+        if (typeof lifecycleVersion === 'string') {
+          this.notaLifecycleVersions.set(change.entityId, lifecycleVersion);
+        }
+        if (
+          fieldVersions &&
+          typeof fieldVersions === 'object' &&
+          !Array.isArray(fieldVersions)
+        ) {
+          this.notaFieldVersions.set(
+            change.entityId,
+            Object.fromEntries(
+              Object.entries(fieldVersions)
+                .filter((entry): entry is [string, string] =>
+                  typeof entry[1] === 'string'),
+            ),
+          );
+        }
+      } else if (change.entityType === 'nota_page') {
+        this.notaPageVersions.set(change.entityId, version);
+        const lifecycleVersion = payload?.lifecycleVersion;
+        if (typeof lifecycleVersion === 'string') {
+          this.notaPageLifecycleVersions.set(change.entityId, lifecycleVersion);
+        }
+      } else if (change.entityType === 'nota_line') {
+        this.notaLineVersions.set(change.entityId, version);
       }
     }
   }
@@ -188,6 +375,7 @@ export class CoreGatewayState {
   recordMutationAcknowledgement(
     path: string,
     acknowledgement: CoreMutationAcknowledgement,
+    requestBody?: CoreOutboxItem['body'],
   ): boolean {
     const version = acknowledgement.entityVersion;
     if (!version) return false;
@@ -256,6 +444,147 @@ export class CoreGatewayState {
       return true;
     }
     const entity = acknowledgement.entity;
+    if (path === '/v1/notas' && entity !== undefined) {
+      const parsed = notaTransactionSchema.safeParse(entity);
+      if (parsed.success) {
+        this.canonicalState = {
+          ...this.canonicalState,
+          notaTransactions: [
+            ...this.canonicalState.notaTransactions.filter(
+              (nota) => nota.id !== parsed.data.id,
+            ),
+            parsed.data,
+          ],
+        };
+        this.notaFieldVersions.set(parsed.data.id, {
+          customerName: '1',
+          customerPlace: '1',
+          transactionDate: '1',
+          payment: '1',
+        });
+        this.notaStructureVersions.set(parsed.data.id, '1');
+        this.notaLifecycleVersions.set(parsed.data.id, version ?? '1');
+        for (const page of parsed.data.pages) {
+          this.notaPageVersions.set(page.id, '1');
+          this.notaPageLifecycleVersions.set(page.id, '1');
+          for (const line of page.lines) this.notaLineVersions.set(line.id, '1');
+        }
+        return true;
+      }
+    }
+    const addPageMatch = /^\/v1\/notas\/([^/]+)\/pages$/.exec(path);
+    if (addPageMatch?.[1] && entity !== undefined) {
+      const page = notaPageSchema.safeParse(entity);
+      const notaId = decodeURIComponent(addPageMatch[1]);
+      if (page.success) {
+        this.canonicalState = {
+          ...this.canonicalState,
+          notaTransactions: this.canonicalState.notaTransactions.map((nota) =>
+            nota.id === notaId
+              ? {
+                  ...nota,
+                  pages: [
+                    ...nota.pages.filter((candidate) => candidate.id !== page.data.id),
+                    page.data,
+                  ],
+                  nextNoteIndex: nota.nextNoteIndex + 1,
+                }
+              : nota,
+          ),
+        };
+        this.notaPageVersions.set(page.data.id, version ?? '1');
+        this.notaPageLifecycleVersions.set(page.data.id, '1');
+        for (const line of page.data.lines) this.notaLineVersions.set(line.id, '1');
+        const structure = this.notaStructureVersions.get(notaId);
+        if (structure) {
+          this.notaStructureVersions.set(
+            notaId,
+            (BigInt(structure) + 1n).toString(),
+          );
+        }
+        return true;
+      }
+    }
+    if (
+      /^\/v1\/notas(?:\/|$)/.test(path) &&
+      entity !== undefined &&
+      entity !== null &&
+      typeof entity === 'object' &&
+      !Array.isArray(entity)
+    ) {
+      const parsed = notaTransactionSchema.safeParse(entity);
+      if (parsed.success) {
+        const current = this.canonicalState.notaTransactions.some(
+          (nota) => nota.id === parsed.data.id,
+        );
+        this.canonicalState = {
+          ...this.canonicalState,
+          notaTransactions: current
+            ? this.canonicalState.notaTransactions.map((nota) =>
+                nota.id === parsed.data.id ? parsed.data : nota)
+            : [...this.canonicalState.notaTransactions, parsed.data],
+        };
+        if (
+          version &&
+          /^\/v1\/notas\/[^/]+\/(complete|reopen|cancel|restore)$/.test(path)
+        ) {
+          this.notaLifecycleVersions.set(parsed.data.id, version);
+        }
+        const request =
+          requestBody &&
+          typeof requestBody === 'object' &&
+          !Array.isArray(requestBody)
+            ? requestBody
+            : undefined;
+        const fields =
+          request?.fields &&
+          typeof request.fields === 'object' &&
+          !Array.isArray(request.fields)
+            ? request.fields
+            : undefined;
+        if (fields) {
+          const known = {
+            ...(this.notaFieldVersions.get(parsed.data.id) ?? {}),
+          };
+          for (const [field, edit] of Object.entries(fields)) {
+            if (
+              edit &&
+              typeof edit === 'object' &&
+              !Array.isArray(edit) &&
+              typeof edit.version === 'string'
+            ) {
+              known[field] = (BigInt(edit.version) + 1n).toString();
+            }
+          }
+          this.notaFieldVersions.set(parsed.data.id, known);
+        }
+        const lineMatch =
+          /^\/v1\/notas\/[^/]+\/pages\/[^/]+\/lines\/([^/]+)$/.exec(path);
+        if (lineMatch?.[1] && version) {
+          this.notaLineVersions.set(decodeURIComponent(lineMatch[1]), version);
+        }
+        const pageLifecycleMatch =
+          /^\/v1\/notas\/([^/]+)\/pages\/([^/]+)\/(cancel|restore)$/.exec(path);
+        if (pageLifecycleMatch?.[1] && pageLifecycleMatch[2] && version) {
+          const notaId = decodeURIComponent(pageLifecycleMatch[1]);
+          const pageId = decodeURIComponent(pageLifecycleMatch[2]);
+          this.notaPageVersions.set(pageId, version);
+          this.notaPageLifecycleVersions.set(pageId, version);
+          const structureVersion =
+            request?.structureVersion &&
+            typeof request.structureVersion === 'string'
+              ? request.structureVersion
+              : this.notaStructureVersions.get(notaId);
+          if (structureVersion) {
+            this.notaStructureVersions.set(
+              notaId,
+              (BigInt(structureVersion) + 1n).toString(),
+            );
+          }
+        }
+        return true;
+      }
+    }
     if (
       path === '/v1/skus' &&
       entity !== undefined &&
@@ -397,4 +726,20 @@ export class CoreGatewayState {
       previewOptimisticOutbox(this.canonicalState, this.outbox),
     );
   }
+}
+
+function notaLineMaterial(
+  line: NotaLine,
+  linePosition: number,
+): Record<string, unknown> {
+  return {
+    linePosition,
+    skuId: line.skuId ?? null,
+    description: line.description,
+    kind: line.kind,
+    quantity: line.quantity,
+    unit: line.unit,
+    pcsPrice: line.pcsPrice,
+    lsnPrice: line.lsnPrice,
+  };
 }

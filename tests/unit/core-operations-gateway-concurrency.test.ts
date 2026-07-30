@@ -176,9 +176,17 @@ describe('Core gateway concurrency and durability', () => {
     await Promise.all([first, second]);
     expect(transport.requests[1]).toMatchObject({
       body: {
-        patch: {
-          customerName: 'Amina',
-          customerPlace: 'Banjarbaru',
+        fields: {
+          customerName: {
+            version: '1',
+            base: 'Amelia',
+            mine: 'Amina',
+          },
+          customerPlace: {
+            version: '1',
+            base: 'Saibah',
+            mine: 'Banjarbaru',
+          },
         },
       },
     });

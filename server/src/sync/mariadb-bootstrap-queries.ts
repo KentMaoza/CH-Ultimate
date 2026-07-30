@@ -72,7 +72,7 @@ export async function readBootstrapCollections(
   );
   const pageRows = await connection.query<Array<Record<string, unknown>>>(
     `SELECT HEX(id) AS id_hex, HEX(nota_id) AS nota_id_hex, page_position,
-            row_version, created_at, updated_at
+            status, row_version, lifecycle_version, created_at, updated_at
      FROM nota_pages
      ORDER BY nota_id, page_position`,
   );
@@ -80,7 +80,8 @@ export async function readBootstrapCollections(
     `SELECT HEX(id) AS id_hex, HEX(nota_id) AS nota_id_hex,
             HEX(page_id) AS page_id_hex, HEX(sku_id) AS sku_id_hex,
             line_position, sku_identifier_snapshot, sku_name_snapshot,
-            quantity_pcs, unit_price_rupiah, line_total_rupiah, row_version,
+            kind_snapshot, quantity_pcs, unit_kind, unit_price_rupiah,
+            pcs_price_rupiah, lsn_price_rupiah, line_total_rupiah, row_version,
             deleted_at, created_at, updated_at
      FROM nota_lines
      ORDER BY nota_id, page_id, line_position`,
@@ -173,7 +174,9 @@ export async function readBootstrapCollections(
       id: requiredUuid(row.id_hex),
       notaId: requiredUuid(row.nota_id_hex),
       pagePosition: Number(row.page_position),
+      status: String(row.status),
       rowVersion: BigInt(String(row.row_version)),
+      lifecycleVersion: BigInt(String(row.lifecycle_version)),
       createdAt: databaseDate(row.created_at),
       updatedAt: databaseDate(row.updated_at),
     })),
@@ -185,8 +188,12 @@ export async function readBootstrapCollections(
       linePosition: Number(row.line_position),
       skuIdentifierSnapshot: String(row.sku_identifier_snapshot),
       skuNameSnapshot: String(row.sku_name_snapshot),
+      kindSnapshot: String(row.kind_snapshot),
       quantityPcs: BigInt(String(row.quantity_pcs)),
+      unitKind: String(row.unit_kind),
       unitPriceRupiah: BigInt(String(row.unit_price_rupiah)),
+      pcsPriceRupiah: BigInt(String(row.pcs_price_rupiah)),
+      lsnPriceRupiah: BigInt(String(row.lsn_price_rupiah)),
       lineTotalRupiah: BigInt(String(row.line_total_rupiah)),
       rowVersion: BigInt(String(row.row_version)),
       deletedAt: nullableDatabaseDate(row.deleted_at),

@@ -197,6 +197,7 @@ export function NotaWorkspace({ onBack, initialSelection, onOpenCompletionDestin
     setMessage('');
     setCompletion({ ...pending, phase: 'saving', destination, reason: undefined });
     try {
+      await gateway.flushNota(pending.transactionId);
       await gateway.completeNotaTransaction(pending.transactionId, destination);
       const completed = gateway.getSnapshot().notaTransactions.find((item) => item.id === pending.transactionId);
       if (completed?.status !== 'completed' || (completed.completionDestination ?? 'archive') !== destination) throw new Error('Nota tidak dapat disimpan ke tujuan yang dipilih.');
@@ -251,7 +252,10 @@ export function NotaWorkspace({ onBack, initialSelection, onOpenCompletionDestin
       setMessage('Nota yang dikonfirmasi sudah tidak tersedia. Tidak ada perubahan dibuat.');
       return;
     }
-    const result = await run(() => gateway.cancelNotaTransaction(pending.transactionId), 'Transaksi tidak dapat dibatalkan.');
+    const result = await run(async () => {
+      await gateway.flushNota(pending.transactionId);
+      await gateway.cancelNotaTransaction(pending.transactionId);
+    }, 'Transaksi tidak dapat dibatalkan.');
     const cancelled = gateway.getSnapshot().notaTransactions.find((item) => item.id === pending.transactionId);
     if (result.ok && cancelled?.status !== 'cancelled') setMessage('Transaksi tidak dapat dibatalkan.');
     setConfirm(null);

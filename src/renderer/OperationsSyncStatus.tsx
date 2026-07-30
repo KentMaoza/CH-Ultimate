@@ -26,6 +26,7 @@ export function OperationsSyncStatus({
   const [snapshot, setSnapshot] = useState<SyncSnapshot>(() =>
     gateway.getSyncSnapshot(),
   );
+  const conflict = gateway.getConflicts()[0];
 
   useEffect(() => {
     setSnapshot(gateway.getSyncSnapshot());
@@ -41,6 +42,23 @@ export function OperationsSyncStatus({
       {snapshot.phase === 'offline' && (
         <button onClick={() => void gateway.retryPending()}>Coba lagi</button>
       )}
+      {snapshot.phase === 'conflict' && conflict && (
+        <section aria-label="Detail konflik data">
+          <p>Dasar: {displayConflictValue(conflict.base)}</p>
+          <p>Saya: {displayConflictValue(conflict.mine)}</p>
+          <p>Server: {displayConflictValue(conflict.server)}</p>
+          <button onClick={() => void gateway.resolveConflict(conflict.id, 'mine')}>
+            Gunakan perubahan saya
+          </button>
+          <button onClick={() => void gateway.resolveConflict(conflict.id, 'server')}>
+            Gunakan versi server
+          </button>
+        </section>
+      )}
     </div>
   );
+}
+
+function displayConflictValue(value: unknown): string {
+  return typeof value === 'string' ? value : JSON.stringify(value);
 }

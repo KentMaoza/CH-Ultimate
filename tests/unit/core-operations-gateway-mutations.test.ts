@@ -6,6 +6,10 @@ import {
 } from '../../src/gateway/core-api-types';
 import type { CoreCacheEnvelope } from '../../src/gateway/core-operations-gateway';
 import { createCoreOperationsGateway } from '../../src/gateway/core-operations-gateway';
+import { mapCoreBootstrapToDemoState } from '../../src/gateway/core-bootstrap-mapping';
+import { CoreGatewayState } from '../../src/gateway/core-gateway-state';
+import { parseCoreBootstrap } from '../../src/gateway/core-api-types';
+import { asCoreJson } from '../../src/gateway/core-optimistic-state';
 import {
   LINE_ID,
   NOTA_ID,
@@ -151,9 +155,17 @@ describe('Core operations gateway mutation coordination', () => {
     const mutationResponse = deferred<{ status: number; body: unknown }>();
     transport.enqueue(async (request) => {
       expect(request.body).toEqual({
-        patch: {
-          customerName: 'Amina',
-          customerPlace: 'Banjarbaru',
+        fields: {
+          customerName: {
+            version: '1',
+            base: 'Amelia',
+            mine: 'Amina',
+          },
+          customerPlace: {
+            version: '1',
+            base: 'Saibah',
+            mine: 'Banjarbaru',
+          },
         },
       });
       requestStarted.resolve();
@@ -274,6 +286,71 @@ describe('Core operations gateway mutation coordination', () => {
       request.path.endsWith('/complete'),
     );
     expect(completeIndex).toBeGreaterThan(headerIndex);
+    expect(transport.requests[completeIndex]?.body).toEqual({
+      lifecycleVersion: '1',
+      destination: 'archive',
+    });
+  });
+
+  it('sends canonical page and whole-line base material', async () => {
+    const { gateway, transport } = readyGateway();
+    await gateway.initialize();
+    transport.enqueue({ status: 200, body: { serverRevision: '2' } });
+    transport.enqueue(emptyPoll());
+
+    await gateway.updateNotaLine(NOTA_ID, PAGE_ID, LINE_ID, {
+      quantity: 2,
+    });
+
+    expect(transport.requests.at(-2)).toMatchObject({
+      method: 'PATCH',
+      path: CORE_API_PATHS.notaLine(NOTA_ID, PAGE_ID, LINE_ID),
+      body: {
+        pageVersion: '1',
+        lineVersion: '1',
+        base: {
+          linePosition: 0,
+          skuId: SKU_ID,
+          description: 'Produk Core',
+          kind: '',
+          quantity: 1,
+          unit: 'pcs',
+          pcsPrice: 25000,
+          lsnPrice: 300000,
+        },
+        mine: {
+          linePosition: 0,
+          skuId: SKU_ID,
+          description: 'Produk Core',
+          kind: '',
+          quantity: 2,
+          unit: 'pcs',
+          pcsPrice: 25000,
+          lsnPrice: 300000,
+        },
+      },
+    });
+  });
+
+  it('keeps a line acknowledgement version isolated from Nota lifecycle version', async () => {
+    const state = new CoreGatewayState();
+    const bootstrap = parseCoreBootstrap(populatedBootstrap('1'));
+    state.commitCanonical(mapCoreBootstrapToDemoState(bootstrap), '1');
+    state.replaceRowVersions(bootstrap);
+
+    state.recordMutationAcknowledgement(
+      CORE_API_PATHS.notaLine(NOTA_ID, PAGE_ID, LINE_ID),
+      {
+        serverRevision: '2',
+        entityVersion: '9',
+        entity: asCoreJson(state.getSnapshot().notaTransactions[0]),
+      },
+      {},
+    );
+
+    expect(state.requireNotaLifecycleContext(NOTA_ID)).toEqual({
+      lifecycleVersion: '1',
+    });
   });
 
   it('stores a typed conflict and resolves it through the dedicated endpoint', async () => {

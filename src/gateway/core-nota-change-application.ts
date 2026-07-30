@@ -115,7 +115,7 @@ export function applyNotaPageChange(
       const page: Nota = {
         id: row.id,
         suffix: noteSuffixFromIndex(row.pagePosition),
-        status: existing?.status ?? 'active',
+        status: row.status,
         lines:
           existing?.lines ??
           Array.from({ length: 15 }, (_, position) =>
@@ -182,15 +182,29 @@ export function applyNotaLineChange(
               row.unitPriceRupiah,
               'unitPriceRupiah',
             );
+            const quantityPcs = integerFromDecimal(
+              row.quantityPcs,
+              'quantityPcs',
+            );
+            const pcsPrice = row.pcsPriceRupiah
+              ? integerFromDecimal(row.pcsPriceRupiah, 'pcsPriceRupiah')
+              : row.unitKind === 'pcs'
+                ? price
+                : Math.floor(price / 12);
+            const lsnPrice = row.lsnPriceRupiah
+              ? integerFromDecimal(row.lsnPriceRupiah, 'lsnPriceRupiah')
+              : row.unitKind === 'lsn'
+                ? price
+                : safeIntegerProduct(price, 12, 'lsnPrice');
             lines[row.linePosition] = {
               id: row.id,
               ...(row.skuId ? { skuId: row.skuId } : {}),
               description: row.skuNameSnapshot,
-              kind: '',
-              quantity: integerFromDecimal(row.quantityPcs, 'quantityPcs'),
-              unit: 'pcs',
-              pcsPrice: price,
-              lsnPrice: safeIntegerProduct(price, 12, 'lsnPrice'),
+              kind: row.kindSnapshot,
+              quantity: row.unitKind === 'lsn' ? quantityPcs / 12 : quantityPcs,
+              unit: row.unitKind,
+              pcsPrice,
+              lsnPrice,
             };
           }
           return { ...page, lines };

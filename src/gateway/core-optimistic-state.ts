@@ -36,6 +36,11 @@ export function mergeQueuedMutation(
   const currentPatch = patchRecord(item.body);
   const nextBody = asCoreJson(body);
   const nextPatch = patchRecord(nextBody);
+  const currentFields = recordField(currentPatch ? undefined : item.body, 'fields');
+  const nextFields = recordField(nextBody, 'fields');
+  const currentMine = recordField(item.body, 'mine');
+  const nextMine = recordField(nextBody, 'mine');
+  const currentBody = jsonRecord(item.body);
   const mergedOptimistic =
     item.optimistic?.kind === 'nota-header' &&
     optimistic?.kind === 'nota-header'
@@ -53,12 +58,38 @@ export function mergeQueuedMutation(
   return {
     ...item,
     body:
-      currentPatch && nextPatch
+      currentFields && nextFields
+        ? asCoreJson({ fields: { ...currentFields, ...nextFields } })
+        : currentMine && nextMine && currentBody
+          ? asCoreJson({ ...currentBody, mine: { ...currentMine, ...nextMine } })
+          : currentPatch && nextPatch
         ? asCoreJson({ patch: { ...currentPatch, ...nextPatch } })
         : nextBody,
     ...(mergedOptimistic ? { optimistic: mergedOptimistic } : {}),
     optimisticActive: Boolean(mergedOptimistic),
   };
+}
+
+function jsonRecord(
+  value: CoreJsonValue | undefined,
+): Record<string, CoreJsonValue> | undefined {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value
+    : undefined;
+}
+
+function recordField(
+  value: CoreJsonValue | undefined,
+  field: string,
+): Record<string, CoreJsonValue> | undefined {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+  const nested = value[field];
+  if (nested === null || typeof nested !== 'object' || Array.isArray(nested)) {
+    return undefined;
+  }
+  return nested;
 }
 
 function patchRecord(

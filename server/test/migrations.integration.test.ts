@@ -37,6 +37,9 @@ const tables = [
   'client_cursor_acknowledgements',
   'audit_events',
   'idempotency_receipts',
+  'nota_conflicts',
+  'revenue_postings',
+  'nota_daily_sequences',
   'image_jobs',
   'image_assets',
   'imports',
@@ -139,9 +142,9 @@ describe('MariaDB migrations against isolated chu_test', () => {
       ['ch-core-schema-migrations'],
     );
 
-    expect(first.appliedVersions).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(first.appliedVersions).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     expect(second.appliedVersions).toEqual([]);
-    expect(Number(rows[0]?.migration_count)).toBe(7);
+    expect(Number(rows[0]?.migration_count)).toBe(8);
     expect(Number(lockRows[0]?.is_free)).toBe(1);
   });
 
@@ -174,9 +177,9 @@ describe('MariaDB migrations against isolated chu_test', () => {
       'SELECT COUNT(*) AS migration_count FROM schema_migrations',
     );
 
-    expect(recovered.appliedVersions).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(recovered.appliedVersions).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     expect(Number(finalTables[0]?.table_count)).toBe(1);
-    expect(Number(finalReceipts[0]?.migration_count)).toBe(7);
+    expect(Number(finalReceipts[0]?.migration_count)).toBe(8);
   });
 
   it('reruns version 2 after its first real ALTER TABLE committed', async () => {
@@ -193,8 +196,8 @@ describe('MariaDB migrations against isolated chu_test', () => {
 
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 1,
-      toVersion: 7,
-      appliedVersions: [2, 3, 4, 5, 6, 7],
+      toVersion: 8,
+      appliedVersions: [2, 3, 4, 5, 6, 7, 8],
     });
   });
 
@@ -268,7 +271,7 @@ describe('MariaDB migrations against isolated chu_test', () => {
     );
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 6,
-      toVersion: 7,
+      toVersion: 8,
       appliedVersions: [7],
     });
   });
@@ -277,8 +280,8 @@ describe('MariaDB migrations against isolated chu_test', () => {
     await applyOriginalVersionOne();
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 1,
-      toVersion: 7,
-      appliedVersions: [2, 3, 4, 5, 6, 7],
+      toVersion: 8,
+      appliedVersions: [2, 3, 4, 5, 6, 7, 8],
     });
     const deviceId = randomUUID().replaceAll('-', '');
     const notaAId = randomUUID().replaceAll('-', '');

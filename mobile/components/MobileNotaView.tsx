@@ -240,29 +240,17 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
     if (!transaction) return;
     completionStarted.current = true;
     setBusy(true);
-    let saved = false;
     try {
       await gateway.completeNotaTransaction(transaction.id, 'archive');
       const completed = gateway.getSnapshot().notaTransactions.find((item) => item.id === transaction.id);
       if (completed?.status !== 'completed') throw new Error('Nota tidak dapat disimpan.');
-      saved = true;
       setCompletionOpen(false);
-      const transfer = await gateway.transferNotaToDesktop(transaction.id);
-      if (!transfer.sent) {
-        setNoticeKind('alert');
-        setNotice(`Nota tersimpan di Arsip. Pengiriman ke desktop gagal: ${transfer.reason ?? 'Alasan tidak tersedia.'}`);
-        return;
-      }
       setNoticeKind('status');
-      setNotice('Nota tersimpan di Arsip dan berhasil dikirim ke desktop.');
+      setNotice('Nota tersimpan di Arsip dan tersedia di semua perangkat.');
     } catch (error) {
       setNoticeKind('alert');
-      if (saved) {
-        setNotice(`Nota tersimpan di Arsip. Pengiriman ke desktop gagal: ${error instanceof Error ? error.message : 'Alasan tidak tersedia.'}`);
-      } else {
-        completionStarted.current = false;
-        setNotice(error instanceof Error ? error.message : 'Nota tidak dapat disimpan.');
-      }
+      completionStarted.current = false;
+      setNotice(error instanceof Error ? error.message : 'Nota tidak dapat disimpan.');
     } finally {
       setBusy(false);
     }
@@ -376,6 +364,6 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
       </section>
       <footer className="mobile-nota-finish"><div><span>Total transaksi</span><strong>{formatRupiah(transactionTotal)}</strong></div><button className="primary-action" disabled={busy} onClick={() => setCompletionOpen(true)}>Selesaikan nota</button></footer>
     </> : !notice && <p className="mobile-nota-empty">Menyiapkan nota baru…</p>}
-    {completionOpen && <div className="mobile-nota-dialog-backdrop"><section role="dialog" aria-modal="true" aria-label="Selesaikan nota mobile?" className="mobile-nota-dialog"><h2>Selesaikan nota mobile?</h2><p>Nota disimpan ke Arsip lalu dicoba dikirim ke desktop.</p><button className="primary-action" disabled={busy} onClick={() => void complete()}>Simpan ke Arsip dan kirim ke desktop</button><button disabled={busy} onClick={() => setCompletionOpen(false)}>Batal</button></section></div>}
+    {completionOpen && <div className="mobile-nota-dialog-backdrop"><section role="dialog" aria-modal="true" aria-label="Selesaikan nota mobile?" className="mobile-nota-dialog"><h2>Selesaikan nota mobile?</h2><p>Nota disimpan ke Arsip dan tersedia di semua perangkat setelah sinkronisasi.</p><button className="primary-action" disabled={busy} onClick={() => void complete()}>Simpan ke Arsip</button><button disabled={busy} onClick={() => setCompletionOpen(false)}>Batal</button></section></div>}
   </section>;
 }

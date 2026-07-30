@@ -22,13 +22,8 @@ import {
 import { CoreGatewayState } from './core-gateway-state';
 import type {
   CreateSkuInput,
-  NotaDesktopTransferResult,
   OperationsGateway,
 } from './operations-gateway-contract';
-
-const transferResultSchema = z
-  .object({ sent: z.boolean(), reason: z.string().optional() })
-  .strict();
 
 function entityOrThrow<T>(
   schema: z.ZodType<T>,
@@ -144,10 +139,11 @@ export class CoreMutationCoordinator {
 
   async addNotaPage(transactionId: string): Promise<Nota | undefined> {
     await this.flushNota(transactionId);
+    const context = this.state.requireNotaStructureContext(transactionId);
     const result = await this.command({
       method: 'POST',
       path: CORE_API_PATHS.notaPages(transactionId),
-      body: {},
+      body: context,
       notaId: transactionId,
     });
     return entityOrThrow(notaPageSchema, result.entity, 'halaman Nota');
@@ -155,20 +151,28 @@ export class CoreMutationCoordinator {
 
   async cancelNotaPage(transactionId: string, pageId: string): Promise<void> {
     await this.flushNota(transactionId);
+    const context = this.state.requireNotaPageLifecycleContext(
+      transactionId,
+      pageId,
+    );
     await this.command({
       method: 'POST',
       path: `${CORE_API_PATHS.notaPage(transactionId, pageId)}/cancel`,
-      body: {},
+      body: context,
       notaId: transactionId,
     });
   }
 
   async restoreNotaPage(transactionId: string, pageId: string): Promise<void> {
     await this.flushNota(transactionId);
+    const context = this.state.requireNotaPageLifecycleContext(
+      transactionId,
+      pageId,
+    );
     await this.command({
       method: 'POST',
       path: `${CORE_API_PATHS.notaPage(transactionId, pageId)}/restore`,
-      body: {},
+      body: context,
       notaId: transactionId,
     });
   }
@@ -177,10 +181,11 @@ export class CoreMutationCoordinator {
     id: string,
     patch: Parameters<OperationsGateway['updateNotaTransaction']>[1],
   ): Promise<void> {
+    const context = this.state.requireNotaHeaderWriteContext(id, patch);
     return this.command({
       method: 'PATCH',
       path: CORE_API_PATHS.notaHeader(id),
-      body: { patch },
+      body: context,
       notaId: id,
       coalesceKey: `nota:${id}:header`,
       optimistic: { kind: 'nota-header', notaId: id, patch },
@@ -193,10 +198,16 @@ export class CoreMutationCoordinator {
     lineId: string,
     patch: Partial<NotaLine>,
   ): Promise<void> {
+    const context = this.state.requireNotaLineWriteContext(
+      transactionId,
+      pageId,
+      lineId,
+      patch,
+    );
     return this.command({
       method: 'PATCH',
       path: CORE_API_PATHS.notaLine(transactionId, pageId, lineId),
-      body: { patch },
+      body: context,
       notaId: transactionId,
       coalesceKey: `nota:${transactionId}:line:${lineId}`,
       optimistic: {
@@ -215,9 +226,15 @@ export class CoreMutationCoordinator {
     lineId: string,
   ): Promise<void> {
     await this.flushNota(transactionId);
+    const context = this.state.requireNotaDeleteContext(
+      transactionId,
+      pageId,
+      lineId,
+    );
     await this.command({
       method: 'DELETE',
       path: CORE_API_PATHS.notaLine(transactionId, pageId, lineId),
+      body: context,
       notaId: transactionId,
       optimistic: {
         kind: 'nota-line',
@@ -241,30 +258,34 @@ export class CoreMutationCoordinator {
     id: string,
     destination: NotaCompletionDestination = 'archive',
   ): Promise<void> {
-    return this.afterFlush(id, CORE_API_PATHS.notaComplete(id), { destination });
-  }
-
-  async transferNotaToDesktop(id: string): Promise<NotaDesktopTransferResult> {
-    await this.flushNota(id);
-    const result = await this.command({
-      method: 'POST',
-      path: CORE_API_PATHS.notaTransfer(id),
-      body: {},
-      notaId: id,
+    return this.afterFlush(id, CORE_API_PATHS.notaComplete(id), {
+      ...this.state.requireNotaLifecycleContext(id),
+      destination,
     });
-    return entityOrThrow(transferResultSchema, result.entity, 'transfer Nota');
   }
 
   reopenNotaTransaction(id: string): Promise<void> {
-    return this.afterFlush(id, CORE_API_PATHS.notaReopen(id));
+    return this.afterFlush(
+      id,
+      CORE_API_PATHS.notaReopen(id),
+      this.state.requireNotaLifecycleContext(id),
+    );
   }
 
   cancelNotaTransaction(id: string): Promise<void> {
-    return this.afterFlush(id, CORE_API_PATHS.notaCancel(id));
+    return this.afterFlush(
+      id,
+      CORE_API_PATHS.notaCancel(id),
+      this.state.requireNotaLifecycleContext(id),
+    );
   }
 
   restoreNotaTransaction(id: string): Promise<void> {
-    return this.afterFlush(id, CORE_API_PATHS.notaRestore(id));
+    return this.afterFlush(
+      id,
+      CORE_API_PATHS.notaRestore(id),
+      this.state.requireNotaLifecycleContext(id),
+    );
   }
 
   private async afterFlush(

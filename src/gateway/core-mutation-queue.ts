@@ -204,6 +204,7 @@ export class CoreMutationQueue {
     const hasAuthoritativeEntity = this.state.recordMutationAcknowledgement(
       item.path,
       acknowledgement,
+      item.body,
     );
     try {
       this.recordDurable(

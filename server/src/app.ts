@@ -16,12 +16,14 @@ import {
   registerCatalogueOperationRoutes,
   type CatalogueOperationHttpService,
 } from './http/catalogue-operation-routes.js';
+import { registerNotaRoutes, type NotaHttpService } from './http/nota-routes.js';
 
 export interface AppDependencies {
   pool: SchemaQueryPool;
   protocol?: ProtocolServices;
   catalogue?: CatalogueHttpServices;
   operations?: CatalogueOperationHttpService;
+  nota?: NotaHttpService;
 }
 
 export function buildApp(deps: AppDependencies): FastifyInstance {
@@ -50,6 +52,9 @@ export function buildApp(deps: AppDependencies): FastifyInstance {
         deps.protocol.identity,
         deps.operations,
       );
+    }
+    if (deps.nota) {
+      registerNotaRoutes(app, deps.protocol.identity, deps.nota);
     }
   }
 

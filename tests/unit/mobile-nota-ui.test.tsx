@@ -183,23 +183,20 @@ test('the sixteenth unique item automatically creates B and keeps fifteen number
   expect(screen.getByRole('button', { name: 'Bagian B' })).toHaveStyle({ '--mobile-nota-accent': '#1565C0' });
 });
 
-test('mobile completion has one archive-and-transfer action and records an honest transfer failure', async () => {
+test('mobile completion synchronizes the archived Nota for all clients', async () => {
   const gateway = renderNota();
   await screen.findByRole('heading', { name: 'Nota Barang' });
   await addManual('Barang Demo');
   fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
   const dialog = screen.getByRole('dialog', { name: 'Selesaikan nota mobile?' });
   expect(within(dialog).getAllByRole('button')).toHaveLength(2);
-  expect(within(dialog).queryByRole('button', { name: 'Simpan ke Arsip' })).not.toBeInTheDocument();
-  expect(within(dialog).queryByRole('button', { name: 'Simpan dan kirim ke desktop' })).not.toBeInTheDocument();
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Simpan ke Arsip dan kirim ke desktop' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Simpan ke Arsip' }));
 
-  expect(await screen.findByRole('alert')).toHaveTextContent('Nota tersimpan di Arsip');
-  expect(screen.getByRole('alert')).toHaveTextContent('Pengiriman ke desktop gagal: CH Core API belum tersedia.');
+  expect(await screen.findByRole('status')).toHaveTextContent(
+    'Nota tersimpan di Arsip dan tersedia di semua perangkat.',
+  );
   expect(gateway.getSnapshot().notaTransactions.find((item) => item.status === 'completed')).toMatchObject({
     completionDestination: 'archive',
-    desktopTransferStatus: 'failed',
-    desktopTransferError: 'CH Core API belum tersedia.',
   });
 });
 

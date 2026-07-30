@@ -217,21 +217,35 @@ export function mapCoreBootstrapToDemoState(
           line.unitPriceRupiah,
           'unitPriceRupiah',
         );
+        const quantityPcs = integerFromDecimal(
+          line.quantityPcs,
+          'quantityPcs',
+        );
+        const pcsPrice = line.pcsPriceRupiah
+          ? integerFromDecimal(line.pcsPriceRupiah, 'pcsPriceRupiah')
+          : line.unitKind === 'pcs'
+            ? unitPrice
+            : Math.floor(unitPrice / 12);
+        const lsnPrice = line.lsnPriceRupiah
+          ? integerFromDecimal(line.lsnPriceRupiah, 'lsnPriceRupiah')
+          : line.unitKind === 'lsn'
+            ? unitPrice
+            : safeIntegerProduct(unitPrice, 12, 'lsnPrice');
         lines[line.linePosition] = {
           id: line.id,
           ...(line.skuId ? { skuId: line.skuId } : {}),
           description: line.skuNameSnapshot,
-          kind: '',
-          quantity: integerFromDecimal(line.quantityPcs, 'quantityPcs'),
-          unit: 'pcs',
-          pcsPrice: unitPrice,
-          lsnPrice: safeIntegerProduct(unitPrice, 12, 'lsnPrice'),
+          kind: line.kindSnapshot,
+          quantity: line.unitKind === 'lsn' ? quantityPcs / 12 : quantityPcs,
+          unit: line.unitKind,
+          pcsPrice,
+          lsnPrice,
         };
       }
       return {
         id: page.id,
         suffix: noteSuffixFromIndex(page.pagePosition),
-        status: 'active',
+        status: page.status,
         lines,
       };
     });

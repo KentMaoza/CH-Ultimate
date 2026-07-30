@@ -15,6 +15,7 @@ export function CompleteNotaDialog({
   onRetry,
   onClose,
   onOpenDestination,
+  pendingCentral = false,
 }: {
   open: boolean;
   phase: CompletionDialogPhase;
@@ -25,6 +26,7 @@ export function CompleteNotaDialog({
   onRetry: () => void;
   onClose: () => void;
   onOpenDestination: (destination: NotaCompletionDestination) => void;
+  pendingCentral?: boolean;
 }) {
   const busy = phase === 'saving';
   const modal = useAccessibleModal<HTMLDivElement>(open, onClose, restoreFocusTo, !busy);
@@ -43,7 +45,13 @@ export function CompleteNotaDialog({
         </div>
       </>}
       {phase === 'saving' && <p role="status">Menyimpan nota ke {label}…</p>}
-      {phase === 'success' && <p>Nota berhasil disimpan di {label}.</p>}
+      {phase === 'success' && (
+        <p>
+          {pendingCentral
+            ? 'Menunggu sinkronisasi — stok dan omzet pusat belum berubah.'
+            : `Nota berhasil disimpan di ${label}.`}
+        </p>
+      )}
       {phase === 'error' && <><p>{reason || 'Nota tidak dapat disimpan.'}</p><small>Tidak ada perubahan yang disimpan. Anda dapat mencoba lagi.</small></>}
       <div className="chu-nota-workspace__completion-actions">
         <button data-modal-initial-focus={phase !== 'choice' || undefined} disabled={busy} onClick={modal.close}>{phase === 'success' ? 'Tutup' : 'Batal'}</button>

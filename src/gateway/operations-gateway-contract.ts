@@ -7,6 +7,7 @@ export interface SyncSnapshot {
   serverRevision: string;
   pendingCount: number;
   conflictCount: number;
+  quarantinedCount?: number;
   lastSyncedAt?: string;
   message?: string;
 }
@@ -89,7 +90,7 @@ export interface OperationsGateway {
   resolveConflict(id: string, choice: 'mine' | 'server'): Promise<void>;
   createSku(input: CreateSkuInput): Promise<Sku>;
   updateSku(id: string, patch: Partial<Sku>): Promise<void>;
-  adjustStock(id: string, quantity: number): Promise<void>;
+  adjustStock(id: string, quantity: number, reason?: string): Promise<void>;
   setArchived(id: string, archived: boolean): Promise<void>;
   validateInitialCatalogue(input: {
     fileName: string;

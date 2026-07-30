@@ -512,7 +512,13 @@ describe('Core operations gateway mutation coordination', () => {
     });
     transport.enqueue(emptyPoll('13'));
     await gateway.updateNotaTransaction(NOTA_ID, { customerName: 'Saya' });
-    expect(transport.requests.at(-2)?.body).toEqual({
+    const finalHeaderWrite = [...transport.requests]
+      .reverse()
+      .find(
+        (request) =>
+          request.path === CORE_API_PATHS.notaHeader(NOTA_ID),
+      );
+    expect(finalHeaderWrite?.body).toEqual({
       lifecycleVersion: '6',
       fields: {
         customerName: {

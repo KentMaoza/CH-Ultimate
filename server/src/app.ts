@@ -17,6 +17,10 @@ import {
   type CatalogueOperationHttpService,
 } from './http/catalogue-operation-routes.js';
 import { registerNotaRoutes, type NotaHttpService } from './http/nota-routes.js';
+import {
+  registerOfflineRoutes,
+  type OfflineHttpService,
+} from './http/offline-routes.js';
 
 export interface AppDependencies {
   pool: SchemaQueryPool;
@@ -24,6 +28,7 @@ export interface AppDependencies {
   catalogue?: CatalogueHttpServices;
   operations?: CatalogueOperationHttpService;
   nota?: NotaHttpService;
+  offline?: OfflineHttpService;
 }
 
 export function buildApp(deps: AppDependencies): FastifyInstance {
@@ -55,6 +60,9 @@ export function buildApp(deps: AppDependencies): FastifyInstance {
     }
     if (deps.nota) {
       registerNotaRoutes(app, deps.protocol.identity, deps.nota);
+    }
+    if (deps.offline) {
+      registerOfflineRoutes(app, deps.protocol.identity, deps.offline);
     }
   }
 

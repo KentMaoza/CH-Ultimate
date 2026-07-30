@@ -38,6 +38,27 @@ test.each([
   expect(screen.getByRole('tab', { name: tab })).toHaveAttribute('aria-selected', 'true');
 });
 
+test('offline desktop completion keeps central stock and omzet visibly pending', async () => {
+  const gateway = new MockOperationsGateway();
+  gateway.getSyncSnapshot = () => ({
+    phase: 'offline',
+    serverRevision: '7',
+    pendingCount: 1,
+    conflictCount: 0,
+  });
+  openNota(gateway);
+
+  await chooseCompletion('archive');
+
+  expect(
+    within(
+      screen.getByRole('dialog', { name: 'Nota berhasil disimpan' }),
+    ).getByText(
+      'Menunggu sinkronisasi — stok dan omzet pusat belum berubah.',
+    ),
+  ).toBeInTheDocument();
+});
+
 class RejectingCompletionGateway extends MockOperationsGateway {
   override async completeNotaTransaction(_transactionId: string, _destination?: NotaCompletionDestination) {
     throw new Error('Stok demo tidak dapat diperbarui.');

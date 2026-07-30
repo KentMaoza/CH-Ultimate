@@ -175,4 +175,25 @@ describe('desktop operations synchronization status', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Coba lagi' }));
     expect(gateway.retryPending).toHaveBeenCalledTimes(1);
   });
+
+  it('shows pending central effects and quarantined queue counts explicitly', () => {
+    const gateway = new MockOperationsGateway();
+    gateway.getSyncSnapshot = () => ({
+      phase: 'revoked',
+      serverRevision: '7',
+      pendingCount: 2,
+      conflictCount: 0,
+      quarantinedCount: 2,
+      message: 'Antrean offline tidak akan dikirim sebelum persetujuan ulang.',
+    });
+
+    render(<OperationsSyncStatus gateway={gateway} />);
+
+    expect(screen.getByText('2 dikarantina')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Antrean offline tidak akan dikirim sebelum persetujuan ulang.',
+      ),
+    ).toBeInTheDocument();
+  });
 });

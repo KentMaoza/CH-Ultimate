@@ -135,7 +135,7 @@ function seedOriginalVersionThree(pool: FakeMigrationPool): void {
 }
 
 describe('runMigrations', () => {
-  it('applies versions 1 through 8 once and makes the second run a no-op', async () => {
+  it('applies versions 1 through 9 once and makes the second run a no-op', async () => {
     const pool = new FakeMigrationPool();
 
     const first = await runMigrations(pool);
@@ -144,15 +144,15 @@ describe('runMigrations', () => {
 
     expect(first).toEqual({
       fromVersion: 0,
-      toVersion: 8,
-      appliedVersions: [1, 2, 3, 4, 5, 6, 7, 8],
+      toVersion: 9,
+      appliedVersions: [1, 2, 3, 4, 5, 6, 7, 8, 9],
     });
     expect(second).toEqual({
-      fromVersion: 8,
-      toVersion: 8,
+      fromVersion: 9,
+      toVersion: 9,
       appliedVersions: [],
     });
-    expect(pool.applied.size).toBe(8);
+    expect(pool.applied.size).toBe(9);
     expect(pool.migrationStatementCount).toBe(statementsAfterFirstRun);
   });
 
@@ -172,16 +172,16 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 0,
-      toVersion: 8,
-      appliedVersions: [1, 2, 3, 4, 5, 6, 7, 8],
+      toVersion: 9,
+      appliedVersions: [1, 2, 3, 4, 5, 6, 7, 8, 9],
     });
   });
 
   it('refuses a database schema newer than this binary and releases the lock', async () => {
-    const pool = new FakeMigrationPool(9);
+    const pool = new FakeMigrationPool(10);
 
     await expect(runMigrations(pool)).rejects.toThrow(
-      'Database schema version 9 is newer than supported version 8',
+      'Database schema version 10 is newer than supported version 9',
     );
 
     expect(pool.lockHeld).toBe(false);
@@ -224,11 +224,11 @@ describe('runMigrations', () => {
 
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 1,
-      toVersion: 8,
-      appliedVersions: [2, 3, 4, 5, 6, 7, 8],
+      toVersion: 9,
+      appliedVersions: [2, 3, 4, 5, 6, 7, 8, 9],
     });
 
-    expect(pool.applied.size).toBe(8);
+    expect(pool.applied.size).toBe(9);
     expect(pool.migrationStatementCount).toBeGreaterThan(2);
   });
 
@@ -245,8 +245,8 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 1,
-      toVersion: 8,
-      appliedVersions: [2, 3, 4, 5, 6, 7, 8],
+      toVersion: 9,
+      appliedVersions: [2, 3, 4, 5, 6, 7, 8, 9],
     });
   });
 
@@ -256,8 +256,8 @@ describe('runMigrations', () => {
 
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 2,
-      toVersion: 8,
-      appliedVersions: [3, 4, 5, 6, 7, 8],
+      toVersion: 9,
+      appliedVersions: [3, 4, 5, 6, 7, 8, 9],
     });
   });
 
@@ -274,8 +274,8 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 2,
-      toVersion: 8,
-      appliedVersions: [3, 4, 5, 6, 7, 8],
+      toVersion: 9,
+      appliedVersions: [3, 4, 5, 6, 7, 8, 9],
     });
   });
 
@@ -292,8 +292,8 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 3,
-      toVersion: 8,
-      appliedVersions: [4, 5, 6, 7, 8],
+      toVersion: 9,
+      appliedVersions: [4, 5, 6, 7, 8, 9],
     });
   });
 });

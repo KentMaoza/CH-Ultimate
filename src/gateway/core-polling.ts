@@ -38,6 +38,8 @@ export class CorePollingCoordinator {
     private readonly state: CoreGatewayState,
     private readonly envelopes: CoreEnvelopeCoordinator,
     private readonly onDeviceRole: (role: 'owner' | 'client') => void,
+    private readonly onAuthenticatedOnline: () => void | Promise<void> = () => {},
+    private readonly onAuthenticationRevoked: () => void | Promise<void> = () => {},
   ) {
     this.scheduler = new CoreSyncScheduler(
       clock,
@@ -46,33 +48,35 @@ export class CorePollingCoordinator {
     );
   }
 
-  initialize = async (): Promise<void> => {
+  initialize = async (cacheAlreadyRestored = false): Promise<void> => {
     if (this.disposed) return;
-    this.initialization ??= this.initializeOnce();
+    this.initialization ??= this.initializeOnce(cacheAlreadyRestored);
     return this.initialization;
   };
 
-  private async initializeOnce(): Promise<void> {
+  private async initializeOnce(cacheAlreadyRestored: boolean): Promise<void> {
     if (this.disposed) return;
     this.scheduler.start();
-    const cached = await this.storage.load();
-    if (this.disposed) return;
-    if (hasUnsupportedCacheVersion(cached)) {
-      this.state.publishSync({
-        phase: 'upgrade-required',
-        message: `Cache versi ${CORE_CACHE_VERSION} diperlukan.`,
-      });
-      return;
-    }
-    if (cached !== undefined && cached !== null) {
-      try {
-        this.state.restore(parseCoreCache(cached));
-      } catch {
+    if (!cacheAlreadyRestored) {
+      const cached = await this.storage.load();
+      if (this.disposed) return;
+      if (hasUnsupportedCacheVersion(cached)) {
         this.state.publishSync({
           phase: 'upgrade-required',
-          message: 'Cache aplikasi tidak kompatibel.',
+          message: `Cache versi ${CORE_CACHE_VERSION} diperlukan.`,
         });
         return;
+      }
+      if (cached !== undefined && cached !== null) {
+        try {
+          this.state.restore(parseCoreCache(cached));
+        } catch {
+          this.state.publishSync({
+            phase: 'upgrade-required',
+            message: 'Cache aplikasi tidak kompatibel.',
+          });
+          return;
+        }
       }
     }
     this.state.publishSync({ phase: 'connecting', message: undefined });
@@ -90,6 +94,7 @@ export class CorePollingCoordinator {
       if (response.status < 200 || response.status >= 300) {
         const error = parseCoreApiError(response.status, response.body);
         if (error.status === 401) {
+          await this.onAuthenticationRevoked();
           this.state.publishSync({
             phase: 'revoked',
             message: 'Akses perangkat dicabut.',
@@ -121,6 +126,7 @@ export class CorePollingCoordinator {
         lastSyncedAt: this.clock.now().toISOString(),
         message: undefined,
       });
+      await this.onAuthenticatedOnline();
     } catch (error) {
       if (
         error instanceof CoreApiUpgradeRequiredError ||
@@ -192,6 +198,7 @@ export class CorePollingCoordinator {
     if (response.status < 200 || response.status >= 300) {
       const error = parseCoreApiError(response.status, response.body);
       if (error.status === 401) {
+        await this.onAuthenticationRevoked();
         this.state.publishSync({
           phase: 'revoked',
           message: 'Akses perangkat dicabut.',
@@ -273,5 +280,6 @@ export class CorePollingCoordinator {
       lastSyncedAt: this.clock.now().toISOString(),
       message: undefined,
     });
+    await this.onAuthenticatedOnline();
   }
 }

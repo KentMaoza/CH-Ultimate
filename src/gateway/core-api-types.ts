@@ -257,6 +257,8 @@ export const CORE_API_PATHS = {
   sku: (id: string) => `/v1/skus/${encodeId(id)}`,
   stockAdjustments: (id: string) =>
     `/v1/skus/${encodeId(id)}/stock-adjustments`,
+  offlineNotas: '/v1/offline/notas',
+  offlineStockAdjustments: '/v1/offline/stock-adjustments',
   validateCatalogue: '/v1/imports/validate',
   commitCatalogue: (id: string) =>
     `/v1/imports/${encodeId(id)}/commit`,

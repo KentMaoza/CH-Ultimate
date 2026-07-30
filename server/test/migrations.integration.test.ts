@@ -142,9 +142,9 @@ describe('MariaDB migrations against isolated chu_test', () => {
       ['ch-core-schema-migrations'],
     );
 
-    expect(first.appliedVersions).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(first.appliedVersions).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
     expect(second.appliedVersions).toEqual([]);
-    expect(Number(rows[0]?.migration_count)).toBe(8);
+    expect(Number(rows[0]?.migration_count)).toBe(9);
     expect(Number(lockRows[0]?.is_free)).toBe(1);
   });
 
@@ -177,9 +177,9 @@ describe('MariaDB migrations against isolated chu_test', () => {
       'SELECT COUNT(*) AS migration_count FROM schema_migrations',
     );
 
-    expect(recovered.appliedVersions).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(recovered.appliedVersions).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
     expect(Number(finalTables[0]?.table_count)).toBe(1);
-    expect(Number(finalReceipts[0]?.migration_count)).toBe(8);
+    expect(Number(finalReceipts[0]?.migration_count)).toBe(9);
   });
 
   it('reruns version 2 after its first real ALTER TABLE committed', async () => {
@@ -196,8 +196,8 @@ describe('MariaDB migrations against isolated chu_test', () => {
 
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 1,
-      toVersion: 8,
-      appliedVersions: [2, 3, 4, 5, 6, 7, 8],
+      toVersion: 9,
+      appliedVersions: [2, 3, 4, 5, 6, 7, 8, 9],
     });
   });
 
@@ -271,17 +271,17 @@ describe('MariaDB migrations against isolated chu_test', () => {
     );
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 6,
-      toVersion: 8,
-      appliedVersions: [7],
+      toVersion: 9,
+      appliedVersions: [7, 8, 9],
     });
   });
 
-  it('upgrades an original v1 schema through v7 and rejects a cross-Nota line', async () => {
+  it('upgrades an original v1 schema through v9 and rejects a cross-Nota line', async () => {
     await applyOriginalVersionOne();
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 1,
-      toVersion: 8,
-      appliedVersions: [2, 3, 4, 5, 6, 7, 8],
+      toVersion: 9,
+      appliedVersions: [2, 3, 4, 5, 6, 7, 8, 9],
     });
     const deviceId = randomUUID().replaceAll('-', '');
     const notaAId = randomUUID().replaceAll('-', '');

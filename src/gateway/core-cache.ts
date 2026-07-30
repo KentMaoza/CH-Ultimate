@@ -77,7 +77,7 @@ export interface CoreCacheEnvelope {
   outbox: CoreOutboxItem[];
 }
 
-const conflictSchema = z
+export const coreConflictSchema = z
   .object({
     id: z.string().uuid(),
     entityType: z.string(),
@@ -123,7 +123,7 @@ const optimisticSchema: z.ZodType<CoreOptimisticChange> = z.discriminatedUnion(
   ],
 );
 
-const outboxItemSchema: z.ZodType<CoreOutboxItem> = z
+export const coreOutboxItemSchema: z.ZodType<CoreOutboxItem> = z
   .object({
     id: z.string().uuid(),
     idempotencyKey: z.string().uuid(),
@@ -136,7 +136,7 @@ const outboxItemSchema: z.ZodType<CoreOutboxItem> = z
     resolvesConflictId: z.string().uuid().optional(),
     optimistic: optimisticSchema.optional(),
     optimisticActive: z.boolean().optional(),
-    conflict: conflictSchema.optional(),
+    conflict: coreConflictSchema.optional(),
   })
   .strict();
 
@@ -145,7 +145,7 @@ const cacheEnvelopeSchema: z.ZodType<CoreCacheEnvelope> = z
     cacheVersion: z.literal(CORE_CACHE_VERSION),
     state: demoStateSchema,
     serverRevision: z.string().regex(/^(0|[1-9]\d*)$/),
-    outbox: z.array(outboxItemSchema),
+    outbox: z.array(coreOutboxItemSchema),
   })
   .strict();
 

@@ -302,6 +302,7 @@ export function NotaWorkspace({ onBack, initialSelection, onOpenCompletionDestin
       onChoose={(destination) => void complete(destination)}
       onRetry={() => completion?.destination && void complete(completion.destination)}
       onClose={() => setCompletion(null)}
+      pendingCentral={gateway.getSyncSnapshot().phase === 'offline'}
       onOpenDestination={(destination) => {
         setCompletion(null);
         onOpenCompletionDestination?.(destination);

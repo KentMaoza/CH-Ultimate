@@ -43,6 +43,10 @@ export class CoreGatewayState {
   private state = emptyCoreState();
   private canonicalState = cloneCore(this.state);
   private outbox: CoreOutboxItem[] = [];
+  private provisionalNotas: NotaTransaction[] = [];
+  private deferredPendingCount = 0;
+  private quarantinedCount = 0;
+  private offlineConflicts: SyncConflict[] = [];
   private outboxVersion = 0;
   private serverRevision = '0';
   private skuVersions = new Map<string, string>();
@@ -60,6 +64,7 @@ export class CoreGatewayState {
     serverRevision: '0',
     pendingCount: 0,
     conflictCount: 0,
+    quarantinedCount: 0,
   };
   private listeners = new Set<() => void>();
   private syncListeners = new Set<() => void>();
@@ -73,10 +78,12 @@ export class CoreGatewayState {
 
   getSyncSnapshot = (): SyncSnapshot => ({ ...this.syncSnapshot });
 
-  getConflicts = (): SyncConflict[] =>
-    this.outbox.flatMap((item) =>
+  getConflicts = (): SyncConflict[] => [
+    ...this.outbox.flatMap((item) =>
       item.conflict ? [cloneCore(item.conflict)] : [],
-    );
+    ),
+    ...cloneCore(this.offlineConflicts),
+  ];
 
   subscribeSync = (listener: () => void): (() => void) => {
     this.syncListeners.add(listener);
@@ -761,6 +768,23 @@ export class CoreGatewayState {
     this.publishSync({});
   }
 
+  setOfflineProjection(
+    provisionalNotas: NotaTransaction[],
+    deferredPendingCount: number,
+    quarantinedCount: number,
+    offlineConflicts: SyncConflict[],
+  ): void {
+    const projectionChanged =
+      JSON.stringify(this.provisionalNotas) !==
+      JSON.stringify(provisionalNotas);
+    this.provisionalNotas = cloneCore(provisionalNotas);
+    this.deferredPendingCount = deferredPendingCount;
+    this.quarantinedCount = quarantinedCount;
+    this.offlineConflicts = cloneCore(offlineConflicts);
+    if (projectionChanged) this.publishProjectedState();
+    this.publishSync({});
+  }
+
   envelope(
     state = this.canonicalState,
     revision = this.serverRevision,
@@ -774,8 +798,11 @@ export class CoreGatewayState {
       ...this.syncSnapshot,
       ...patch,
       serverRevision: this.serverRevision,
-      pendingCount: this.outbox.length,
-      conflictCount: this.outbox.filter((item) => item.conflict).length,
+      pendingCount: this.outbox.length + this.deferredPendingCount,
+      conflictCount:
+        this.outbox.filter((item) => item.conflict).length +
+        this.offlineConflicts.length,
+      quarantinedCount: this.quarantinedCount,
     };
     this.syncListeners.forEach((listener) => listener());
   }
@@ -786,9 +813,20 @@ export class CoreGatewayState {
   }
 
   private publishProjectedState(): void {
-    this.publishState(
-      previewOptimisticOutbox(this.canonicalState, this.outbox),
+    const projected = previewOptimisticOutbox(
+      this.canonicalState,
+      this.outbox,
     );
+    this.publishState({
+      ...projected,
+      notaTransactions: [
+        ...projected.notaTransactions.filter(
+          (nota) =>
+            !this.provisionalNotas.some((local) => local.id === nota.id),
+        ),
+        ...cloneCore(this.provisionalNotas),
+      ],
+    });
   }
 }
 

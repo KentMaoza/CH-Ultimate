@@ -39,6 +39,10 @@ export function OperationsSyncStatus({
       {snapshot.pendingCount > 0 && (
         <small>{snapshot.pendingCount} menunggu</small>
       )}
+      {(snapshot.quarantinedCount ?? 0) > 0 && (
+        <small>{snapshot.quarantinedCount} dikarantina</small>
+      )}
+      {snapshot.message && <small>{snapshot.message}</small>}
       {snapshot.phase === 'offline' && (
         <button onClick={() => void gateway.retryPending()}>Coba lagi</button>
       )}

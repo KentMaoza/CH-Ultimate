@@ -200,6 +200,28 @@ test('mobile completion synchronizes the archived Nota for all clients', async (
   });
 });
 
+test('mobile completion labels central stock and omzet as pending while offline', async () => {
+  const gateway = renderNota();
+  gateway.getSyncSnapshot = () => ({
+    phase: 'offline',
+    serverRevision: '7',
+    pendingCount: 1,
+    conflictCount: 0,
+  });
+  await screen.findByRole('heading', { name: 'Nota Barang' });
+  await addManual('Barang Offline');
+  fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
+  fireEvent.click(
+    within(
+      screen.getByRole('dialog', { name: 'Selesaikan nota mobile?' }),
+    ).getByRole('button', { name: 'Simpan ke Arsip' }),
+  );
+
+  expect(await screen.findByRole('status')).toHaveTextContent(
+    'Menunggu sinkronisasi — stok dan omzet pusat belum berubah.',
+  );
+});
+
 test('SKU picker adds the selected product to the active B section and keeps the picker open', async () => {
   const gateway = renderNota(undefined, createMobileDemoState, new AsyncAddNotaPageGateway(createMobileDemoState));
   await screen.findByRole('heading', { name: 'Nota Barang' });

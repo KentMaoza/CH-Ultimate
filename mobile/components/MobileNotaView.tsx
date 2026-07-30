@@ -246,7 +246,11 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
       if (completed?.status !== 'completed') throw new Error('Nota tidak dapat disimpan.');
       setCompletionOpen(false);
       setNoticeKind('status');
-      setNotice('Nota tersimpan di Arsip dan tersedia di semua perangkat.');
+      setNotice(
+        gateway.getSyncSnapshot().phase === 'offline'
+          ? 'Menunggu sinkronisasi — stok dan omzet pusat belum berubah.'
+          : 'Nota tersimpan di Arsip dan tersedia di semua perangkat.',
+      );
     } catch (error) {
       setNoticeKind('alert');
       completionStarted.current = false;

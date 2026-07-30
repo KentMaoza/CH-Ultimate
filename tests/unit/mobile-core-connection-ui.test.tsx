@@ -153,4 +153,23 @@ describe('mobile synchronization status', () => {
 
     expect(screen.getByText('Demo lokal')).toBeInTheDocument();
   });
+
+  it('shows quarantined work and the pending central-effects message', () => {
+    const gateway = new MockOperationsGateway();
+    gateway.getSyncSnapshot = () => ({
+      phase: 'revoked',
+      serverRevision: '7',
+      pendingCount: 1,
+      conflictCount: 0,
+      quarantinedCount: 1,
+      message: 'Menunggu persetujuan ulang perangkat ini.',
+    });
+
+    render(<OperationsSyncStatus gateway={gateway} />);
+
+    expect(screen.getByText('1 dikarantina')).toBeInTheDocument();
+    expect(
+      screen.getByText('Menunggu persetujuan ulang perangkat ini.'),
+    ).toBeInTheDocument();
+  });
 });

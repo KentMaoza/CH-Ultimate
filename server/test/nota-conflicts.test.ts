@@ -4,6 +4,7 @@ import {
   decideLineMutation,
   lifecycleEditConflict,
   mergeHeaderFields,
+  planEditableConflictOverride,
   parseNotaStoredJson,
   versionConflict,
 } from '../src/nota/conflicts.js';
@@ -124,4 +125,44 @@ describe('Nota version merges and conflicts', () => {
     expect(lifecycleEditConflict('draft', '3', '3', 'header')).toBeNull();
     expect(lifecycleEditConflict('reopened', '4', '4', 'line')).toBeNull();
   });
+
+  it.each([
+    {
+      status: 'completed',
+      cancelledFromStatus: null,
+      before: ['reopen'],
+      after: ['complete'],
+    },
+    {
+      status: 'cancelled',
+      cancelledFromStatus: 'draft',
+      before: ['restore'],
+      after: ['cancel'],
+    },
+    {
+      status: 'cancelled',
+      cancelledFromStatus: 'reopened',
+      before: ['restore'],
+      after: ['cancel'],
+    },
+    {
+      status: 'cancelled',
+      cancelledFromStatus: 'completed',
+      before: ['restore', 'reopen'],
+      after: ['complete', 'cancel'],
+    },
+  ])(
+    'plans an auditable editable override for $status from $cancelledFromStatus',
+    ({ status, cancelledFromStatus, before, after }) => {
+      expect(planEditableConflictOverride({
+        status,
+        cancelledFromStatus,
+        completionDestination: 'finished',
+      })).toEqual({
+        before,
+        after,
+        completionDestination: 'finished',
+      });
+    },
+  );
 });

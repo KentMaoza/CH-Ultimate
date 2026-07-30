@@ -353,4 +353,179 @@ integration('Nota lifecycle against isolated chu_test MariaDB', () => {
     );
     expect(Number(count[0]?.posting_count)).toBe(1);
   });
+
+  it('faithfully applies mine across completion and cancellation races', async () => {
+    const deviceId = randomUUID();
+    await pool.query(
+      `INSERT INTO devices
+         (id, role, installation_id, display_name, platform, token_hash,
+          token_expires_at, approved_at)
+       VALUES
+         (UNHEX(REPLACE(?, '-', '')), 'client',
+          UNHEX(REPLACE(?, '-', '')), 'Override integration', 'test',
+          UNHEX(SHA2(?, 256)), DATE_ADD(UTC_TIMESTAMP(6), INTERVAL 1 DAY),
+          UTC_TIMESTAMP(6))`,
+      [deviceId, randomUUID(), randomUUID()],
+    );
+    const service = new NotaOperationsService(pool as unknown as ProtocolPool);
+    const context = () => ({ deviceId, idempotencyKey: randomUUID() });
+    const captureConflict = async (
+      command: () => Promise<unknown>,
+    ): Promise<NotaConflictError> => {
+      try {
+        await command();
+      } catch (error) {
+        if (error instanceof NotaConflictError) return error;
+        throw error;
+      }
+      throw new Error('Expected a durable Nota conflict');
+    };
+
+    const headerNota = await service.create(context(), {}) as {
+      entity: { id: string };
+    };
+    await service.complete(context(), headerNota.entity.id, {
+      lifecycleVersion: '1',
+      destination: 'archive',
+    });
+    const headerConflict = await captureConflict(() =>
+      service.updateHeader(context(), headerNota.entity.id, {
+        lifecycleVersion: '1',
+        fields: {
+          customerName: { version: '1', base: '', mine: 'Override selesai' },
+        },
+      }),
+    );
+    const headerResolved = await service.resolveConflict(
+      context(),
+      headerConflict.conflict.id,
+      { choice: 'mine' },
+    ) as {
+      entity: { status: string; customerName: string };
+    };
+    expect(headerResolved.entity).toMatchObject({
+      status: 'completed',
+      customerName: 'Override selesai',
+    });
+
+    const completionNota = await service.create(context(), {}) as {
+      entity: { id: string };
+    };
+    await service.complete(context(), completionNota.entity.id, {
+      lifecycleVersion: '1',
+      destination: 'archive',
+    });
+    const completionConflict = await captureConflict(() =>
+      service.complete(context(), completionNota.entity.id, {
+        lifecycleVersion: '1',
+        destination: 'finished',
+      }),
+    );
+    const completionResolved = await service.resolveConflict(
+      context(),
+      completionConflict.conflict.id,
+      { choice: 'mine' },
+    ) as {
+      entity: { status: string; completionDestination: string };
+    };
+    expect(completionResolved.entity).toMatchObject({
+      status: 'completed',
+      completionDestination: 'finished',
+    });
+
+    const lineNota = await service.create(context(), {}) as {
+      entity: {
+        id: string;
+        pages: Array<{ id: string; lines: Array<{ id: string }> }>;
+      };
+    };
+    const linePageId = lineNota.entity.pages[0]!.id;
+    const lineId = lineNota.entity.pages[0]!.lines[0]!.id;
+    await service.cancel(context(), lineNota.entity.id, {
+      lifecycleVersion: '1',
+    });
+    const lineConflict = await captureConflict(() =>
+      service.updateLine(
+        context(),
+        lineNota.entity.id,
+        linePageId,
+        lineId,
+        {
+          lifecycleVersion: '1',
+          pageVersion: '1',
+          lineVersion: '1',
+          base: {
+            linePosition: 0,
+            skuId: null,
+            description: '',
+            kind: '',
+            quantity: 0,
+            unit: 'pcs',
+            pcsPrice: 0,
+            lsnPrice: 0,
+          },
+          mine: {
+            linePosition: 0,
+            skuId: null,
+            description: 'Baris sesudah batal',
+            kind: 'manual',
+            quantity: 1,
+            unit: 'pcs',
+            pcsPrice: 5000,
+            lsnPrice: 60000,
+          },
+        },
+      ),
+    );
+    const lineResolved = await service.resolveConflict(
+      context(),
+      lineConflict.conflict.id,
+      { choice: 'mine' },
+    ) as {
+      entity: {
+        status: string;
+        pages: Array<{ lines: Array<{ description: string }> }>;
+      };
+    };
+    expect(lineResolved.entity.status).toBe('cancelled');
+    expect(lineResolved.entity.pages[0]?.lines[0]?.description).toBe(
+      'Baris sesudah batal',
+    );
+
+    const evidence = await pool.query<Array<{
+      nota_id: string;
+      posting_count: number;
+      override_count: number;
+    }>>(
+      `SELECT
+         LOWER(CONCAT(
+           SUBSTR(HEX(n.id), 1, 8), '-', SUBSTR(HEX(n.id), 9, 4), '-',
+           SUBSTR(HEX(n.id), 13, 4), '-', SUBSTR(HEX(n.id), 17, 4), '-',
+           SUBSTR(HEX(n.id), 21, 12)
+         )) AS nota_id,
+         (SELECT COUNT(*) FROM nota_postings p WHERE p.nota_id = n.id)
+           AS posting_count,
+         (SELECT COUNT(*) FROM audit_events a
+          WHERE a.entity_id = n.id AND a.action = 'nota.conflict.override')
+           AS override_count
+       FROM notas n
+       WHERE n.id IN (
+         UNHEX(REPLACE(?, '-', '')),
+         UNHEX(REPLACE(?, '-', '')),
+         UNHEX(REPLACE(?, '-', ''))
+       )`,
+      [
+        headerNota.entity.id,
+        completionNota.entity.id,
+        lineNota.entity.id,
+      ],
+    );
+    const byId = new Map(evidence.map((row) => [row.nota_id, row]));
+    expect(Number(byId.get(headerNota.entity.id)?.posting_count)).toBe(2);
+    expect(Number(byId.get(completionNota.entity.id)?.posting_count)).toBe(2);
+    expect(Number(byId.get(lineNota.entity.id)?.posting_count)).toBe(0);
+    expect(
+      evidence.map((row) => Number(row.override_count)),
+    ).toEqual([1, 1, 1]);
+  });
 });

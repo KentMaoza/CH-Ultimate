@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  checkedPostingAdd,
   completionPosting,
   shouldReapplyPostingOnRestore,
   shouldReversePostingOnCancel,
@@ -78,5 +79,44 @@ describe('Nota posting effects', () => {
     expect(shouldReapplyPostingOnRestore('reopened')).toBe(true);
     expect(shouldReversePostingOnCancel('draft')).toBe(false);
     expect(shouldReapplyPostingOnRestore('draft')).toBe(false);
+  });
+
+  it('rejects a combined per-SKU quantity beyond the safe integer contract', () => {
+    expect(() =>
+      completionPosting(
+        [
+          {
+            skuId: 'sku-a',
+            quantityPcs: BigInt(Number.MAX_SAFE_INTEGER),
+            lineTotalRupiah: 0n,
+          },
+          { skuId: 'sku-a', quantityPcs: 1n, lineTotalRupiah: 0n },
+        ],
+        null,
+      ),
+    ).toThrow('stock effect');
+  });
+
+  it('rejects aggregate revenue and resulting balance overflow', () => {
+    expect(() =>
+      completionPosting(
+        [
+          {
+            skuId: null,
+            quantityPcs: 1n,
+            lineTotalRupiah: BigInt(Number.MAX_SAFE_INTEGER),
+          },
+          { skuId: null, quantityPcs: 1n, lineTotalRupiah: 1n },
+        ],
+        null,
+      ),
+    ).toThrow('Nota amount');
+    expect(() =>
+      checkedPostingAdd(
+        BigInt(Number.MAX_SAFE_INTEGER),
+        1n,
+        'stock balance',
+      ),
+    ).toThrow('stock balance');
   });
 });

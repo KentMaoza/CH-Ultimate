@@ -16,6 +16,7 @@ import type {
 import { writeOperationAudit, writeOperationChange } from '../catalogue/mariadb-operation-writes.js';
 import {
   completionPosting,
+  PostingArithmeticError,
   restorePosting,
   reversalPosting,
   shouldReapplyPostingOnRestore,
@@ -51,13 +52,25 @@ export class MariaDbNotaLifecycleRepository {
     this.dependencies = { ...defaults, ...dependencies };
   }
 
-  complete = (
+  complete = async (
     connection: ProtocolConnection,
     deviceId: string,
     operationId: string,
     id: string,
     input: CompleteNotaRequest,
-  ) => this.postCompletion(connection, deviceId, operationId, id, input);
+  ) => {
+    try {
+      return await this.postCompletion(
+        connection,
+        deviceId,
+        operationId,
+        id,
+        input,
+      );
+    } catch (error) {
+      this.rethrowPostingArithmetic(error);
+    }
+  };
 
   reopen = async (
     connection: ProtocolConnection,
@@ -346,21 +359,25 @@ export class MariaDbNotaLifecycleRepository {
     now: Date,
     reversesPostingId?: string,
   ): Promise<string> {
-    return writeNotaPosting(connection, this.dependencies.uuid, {
-      deviceId,
-      operationId,
-      notaId,
-      kind,
-      amount,
-      snapshotLines,
-      snapshotEffects,
-      trackedLineIds,
-      movementEffects,
-      revenueDelta,
-      lifecycleVersion,
-      now,
-      ...(reversesPostingId ? { reversesPostingId } : {}),
-    });
+    try {
+      return await writeNotaPosting(connection, this.dependencies.uuid, {
+        deviceId,
+        operationId,
+        notaId,
+        kind,
+        amount,
+        snapshotLines,
+        snapshotEffects,
+        trackedLineIds,
+        movementEffects,
+        revenueDelta,
+        lifecycleVersion,
+        now,
+        ...(reversesPostingId ? { reversesPostingId } : {}),
+      });
+    } catch (error) {
+      this.rethrowPostingArithmetic(error);
+    }
   }
 
   private async reversePosting(
@@ -373,10 +390,15 @@ export class MariaDbNotaLifecycleRepository {
   ): Promise<void> {
     const latest = await this.latestSnapshot(connection, id);
     if (!latest) throw new Error('Completed Nota posting snapshot is missing');
-    const posting = reversalPosting({
-      amountRupiah: latest.amount,
-      stockEffects: latest.effects,
-    });
+    let posting;
+    try {
+      posting = reversalPosting({
+        amountRupiah: latest.amount,
+        stockEffects: latest.effects,
+      });
+    } catch (error) {
+      this.rethrowPostingArithmetic(error);
+    }
     await this.writePosting(
       connection,
       deviceId,
@@ -404,10 +426,15 @@ export class MariaDbNotaLifecycleRepository {
   ): Promise<void> {
     const latest = await this.latestSnapshot(connection, id);
     if (!latest) throw new Error('Cancelled Nota posting snapshot is missing');
-    const posting = restorePosting({
-      amountRupiah: latest.amount,
-      stockEffects: latest.effects,
-    });
+    let posting;
+    try {
+      posting = restorePosting({
+        amountRupiah: latest.amount,
+        stockEffects: latest.effects,
+      });
+    } catch (error) {
+      this.rethrowPostingArithmetic(error);
+    }
     await this.writePosting(
       connection,
       deviceId,
@@ -423,5 +450,16 @@ export class MariaDbNotaLifecycleRepository {
       (BigInt(String(row.lifecycle_version)) + 1n).toString(),
       this.dependencies.now(),
     );
+  }
+
+  private rethrowPostingArithmetic(error: unknown): never {
+    if (error instanceof PostingArithmeticError) {
+      throw new NotaOperationError(
+        'NOTA_ARITHMETIC_OUT_OF_RANGE',
+        422,
+        error.message,
+      );
+    }
+    throw error;
   }
 }

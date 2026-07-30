@@ -9,6 +9,10 @@ import {
   type ProtocolConnection,
 } from '../sync/idempotency.js';
 import { parseNotaStoredJson } from './conflicts.js';
+import {
+  assertSafePostingInteger,
+  checkedPostingAdd,
+} from './posting.js';
 
 export interface LatestPostingSnapshot {
   amount: bigint;
@@ -84,6 +88,62 @@ export async function writeNotaPosting(
   uuid: () => string,
   input: WriteNotaPostingInput,
 ): Promise<string> {
+  assertSafePostingInteger(input.amount, 'posting amount');
+  assertSafePostingInteger(input.revenueDelta, 'revenue delta');
+  for (const delta of input.snapshotEffects.values()) {
+    assertSafePostingInteger(delta, 'stock snapshot effect');
+  }
+  for (const line of input.snapshotLines) {
+    for (const field of [
+      'quantityPcs',
+      'unitPriceRupiah',
+      'pcsPriceRupiah',
+      'lsnPriceRupiah',
+      'lineTotalRupiah',
+    ]) {
+      assertSafePostingInteger(BigInt(String(line[field])), `posting ${field}`);
+    }
+  }
+  const balancePlans: Array<{
+    skuId: string;
+    delta: bigint;
+    beforeQuantity: bigint;
+    afterQuantity: bigint;
+    afterVersion: bigint;
+  }> = [];
+  for (const [skuId, delta] of input.movementEffects) {
+    if (delta === 0n) continue;
+    assertSafePostingInteger(delta, 'stock movement delta');
+    await connection.query(
+      `SELECT id FROM skus
+       WHERE id = UNHEX(REPLACE(?, '-', ''))
+       FOR UPDATE`,
+      [skuId],
+    );
+    const balances = await connection.query<Array<Record<string, unknown>>>(
+      `SELECT quantity_pcs, row_version
+       FROM stock_balances
+       WHERE sku_id = UNHEX(REPLACE(?, '-', ''))
+       FOR UPDATE`,
+      [skuId],
+    );
+    if (!balances[0]) continue;
+    const beforeQuantity = assertSafePostingInteger(
+      BigInt(String(balances[0].quantity_pcs)),
+      'stock balance',
+    );
+    balancePlans.push({
+      skuId,
+      delta,
+      beforeQuantity,
+      afterQuantity: checkedPostingAdd(
+        beforeQuantity,
+        delta,
+        'stock balance',
+      ),
+      afterVersion: BigInt(String(balances[0].row_version)) + 1n,
+    });
+  }
   const postingId = uuid();
   const snapshot = {
     lines: input.snapshotLines,
@@ -132,32 +192,13 @@ export async function writeNotaPosting(
     },
     input.now,
   );
-  for (const [skuId, delta] of input.movementEffects) {
-    if (delta === 0n) continue;
-    await connection.query(
-      `SELECT id FROM skus
-       WHERE id = UNHEX(REPLACE(?, '-', ''))
-       FOR UPDATE`,
-      [skuId],
-    );
-    const balances = await connection.query<Array<Record<string, unknown>>>(
-      `SELECT quantity_pcs, row_version
-       FROM stock_balances
-       WHERE sku_id = UNHEX(REPLACE(?, '-', ''))
-       FOR UPDATE`,
-      [skuId],
-    );
-    if (!balances[0]) continue;
-    const beforeQuantity = BigInt(String(balances[0].quantity_pcs));
-    const beforeVersion = BigInt(String(balances[0].row_version));
-    const afterQuantity = beforeQuantity + delta;
-    const afterVersion = beforeVersion + 1n;
+  for (const plan of balancePlans) {
     await connection.query(
       `UPDATE stock_balances
        SET quantity_pcs = quantity_pcs + ?,
            row_version = row_version + 1, updated_at = ?
        WHERE sku_id = UNHEX(REPLACE(?, '-', ''))`,
-      [delta, input.now, skuId],
+      [plan.delta, input.now, plan.skuId],
     );
     const movementId = uuid();
     const reason = input.kind.includes('reversal')
@@ -173,8 +214,8 @@ export async function writeNotaPosting(
           UNHEX(REPLACE(?, '-', '')), ?)`,
       [
         movementId,
-        skuId,
-        delta,
+        plan.skuId,
+        plan.delta,
         reason,
         postingId,
         input.deviceId,
@@ -185,11 +226,11 @@ export async function writeNotaPosting(
     await writeOperationChange(
       connection,
       'stock_balance',
-      skuId,
+      plan.skuId,
       {
-        skuId,
-        quantityPcs: afterQuantity.toString(),
-        rowVersion: afterVersion.toString(),
+        skuId: plan.skuId,
+        quantityPcs: plan.afterQuantity.toString(),
+        rowVersion: plan.afterVersion.toString(),
         updatedAt: input.now.toISOString(),
       },
       input.now,
@@ -200,14 +241,14 @@ export async function writeNotaPosting(
       movementId,
       {
         id: movementId,
-        skuId,
-        deltaPcs: delta.toString(),
+        skuId: plan.skuId,
+        deltaPcs: plan.delta.toString(),
         reason,
         deviceId: input.deviceId,
         operationId: input.operationId,
         createdAt: input.now.toISOString(),
-        beforeQuantityPcs: beforeQuantity.toString(),
-        afterQuantityPcs: afterQuantity.toString(),
+        beforeQuantityPcs: plan.beforeQuantity.toString(),
+        afterQuantityPcs: plan.afterQuantity.toString(),
       },
       input.now,
     );

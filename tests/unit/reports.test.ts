@@ -102,6 +102,82 @@ test('Core revenue uses immutable posting rows instead of mutable Nota pages', (
   }]);
 });
 
+test('ranged Core revenue uses only in-range completion, recompletion, and cancellation deltas', () => {
+  const state = createInitialState();
+  const notaId = '11111111-1111-4111-8111-111111111111';
+  const posting = (
+    id: string,
+    postingKind: string,
+    amountRupiah: number,
+    quantity: number,
+    lifecycleVersion: string,
+    postedAt: string,
+  ) => ({
+    id,
+    notaId,
+    postingKind,
+    amountRupiah,
+    lines: [{
+      id: `line-${id}`,
+      skuId: 'sku-1',
+      description: 'Beras snapshot',
+      kind: 'Pangan',
+      quantity,
+      unit: 'pcs' as const,
+      pcsPrice: 10_000,
+      lsnPrice: 120_000,
+    }],
+    stockEffects: { 'sku-1': quantity },
+    trackedLineIds: { [`line-${id}`]: 'sku-1' },
+    lifecycleVersion,
+    postedAt,
+  });
+  const completeId = '22222222-2222-4222-8222-222222222222';
+  const recompleteId = '33333333-3333-4333-8333-333333333333';
+  const cancelId = '44444444-4444-4444-8444-444444444444';
+  const restoreId = '55555555-5555-4555-8555-555555555555';
+  const notaPostings = [
+    posting(completeId, 'complete', 100_000, 10, '2', '2026-07-20T02:00:00.000Z'),
+    posting(recompleteId, 'recomplete', 150_000, 15, '4', '2026-07-21T02:00:00.000Z'),
+    posting(cancelId, 'cancel_reversal', -150_000, 15, '5', '2026-07-22T02:00:00.000Z'),
+    posting(restoreId, 'restore', 150_000, 15, '6', '2026-07-23T02:00:00.000Z'),
+  ];
+  const revenuePostings = notaPostings.map((row, index) => ({
+    id: `60000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+    notaId,
+    notaPostingId: row.id,
+    amountRupiah: [100_000, 50_000, -150_000, 150_000][index]!,
+    postingKind: row.postingKind,
+    postedAt: row.postedAt,
+  }));
+
+  const report = buildRevenueReport({
+    ...state,
+    notaPostings,
+    revenuePostings,
+  }, new Date('2026-07-22T12:00:00.000Z'), {
+    from: '2026-07-21',
+    to: '2026-07-22',
+  });
+
+  expect(report.today).toBe(-150_000);
+  expect(report.month).toBe(-100_000);
+  expect(report.year).toBe(-100_000);
+  expect(report.byDay).toEqual([
+    { date: '2026-07-21', revenue: 50_000 },
+    { date: '2026-07-22', revenue: -150_000 },
+  ]);
+  expect(report.bySku).toEqual([{
+    skuId: 'sku-1',
+    name: 'Beras Hitam Premium 1 kg',
+    units: -10,
+    revenue: -100_000,
+  }]);
+  expect(report.bySku.reduce((sum, row) => sum + row.revenue, 0)).toBe(
+    report.byDay.reduce((sum, row) => sum + row.revenue, 0),
+  );
+});
+
 test('empty-stock report includes only tracked zero and negative balances', () => {
   const items = buildEmptyStockItems(createInitialState());
   expect(items.map((item) => item.sku.skuNumber)).toEqual(['ACC-204-SLV', 'SNK-044']);

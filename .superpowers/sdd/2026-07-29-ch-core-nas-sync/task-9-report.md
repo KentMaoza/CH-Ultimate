@@ -207,3 +207,71 @@ before touching any database that was not explicitly named `chu_test`.
 The E2E startup guard was not weakened to restore the old silent demo fallback.
 No NAS, DSM, MariaDB package, certificate, reverse proxy, or deployment setting
 was accessed or changed during this fix round.
+
+## Fix round 2
+
+The second review round closed the remaining three authority and accounting
+findings.
+
+- A `mine` resolution for an edit that raced with completion or cancellation
+  now preserves both intentions. The server plans the required
+  restore/reopen transition, reapplies the complete stored edit intent against
+  current versions, then recompletes and/or recancels to the authoritative
+  lifecycle state. A conflicting completion with a different archive
+  destination reopens and recompletes instead of returning a false success.
+- The guarded `/chu_test` lifecycle source covers header-versus-completion,
+  line-versus-cancellation, and concurrent completion-destination conflicts.
+  It asserts the final fields, final lifecycle destination, posting counts,
+  and durable `nota.conflict.override` audit events.
+- Nota posting arithmetic now validates each line and the aggregate amount,
+  each per-SKU aggregate stock effect, the derived movement delta, and reversal
+  or restoration values. The posting store locks and validates every affected
+  balance and computes every resulting balance before it inserts any posting,
+  movement, revenue, or change row.
+- Arithmetic range failures are translated to a stable
+  `NOTA_ARITHMETIC_OUT_OF_RANGE` response instead of reaching a database bind
+  or partially writing a multi-SKU posting.
+- Core revenue breakdowns now derive completion, recompletion, cancellation,
+  and restoration contributions from the same in-range immutable revenue rows
+  used for totals and daily buckets. Recompletion uses the prior positive
+  snapshot only as its base; it does not pull prior revenue into the requested
+  range. Unlinked or otherwise unattributed amounts remain explicit so the
+  breakdown always sums to the ledger.
+
+### Fix-round-2 TDD evidence
+
+1. Conflict planning tests were RED for the missing completed/cancelled
+   transition plan, then GREEN with 15 focused conflict tests.
+2. Aggregate amount, same-SKU stock-effect, and resulting-balance tests were
+   RED for unsafe arithmetic, then GREEN. The posting-store regression proves
+   an overflowing balance causes zero `INSERT` or `UPDATE` statements.
+3. The ranged immutable-ledger test was RED because the old all-time net/latest
+   snapshot algorithm returned no SKU rows. It is GREEN with in-range
+   recompletion and cancellation deltas and an exact breakdown-versus-day sum.
+4. The combined focused run passed 22 server tests and 6 report tests. Source
+   and integration-test typechecking passed. All production Nota modules remain
+   below 500 lines.
+
+### Fix-round-2 verification
+
+| Gate | Result |
+| --- | --- |
+| `npm run verify` | PASS — 54 files, 409 tests |
+| `npm run test:mobile` | PASS — 9 files, 81 tests |
+| `npm run mobile:build` | PASS — 587 modules |
+| `npm run package` | PASS — Electron arm64 package |
+| `npm run server:test` | PASS — 37 files; 251 passed, 1 intentional workbook skip |
+| server source/test typecheck | PASS |
+| `npm run server:build` | PASS |
+| `npm run android:sync` | PASS |
+| Android `test` with Android Studio JDK 21 and local SDK | PASS |
+| Android `lint` with Android Studio JDK 21 and local SDK | PASS |
+| `git diff --check` | PASS |
+| `npm run server:test:integration` | BLOCKED — exact isolated `chu_test` URL absent; command failed closed before database access |
+| `npm run test:e2e` | NOT RE-RUN — known Task 11 provisioning/pairing blocker remains at fail-closed Core startup |
+
+The existing Vite CJS-deprecation, large-chunk, and Gradle `flatDir` warnings
+remain non-blocking. No NAS, DSM, SMB, QuickConnect, Tailscale endpoint,
+MariaDB package, certificate, reverse proxy, firewall, or deployment setting
+was accessed or changed during this round. Task 10 and Task 11 were not
+started.

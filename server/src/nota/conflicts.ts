@@ -119,3 +119,48 @@ export function lifecycleEditConflict(
     server: { status, lifecycleVersion: currentVersion },
   };
 }
+
+export type EditableOverrideAction =
+  | 'restore'
+  | 'reopen'
+  | 'complete'
+  | 'cancel';
+
+export function planEditableConflictOverride(input: {
+  status: string;
+  cancelledFromStatus: unknown;
+  completionDestination: unknown;
+}): {
+  before: EditableOverrideAction[];
+  after: EditableOverrideAction[];
+  completionDestination: 'archive' | 'finished';
+} {
+  const completionDestination =
+    input.completionDestination === 'finished' ? 'finished' : 'archive';
+  if (input.status === 'completed') {
+    return {
+      before: ['reopen'],
+      after: ['complete'],
+      completionDestination,
+    };
+  }
+  if (input.status === 'cancelled') {
+    const cancelledFromStatus = ['completed', 'reopened'].includes(
+      String(input.cancelledFromStatus),
+    )
+      ? String(input.cancelledFromStatus)
+      : 'draft';
+    return {
+      before:
+        cancelledFromStatus === 'completed'
+          ? ['restore', 'reopen']
+          : ['restore'],
+      after:
+        cancelledFromStatus === 'completed'
+          ? ['complete', 'cancel']
+          : ['cancel'],
+      completionDestination,
+    };
+  }
+  return { before: [], after: [], completionDestination };
+}

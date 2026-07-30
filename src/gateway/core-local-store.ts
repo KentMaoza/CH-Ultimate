@@ -21,6 +21,13 @@ export const CORE_CACHE_VERSION = 3;
 
 export class CoreLocalOwnershipError extends Error {}
 
+function rejectUnownedLegacyWork(hasRecoverableWork: boolean): void {
+  if (!hasRecoverableWork) return;
+  throw new CoreLocalOwnershipError(
+    'Legacy cache contains pending work with unverified ownership.',
+  );
+}
+
 export type CoreDeferredStatus =
   | 'deferred'
   | 'sending'
@@ -257,17 +264,13 @@ export function migrateCoreCache(
   const installationId = uuid.parse(uuidFactory());
   const v2 = legacyV2EnvelopeSchema.safeParse(value);
   if (v2.success) {
-    if (
+    rejectUnownedLegacyWork(
       v2.data.outbox.length > 0 ||
-      v2.data.deferredOutbox.length > 0 ||
-      v2.data.provisionalNotas.length > 0 ||
-      v2.data.offlineConflicts.length > 0 ||
-      v2.data.quarantine.active
-    ) {
-      throw new CoreLocalOwnershipError(
-        'Legacy cache contains pending work with unverified ownership.',
-      );
-    }
+        v2.data.deferredOutbox.length > 0 ||
+        v2.data.provisionalNotas.length > 0 ||
+        v2.data.offlineConflicts.length > 0 ||
+        v2.data.quarantine.active,
+    );
     return {
       ...cloneCore(v2.data),
       cacheVersion: CORE_CACHE_VERSION,
@@ -278,6 +281,7 @@ export function migrateCoreCache(
     };
   }
   const legacy = legacyV1EnvelopeSchema.parse(value);
+  rejectUnownedLegacyWork(legacy.outbox.length > 0);
   return {
     cacheVersion: CORE_CACHE_VERSION,
     installationId,

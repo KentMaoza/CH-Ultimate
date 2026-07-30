@@ -90,16 +90,7 @@ describe('Core operations gateway bootstrap and polling', () => {
         sourceLabel: 'CH Core',
       },
       serverRevision: '7',
-      outbox: [
-        {
-          id: '88888888-8888-4888-8888-888888888888',
-          idempotencyKey: '99999999-9999-4999-8999-999999999999',
-          method: 'PATCH',
-          path: `/v1/skus/${SKU_ID}`,
-          body: { name: 'Pending name' },
-          createdAt: '2026-07-29T00:59:00.000Z',
-        },
-      ],
+      outbox: [],
     };
     const storage = new MemoryStorage(cached);
     const transport = new ScriptedTransport();
@@ -128,7 +119,7 @@ describe('Core operations gateway bootstrap and polling', () => {
     expect(gateway.getSyncSnapshot()).toMatchObject({
       phase: 'connecting',
       serverRevision: '7',
-      pendingCount: 1,
+      pendingCount: 0,
     });
 
     await Promise.resolve();
@@ -154,7 +145,7 @@ describe('Core operations gateway bootstrap and polling', () => {
     expect(gateway.getSyncSnapshot()).toMatchObject({
       phase: 'online',
       serverRevision: '8',
-      pendingCount: 1,
+      pendingCount: 0,
     });
     expect(clock.pendingDelays()).toEqual([2_000]);
   });

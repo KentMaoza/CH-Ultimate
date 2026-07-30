@@ -145,7 +145,31 @@ describe('Core local cache v3', () => {
     ).toThrow('pending work');
   });
 
-  it('migrates a v1 cache without losing its canonical cursor or online outbox', () => {
+  it('rebinds only a clean v1 canonical cache to the native installation UUID', () => {
+    const legacy = {
+      cacheVersion: 1,
+      state: emptyCoreState(),
+      serverRevision: '17',
+      outbox: [],
+    };
+
+    const migrated = migrateCoreCache(legacy, () => INSTALLATION_ID);
+
+    expect(migrated).toMatchObject({
+      cacheVersion: CORE_CACHE_VERSION,
+      installationId: INSTALLATION_ID,
+      state: legacy.state,
+      serverRevision: '17',
+      outbox: [],
+      deferredOutbox: [],
+      provisionalNotas: [],
+      offlineConflicts: [],
+      quarantine: { active: false },
+    });
+    expect(parseCoreLocalEnvelope(migrated)).toEqual(migrated);
+  });
+
+  it('refuses to rebind v1 ownership with a pending online outbox', () => {
     const legacy = {
       cacheVersion: 1,
       state: emptyCoreState(),
@@ -161,21 +185,12 @@ describe('Core local cache v3', () => {
         },
       ],
     };
+    const before = JSON.stringify(legacy);
 
-    const migrated = migrateCoreCache(legacy, () => INSTALLATION_ID);
-
-    expect(migrated).toMatchObject({
-      cacheVersion: CORE_CACHE_VERSION,
-      installationId: INSTALLATION_ID,
-      state: legacy.state,
-      serverRevision: '17',
-      outbox: legacy.outbox,
-      deferredOutbox: [],
-      provisionalNotas: [],
-      offlineConflicts: [],
-      quarantine: { active: false },
-    });
-    expect(parseCoreLocalEnvelope(migrated)).toEqual(migrated);
+    expect(() =>
+      migrateCoreCache(legacy, () => INSTALLATION_ID),
+    ).toThrow('pending work');
+    expect(JSON.stringify(legacy)).toBe(before);
   });
 
   it('fails closed on corrupt v3 data while leaving the caller-owned value untouched', () => {

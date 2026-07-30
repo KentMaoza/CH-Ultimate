@@ -183,7 +183,9 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     await this.mutations.flushNota(id);
   };
   retryPending = async (): Promise<void> => {
-    if (this.state.getSyncSnapshot().phase === 'revoked') {
+    const phase = this.state.getSyncSnapshot().phase;
+    if (phase === 'upgrade-required') return;
+    if (phase === 'revoked') {
       await this.polling.retryPending();
       return;
     }

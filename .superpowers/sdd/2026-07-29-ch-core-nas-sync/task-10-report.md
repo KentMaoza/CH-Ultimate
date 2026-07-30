@@ -2,7 +2,7 @@
 
 ## Status
 
-`DONE_WITH_CONCERNS`
+`APPROVED_WITH_ENVIRONMENTAL_GATES`
 
 CH Ultimate now supports exactly two durable offline commands: one new local
 Nota represented by a replaceable full snapshot before first send, and one
@@ -10,9 +10,9 @@ signed stock delta with a required reason and captured SKU snapshot. All other
 shared writes fail closed while offline. A successful authenticated refresh is
 required before either command can transmit.
 
-The implementation and reviewer fix rounds are complete. Reviewer fix round 4
-addresses its one reported finding and is pending re-review. The root,
-server-unit, mobile, package, and Android gates pass. Two
+The implementation and four reviewer fix rounds are complete. The final
+scoped re-review approved the task with no Critical or Important findings.
+The root, server-unit, mobile, package, and Android gates pass. Two
 environmental/inherited gates remain:
 
 - `CH_CORE_TEST_DATABASE_URL` is unset, so the exact isolated `chu_test`
@@ -176,7 +176,8 @@ stays below 500 lines.
     central guard now protects the three bypasses: flush, retry, and image
     fetch. Normal bootstrap and revoked-device reapproval remain unchanged.
     The focused set passed 40 tests and the final root suite passed 445 tests.
-    The one finding is addressed pending re-review.
+    The final scoped re-review approved the complete Task 10 range with no
+    Critical or Important findings.
 
 ## Exact MariaDB integration source
 

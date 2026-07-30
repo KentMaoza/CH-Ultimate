@@ -47,6 +47,20 @@ export async function readBootstrapCollections(
      FROM stock_balances
      ORDER BY sku_id`,
   );
+  const priceRows = await connection.query<Array<Record<string, unknown>>>(
+    `SELECT HEX(id) AS id_hex, HEX(sku_id) AS sku_id_hex, price_rupiah,
+            source, HEX(changed_by_device_id) AS changed_by_device_id_hex,
+            effective_at
+     FROM price_history
+     ORDER BY effective_at, id`,
+  );
+  const movementRows = await connection.query<Array<Record<string, unknown>>>(
+    `SELECT HEX(id) AS id_hex, HEX(sku_id) AS sku_id_hex, delta_pcs,
+            reason, HEX(device_id) AS device_id_hex,
+            HEX(operation_id) AS operation_id_hex, created_at
+     FROM stock_movements
+     ORDER BY created_at, id`,
+  );
   const notaRows = await connection.query<Array<Record<string, unknown>>>(
     `SELECT HEX(id) AS id_hex, nota_number, business_date, status,
             header_json, field_versions, structure_version,
@@ -120,6 +134,23 @@ export async function readBootstrapCollections(
       quantityPcs: BigInt(String(row.quantity_pcs)),
       rowVersion: BigInt(String(row.row_version)),
       updatedAt: databaseDate(row.updated_at),
+    })),
+    priceHistory: priceRows.map((row) => ({
+      id: requiredUuid(row.id_hex),
+      skuId: requiredUuid(row.sku_id_hex),
+      priceRupiah: BigInt(String(row.price_rupiah)),
+      source: String(row.source),
+      changedByDeviceId: nullableHexToUuid(row.changed_by_device_id_hex),
+      effectiveAt: databaseDate(row.effective_at),
+    })),
+    stockMovements: movementRows.map((row) => ({
+      id: requiredUuid(row.id_hex),
+      skuId: requiredUuid(row.sku_id_hex),
+      deltaPcs: BigInt(String(row.delta_pcs)),
+      reason: String(row.reason),
+      deviceId: requiredUuid(row.device_id_hex),
+      operationId: nullableHexToUuid(row.operation_id_hex),
+      createdAt: databaseDate(row.created_at),
     })),
     notas: notaRows.map((row) => ({
       id: requiredUuid(row.id_hex),

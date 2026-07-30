@@ -85,6 +85,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
         () => this.polling.refreshNow(),
         () => clock.now(),
       ),
+      this.state,
     );
   }
 

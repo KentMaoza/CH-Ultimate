@@ -26,8 +26,10 @@ export {
   coreNotaLineRowSchema,
   coreNotaPageRowSchema,
   coreNotaRowSchema,
+  corePriceHistoryRowSchema,
   coreSkuIdentifierRowSchema,
   coreSkuRowSchema,
+  coreStockMovementRowSchema,
   coreTemplateRowSchema,
 } from './core-api-schemas';
 export type { CoreJsonValue } from './core-api-schemas';
@@ -136,6 +138,8 @@ export interface CoreMutationAcknowledgement {
   apiSchemaVersion?: 1;
   serverRevision?: string;
   entity?: CoreJsonValue;
+  entityVersion?: string;
+  entityId?: string;
 }
 
 export function parseCoreMutationAcknowledgement(

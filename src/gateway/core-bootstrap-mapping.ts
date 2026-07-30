@@ -145,6 +145,50 @@ export function mapCoreBootstrapToDemoState(
     createdAt: row.createdAt,
     archived: row.archivedAt !== null,
   }));
+  const previousPrices = new Map<string, number>();
+  state.priceChanges = [...bootstrap.priceHistory]
+    .sort((left, right) => left.effectiveAt.localeCompare(right.effectiveAt))
+    .map((row) => {
+      const after = integerFromDecimal(row.priceRupiah, 'priceRupiah');
+      const before = row.beforePriceRupiah
+        ? integerFromDecimal(row.beforePriceRupiah, 'beforePriceRupiah')
+        : previousPrices.get(row.skuId) ?? after;
+      previousPrices.set(row.skuId, after);
+      return {
+        id: row.id,
+        skuId: row.skuId,
+        before,
+        after,
+        createdAt: row.effectiveAt,
+      };
+    });
+  const runningBalances = new Map(balances);
+  state.adjustments = [...bootstrap.stockMovements]
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    .map((row) => {
+      const quantity = integerFromDecimal(row.deltaPcs, 'deltaPcs');
+      const after = row.afterQuantityPcs
+        ? integerFromDecimal(row.afterQuantityPcs, 'afterQuantityPcs')
+        : runningBalances.get(row.skuId) ?? quantity;
+      const before = row.beforeQuantityPcs
+        ? integerFromDecimal(row.beforeQuantityPcs, 'beforeQuantityPcs')
+        : after - quantity;
+      runningBalances.set(row.skuId, before);
+      return {
+        id: row.id,
+        skuId: row.skuId,
+        quantity,
+        before,
+        after,
+        createdAt: row.createdAt,
+        source: row.reason.includes('reversal')
+          ? ('reversal' as const)
+          : row.reason.includes('nota')
+            ? ('nota' as const)
+            : ('manual' as const),
+      };
+    })
+    .reverse();
 
   const pagesByNota = new Map<string, CoreBootstrap['notaPages']>();
   for (const page of bootstrap.notaPages) {

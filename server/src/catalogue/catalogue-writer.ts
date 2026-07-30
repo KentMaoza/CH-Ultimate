@@ -15,9 +15,13 @@ export interface PreparedCatalogueRow {
   priceHistoryId: string;
 }
 
-function identifierHash(value: string): Buffer {
+export function normalizeIdentifier(value: string): string {
+  return value.normalize('NFKC').toLocaleLowerCase('id-ID');
+}
+
+export function identifierHash(value: string): Buffer {
   return createHash('sha256')
-    .update(value.toLocaleLowerCase('id-ID'), 'utf8')
+    .update(normalizeIdentifier(value), 'utf8')
     .digest();
 }
 

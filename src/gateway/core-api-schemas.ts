@@ -69,6 +69,40 @@ export const coreBalanceRowSchema = z
   })
   .strict();
 
+export const corePriceHistoryRowSchema = z
+  .object({
+    id: uuidSchema,
+    skuId: uuidSchema,
+    priceRupiah: canonicalDecimalSchema,
+    source: z.string(),
+    changedByDeviceId: uuidSchema.nullable(),
+    effectiveAt: isoTimestampSchema,
+    beforePriceRupiah: canonicalDecimalSchema.optional(),
+  })
+  .strict();
+
+export const coreStockMovementRowSchema = z
+  .object({
+    id: uuidSchema,
+    skuId: uuidSchema,
+    deltaPcs: z
+      .string()
+      .regex(/^-?[1-9]\d*$/, 'Expected a nonzero signed decimal string'),
+    reason: z.string(),
+    deviceId: uuidSchema,
+    operationId: uuidSchema.nullable(),
+    createdAt: isoTimestampSchema,
+    beforeQuantityPcs: z
+      .string()
+      .regex(/^(0|-?[1-9]\d*)$/)
+      .optional(),
+    afterQuantityPcs: z
+      .string()
+      .regex(/^(0|-?[1-9]\d*)$/)
+      .optional(),
+  })
+  .strict();
+
 const notaHeaderSchema = z
   .object({
     customerName: z.string().optional(),
@@ -152,6 +186,8 @@ export const coreBootstrapSchema = z
     skuIdentifiers: z.array(coreSkuIdentifierRowSchema),
     skus: z.array(coreSkuRowSchema),
     balances: z.array(coreBalanceRowSchema),
+    priceHistory: z.array(corePriceHistoryRowSchema).default([]),
+    stockMovements: z.array(coreStockMovementRowSchema).default([]),
     notas: z.array(coreNotaRowSchema),
     notaPages: z.array(coreNotaPageRowSchema),
     notaLines: z.array(coreNotaLineRowSchema),
@@ -205,6 +241,8 @@ export const mutationAcknowledgementSchema = z
     ...apiSchemaMarker,
     serverRevision: canonicalDecimalSchema.optional(),
     entity: coreJsonValueSchema.optional(),
+    entityVersion: canonicalDecimalSchema.optional(),
+    entityId: uuidSchema.optional(),
   })
   .strict();
 

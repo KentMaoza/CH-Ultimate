@@ -28,6 +28,8 @@ describe('readBootstrapCollections', () => {
       skuIdentifiers: [],
       skus: [],
       balances: [],
+      priceHistory: [],
+      stockMovements: [],
       notas: [],
       notaPages: [],
       notaLines: [],

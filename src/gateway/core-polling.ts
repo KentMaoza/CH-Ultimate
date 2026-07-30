@@ -114,6 +114,7 @@ export class CorePollingCoordinator {
         bootstrap.serverRevision,
       );
       if (committed === 'stale') return;
+      this.state.replaceRowVersions(bootstrap);
       this.bootstrapped = true;
       this.state.publishSync({
         phase: 'online',
@@ -265,6 +266,7 @@ export class CorePollingCoordinator {
         await this.bootstrap();
         return;
       }
+      this.state.recordChangeVersions(fresh);
     }
     this.state.publishSync({
       phase: 'online',

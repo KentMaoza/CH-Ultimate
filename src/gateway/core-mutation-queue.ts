@@ -162,6 +162,13 @@ export class CoreMutationQueue {
             await this.storeConflict(item, apiError.conflict);
             return;
           }
+          if ([400, 403, 404, 409, 422].includes(apiError.status)) {
+            await this.rejectPermanent(
+              item,
+              new Error(coreMutationErrorMessage(apiError.code)),
+            );
+            continue;
+          }
           const phase =
             apiError.status === 401
               ? 'revoked'
@@ -190,15 +197,24 @@ export class CoreMutationQueue {
     item: CoreOutboxItem,
     acknowledgement: CoreMutationAcknowledgement,
   ): Promise<void> {
+    this.state.recordMutationVersion(item.path, acknowledgement);
     try {
       this.recordDurable(
         await this.envelopes.replaceOutbox((outbox) =>
-          outbox.filter(
-            (candidate) =>
-              candidate.id !== item.id &&
-              (!item.resolvesConflictId ||
-                candidate.conflict?.id !== item.resolvesConflictId),
-          ),
+          outbox
+            .filter(
+              (candidate) =>
+                candidate.id !== item.id &&
+                (!item.resolvesConflictId ||
+                  candidate.conflict?.id !== item.resolvesConflictId),
+            )
+            .map((candidate) =>
+              rebaseQueuedRowVersion(
+                candidate,
+                item.path,
+                acknowledgement.entityVersion,
+              ),
+            ),
         ),
       );
       this.durableFingerprintById.delete(item.id);
@@ -235,6 +251,24 @@ export class CoreMutationQueue {
     }
     this.state.publishSync({ phase: 'conflict', message: 'CONFLICT' });
     this.failDeferred(item.id, new Error('CONFLICT'));
+  }
+
+  private async rejectPermanent(
+    item: CoreOutboxItem,
+    error: Error,
+  ): Promise<void> {
+    try {
+      this.recordDurable(
+        await this.envelopes.replaceOutbox((outbox) =>
+          outbox.filter((candidate) => candidate.id !== item.id),
+        ),
+      );
+      this.durableFingerprintById.delete(item.id);
+      this.state.publishSync({ phase: 'online', message: error.message });
+      this.failDeferred(item.id, error);
+    } catch (persistenceError) {
+      await this.failCurrent(item.id, persistenceError);
+    }
   }
 
   private async failCurrent(
@@ -284,4 +318,38 @@ export class CoreMutationQueue {
     this.deferredById.get(id)?.reject(error);
     this.deferredById.delete(id);
   }
+}
+
+function coreMutationErrorMessage(code: string): string {
+  const messages: Record<string, string> = {
+    IDENTIFIER_CONFLICT: 'Nomor SKU atau alias sudah digunakan.',
+    SKU_NOT_ACTIVE:
+      'SKU sudah diarsipkan atau tidak tersedia. Sinkronkan ulang lalu coba lagi.',
+    STOCK_NOT_TRACKED: 'Stok SKU ini tidak dilacak.',
+    SKU_NOT_FOUND: 'SKU tidak ditemukan. Sinkronkan ulang lalu coba lagi.',
+    INVALID_REQUEST: 'Data perubahan tidak valid. Periksa isian lalu coba lagi.',
+    FORBIDDEN: 'Perangkat ini tidak diizinkan melakukan perubahan tersebut.',
+  };
+  return messages[code] ?? `Perubahan ditolak oleh CH Core (${code}).`;
+}
+
+function rebaseQueuedRowVersion(
+  item: CoreOutboxItem,
+  acknowledgedPath: string,
+  entityVersion: string | undefined,
+): CoreOutboxItem {
+  if (
+    !entityVersion ||
+    item.path !== acknowledgedPath ||
+    item.body === null ||
+    typeof item.body !== 'object' ||
+    Array.isArray(item.body) ||
+    !Object.prototype.hasOwnProperty.call(item.body, 'rowVersion')
+  ) {
+    return item;
+  }
+  return {
+    ...item,
+    body: { ...item.body, rowVersion: entityVersion },
+  };
 }

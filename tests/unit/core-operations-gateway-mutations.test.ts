@@ -193,7 +193,10 @@ describe('Core operations gateway mutation coordination', () => {
     };
     const secondTemplate = { ...firstTemplate, fontSize: 12 };
     transport.enqueue((request) => {
-      expect(request.body).toEqual({ definition: secondTemplate });
+      expect(request.body).toEqual({
+        rowVersion: null,
+        definition: secondTemplate,
+      });
       return mutationResponse.promise;
     });
     transport.enqueue(emptyPoll());

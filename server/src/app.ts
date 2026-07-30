@@ -12,11 +12,16 @@ import {
   registerCatalogueRoutes,
   type CatalogueHttpServices,
 } from './http/catalogue-routes.js';
+import {
+  registerCatalogueOperationRoutes,
+  type CatalogueOperationHttpService,
+} from './http/catalogue-operation-routes.js';
 
 export interface AppDependencies {
   pool: SchemaQueryPool;
   protocol?: ProtocolServices;
   catalogue?: CatalogueHttpServices;
+  operations?: CatalogueOperationHttpService;
 }
 
 export function buildApp(deps: AppDependencies): FastifyInstance {
@@ -38,6 +43,13 @@ export function buildApp(deps: AppDependencies): FastifyInstance {
     registerProtocolRoutes(app, deps.protocol);
     if (deps.catalogue) {
       registerCatalogueRoutes(app, deps.protocol.identity, deps.catalogue);
+    }
+    if (deps.operations) {
+      registerCatalogueOperationRoutes(
+        app,
+        deps.protocol.identity,
+        deps.operations,
+      );
     }
   }
 

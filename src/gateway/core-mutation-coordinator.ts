@@ -19,6 +19,7 @@ import {
   CoreMutationQueue,
   type CoreMutationSpec,
 } from './core-mutation-queue';
+import { CoreGatewayState } from './core-gateway-state';
 import type {
   CreateSkuInput,
   NotaDesktopTransferResult,
@@ -42,7 +43,10 @@ function entityOrThrow<T>(
 }
 
 export class CoreMutationCoordinator {
-  constructor(private readonly queue: CoreMutationQueue) {}
+  constructor(
+    private readonly queue: CoreMutationQueue,
+    private readonly state: CoreGatewayState,
+  ) {}
 
   flushNota(id: string): Promise<void> {
     return this.queue.flushNota(id);
@@ -65,19 +69,20 @@ export class CoreMutationCoordinator {
     return entityOrThrow(skuSchema, result.entity, 'SKU');
   }
 
-  updateSku(id: string, patch: Partial<Sku>): Promise<void> {
-    return this.command({
+  async updateSku(id: string, patch: Partial<Sku>): Promise<void> {
+    const rowVersion = this.state.requireSkuVersion(id);
+    await this.command({
       method: 'PATCH',
       path: CORE_API_PATHS.sku(id),
-      body: { patch },
-    }).then(() => undefined);
+      body: { rowVersion, patch },
+    });
   }
 
   adjustStock(id: string, quantity: number): Promise<void> {
     return this.command({
       method: 'POST',
       path: CORE_API_PATHS.stockAdjustments(id),
-      body: { quantity },
+      body: { delta: quantity },
     }).then(() => undefined);
   }
 
@@ -89,7 +94,10 @@ export class CoreMutationCoordinator {
     return this.command({
       method: 'PATCH',
       path: CORE_API_PATHS.template('label'),
-      body: { definition: template },
+      body: {
+        rowVersion: this.state.getTemplateVersion('label'),
+        definition: template,
+      },
       coalesceKey: 'template:label',
       optimistic: { kind: 'label-template', template },
     }).then(() => undefined);
@@ -99,7 +107,10 @@ export class CoreMutationCoordinator {
     return this.command({
       method: 'PATCH',
       path: CORE_API_PATHS.template('invoice'),
-      body: { definition: template },
+      body: {
+        rowVersion: this.state.getTemplateVersion('invoice'),
+        definition: template,
+      },
       coalesceKey: 'template:invoice',
       optimistic: { kind: 'invoice-template', template },
     }).then(() => undefined);

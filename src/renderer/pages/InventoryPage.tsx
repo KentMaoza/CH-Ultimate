@@ -174,8 +174,18 @@ export function InventoryPage() {
 
   async function applyAdjustment() {
     if (!adjusting) return;
-    await gateway.adjustStock(adjusting.sku.id, Number(quantity) * adjusting.direction);
-    setAdjusting(null); setQuantity('');
+    try {
+      await gateway.adjustStock(
+        adjusting.sku.id,
+        Number(quantity) * adjusting.direction,
+      );
+      setAdjusting(null);
+      setQuantity('');
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : 'Perubahan stok gagal.',
+      );
+    }
   }
 
   function openAdjustment(sku: Sku, direction: 1 | -1) { setAdjusting({ sku, direction }); setQuantity(''); }

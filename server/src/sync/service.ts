@@ -4,6 +4,8 @@ export interface BootstrapCollections {
   skuIdentifiers: unknown[];
   skus: unknown[];
   balances: unknown[];
+  priceHistory?: unknown[];
+  stockMovements?: unknown[];
   notas: unknown[];
   notaPages: unknown[];
   notaLines: unknown[];
@@ -117,6 +119,8 @@ export class SyncService {
         skuIdentifiers: collections.skuIdentifiers.map(jsonSafe),
         skus: collections.skus.map(jsonSafe),
         balances: collections.balances.map(jsonSafe),
+        priceHistory: (collections.priceHistory ?? []).map(jsonSafe),
+        stockMovements: (collections.stockMovements ?? []).map(jsonSafe),
         notas: collections.notas.map(jsonSafe),
         notaPages: collections.notaPages.map(jsonSafe),
         notaLines: collections.notaLines.map(jsonSafe),

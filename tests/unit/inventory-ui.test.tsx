@@ -30,6 +30,29 @@ test('uses explicit add and subtract stock actions without requiring signed inpu
   expect(await screen.findByTestId('sku-stock-sku-1')).toHaveTextContent('22');
 });
 
+test('keeps the stock dialog open and shows an actionable server error', async () => {
+  const gateway = new MockOperationsGateway();
+  vi.spyOn(gateway, 'adjustStock').mockRejectedValue(
+    new Error('SKU sudah diarsipkan. Sinkronkan ulang lalu coba lagi.'),
+  );
+  render(<App gateway={gateway} />);
+  const row = screen.getByRole('row', { name: /BRS-108-BLK/ });
+  fireEvent.click(
+    within(row).getByRole('button', { name: 'Tambah stok BRS-108-BLK' }),
+  );
+  fireEvent.change(screen.getByLabelText('Jumlah stok ditambah'), {
+    target: { value: '2' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Tambah stok' }));
+
+  expect(
+    await screen.findByText(
+      'SKU sudah diarsipkan. Sinkronkan ulang lalu coba lagi.',
+    ),
+  ).toBeInTheDocument();
+  expect(screen.getByRole('dialog', { name: 'Tambah stok' })).toBeInTheDocument();
+});
+
 test('lists filtered price and quantity changes and exposes price export', async () => {
   const gateway = new MockOperationsGateway();
   await gateway.updateSku('sku-1', { imageUrl: 'https://example.test/beras.jpg' });
@@ -156,7 +179,13 @@ test('replaces a warehouse image from a clickable thumbnail and exposes an enlar
   await waitFor(() => expect(gateway.getSnapshot().skus.find((sku) => sku.id === 'sku-1')!.imageUrl).toMatch(/^data:image\/png;base64,/));
   expect(gateway.getSnapshot().skus.find((sku) => sku.id === 'sku-2')!.imageUrl).toBe(untouchedImage);
   expect(fileInput).toHaveValue('');
-  expect(within(screen.getByRole('button', { name: 'Ubah gambar BRS-108-BLK' })).getByRole('img', { name: 'Gambar BRS-108-BLK' })).toHaveAttribute('src', expect.stringMatching(/^data:image\/png;base64,/));
+  await waitFor(() =>
+    expect(
+      within(
+        screen.getByRole('button', { name: 'Ubah gambar BRS-108-BLK' }),
+      ).getByRole('img', { name: 'Gambar BRS-108-BLK' }),
+    ).toHaveAttribute('src', expect.stringMatching(/^data:image\/png;base64,/)),
+  );
   inputClick.mockRestore();
 });
 

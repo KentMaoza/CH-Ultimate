@@ -1,5 +1,10 @@
 import type { DemoState } from '../domain/types';
 import type { SyncSnapshot } from './operations-gateway-contract';
+import type {
+  CoreBootstrap,
+  CoreChange,
+  CoreMutationAcknowledgement,
+} from './core-api-types';
 import { emptyCoreState } from './core-bootstrap-mapping';
 import {
   cloneCore,
@@ -15,6 +20,9 @@ export class CoreGatewayState {
   private outbox: CoreOutboxItem[] = [];
   private outboxVersion = 0;
   private serverRevision = '0';
+  private skuVersions = new Map<string, string>();
+  private balanceVersions = new Map<string, string>();
+  private templateVersions = new Map<'label' | 'invoice', string>();
   private syncSnapshot: SyncSnapshot = {
     phase: 'connecting',
     serverRevision: '0',
@@ -44,6 +52,102 @@ export class CoreGatewayState {
 
   getServerRevision(): string {
     return this.serverRevision;
+  }
+
+  replaceRowVersions(bootstrap: CoreBootstrap): void {
+    this.skuVersions = new Map(
+      bootstrap.skus.map((row) => [row.id, row.rowVersion]),
+    );
+    this.balanceVersions = new Map(
+      bootstrap.balances.map((row) => [row.skuId, row.rowVersion]),
+    );
+    this.templateVersions = new Map();
+    for (const row of bootstrap.templates) {
+      if (
+        row.archivedAt === null &&
+        (row.templateKind === 'label' || row.templateKind === 'invoice')
+      ) {
+        this.templateVersions.set(row.templateKind, row.rowVersion);
+      }
+    }
+  }
+
+  requireSkuVersion(id: string): string {
+    const version = this.skuVersions.get(id);
+    if (!version) {
+      throw new Error(
+        'Versi SKU belum tersedia. Sinkronkan ulang lalu coba lagi.',
+      );
+    }
+    return version;
+  }
+
+  getTemplateVersion(kind: 'label' | 'invoice'): string | null {
+    return this.templateVersions.get(kind) ?? null;
+  }
+
+  recordChangeVersions(changes: CoreChange[]): void {
+    for (const change of changes) {
+      const payload =
+        change.payload !== null &&
+        typeof change.payload === 'object' &&
+        !Array.isArray(change.payload)
+          ? change.payload
+          : undefined;
+      const version = payload?.rowVersion;
+      if (typeof version !== 'string') continue;
+      if (change.entityType === 'sku') {
+        this.skuVersions.set(change.entityId, version);
+      } else if (
+        change.entityType === 'stock_balance' ||
+        change.entityType === 'balance'
+      ) {
+        const skuId = payload?.skuId;
+        if (typeof skuId === 'string') {
+          this.balanceVersions.set(skuId, version);
+        }
+      } else if (change.entityType === 'template') {
+        const kind = payload?.templateKind;
+        if (kind === 'label' || kind === 'invoice') {
+          this.templateVersions.set(kind, version);
+        }
+      }
+    }
+  }
+
+  recordMutationVersion(
+    path: string,
+    acknowledgement: CoreMutationAcknowledgement,
+  ): void {
+    const version = acknowledgement.entityVersion;
+    if (!version) return;
+    const skuMatch = /^\/v1\/skus\/([^/]+)$/.exec(path);
+    if (skuMatch?.[1]) {
+      this.skuVersions.set(decodeURIComponent(skuMatch[1]), version);
+      return;
+    }
+    const stockMatch =
+      /^\/v1\/skus\/([^/]+)\/stock-adjustments$/.exec(path);
+    if (stockMatch?.[1]) {
+      this.balanceVersions.set(decodeURIComponent(stockMatch[1]), version);
+      return;
+    }
+    const templateMatch = /^\/v1\/templates\/(label|invoice)$/.exec(path);
+    if (templateMatch?.[1] === 'label' || templateMatch?.[1] === 'invoice') {
+      this.templateVersions.set(templateMatch[1], version);
+      return;
+    }
+    const entity = acknowledgement.entity;
+    if (
+      path === '/v1/skus' &&
+      entity !== undefined &&
+      entity !== null &&
+      typeof entity === 'object' &&
+      !Array.isArray(entity) &&
+      typeof entity.id === 'string'
+    ) {
+      this.skuVersions.set(entity.id, version);
+    }
   }
 
   getOutbox(): CoreOutboxItem[] {

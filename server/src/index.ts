@@ -2,6 +2,7 @@ import { pathToFileURL } from 'node:url';
 
 import { buildApp as buildFastifyApp } from './app.js';
 import { createCatalogueRuntime } from './catalogue/runtime.js';
+import { CatalogueOperationsService } from './catalogue/operations-service.js';
 import {
   loadServerConfig,
   type ServerConfig,
@@ -64,6 +65,7 @@ const defaultDependencies: StartupDependencies = {
         config.ownerBootstrapSecret,
       ),
       catalogue: catalogue.services,
+      operations: new CatalogueOperationsService(pool),
     });
   },
   createMaintenance: (pool, config) => {

@@ -10,15 +10,28 @@ export function LabelPage() {
   const [mode, setMode] = useState<'label' | 'invoice'>('label');
   const [skuId, setSkuId] = useState(state.skus[0]?.id ?? '');
   const [quantity, setQuantity] = useState(1);
+  const [message, setMessage] = useState('');
   const sku = state.skus.find((item) => item.id === skuId) ?? state.skus[0];
   const template = state.labelTemplate;
-  const update = (patch: Partial<LabelTemplate>) => void gateway.setLabelTemplate({ ...template, ...patch });
+  const update = (patch: Partial<LabelTemplate>) => {
+    setMessage('');
+    void gateway
+      .setLabelTemplate({ ...template, ...patch })
+      .catch((error) =>
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : 'Template label gagal disimpan.',
+        ),
+      );
+  };
   const toggleField = (field: LabelTemplate['fields'][number]) => update({ fields: template.fields.includes(field) ? template.fields.filter((item) => item !== field) : [...template.fields, field] });
   if (mode === 'invoice') return <><div className="template-tabs" role="tablist" aria-label="Jenis template"><button role="tab" aria-selected={false} onClick={() => setMode('label')}>Label</button><button role="tab" aria-selected>Invoice</button></div><InvoiceTemplateBuilder /></>;
   return (
     <><div className="template-tabs" role="tablist" aria-label="Jenis template"><button role="tab" aria-selected onClick={() => setMode('label')}>Label</button><button role="tab" aria-selected={false} onClick={() => setMode('invoice')}>Invoice</button></div><div className="feature-page label-layout">
       <section className="builder-panel">
         <div className="section-heading"><span>GUIDED BUILDER</span><h2>Template label</h2><p>Atur media, ukuran, dan isi. Output produksi belum aktif.</p></div>
+        {message && <div className="notice" role="status">{message}</div>}
         <div className="form-grid compact">
           <label><span>Media label</span><select value={template.medium} onChange={(event) => update({ medium: event.target.value as LabelTemplate['medium'], columns: event.target.value === 'a4' ? 3 : 1 })}><option value="thermal">Thermal roll</option><option value="a4">A4 grid</option></select></label>
           <label><span>SKU preview</span><select value={sku?.id} onChange={(event) => setSkuId(event.target.value)}>{state.skus.filter((item) => !item.archived).map((item) => <option key={item.id} value={item.id}>{item.skuNumber}</option>)}</select></label>

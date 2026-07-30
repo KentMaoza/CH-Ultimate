@@ -1,8 +1,10 @@
 import type { DemoState, Sku } from '../domain/types';
 import {
   coreBalanceRowSchema,
+  corePriceHistoryRowSchema,
   coreSkuIdentifierRowSchema,
   coreSkuRowSchema,
+  coreStockMovementRowSchema,
   type CoreChange,
 } from './core-api-types';
 import { integerFromDecimal } from './core-bootstrap-mapping';
@@ -111,6 +113,65 @@ function applyBalance(state: DemoState, change: CoreChange): DemoState {
   };
 }
 
+function applyPriceHistory(state: DemoState, change: CoreChange): DemoState {
+  if (change.operation !== 'upsert') {
+    throw new CoreChangeRequiresBootstrapError('Unknown price history operation');
+  }
+  const row = corePriceHistoryRowSchema.parse(change.payload);
+  requireIdentity(change, row.id);
+  const after = integerFromDecimal(row.priceRupiah, 'priceRupiah');
+  const before = row.beforePriceRupiah
+    ? integerFromDecimal(row.beforePriceRupiah, 'beforePriceRupiah')
+    : state.skus.find((sku) => sku.id === row.skuId)?.referencePrice ?? after;
+  return {
+    ...state,
+    priceChanges: [
+      ...state.priceChanges.filter((item) => item.id !== row.id),
+      {
+        id: row.id,
+        skuId: row.skuId,
+        before,
+        after,
+        createdAt: row.effectiveAt,
+      },
+    ],
+  };
+}
+
+function applyStockMovement(state: DemoState, change: CoreChange): DemoState {
+  if (change.operation !== 'upsert') {
+    throw new CoreChangeRequiresBootstrapError('Unknown stock movement operation');
+  }
+  const row = coreStockMovementRowSchema.parse(change.payload);
+  requireIdentity(change, row.id);
+  const quantity = integerFromDecimal(row.deltaPcs, 'deltaPcs');
+  const after = row.afterQuantityPcs
+    ? integerFromDecimal(row.afterQuantityPcs, 'afterQuantityPcs')
+    : state.skus.find((sku) => sku.id === row.skuId)?.stock ?? quantity;
+  const before = row.beforeQuantityPcs
+    ? integerFromDecimal(row.beforeQuantityPcs, 'beforeQuantityPcs')
+    : after - quantity;
+  return {
+    ...state,
+    adjustments: [
+      ...state.adjustments.filter((item) => item.id !== row.id),
+      {
+        id: row.id,
+        skuId: row.skuId,
+        quantity,
+        before,
+        after,
+        createdAt: row.createdAt,
+        source: row.reason.includes('reversal')
+          ? 'reversal'
+          : row.reason.includes('nota')
+            ? 'nota'
+            : 'manual',
+      },
+    ],
+  };
+}
+
 export function applyCoreChange(
   state: DemoState,
   change: CoreChange,
@@ -133,6 +194,12 @@ export function applyCoreChange(
   }
   if (['balance', 'stock_balance'].includes(change.entityType)) {
     return applyBalance(state, change);
+  }
+  if (change.entityType === 'price_history') {
+    return applyPriceHistory(state, change);
+  }
+  if (change.entityType === 'stock_movement') {
+    return applyStockMovement(state, change);
   }
   if (change.entityType === 'nota') return applyNotaChange(state, change);
   if (change.entityType === 'nota_page') {

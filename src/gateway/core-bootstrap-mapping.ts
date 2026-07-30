@@ -136,8 +136,12 @@ export function mapCoreBootstrapToDemoState(
     referencePrice: integerFromDecimal(row.priceRupiah, 'priceRupiah'),
     stock: balances.get(row.id) ?? 0,
     tracked: balances.has(row.id),
-    note: '',
+    note: row.sourceNote ?? '',
     imageUrl: '',
+    ...(row.imageHash ? { imageHash: row.imageHash } : {}),
+    ...(row.sourceCreatedAt
+      ? { sourceCreatedAt: row.sourceCreatedAt }
+      : {}),
     createdAt: row.createdAt,
     archived: row.archivedAt !== null,
   }));

@@ -32,6 +32,7 @@ const INVALID_CONFIG = 'Konfigurasi CH Core tidak valid.';
 const INVALID_REQUEST = 'Permintaan CH Core tidak valid.';
 const UUID =
   '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}';
+const SHA256 = '[0-9a-f]{64}';
 
 function isApprovedLanHost(hostname: string): boolean {
   const match = /^192\.168\.1\.(\d{1,3})$/.exec(hostname);
@@ -55,7 +56,12 @@ const operationRules: ReadonlyArray<{
     methods: ['POST'],
     path: new RegExp(`^/v1/skus/${UUID}/stock-adjustments$`),
   },
-  { methods: ['POST'], path: /^\/v1\/imports\/initial-catalogue$/ },
+  { methods: ['POST'], path: /^\/v1\/imports\/validate$/ },
+  {
+    methods: ['POST'],
+    path: new RegExp(`^/v1/imports/${UUID}/commit$`),
+  },
+  { methods: ['GET'], path: new RegExp(`^/v1/images/${SHA256}$`) },
   { methods: ['PATCH'], path: /^\/v1\/templates\/(?:label|invoice)$/ },
   { methods: ['POST'], path: /^\/v1\/notas$/ },
   {

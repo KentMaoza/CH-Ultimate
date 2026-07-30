@@ -34,7 +34,9 @@ export async function readBootstrapCollections(
   );
   const skuRows = await connection.query<Array<Record<string, unknown>>>(
     `SELECT HEX(id) AS id_hex, primary_identifier, name, price_rupiah,
-            row_version, archived_at, created_at, updated_at
+            HEX(image_hash) AS image_hash_hex, source_image_url,
+            source_note, source_created_at, row_version, archived_at,
+            created_at, updated_at
      FROM skus
      ORDER BY id`,
   );
@@ -91,6 +93,23 @@ export async function readBootstrapCollections(
       primaryIdentifier: String(row.primary_identifier),
       name: String(row.name),
       priceRupiah: BigInt(String(row.price_rupiah)),
+      imageHash:
+        row.image_hash_hex === null || row.image_hash_hex === undefined
+          ? null
+          : String(row.image_hash_hex).toLowerCase(),
+      sourceImageUrl:
+        row.source_image_url === null || row.source_image_url === undefined
+          ? null
+          : String(row.source_image_url),
+      sourceNote:
+        row.source_note === null || row.source_note === undefined
+          ? ''
+          : String(row.source_note),
+      sourceCreatedAt:
+        row.source_created_at === null ||
+        row.source_created_at === undefined
+          ? ''
+          : String(row.source_created_at),
       rowVersion: BigInt(String(row.row_version)),
       archivedAt: nullableDatabaseDate(row.archived_at),
       createdAt: databaseDate(row.created_at),

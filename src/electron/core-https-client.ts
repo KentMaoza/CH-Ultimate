@@ -13,6 +13,8 @@ const RESPONSE_ERROR = 'Respons CH Core tidak valid.';
 const DEFAULT_TIMEOUT_MS = 8_000;
 const DEFAULT_MAX_REQUEST_BYTES = 1_000_000;
 const DEFAULT_MAX_RESPONSE_BYTES = 2_000_000;
+const CATALOGUE_TRANSFER_MAX_BYTES = 7_100_000;
+const IMAGE_PATH = /^\/v1\/images\/[0-9a-f]{64}$/;
 
 type RequestImplementation = (
   options: RequestOptions,
@@ -61,7 +63,17 @@ export function createCoreHttpsClient(options: CoreHttpsClientOptions = {}) {
 
   return {
     send(input: CoreMainSendInput): Promise<CoreApiResponse> {
-      const body = serializeBody(input.request.body, maxRequestBytes);
+      const requestLimit =
+        options.maxRequestBytes ??
+        (input.request.path === '/v1/imports/validate'
+          ? CATALOGUE_TRANSFER_MAX_BYTES
+          : maxRequestBytes);
+      const responseLimit =
+        options.maxResponseBytes ??
+        (IMAGE_PATH.test(input.request.path)
+          ? CATALOGUE_TRANSFER_MAX_BYTES
+          : maxResponseBytes);
+      const body = serializeBody(input.request.body, requestLimit);
       const endpoint = new URL(input.endpoint);
       const headers: Record<string, string | number> = {
         accept: 'application/json',
@@ -103,7 +115,7 @@ export function createCoreHttpsClient(options: CoreHttpsClientOptions = {}) {
                 ? chunk
                 : Buffer.from(chunk);
               size += encoded.length;
-              if (size > maxResponseBytes) {
+              if (size > responseLimit) {
                 response.destroy();
                 fail(RESPONSE_ERROR);
                 return;

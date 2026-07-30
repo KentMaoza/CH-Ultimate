@@ -19,6 +19,7 @@ export class MockOperationsGateway implements OperationsGateway {
   readonly capabilities: OperationsGatewayCapabilities = {
     canResetDemoData: true,
     canImportInitialCatalogue: true,
+    canStageInitialCatalogue: false,
   };
   private readonly syncSnapshot: SyncSnapshot = {
     phase: 'demo',
@@ -88,6 +89,13 @@ export class MockOperationsGateway implements OperationsGateway {
   }
   async adjustStock(id: string, quantity: number): Promise<void> { this.publish(reduceOperation(this.state, { type: 'adjust-stock', id, quantity })); }
   async setArchived(id: string, archived: boolean): Promise<void> { this.publish(reduceOperation(this.state, { type: 'archive-sku', id, archived })); }
+  async validateInitialCatalogue(): Promise<never> {
+    throw new Error('Import bertahap hanya tersedia melalui CH Core.');
+  }
+  async commitInitialCatalogue(): Promise<never> {
+    throw new Error('Import bertahap hanya tersedia melalui CH Core.');
+  }
+  async loadSkuImage(sku: Sku): Promise<string> { return sku.imageUrl; }
   async replaceFromWorkbook(result: WorkbookImportResult, sourceLabel: string): Promise<void> {
     this.publish(reduceOperation(this.state, { type: 'replace-skus', skus: result.skus, sourceLabel, importSummary: { loaded: result.loaded, skipped: result.skipped, warnings: result.warnings } }));
   }

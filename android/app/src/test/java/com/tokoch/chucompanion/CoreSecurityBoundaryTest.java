@@ -50,6 +50,12 @@ public class CoreSecurityBoundaryTest {
             true,
             true
         );
+        CoreRequestPolicy.requireApproved(
+            "GET",
+            "/v1/images/" + "a".repeat(64),
+            false,
+            false
+        );
 
         for (String path : new String[] {
             "https://192.168.1.14:8443/v1/bootstrap",
@@ -57,6 +63,7 @@ public class CoreSecurityBoundaryTest {
             "/v1/../bootstrap",
             "/v1/%2e%2e/bootstrap",
             "/v1/not-a-route",
+            "/v1/images/" + "a".repeat(63),
             "/v1/changes?limit=500&after=0"
         }) {
             assertThrows(

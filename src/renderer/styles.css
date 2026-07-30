@@ -98,6 +98,12 @@ td small { display: block; margin-top: 3px; color: #777; font-size: 9px; }
 .dialog h2 { margin: 0 0 8px; }
 .dialog p { margin: 0 0 18px; color: #555; }
 .dialog-actions { justify-content: flex-end; margin-top: 20px; }
+.catalogue-preview-dialog { width: min(780px, 100%); max-height: calc(100vh - 48px); overflow: auto; }
+.catalogue-preview-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 18px 0; border: 1px solid #111; background: #111; }
+.catalogue-preview-metrics > div { padding: 12px; background: #fff; }
+.catalogue-preview-metrics dt { font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.catalogue-preview-metrics dd { margin: 4px 0 0; font-size: 18px; font-weight: 900; }
+.catalogue-preview-table { max-height: 240px; overflow: auto; border: 1px solid #111; }
 .stack-fields { display: grid; gap: 14px; }
 .form-layout { display: grid; grid-template-columns: minmax(560px, 1.4fr) minmax(250px, .6fr); gap: 18px; align-items: start; }
 .editor-card, .guide-card { border: 2px solid #111; background: #fff; }

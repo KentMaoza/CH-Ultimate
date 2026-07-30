@@ -14,7 +14,9 @@
     "start": "node --max-old-space-size=160 dist/index.js"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "fastify": "^5.0.0",
+    "jszip": "^3.10.1",
     "mariadb": "^3.0.0",
     "zod": "^4.0.0"
   },

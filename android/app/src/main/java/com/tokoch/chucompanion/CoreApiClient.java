@@ -20,6 +20,7 @@ import org.json.JSONTokener;
 final class CoreApiClient {
     private static final int TIMEOUT_MS = 8_000;
     private static final int MAX_RESPONSE_BYTES = 2_000_000;
+    private static final int MAX_IMAGE_RESPONSE_BYTES = 7_100_000;
     private final Context context;
     private final CoreDeploymentConfig config;
 
@@ -84,7 +85,8 @@ final class CoreApiClient {
                     : connection.getInputStream();
             Object responseBody = readJson(
                 stream,
-                connection.getContentType()
+                connection.getContentType(),
+                maximumResponseBytes(path)
             );
             return new Response(status, responseBody);
         } catch (CoreSecurityException error) {
@@ -140,7 +142,8 @@ final class CoreApiClient {
 
     private Object readJson(
         InputStream input,
-        String contentType
+        String contentType,
+        int maximumBytes
     ) throws Exception {
         if (input == null) return JSONObject.NULL;
         if (
@@ -163,7 +166,7 @@ final class CoreApiClient {
             int total = 0;
             while ((count = stream.read(buffer)) >= 0) {
                 total += count;
-                if (total > MAX_RESPONSE_BYTES) {
+                if (total > maximumBytes) {
                     throw new CoreSecurityException(
                         "Respons CH Core tidak valid."
                     );
@@ -185,6 +188,13 @@ final class CoreApiClient {
             );
         }
         return parsed;
+    }
+
+    private static int maximumResponseBytes(String path) {
+        if (path != null && path.matches("^/v1/images/[0-9a-f]{64}$")) {
+            return MAX_IMAGE_RESPONSE_BYTES;
+        }
+        return MAX_RESPONSE_BYTES;
     }
 
     static final class Response {

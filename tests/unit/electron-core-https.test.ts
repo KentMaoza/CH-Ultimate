@@ -159,6 +159,74 @@ describe('main-process CH Core HTTPS client', () => {
     ).rejects.toThrow('Respons CH Core tidak valid.');
   });
 
+  it('raises byte limits only for catalogue validation and image routes', async () => {
+    const requestBody = {
+      fileName: 'catalogue.xlsx',
+      workbookBase64: 'A'.repeat(2_100_000),
+    };
+    const validate = respondingRequest({
+      status: 200,
+      chunks: ['{}'],
+    });
+    const validateClient = createCoreHttpsClient({
+      requestImpl: validate.requestImpl,
+    });
+
+    await expect(
+      validateClient.send({
+        endpoint,
+        ca,
+        authorization,
+        request: {
+          method: 'POST',
+          path: '/v1/imports/validate',
+          body: requestBody,
+        },
+      }),
+    ).resolves.toEqual({ status: 200, body: {} });
+
+    const image = respondingRequest({
+      status: 200,
+      chunks: [
+        JSON.stringify({
+          mimeType: 'image/png',
+          bytesBase64: 'A'.repeat(2_100_000),
+        }),
+      ],
+    });
+    const imageClient = createCoreHttpsClient({
+      requestImpl: image.requestImpl,
+    });
+    await expect(
+      imageClient.send({
+        endpoint,
+        ca,
+        authorization,
+        request: {
+          method: 'GET',
+          path: `/v1/images/${'a'.repeat(64)}`,
+        },
+      }),
+    ).resolves.toMatchObject({ status: 200 });
+
+    const ordinary = respondingRequest({ status: 200, chunks: ['{}'] });
+    const ordinaryClient = createCoreHttpsClient({
+      requestImpl: ordinary.requestImpl,
+    });
+    expect(() =>
+      ordinaryClient.send({
+        endpoint,
+        ca,
+        authorization,
+        request: {
+          method: 'POST',
+          path: '/v1/skus',
+          body: requestBody,
+        },
+      }),
+    ).toThrow('Permintaan CH Core terlalu besar.');
+  });
+
   it('destroys timed-out requests and returns a generic connection error', async () => {
     let timeout: (() => void) | undefined;
     const destroy = vi.fn();

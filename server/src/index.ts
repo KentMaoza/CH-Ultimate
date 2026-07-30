@@ -1,6 +1,7 @@
 import { pathToFileURL } from 'node:url';
 
 import { buildApp as buildFastifyApp } from './app.js';
+import { createCatalogueRuntime } from './catalogue/runtime.js';
 import {
   loadServerConfig,
   type ServerConfig,
@@ -42,6 +43,7 @@ export interface StartupDependencies {
   buildApp(deps: { pool: RuntimePool; config: ServerConfig }): RuntimeApp;
   createMaintenance?(
     pool: RuntimePool,
+    config: ServerConfig,
   ): MaintenanceLifecycle;
 }
 
@@ -53,15 +55,31 @@ const defaultDependencies: StartupDependencies = {
   loadConfig: loadServerConfig,
   createPool,
   migrate: runMigrations,
-  buildApp: ({ pool, config }) =>
-    buildFastifyApp({
+  buildApp: ({ pool, config }) => {
+    const catalogue = createCatalogueRuntime(pool, config);
+    return buildFastifyApp({
       pool,
       protocol: createProtocolServices(
         pool,
         config.ownerBootstrapSecret,
       ),
-    }),
-  createMaintenance: (pool) => new ProtocolMaintenance(pool),
+      catalogue: catalogue.services,
+    });
+  },
+  createMaintenance: (pool, config) => {
+    const protocol = new ProtocolMaintenance(pool);
+    const catalogue = createCatalogueRuntime(pool, config).maintenance;
+    return {
+      start() {
+        protocol.start();
+        catalogue.start();
+      },
+      stop() {
+        catalogue.stop();
+        protocol.stop();
+      },
+    };
+  },
 };
 
 export async function startServer(
@@ -76,7 +94,7 @@ export async function startServer(
   try {
     await dependencies.migrate(pool);
     app = dependencies.buildApp({ pool, config });
-    maintenance = dependencies.createMaintenance?.(pool);
+    maintenance = dependencies.createMaintenance?.(pool, config);
     await app.listen({ host: config.host, port: config.port });
     maintenance?.start();
   } catch (startupError) {

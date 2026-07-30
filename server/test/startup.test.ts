@@ -53,6 +53,7 @@ function startupScenario(scenario: StartupScenario): {
           port: 3000,
           databaseUrl: 'mariadb://user:password@db.internal/chu_test',
           dbPoolMax: 4,
+          privateStorageRoot: '/private/ch-core',
         };
       },
       createPool() {
@@ -116,6 +117,7 @@ describe('startServer', () => {
       port: 3000,
       databaseUrl: 'mariadb://user:password@db.internal/chu_test',
       dbPoolMax: 4,
+      privateStorageRoot: '/private/ch-core',
       ownerBootstrapSecret: 'b'.repeat(32),
     });
     deps.buildApp = (buildDependencies) => {

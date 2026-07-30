@@ -35,6 +35,80 @@ function emptyPoll(revision = '1') {
 }
 
 describe('Core operations gateway mutation coordination', () => {
+  it('validates, previews, commits, reboots, and reads cached images through approved routes', async () => {
+    const { gateway, transport } = readyGateway();
+    await gateway.initialize();
+    const validation = {
+      importId: '88888888-8888-4888-8888-888888888888',
+      workbookSha256: 'a'.repeat(64),
+      sourceFileName: 'catalogue.xlsx',
+      status: 'staged',
+      preview: {
+        rowCount: 3_144,
+        imageJobCount: 2_786,
+        missingImageCount: 358,
+        priceMismatchCount: 3,
+        selectedPriceTotal: 276_267_011,
+        stockTotal: 4_115,
+        maximumCellTextLength: 168,
+        warnings: [],
+        priceMismatches: [],
+      },
+      expiresAt: '2026-07-31T00:00:00.000Z',
+      committedAt: null,
+    };
+    transport.enqueue({ status: 200, body: validation });
+
+    await expect(
+      gateway.validateInitialCatalogue({
+        fileName: 'catalogue.xlsx',
+        workbookBase64: 'eGxzeA==',
+      }),
+    ).resolves.toEqual(validation);
+    expect(transport.requests.at(-1)).toEqual({
+      method: 'POST',
+      path: '/v1/imports/validate',
+      body: {
+        fileName: 'catalogue.xlsx',
+        workbookBase64: 'eGxzeA==',
+      },
+    });
+
+    const receipt = {
+      importId: validation.importId,
+      workbookSha256: validation.workbookSha256,
+      rowCount: 3_144,
+      imageJobCount: 2_786,
+      committedAt: '2026-07-30T02:00:00.000Z',
+      replayed: false,
+    };
+    transport.enqueue({ status: 200, body: receipt });
+    transport.enqueue({ status: 200, body: populatedBootstrap('2') });
+    await expect(
+      gateway.commitInitialCatalogue(validation.importId),
+    ).resolves.toEqual(receipt);
+    expect(transport.requests.at(-2)).toEqual({
+      method: 'POST',
+      path: `/v1/imports/${validation.importId}/commit`,
+    });
+    expect(transport.requests.at(-1)?.path).toBe('/v1/bootstrap');
+
+    transport.enqueue({
+      status: 200,
+      body: {
+        mimeType: 'image/png',
+        bytesBase64: 'iVBORw==',
+      },
+    });
+    await expect(
+      gateway.loadSkuImage(gateway.getSnapshot().skus[0]!),
+    ).resolves.toBe('data:image/png;base64,iVBORw==');
+    expect(transport.requests.at(-1)).toEqual({
+      method: 'GET',
+      path: `/v1/images/${'a'.repeat(64)}`,
+    });
+  });
+
   it('persists one stable UUID idempotency key before first send and reuses it on manual retry', async () => {
     const { gateway, transport, storage } = readyGateway();
     await gateway.initialize();
@@ -274,7 +348,8 @@ describe('Core operations gateway mutation coordination', () => {
 
     expect(gateway.capabilities).toEqual({
       canResetDemoData: false,
-      canImportInitialCatalogue: true,
+      canImportInitialCatalogue: false,
+      canStageInitialCatalogue: true,
     });
     await expect(gateway.reset()).rejects.toThrow(
       'Reset data demo tidak tersedia',

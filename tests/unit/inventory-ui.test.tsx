@@ -1,6 +1,10 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { App } from '../../src/renderer/App';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
+import type {
+  CatalogueValidationResult,
+  OperationsGateway,
+} from '../../src/gateway/operations-gateway-contract';
 
 test('adjusts a tracked SKU into a negative balance in the current session', async () => {
   render(<App gateway={new MockOperationsGateway()} />);
@@ -154,4 +158,110 @@ test('replaces a warehouse image from a clickable thumbnail and exposes an enlar
   expect(fileInput).toHaveValue('');
   expect(within(screen.getByRole('button', { name: 'Ubah gambar BRS-108-BLK' })).getByRole('img', { name: 'Gambar BRS-108-BLK' })).toHaveAttribute('src', expect.stringMatching(/^data:image\/png;base64,/));
   inputClick.mockRestore();
+});
+
+test('previews exact CH Core catalogue totals before an explicit commit', async () => {
+  const gateway = new MockOperationsGateway();
+  Object.assign(gateway.capabilities, {
+    canImportInitialCatalogue: false,
+    canStageInitialCatalogue: true,
+  });
+  const stagedGateway: OperationsGateway = gateway;
+  const validation: CatalogueValidationResult = {
+    importId: '88888888-8888-4888-8888-888888888888',
+    workbookSha256: 'a'.repeat(64),
+    sourceFileName: 'catalogue.xlsx',
+    status: 'staged',
+    preview: {
+      rowCount: 3_144,
+      imageJobCount: 2_786,
+      missingImageCount: 358,
+      priceMismatchCount: 3,
+      selectedPriceTotal: 276_267_011,
+      stockTotal: 4_115,
+      maximumCellTextLength: 168,
+      warnings: ['3 baris memakai harga terpilih yang berbeda.'],
+      priceMismatches: [
+        {
+          rowNumber: 17,
+          primarySku: 'SKU-017',
+          modalPrice: 80_000,
+          salePrice: 90_000,
+          selectedPrice: 90_000,
+        },
+      ],
+    },
+    expiresAt: '2026-07-31T00:00:00.000Z',
+    committedAt: null,
+  };
+  const validate = vi
+    .spyOn(stagedGateway, 'validateInitialCatalogue')
+    .mockResolvedValue(validation);
+  const commit = vi
+    .spyOn(stagedGateway, 'commitInitialCatalogue')
+    .mockResolvedValue({
+      importId: validation.importId,
+      workbookSha256: validation.workbookSha256,
+      rowCount: 3_144,
+      imageJobCount: 2_786,
+      committedAt: '2026-07-30T02:00:00.000Z',
+      replayed: false,
+    });
+  const confirm = vi.spyOn(window, 'confirm');
+  render(<App gateway={gateway} />);
+
+  const file = new File([new Uint8Array([80, 75, 3, 4])], 'catalogue.xlsx', {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  fireEvent.change(screen.getByLabelText('Import XLSX'), {
+    target: { files: [file] },
+  });
+
+  const dialog = await screen.findByRole('dialog', {
+    name: 'Tinjau import katalog',
+  });
+  expect(validate).toHaveBeenCalledWith({
+    fileName: 'catalogue.xlsx',
+    workbookBase64: 'UEsDBA==',
+  });
+  expect(confirm).not.toHaveBeenCalled();
+  expect(within(dialog).getByText('3.144')).toBeInTheDocument();
+  expect(within(dialog).getByText('2.786')).toBeInTheDocument();
+  expect(within(dialog).getByText('358')).toBeInTheDocument();
+  expect(within(dialog).getByText('Rp 276.267.011')).toBeInTheDocument();
+  expect(within(dialog).getByText('4.115')).toBeInTheDocument();
+  expect(within(dialog).getByText('SKU-017')).toBeInTheDocument();
+
+  fireEvent.click(
+    within(dialog).getByRole('button', { name: 'Komit katalog' }),
+  );
+  await waitFor(() =>
+    expect(commit).toHaveBeenCalledWith(validation.importId),
+  );
+  expect(
+    await screen.findByText('3.144 SKU dikomit ke CH Core.'),
+  ).toBeInTheDocument();
+  confirm.mockRestore();
+});
+
+test('loads an imported SKU image through the gateway cache boundary', async () => {
+  const gateway = new MockOperationsGateway();
+  await gateway.updateSku('sku-1', {
+    imageHash: 'a'.repeat(64),
+    imageUrl: '',
+  });
+  const stagedGateway: OperationsGateway = gateway;
+  const load = vi
+    .spyOn(stagedGateway, 'loadSkuImage')
+    .mockResolvedValue('data:image/png;base64,iVBORw==');
+
+  render(<App gateway={gateway} />);
+
+  const image = await within(
+    screen.getByRole('button', { name: 'Ubah gambar BRS-108-BLK' }),
+  ).findByRole('img', { name: 'Gambar BRS-108-BLK' });
+  expect(image).toHaveAttribute('src', 'data:image/png;base64,iVBORw==');
+  expect(load).toHaveBeenCalledWith(
+    expect.objectContaining({ imageHash: 'a'.repeat(64) }),
+  );
 });

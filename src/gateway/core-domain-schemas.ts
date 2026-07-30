@@ -13,6 +13,8 @@ export const skuSchema = z
     tracked: z.boolean(),
     note: z.string(),
     imageUrl: z.string(),
+    imageHash: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+    sourceCreatedAt: z.string().optional(),
     createdAt: timestampSchema,
     archived: z.boolean(),
   })

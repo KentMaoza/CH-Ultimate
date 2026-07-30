@@ -8,10 +8,15 @@ import {
   registerProtocolRoutes,
   type ProtocolServices,
 } from './http/routes.js';
+import {
+  registerCatalogueRoutes,
+  type CatalogueHttpServices,
+} from './http/catalogue-routes.js';
 
 export interface AppDependencies {
   pool: SchemaQueryPool;
   protocol?: ProtocolServices;
+  catalogue?: CatalogueHttpServices;
 }
 
 export function buildApp(deps: AppDependencies): FastifyInstance {
@@ -31,6 +36,9 @@ export function buildApp(deps: AppDependencies): FastifyInstance {
 
   if (deps.protocol) {
     registerProtocolRoutes(app, deps.protocol);
+    if (deps.catalogue) {
+      registerCatalogueRoutes(app, deps.protocol.identity, deps.catalogue);
+    }
   }
 
   return app;

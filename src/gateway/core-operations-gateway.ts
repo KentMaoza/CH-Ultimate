@@ -20,12 +20,21 @@ import { CoreMutationCoordinator } from './core-mutation-coordinator';
 import { CoreMutationQueue } from './core-mutation-queue';
 import { CorePollingCoordinator } from './core-polling';
 import type {
+  CatalogueCommitReceipt,
+  CatalogueValidationResult,
   CreateSkuInput,
   NotaDesktopTransferResult,
   OperationsGateway,
   OperationsGatewayCapabilities,
   SyncSnapshot,
 } from './operations-gateway-contract';
+import {
+  CORE_API_PATHS,
+  parseCatalogueCommit,
+  parseCatalogueImage,
+  parseCatalogueValidation,
+  parseCoreApiError,
+} from './core-api-types';
 
 export type {
   CoreCacheEnvelope,
@@ -44,7 +53,8 @@ export interface CoreOperationsGateway extends OperationsGateway {
 class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   readonly capabilities: OperationsGatewayCapabilities = {
     canResetDemoData: false,
-    canImportInitialCatalogue: true,
+    canImportInitialCatalogue: false,
+    canStageInitialCatalogue: true,
   };
 
   private readonly state = new CoreGatewayState();
@@ -52,7 +62,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   private readonly mutations: CoreMutationCoordinator;
 
   constructor(
-    transport: CoreApiTransport,
+    private readonly transport: CoreApiTransport,
     storage: CoreGatewayStorage,
     clock: CoreGatewayClock,
   ) {
@@ -98,9 +108,55 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   setArchived = (id: string, archived: boolean): Promise<void> =>
     this.mutations.setArchived(id, archived);
   replaceFromWorkbook = (
-    result: WorkbookImportResult,
-    sourceLabel: string,
-  ): Promise<void> => this.mutations.replaceFromWorkbook(result, sourceLabel);
+    _result: WorkbookImportResult,
+    _sourceLabel: string,
+  ): Promise<void> =>
+    Promise.reject(
+      new Error('Gunakan validasi dan komit import bertahap di CH Core.'),
+    );
+
+  async validateInitialCatalogue(input: {
+    fileName: string;
+    workbookBase64: string;
+  }): Promise<CatalogueValidationResult> {
+    const response = await this.transport.request({
+      method: 'POST',
+      path: CORE_API_PATHS.validateCatalogue,
+      body: input,
+    });
+    this.throwForApiError(response.status, response.body);
+    return parseCatalogueValidation(response.body);
+  }
+
+  async commitInitialCatalogue(
+    importId: string,
+  ): Promise<CatalogueCommitReceipt> {
+    const response = await this.transport.request({
+      method: 'POST',
+      path: CORE_API_PATHS.commitCatalogue(importId),
+    });
+    this.throwForApiError(response.status, response.body);
+    const receipt = parseCatalogueCommit(response.body);
+    await this.polling.reloadCanonical();
+    return receipt;
+  }
+
+  async loadSkuImage(sku: Sku): Promise<string> {
+    if (!sku.imageHash) return sku.imageUrl;
+    const response = await this.transport.request({
+      method: 'GET',
+      path: CORE_API_PATHS.image(sku.imageHash),
+    });
+    this.throwForApiError(response.status, response.body);
+    const image = parseCatalogueImage(response.body);
+    return `data:${image.mimeType};base64,${image.bytesBase64}`;
+  }
+
+  private throwForApiError(status: number, body: unknown): void {
+    if (status >= 200 && status < 300) return;
+    const error = parseCoreApiError(status, body);
+    throw new Error(error.code);
+  }
 
   async reset(): Promise<void> {
     throw new Error('Reset data demo tidak tersedia di CH Core.');

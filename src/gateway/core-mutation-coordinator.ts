@@ -8,7 +8,6 @@ import type {
   NotaLine,
   NotaTransaction,
   Sku,
-  WorkbookImportResult,
 } from '../domain/types';
 import { CORE_API_PATHS } from './core-api-types';
 import {
@@ -84,17 +83,6 @@ export class CoreMutationCoordinator {
 
   setArchived(id: string, archived: boolean): Promise<void> {
     return this.updateSku(id, { archived });
-  }
-
-  replaceFromWorkbook(
-    result: WorkbookImportResult,
-    sourceLabel: string,
-  ): Promise<void> {
-    return this.command({
-      method: 'POST',
-      path: CORE_API_PATHS.initialCatalogue,
-      body: { result, sourceLabel },
-    }).then(() => undefined);
   }
 
   setLabelTemplate(template: LabelTemplate): Promise<void> {

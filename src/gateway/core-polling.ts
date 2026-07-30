@@ -145,6 +145,11 @@ export class CorePollingCoordinator {
     await this.scheduler.request();
   }
 
+  async reloadCanonical(): Promise<void> {
+    this.bootstrapped = false;
+    await this.scheduler.request();
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;

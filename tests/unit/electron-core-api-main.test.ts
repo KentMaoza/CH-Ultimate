@@ -72,6 +72,19 @@ describe('CH Core operation allowlist', () => {
     const requests = [
       { method: 'GET' as const, path: '/v1/bootstrap' },
       { method: 'GET' as const, path: '/v1/changes?after=0&limit=500' },
+      {
+        method: 'POST' as const,
+        path: '/v1/imports/validate',
+        body: { fileName: 'catalogue.xlsx', workbookBase64: 'eGxzeA==' },
+      },
+      {
+        method: 'POST' as const,
+        path: '/v1/imports/11111111-1111-4111-8111-111111111111/commit',
+      },
+      {
+        method: 'GET' as const,
+        path: `/v1/images/${'a'.repeat(64)}`,
+      },
       { method: 'POST' as const, path: '/v1/skus', body: { name: 'Beras' } },
       {
         method: 'PATCH' as const,
@@ -107,6 +120,7 @@ describe('CH Core operation allowlist', () => {
       '/v1/%2e%2e/bootstrap',
       '/v1/bootstrap\nX-Test: yes',
       '/v1/not-a-route',
+      `/v1/images/${'a'.repeat(63)}`,
     ];
 
     for (const path of paths) {
@@ -128,6 +142,10 @@ describe('CH Core operation allowlist', () => {
       { method: 'POST' as const, path: '/v1/bootstrap' },
       { method: 'GET' as const, path: '/v1/skus' },
       { method: 'POST' as const, path: '/v1/pairings/redeem' },
+      {
+        method: 'POST' as const,
+        path: '/v1/imports/initial-catalogue',
+      },
       {
         method: 'GET' as const,
         path: '/v1/bootstrap',

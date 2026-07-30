@@ -125,6 +125,9 @@ describe('Core operations gateway bootstrap and polling', () => {
       skuNumber: 'SKU-001',
       aliases: ['SCAN-001'],
       stock: 12,
+      note: 'Rak A',
+      imageHash: 'a'.repeat(64),
+      sourceCreatedAt: '2026-07-28 09:24',
     });
     expect(gateway.getSnapshot().notaTransactions[0]?.pages[0]?.lines).toHaveLength(15);
     expect(publishedNames).toEqual(['Cached product', 'Produk Core']);

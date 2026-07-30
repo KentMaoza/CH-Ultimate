@@ -15,6 +15,7 @@ describe('loadServerConfig', () => {
       databaseUrl:
         'mariadb://chu_app:secret@192.0.2.10:3306/chu_test',
       dbPoolMax: 4,
+      privateStorageRoot: '/var/lib/ch-core/private',
     });
   });
 
@@ -73,6 +74,35 @@ describe('loadServerConfig', () => {
         CH_CORE_DATABASE_URL:
           'mariadb://chu_app:secret@192.0.2.10:3306/chu_test',
         CH_CORE_OWNER_BOOTSTRAP_SECRET: 'short-secret',
+      }),
+    ).toThrow('Invalid CH Core server configuration');
+  });
+
+  it('accepts only an absolute private storage root and optional catalogue hash', () => {
+    const hash = 'a'.repeat(64);
+    const config = loadServerConfig({
+      CH_CORE_DATABASE_URL:
+        'mariadb://chu_app:secret@192.0.2.10:3306/chu_test',
+      CH_CORE_PRIVATE_STORAGE_ROOT: '/volume1/ch-core/private',
+      CH_CORE_INITIAL_CATALOGUE_SHA256: hash,
+    });
+
+    expect(config.privateStorageRoot).toBe('/volume1/ch-core/private');
+    expect(config.initialCatalogueSha256).toBe(hash);
+    for (const root of ['relative/path', '/', '/tmp/private\nunsafe']) {
+      expect(() =>
+        loadServerConfig({
+          CH_CORE_DATABASE_URL:
+            'mariadb://chu_app:secret@192.0.2.10:3306/chu_test',
+          CH_CORE_PRIVATE_STORAGE_ROOT: root,
+        }),
+      ).toThrow('Invalid CH Core server configuration');
+    }
+    expect(() =>
+      loadServerConfig({
+        CH_CORE_DATABASE_URL:
+          'mariadb://chu_app:secret@192.0.2.10:3306/chu_test',
+        CH_CORE_INITIAL_CATALOGUE_SHA256: 'not-a-hash',
       }),
     ).toThrow('Invalid CH Core server configuration');
   });

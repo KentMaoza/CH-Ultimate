@@ -1,0 +1,295 @@
+import { describe, expect, it, vi } from 'vitest';
+
+import { MariaDbCatalogueRepository } from '../src/catalogue/mariadb-repository.js';
+import type {
+  CatalogueCommitResult,
+  CatalogueImportRecord,
+} from '../src/catalogue/service.js';
+import type { CatalogueWorkbook } from '../src/catalogue/workbook.js';
+import type {
+  ProtocolConnection,
+  ProtocolPool,
+} from '../src/sync/idempotency.js';
+
+const importId = '11111111-1111-4111-8111-111111111111';
+const deviceId = '22222222-2222-4222-8222-222222222222';
+const skuId = '33333333-3333-4333-8333-333333333333';
+const primaryIdentifierId = '44444444-4444-4444-8444-444444444444';
+const productIdentifierId = '55555555-5555-4555-8555-555555555555';
+const imageJobId = '66666666-6666-4666-8666-666666666666';
+const priceHistoryId = '77777777-7777-4777-8777-777777777777';
+
+const record: CatalogueImportRecord = {
+  id: importId,
+  workbookSha256: 'a'.repeat(64),
+  sourceFileName: 'catalogue.xlsx',
+  stagedPath: `imports/staged/${'a'.repeat(64)}.xlsx`,
+  status: 'staged',
+  preview: {
+    rowCount: 1,
+    imageJobCount: 1,
+    missingImageCount: 0,
+    priceMismatchCount: 1,
+    selectedPriceTotal: 15_000,
+    stockTotal: 12,
+    maximumCellTextLength: 30,
+    warnings: [],
+    priceMismatches: [
+      {
+        rowNumber: 2,
+        primarySku: 'SKU-A',
+        modalPrice: 12_000,
+        salePrice: 15_000,
+        selectedPrice: 15_000,
+      },
+    ],
+  },
+  createdByDeviceId: deviceId,
+  createdAt: '2026-07-30T01:00:00.000Z',
+  expiresAt: '2026-07-31T01:00:00.000Z',
+  committedAt: null,
+  result: null,
+};
+
+const workbook: CatalogueWorkbook = {
+  rows: [
+    {
+      rowNumber: 2,
+      primarySku: 'SKU-A',
+      productCode: '87000001',
+      name: 'Produk A',
+      selectedPrice: 15_000,
+      stockPcs: 12,
+      note: 'Rak A',
+      imageSourceUrl: 'https://res.bigseller.pro/a.jpg',
+      sourceCreatedAt: '2026-07-30 09:24',
+    },
+  ],
+  preview: record.preview,
+};
+
+type QueryResult = unknown;
+
+function commitHarness(options: {
+  lockedStatus?: 'staged' | 'committed';
+  liveTransactions?: boolean;
+  failOn?: RegExp;
+} = {}) {
+  const events: string[] = [];
+  const queries: Array<{ sql: string; values: readonly unknown[] }> = [];
+  const committedResult: CatalogueCommitResult = {
+    importId,
+    workbookSha256: record.workbookSha256,
+    rowCount: 1,
+    imageJobCount: 1,
+    committedAt: '2026-07-30T02:00:00.000Z',
+    replayed: false,
+  };
+  const connection: ProtocolConnection = {
+    beginTransaction: async () => {
+      events.push('begin');
+    },
+    commit: async () => {
+      events.push('commit');
+    },
+    rollback: async () => {
+      events.push('rollback');
+    },
+    release: () => {
+      events.push('release');
+    },
+    query: async <T>(
+      sql: string,
+      values: readonly unknown[] = [],
+    ): Promise<T> => {
+      const compact = sql.replace(/\s+/g, ' ').trim();
+      queries.push({ sql: compact, values });
+      if (options.failOn?.test(compact)) throw new Error('database failed');
+      if (compact.includes('FROM imports') && compact.includes('FOR UPDATE')) {
+        return [
+          {
+            status: options.lockedStatus ?? 'staged',
+            result_json:
+              options.lockedStatus === 'committed'
+                ? JSON.stringify(committedResult)
+                : null,
+          },
+        ] as T;
+      }
+      if (compact.includes('AS has_live_transactions')) {
+        return [
+          {
+            has_live_transactions: options.liveTransactions ? 1 : 0,
+          },
+        ] as T;
+      }
+      if (compact.includes('AS has_existing_catalogue')) {
+        return [{ has_existing_catalogue: 0 }] as T;
+      }
+      return { affectedRows: 1 } as T;
+    },
+  };
+  const pool: ProtocolPool & {
+    query<T>(
+      sql: string,
+      values?: readonly unknown[],
+    ): Promise<T>;
+  } = {
+    getConnection: vi.fn(async () => connection),
+    query: (sql, values) => connection.query(sql, values),
+  };
+  const uuids = [
+    skuId,
+    primaryIdentifierId,
+    productIdentifierId,
+    imageJobId,
+    priceHistoryId,
+  ];
+  const repository = new MariaDbCatalogueRepository(pool, {
+    randomUuid: () => uuids.shift()!,
+  });
+  return { committedResult, events, queries, repository };
+}
+
+describe('MariaDB catalogue repository', () => {
+  it('persists staged source identity and preview without changing the workbook path', async () => {
+    const query = vi.fn(async <T>() => ({ affectedRows: 1 }) as T);
+    const repository = new MariaDbCatalogueRepository({ query } as never);
+
+    await expect(repository.createStage(record)).resolves.toEqual(record);
+
+    expect(query).toHaveBeenCalledOnce();
+    const [sql, values] = query.mock.calls[0]! as unknown as [
+      string,
+      readonly unknown[],
+    ];
+    expect(sql).toContain('INSERT INTO imports');
+    expect(sql).toContain('source_file_name');
+    expect(sql).toContain('preview_json');
+    expect(values).toEqual(
+      expect.arrayContaining([
+        importId,
+        Buffer.from(record.workbookSha256, 'hex'),
+        record.sourceFileName,
+        record.stagedPath,
+      ]),
+    );
+  });
+
+  it('atomically writes SKU provenance, aliases, stock, price, image job, audit, and changes', async () => {
+    const { events, queries, repository } = commitHarness();
+
+    const result = await repository.commit(
+      record,
+      workbook,
+      new Date('2026-07-30T02:00:00.000Z'),
+    );
+
+    expect(result).toEqual({
+      importId,
+      workbookSha256: record.workbookSha256,
+      rowCount: 1,
+      imageJobCount: 1,
+      committedAt: '2026-07-30T02:00:00.000Z',
+      replayed: false,
+    });
+    expect(events).toEqual(['begin', 'commit', 'release']);
+    const insert = (table: string) =>
+      queries.find(({ sql }) => sql.startsWith(`INSERT INTO ${table}`));
+    expect(insert('skus')?.values).toEqual(
+      expect.arrayContaining([
+        skuId,
+        'SKU-A',
+        'Produk A',
+        15_000,
+        'https://res.bigseller.pro/a.jpg',
+        importId,
+        'Rak A',
+        '2026-07-30 09:24',
+      ]),
+    );
+    expect(insert('sku_identifiers')?.values).toEqual(
+      expect.arrayContaining([
+        primaryIdentifierId,
+        'SKU-A',
+        'primary',
+        productIdentifierId,
+        '87000001',
+        'product_code',
+      ]),
+    );
+    expect(insert('stock_balances')?.values).toContain(12);
+    expect(insert('price_history')?.values).toContain('catalogue_import');
+    expect(insert('image_jobs')?.values).toEqual(
+      expect.arrayContaining([
+        imageJobId,
+        importId,
+        skuId,
+        'https://res.bigseller.pro/a.jpg',
+      ]),
+    );
+    expect(insert('audit_events')).toBeDefined();
+    expect(insert('change_log')).toBeDefined();
+    expect(
+      queries.some(({ sql }) =>
+        sql.startsWith('UPDATE imports SET status ='),
+      ),
+    ).toBe(true);
+  });
+
+  it('returns a locked committed result as an idempotent replay', async () => {
+    const { committedResult, events, queries, repository } = commitHarness({
+      lockedStatus: 'committed',
+    });
+
+    await expect(
+      repository.commit(
+        record,
+        workbook,
+        new Date('2026-07-30T03:00:00.000Z'),
+      ),
+    ).resolves.toEqual({ ...committedResult, replayed: true });
+
+    expect(events).toEqual(['begin', 'commit', 'release']);
+    expect(
+      queries.some(({ sql }) => sql.startsWith('INSERT INTO skus')),
+    ).toBe(false);
+  });
+
+  it('blocks a different full import after live transactions and rolls back', async () => {
+    const { events, queries, repository } = commitHarness({
+      liveTransactions: true,
+    });
+
+    await expect(
+      repository.commit(
+        record,
+        workbook,
+        new Date('2026-07-30T02:00:00.000Z'),
+      ),
+    ).rejects.toMatchObject({
+      code: 'LIVE_TRANSACTIONS_EXIST',
+      statusCode: 409,
+    });
+
+    expect(events).toEqual(['begin', 'rollback', 'release']);
+    expect(
+      queries.some(({ sql }) => sql.startsWith('INSERT INTO skus')),
+    ).toBe(false);
+  });
+
+  it('rolls back every catalogue write when one insert fails', async () => {
+    const { events, repository } = commitHarness({
+      failOn: /^INSERT INTO stock_balances/,
+    });
+
+    await expect(
+      repository.commit(
+        record,
+        workbook,
+        new Date('2026-07-30T02:00:00.000Z'),
+      ),
+    ).rejects.toThrow('database failed');
+    expect(events).toEqual(['begin', 'rollback', 'release']);
+  });
+});

@@ -14,6 +14,46 @@ export interface SyncSnapshot {
 export interface OperationsGatewayCapabilities {
   canResetDemoData: boolean;
   canImportInitialCatalogue: boolean;
+  canStageInitialCatalogue: boolean;
+}
+
+export interface CataloguePriceMismatch {
+  rowNumber: number;
+  primarySku: string;
+  modalPrice: number;
+  salePrice: number;
+  selectedPrice: number;
+}
+
+export interface CatalogueImportPreview {
+  rowCount: number;
+  imageJobCount: number;
+  missingImageCount: number;
+  priceMismatchCount: number;
+  selectedPriceTotal: number;
+  stockTotal: number;
+  maximumCellTextLength: number;
+  warnings: string[];
+  priceMismatches: CataloguePriceMismatch[];
+}
+
+export interface CatalogueValidationResult {
+  importId: string;
+  workbookSha256: string;
+  sourceFileName: string;
+  status: 'staged' | 'committed';
+  preview: CatalogueImportPreview;
+  expiresAt: string;
+  committedAt: string | null;
+}
+
+export interface CatalogueCommitReceipt {
+  importId: string;
+  workbookSha256: string;
+  rowCount: number;
+  imageJobCount: number;
+  committedAt: string;
+  replayed: boolean;
 }
 
 export interface CreateSkuInput {
@@ -45,6 +85,14 @@ export interface OperationsGateway {
   updateSku(id: string, patch: Partial<Sku>): Promise<void>;
   adjustStock(id: string, quantity: number): Promise<void>;
   setArchived(id: string, archived: boolean): Promise<void>;
+  validateInitialCatalogue(input: {
+    fileName: string;
+    workbookBase64: string;
+  }): Promise<CatalogueValidationResult>;
+  commitInitialCatalogue(
+    importId: string,
+  ): Promise<CatalogueCommitReceipt>;
+  loadSkuImage(sku: Sku): Promise<string>;
   replaceFromWorkbook(result: WorkbookImportResult, sourceLabel: string): Promise<void>;
   reset(): Promise<void>;
   setLabelTemplate(template: LabelTemplate): Promise<void>;

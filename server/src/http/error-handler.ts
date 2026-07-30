@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 
 import { IdentityError } from '../auth/identity.js';
+import { CatalogueError } from '../catalogue/service.js';
+import { CatalogueValidationError } from '../catalogue/xlsx-archive.js';
 import { IdempotencyError } from '../sync/idempotency.js';
 import { SyncError } from '../sync/service.js';
 
@@ -15,9 +17,13 @@ export function installProtocolErrorHandler(app: FastifyInstance): void {
     }
     if (
       error instanceof IdentityError ||
-      error instanceof IdempotencyError
+      error instanceof IdempotencyError ||
+      error instanceof CatalogueError
     ) {
       return reply.code(error.statusCode).send({ code: error.code });
+    }
+    if (error instanceof CatalogueValidationError) {
+      return reply.code(422).send({ code: error.code });
     }
     const errorStatusCode =
       typeof error === 'object' &&

@@ -135,7 +135,7 @@ function seedOriginalVersionThree(pool: FakeMigrationPool): void {
 }
 
 describe('runMigrations', () => {
-  it('applies versions 1 through 4 once and makes the second run a no-op', async () => {
+  it('applies versions 1 through 5 once and makes the second run a no-op', async () => {
     const pool = new FakeMigrationPool();
 
     const first = await runMigrations(pool);
@@ -144,15 +144,15 @@ describe('runMigrations', () => {
 
     expect(first).toEqual({
       fromVersion: 0,
-      toVersion: 4,
-      appliedVersions: [1, 2, 3, 4],
+      toVersion: 5,
+      appliedVersions: [1, 2, 3, 4, 5],
     });
     expect(second).toEqual({
-      fromVersion: 4,
-      toVersion: 4,
+      fromVersion: 5,
+      toVersion: 5,
       appliedVersions: [],
     });
-    expect(pool.applied.size).toBe(4);
+    expect(pool.applied.size).toBe(5);
     expect(pool.migrationStatementCount).toBe(statementsAfterFirstRun);
   });
 
@@ -172,16 +172,16 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 0,
-      toVersion: 4,
-      appliedVersions: [1, 2, 3, 4],
+      toVersion: 5,
+      appliedVersions: [1, 2, 3, 4, 5],
     });
   });
 
   it('refuses a database schema newer than this binary and releases the lock', async () => {
-    const pool = new FakeMigrationPool(5);
+    const pool = new FakeMigrationPool(6);
 
     await expect(runMigrations(pool)).rejects.toThrow(
-      'Database schema version 5 is newer than supported version 4',
+      'Database schema version 6 is newer than supported version 5',
     );
 
     expect(pool.lockHeld).toBe(false);
@@ -224,11 +224,11 @@ describe('runMigrations', () => {
 
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 1,
-      toVersion: 4,
-      appliedVersions: [2, 3, 4],
+      toVersion: 5,
+      appliedVersions: [2, 3, 4, 5],
     });
 
-    expect(pool.applied.size).toBe(4);
+    expect(pool.applied.size).toBe(5);
     expect(pool.migrationStatementCount).toBeGreaterThan(2);
   });
 
@@ -245,8 +245,8 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 1,
-      toVersion: 4,
-      appliedVersions: [2, 3, 4],
+      toVersion: 5,
+      appliedVersions: [2, 3, 4, 5],
     });
   });
 
@@ -256,8 +256,8 @@ describe('runMigrations', () => {
 
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 2,
-      toVersion: 4,
-      appliedVersions: [3, 4],
+      toVersion: 5,
+      appliedVersions: [3, 4, 5],
     });
   });
 
@@ -274,8 +274,8 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 2,
-      toVersion: 4,
-      appliedVersions: [3, 4],
+      toVersion: 5,
+      appliedVersions: [3, 4, 5],
     });
   });
 
@@ -292,8 +292,8 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 3,
-      toVersion: 4,
-      appliedVersions: [4],
+      toVersion: 5,
+      appliedVersions: [4, 5],
     });
   });
 });
@@ -374,6 +374,25 @@ describe('initial schema', () => {
     expect(sql).toMatch(
       /ADD UNIQUE INDEX IF NOT EXISTS uq_pairings_request_id \(request_id\)/,
     );
+  });
+
+  it('adds catalogue provenance and bounded image job tables in v5', async () => {
+    const sql = await readFile(
+      new URL('../migrations/005_catalogue_import.sql', import.meta.url),
+      'utf8',
+    );
+
+    expect(sql).toMatch(/ALTER TABLE imports[\s\S]*source_file_name/);
+    expect(sql).toMatch(/ALTER TABLE imports[\s\S]*preview_json/);
+    expect(sql).toMatch(/ALTER TABLE skus[\s\S]*source_import_id/);
+    expect(sql).toMatch(/ALTER TABLE skus[\s\S]*source_note/);
+    expect(sql).toMatch(/ALTER TABLE skus[\s\S]*source_created_at/);
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS image_assets/);
+    expect(sql).toMatch(/content_hash BINARY\(32\) NOT NULL PRIMARY KEY/);
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS image_jobs/);
+    expect(sql).toMatch(/UNIQUE KEY uq_image_jobs_import_sku/);
+    expect(sql).toMatch(/FOREIGN KEY \(import_id\) REFERENCES imports \(id\)/);
+    expect(sql).toMatch(/FOREIGN KEY \(sku_id\) REFERENCES skus \(id\)/);
   });
 
   it('declares every foundation table needed by later CH Core slices', async () => {

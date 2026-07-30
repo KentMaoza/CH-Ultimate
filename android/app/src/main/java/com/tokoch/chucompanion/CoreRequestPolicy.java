@@ -10,6 +10,7 @@ final class CoreRequestPolicy {
     private static final String UUID =
         "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-" +
         "[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}";
+    private static final String SHA256 = "[0-9a-f]{64}";
     private static final Pattern CONTROL_OR_SEPARATOR =
         Pattern.compile("[\\x00-\\x1f\\x7f\\\\#]");
     private static final List<Rule> RULES = List.of(
@@ -28,8 +29,8 @@ final class CoreRequestPolicy {
             Pattern.compile("^/v1/skus/" + UUID + "/stock-adjustments$")
         ),
         new Rule(
-            Set.of("POST"),
-            Pattern.compile("^/v1/imports/initial-catalogue$")
+            Set.of("GET"),
+            Pattern.compile("^/v1/images/" + SHA256 + "$")
         ),
         new Rule(
             Set.of("PATCH"),

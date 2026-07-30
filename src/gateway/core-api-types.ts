@@ -10,6 +10,10 @@ import {
   uuidSchemaForErrors,
   type CoreJsonValue,
 } from './core-api-schemas';
+import type {
+  CatalogueCommitReceipt,
+  CatalogueValidationResult,
+} from './operations-gateway-contract';
 
 export {
   CORE_API_SCHEMA_VERSION,
@@ -145,6 +149,89 @@ export function parseCoreMutationAcknowledgement(
   );
 }
 
+const cataloguePriceMismatchSchema = z
+  .object({
+    rowNumber: z.number().int().min(2),
+    primarySku: z.string().min(1),
+    modalPrice: z.number().int(),
+    salePrice: z.number().int(),
+    selectedPrice: z.number().int(),
+  })
+  .strict();
+const cataloguePreviewSchema = z
+  .object({
+    rowCount: z.number().int().min(0).max(10_000),
+    imageJobCount: z.number().int().min(0).max(10_000),
+    missingImageCount: z.number().int().min(0).max(10_000),
+    priceMismatchCount: z.number().int().min(0).max(10_000),
+    selectedPriceTotal: z.number().int(),
+    stockTotal: z.number().int(),
+    maximumCellTextLength: z.number().int().min(0).max(16 * 1024),
+    warnings: z.array(z.string()),
+    priceMismatches: z.array(cataloguePriceMismatchSchema),
+  })
+  .strict();
+const catalogueValidationSchema: z.ZodType<CatalogueValidationResult> = z
+  .object({
+    importId: uuidSchemaForErrors,
+    workbookSha256: z.string().regex(/^[0-9a-f]{64}$/),
+    sourceFileName: z.string().min(1).max(255),
+    status: z.enum(['staged', 'committed']),
+    preview: cataloguePreviewSchema,
+    expiresAt: z.string().datetime({ offset: true }),
+    committedAt: z.string().datetime({ offset: true }).nullable(),
+  })
+  .strict();
+const catalogueCommitSchema: z.ZodType<CatalogueCommitReceipt> = z
+  .object({
+    importId: uuidSchemaForErrors,
+    workbookSha256: z.string().regex(/^[0-9a-f]{64}$/),
+    rowCount: z.number().int().min(0).max(10_000),
+    imageJobCount: z.number().int().min(0).max(10_000),
+    committedAt: z.string().datetime({ offset: true }),
+    replayed: z.boolean(),
+  })
+  .strict();
+const catalogueImageSchema = z
+  .object({
+    mimeType: z.enum([
+      'image/png',
+      'image/jpeg',
+      'image/gif',
+      'image/webp',
+    ]),
+    bytesBase64: z
+      .string()
+      .max(Math.ceil((5 * 1024 * 1024) / 3) * 4)
+      .regex(
+        /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/,
+      ),
+  })
+  .strict();
+
+export function parseCatalogueValidation(
+  body: unknown,
+): CatalogueValidationResult {
+  return parseEnvelope(
+    catalogueValidationSchema,
+    body,
+    'catalogue validation',
+  );
+}
+
+export function parseCatalogueCommit(
+  body: unknown,
+): CatalogueCommitReceipt {
+  return parseEnvelope(catalogueCommitSchema, body, 'catalogue commit');
+}
+
+export function parseCatalogueImage(body: unknown): {
+  mimeType: string;
+  bytesBase64: string;
+} {
+  return parseEnvelope(catalogueImageSchema, body, 'catalogue image');
+}
+
 const encodeId = (id: string) => encodeURIComponent(id);
 
 export const CORE_API_PATHS = {
@@ -154,7 +241,10 @@ export const CORE_API_PATHS = {
   sku: (id: string) => `/v1/skus/${encodeId(id)}`,
   stockAdjustments: (id: string) =>
     `/v1/skus/${encodeId(id)}/stock-adjustments`,
-  initialCatalogue: '/v1/imports/initial-catalogue',
+  validateCatalogue: '/v1/imports/validate',
+  commitCatalogue: (id: string) =>
+    `/v1/imports/${encodeId(id)}/commit`,
+  image: (hash: string) => `/v1/images/${encodeId(hash)}`,
   template: (kind: 'label' | 'invoice') => `/v1/templates/${kind}`,
   notas: '/v1/notas',
   nota: (id: string) => `/v1/notas/${encodeId(id)}`,

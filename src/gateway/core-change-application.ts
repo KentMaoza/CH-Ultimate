@@ -43,8 +43,12 @@ function applySku(state: DemoState, change: CoreChange): DemoState {
     referencePrice: integerFromDecimal(row.priceRupiah, 'priceRupiah'),
     stock: current?.stock ?? 0,
     tracked: current?.tracked ?? false,
-    note: current?.note ?? '',
+    note: row.sourceNote ?? current?.note ?? '',
     imageUrl: current?.imageUrl ?? '',
+    ...(row.imageHash ? { imageHash: row.imageHash } : {}),
+    ...(row.sourceCreatedAt
+      ? { sourceCreatedAt: row.sourceCreatedAt }
+      : {}),
     createdAt: row.createdAt,
     archived: row.archivedAt !== null,
   };

@@ -10,11 +10,14 @@ import {
   populatedBootstrap,
 } from './core-gateway-test-support';
 
+const INSTALLATION_ID = '10101010-1010-4010-8010-101010101010';
+
 function bridge(
   status: Awaited<ReturnType<ChCoreBridge['credentialStatus']>>,
 ): ChCoreBridge {
   return {
     request: vi.fn(),
+    installationId: vi.fn().mockResolvedValue(INSTALLATION_ID),
     credentialStatus: vi.fn().mockResolvedValue(status),
     enrollOwner: vi.fn(),
     claimPairing: vi.fn(),
@@ -118,6 +121,7 @@ describe('desktop CH Core bootstrap', () => {
       method: 'GET',
       path: '/v1/bootstrap',
     });
+    expect(chCore.installationId).toHaveBeenCalled();
     expect(result.gateway.getSyncSnapshot()).toMatchObject({
       phase: 'online',
       serverRevision: '4',

@@ -119,6 +119,14 @@ async function publicCredentialStatus(
   }
 }
 
+async function installationId(
+  store: CoreCredentialStore,
+): Promise<string> {
+  const state = await store.load();
+  if (!state) throw new Error('Perangkat CH Core belum memiliki identitas.');
+  return state.installationId;
+}
+
 function unavailableService(
   options: CoreDesktopServiceOptions,
   config: Exclude<ConfigResult, { status: 'ready' }>,
@@ -131,6 +139,7 @@ function unavailableService(
       validateCoreOperationRequest(request);
       return unavailable();
     },
+    installationId: () => installationId(options.store),
     credentialStatus: () =>
       publicCredentialStatus(
         options.store,
@@ -173,6 +182,7 @@ export async function createCoreDesktopService(
 
   return {
     request: api.request,
+    installationId: () => installationId(options.store),
     credentialStatus: () =>
       publicCredentialStatus(
         options.store,

@@ -35,6 +35,7 @@ export class CoreMutationQueue {
     private readonly state: CoreGatewayState,
     private readonly refresh: () => Promise<void>,
     private readonly now: () => Date,
+    private readonly onAuthenticationRevoked: () => Promise<void>,
   ) {}
 
   enqueue(spec: CoreMutationSpec): Promise<CoreMutationAcknowledgement> {
@@ -173,10 +174,17 @@ export class CoreMutationQueue {
             );
             continue;
           }
+          if (apiError.status === 401) {
+            await this.onAuthenticationRevoked();
+            this.state.publishSync({
+              phase: 'revoked',
+              message: 'Akses perangkat dicabut. Antrean lokal dikarantina.',
+            });
+            this.failAllDeferred(new Error(apiError.code));
+            return;
+          }
           const phase =
-            apiError.status === 401
-              ? 'revoked'
-              : apiError.code === 'UPGRADE_REQUIRED'
+            apiError.code === 'UPGRADE_REQUIRED'
                 ? 'upgrade-required'
                 : 'offline';
           await this.failCurrent(
@@ -326,6 +334,12 @@ export class CoreMutationQueue {
   private failDeferred(id: string, error: unknown): void {
     this.deferredById.get(id)?.reject(error);
     this.deferredById.delete(id);
+  }
+
+  private failAllDeferred(error: unknown): void {
+    for (const id of [...this.deferredById.keys()]) {
+      this.failDeferred(id, error);
+    }
   }
 }
 

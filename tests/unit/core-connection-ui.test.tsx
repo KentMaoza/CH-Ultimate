@@ -61,6 +61,7 @@ describe('desktop connection screen', () => {
       'Penyimpanan aman tidak tersedia. Perangkat tidak dapat dipasangkan.';
     const bridge = {
       request: vi.fn(),
+      installationId: vi.fn(),
       credentialStatus: vi.fn(),
       enrollOwner: vi.fn(),
       claimPairing: vi.fn().mockRejectedValue(
@@ -104,6 +105,7 @@ describe('desktop connection screen', () => {
     const privateFailure = 'server gagal dengan token rahasia-123';
     const bridge = {
       request: vi.fn(),
+      installationId: vi.fn(),
       credentialStatus: vi.fn(),
       enrollOwner: vi.fn(),
       claimPairing: vi.fn().mockRejectedValue(new Error(privateFailure)),

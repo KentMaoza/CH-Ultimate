@@ -13,11 +13,16 @@ import {
   populatedBootstrap,
 } from './core-gateway-test-support';
 
+const INSTALLATION_ID = '10101010-1010-4010-8010-101010101010';
+
 function nativePlugin(
   status: Awaited<ReturnType<NativeCoreApiPlugin['credentialStatus']>>,
 ): NativeCoreApiPlugin {
   return {
     request: vi.fn(),
+    installationId: vi.fn().mockResolvedValue({
+      installationId: INSTALLATION_ID,
+    }),
     credentialStatus: vi.fn().mockResolvedValue(status),
     claimPairing: vi.fn(),
     completePairing: vi.fn(),
@@ -74,6 +79,18 @@ describe('Android CH Core adapter', () => {
     });
     expect(JSON.stringify(result)).not.toContain('native-secret');
     expect(JSON.stringify(result)).not.toContain('192.168.1.14');
+  });
+
+  it('surfaces only the stable native installation UUID', async () => {
+    const plugin = nativePlugin({
+      production: true,
+      configuration: 'ready',
+      credential: 'paired',
+    });
+
+    await expect(
+      createNativeCoreApiBridge(plugin).installationId(),
+    ).resolves.toBe(INSTALLATION_ID);
   });
 });
 
@@ -142,6 +159,7 @@ describe('mobile CH Core bootstrap', () => {
       method: 'GET',
       path: '/v1/bootstrap',
     });
+    expect(plugin.installationId).toHaveBeenCalled();
     expect(result.gateway.getSyncSnapshot()).toMatchObject({
       phase: 'online',
       serverRevision: '4',

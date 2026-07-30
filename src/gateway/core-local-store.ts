@@ -17,7 +17,7 @@ import {
 } from './core-domain-schemas';
 import type { CoreConflict, CoreJsonValue } from './core-api-types';
 
-export const CORE_CACHE_VERSION = 2;
+export const CORE_CACHE_VERSION = 3;
 
 export type CoreDeferredStatus =
   | 'deferred'
@@ -79,17 +79,19 @@ export interface CoreOfflineConflict {
 }
 
 export interface CoreLocalEnvelope {
-  cacheVersion: 2;
+  cacheVersion: 3;
   installationId: string;
   state: DemoState;
   serverRevision: string;
   outbox: CoreOutboxItem[];
+  quarantinedOutbox: CoreOutboxItem[];
   deferredOutbox: CoreDeferredCommand[];
   provisionalNotas: NotaTransaction[];
   offlineConflicts: CoreOfflineConflict[];
   quarantine: {
     active: boolean;
     quarantinedAt?: string;
+    installationId?: string;
   };
 }
 
@@ -162,9 +164,68 @@ const offlineConflictSchema: z.ZodType<CoreOfflineConflict> = z
     errorCode: z.string().max(128).optional(),
   })
   .strict();
+const quarantineSchema = z
+  .object({
+    active: z.boolean(),
+    quarantinedAt: timestampSchema.optional(),
+    installationId: uuid.optional(),
+  })
+  .strict()
+  .superRefine((quarantine, context) => {
+    if (quarantine.active && !quarantine.installationId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Active quarantine requires an installation ID.',
+      });
+    }
+  });
 const localEnvelopeSchema: z.ZodType<CoreLocalEnvelope> = z
   .object({
     cacheVersion: z.literal(CORE_CACHE_VERSION),
+    installationId: uuid,
+    state: demoStateSchema,
+    serverRevision: decimalCursor,
+    outbox: z.array(coreOutboxItemSchema),
+    quarantinedOutbox: z.array(coreOutboxItemSchema),
+    deferredOutbox: z.array(deferredCommandSchema),
+    provisionalNotas: z.array(notaTransactionSchema),
+    offlineConflicts: z.array(offlineConflictSchema),
+    quarantine: quarantineSchema,
+  })
+  .strict()
+  .superRefine((envelope, context) => {
+    if (
+      envelope.quarantine.active &&
+      (envelope.outbox.length > 0 ||
+        envelope.quarantine.installationId !== envelope.installationId)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Active quarantine must own all normal pending work.',
+      });
+    }
+    if (
+      !envelope.quarantine.active &&
+      envelope.quarantinedOutbox.length > 0
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Inactive quarantine cannot retain pending work.',
+      });
+    }
+  });
+
+const legacyV1EnvelopeSchema = z
+  .object({
+    cacheVersion: z.literal(1),
+    state: demoStateSchema,
+    serverRevision: decimalCursor,
+    outbox: z.array(coreOutboxItemSchema),
+  })
+  .strict();
+const legacyV2EnvelopeSchema = z
+  .object({
+    cacheVersion: z.literal(2),
     installationId: uuid,
     state: demoStateSchema,
     serverRevision: decimalCursor,
@@ -181,15 +242,6 @@ const localEnvelopeSchema: z.ZodType<CoreLocalEnvelope> = z
   })
   .strict();
 
-const legacyEnvelopeSchema = z
-  .object({
-    cacheVersion: z.literal(1),
-    state: demoStateSchema,
-    serverRevision: decimalCursor,
-    outbox: z.array(coreOutboxItemSchema),
-  })
-  .strict();
-
 export function parseCoreLocalEnvelope(value: unknown): CoreLocalEnvelope {
   return cloneCore(localEnvelopeSchema.parse(value));
 }
@@ -200,13 +252,33 @@ export function migrateCoreCache(
 ): CoreLocalEnvelope {
   const current = localEnvelopeSchema.safeParse(value);
   if (current.success) return cloneCore(current.data);
-  const legacy = legacyEnvelopeSchema.parse(value);
+  const installationId = uuid.parse(uuidFactory());
+  const v2 = legacyV2EnvelopeSchema.safeParse(value);
+  if (v2.success) {
+    return {
+      ...cloneCore(v2.data),
+      cacheVersion: CORE_CACHE_VERSION,
+      installationId,
+      outbox: v2.data.quarantine.active ? [] : cloneCore(v2.data.outbox),
+      quarantinedOutbox: v2.data.quarantine.active
+        ? cloneCore(v2.data.outbox)
+        : [],
+      quarantine: v2.data.quarantine.active
+        ? {
+            ...v2.data.quarantine,
+            installationId,
+          }
+        : { active: false },
+    };
+  }
+  const legacy = legacyV1EnvelopeSchema.parse(value);
   return {
     cacheVersion: CORE_CACHE_VERSION,
-    installationId: uuid.parse(uuidFactory()),
+    installationId,
     state: cloneCore(legacy.state),
     serverRevision: legacy.serverRevision,
     outbox: cloneCore(legacy.outbox),
+    quarantinedOutbox: [],
     deferredOutbox: [],
     provisionalNotas: [],
     offlineConflicts: [],
@@ -224,6 +296,7 @@ export function emptyCoreLocalEnvelope(
     state: cloneCore(state),
     serverRevision: '0',
     outbox: [],
+    quarantinedOutbox: [],
     deferredOutbox: [],
     provisionalNotas: [],
     offlineConflicts: [],
@@ -244,12 +317,18 @@ export class CoreLocalStore {
     private readonly uuidFactory: () => string = () => crypto.randomUUID(),
   ) {}
 
-  prime(raw: unknown): CoreLocalEnvelope {
+  prime(raw: unknown, nativeInstallationId?: string): CoreLocalEnvelope {
     if (this.envelope) return cloneCore(this.envelope);
+    const installationId = uuid.parse(
+      nativeInstallationId ?? this.uuidFactory(),
+    );
     const envelope =
       raw === undefined || raw === null
-        ? emptyCoreLocalEnvelope(emptyCoreState(), this.uuidFactory())
-        : migrateCoreCache(raw, this.uuidFactory);
+        ? emptyCoreLocalEnvelope(emptyCoreState(), installationId)
+        : migrateCoreCache(raw, () => installationId);
+    if (envelope.installationId !== installationId) {
+      throw new Error('Cache belongs to a different installation.');
+    }
     this.envelope = envelope;
     return cloneCore(envelope);
   }
@@ -275,7 +354,9 @@ export class CoreLocalStore {
         ...current,
         state: cloneCore(canonical.state),
         serverRevision: canonical.serverRevision,
-        outbox: cloneCore(canonical.outbox),
+        outbox: current.quarantine.active
+          ? []
+          : cloneCore(canonical.outbox),
       };
       await this.saveRaw(next);
       this.envelope = next;
@@ -292,6 +373,57 @@ export class CoreLocalStore {
       this.envelope = next;
       return cloneCore(next);
     });
+  }
+
+  quarantineCurrentWork(quarantinedAt: string): Promise<CoreLocalEnvelope> {
+    return this.update((envelope) => {
+      const combined = new Map(
+        [...envelope.quarantinedOutbox, ...envelope.outbox].map(
+          (item) => [item.id, item],
+        ),
+      );
+      return {
+        ...envelope,
+        outbox: [],
+        quarantinedOutbox: [...combined.values()],
+        deferredOutbox: envelope.deferredOutbox.map((command) => ({
+          ...command,
+          status: 'quarantined',
+          lastError: 'Akses perangkat dicabut.',
+        })),
+        quarantine: {
+          active: true,
+          quarantinedAt,
+          installationId: envelope.installationId,
+        },
+      };
+    });
+  }
+
+  async resumeQuarantinedWork(
+    nativeInstallationId: string,
+  ): Promise<boolean> {
+    const expected = uuid.parse(nativeInstallationId);
+    const current = await this.load();
+    if (!current.quarantine.active) return true;
+    if (
+      current.installationId !== expected ||
+      current.quarantine.installationId !== expected
+    ) {
+      return false;
+    }
+    await this.update((envelope) => ({
+      ...envelope,
+      outbox: cloneCore(envelope.quarantinedOutbox),
+      quarantinedOutbox: [],
+      quarantine: { active: false },
+      deferredOutbox: envelope.deferredOutbox.map((command) =>
+        command.status === 'quarantined'
+          ? { ...command, status: 'error', lastError: undefined }
+          : command,
+      ),
+    }));
+    return true;
   }
 
   canonicalStorage(): CoreGatewayStorage {

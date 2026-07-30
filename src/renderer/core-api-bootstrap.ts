@@ -93,7 +93,10 @@ export async function bootstrapDesktopGateway(
   }
 
   const gateway = createCoreOperationsGateway(
-    { request: (request) => options.bridge!.request(request) },
+    {
+      installationId: () => options.bridge!.installationId(),
+      request: (request) => options.bridge!.request(request),
+    },
     options.storage ?? createCoreGatewayStorage(),
     options.clock ?? createCoreGatewayClock(),
   );

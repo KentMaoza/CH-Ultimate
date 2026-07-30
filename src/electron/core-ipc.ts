@@ -111,6 +111,10 @@ export function registerCoreIpcHandlers(
     ),
   );
   ipcMain.handle(
+    CH_CORE_IPC_CHANNELS.installationId,
+    authorized(() => service.installationId()),
+  );
+  ipcMain.handle(
     CH_CORE_IPC_CHANNELS.credentialStatus,
     authorized(() => service.credentialStatus()),
   );

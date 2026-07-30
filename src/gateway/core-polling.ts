@@ -94,6 +94,7 @@ export class CorePollingCoordinator {
       if (response.status < 200 || response.status >= 300) {
         const error = parseCoreApiError(response.status, response.body);
         if (error.status === 401) {
+          this.authenticationRevoked();
           await this.onAuthenticationRevoked();
           this.state.publishSync({
             phase: 'revoked',
@@ -159,6 +160,10 @@ export class CorePollingCoordinator {
     await this.scheduler.request();
   }
 
+  authenticationRevoked(): void {
+    this.bootstrapped = false;
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
@@ -198,6 +203,7 @@ export class CorePollingCoordinator {
     if (response.status < 200 || response.status >= 300) {
       const error = parseCoreApiError(response.status, response.body);
       if (error.status === 401) {
+        this.authenticationRevoked();
         await this.onAuthenticationRevoked();
         this.state.publishSync({
           phase: 'revoked',

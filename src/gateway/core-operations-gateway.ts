@@ -13,6 +13,7 @@ import { ZodError } from 'zod';
 import { noteSuffixFromIndex } from '../domain/nota';
 import type { CoreApiTransport } from './core-api-transport';
 import {
+  parseCoreCache,
   type CoreGatewayClock,
   type CoreGatewayStorage,
 } from './core-cache';
@@ -85,6 +86,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   private readonly localStore: CoreLocalStore;
   private readonly deferred: CoreDeferredOutbox;
   private readonly clock: CoreGatewayClock;
+  private provisionalNotaIds = new Set<string>();
 
   constructor(
     private readonly transport: CoreApiTransport,
@@ -131,6 +133,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
         this.state,
         () => this.polling.refreshNow(),
         () => clock.now(),
+        () => this.onAuthenticationRevoked(),
       ),
       this.state,
     );
@@ -145,8 +148,23 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     this.state.subscribeSync(listener);
   initialize = async (): Promise<void> => {
     let envelope: CoreLocalEnvelope;
+    let legacyCacheRestored = false;
     try {
-      envelope = this.localStore.prime(await this.storage.load());
+      const cached = await this.storage.load();
+      if (
+        cached &&
+        typeof cached === 'object' &&
+        Reflect.get(cached, 'cacheVersion') === 1
+      ) {
+        this.state.restore(parseCoreCache(cached));
+        this.state.publishSync({ phase: 'connecting', message: undefined });
+        legacyCacheRestored = true;
+      }
+      const installationId = await this.transport.installationId();
+      envelope = this.localStore.prime(
+        cached,
+        installationId,
+      );
     } catch (error) {
       if (!(error instanceof ZodError)) throw error;
       this.state.publishSync({
@@ -155,15 +173,19 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
       });
       return;
     }
-    this.applyOfflineProjection(envelope, true);
+    this.applyOfflineProjection(envelope, !legacyCacheRestored);
     await this.polling.initialize(true);
   };
   dispose = (): void => this.polling.dispose();
   flushNota = async (id: string): Promise<void> => {
-    if (this.isOffline() && (await this.localNota(id))) return;
+    if (this.hasLocalNota(id)) return;
     await this.mutations.flushNota(id);
   };
   retryPending = async (): Promise<void> => {
+    if (this.state.getSyncSnapshot().phase === 'revoked') {
+      await this.polling.retryPending();
+      return;
+    }
     await this.mutations.retryPending();
     if (this.state.getSyncSnapshot().phase === 'online') {
       await this.deferred.pump(true);
@@ -345,7 +367,10 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   addNotaPage = async (
     transactionId: string,
   ): Promise<Nota | undefined> => {
-    if (!this.isOffline()) return this.mutations.addNotaPage(transactionId);
+    if (!this.hasLocalNota(transactionId)) {
+      if (this.isOffline()) return this.offlineBlocked();
+      return this.mutations.addNotaPage(transactionId);
+    }
     const transaction = await this.requireLocalNota(transactionId);
     this.requireEditableLocalNota(transaction);
     const page = createOfflinePage(transaction.nextNoteIndex);
@@ -356,14 +381,16 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     });
     return page;
   };
-  cancelNotaPage = (
+  cancelNotaPage = async (
     transactionId: string,
     pageId: string,
   ): Promise<void> => {
-    if (!this.isOffline()) {
-      return this.mutations.cancelNotaPage(transactionId, pageId);
+    if (!this.hasLocalNota(transactionId)) {
+      if (this.isOffline()) return this.offlineBlocked();
+      await this.mutations.cancelNotaPage(transactionId, pageId);
+      return;
     }
-    return this.updateLocalNota(transactionId, (transaction) => {
+    await this.updateLocalNota(transactionId, (transaction) => {
       this.requireEditableLocalNota(transaction);
       if (transaction.pages.filter((page) => page.status === 'active').length < 2) {
         throw new Error('Nota harus memiliki setidaknya satu halaman aktif.');
@@ -376,47 +403,56 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
       };
     });
   };
-  restoreNotaPage = (
+  restoreNotaPage = async (
     transactionId: string,
     pageId: string,
   ): Promise<void> => {
-    if (!this.isOffline()) {
-      return this.mutations.restoreNotaPage(transactionId, pageId);
+    if (!this.hasLocalNota(transactionId)) {
+      if (this.isOffline()) return this.offlineBlocked();
+      await this.mutations.restoreNotaPage(transactionId, pageId);
+      return;
     }
-    return this.updateLocalNota(transactionId, (transaction) => ({
-      ...transaction,
-      pages: transaction.pages.map((page) =>
-        page.id === pageId ? { ...page, status: 'active' } : page,
-      ),
-    }));
+    await this.updateLocalNota(transactionId, (transaction) => {
+      this.requireEditableLocalNota(transaction);
+      return {
+        ...transaction,
+        pages: transaction.pages.map((page) =>
+          page.id === pageId ? { ...page, status: 'active' } : page,
+        ),
+      };
+    });
   };
-  updateNotaTransaction = (
+  updateNotaTransaction = async (
     id: string,
     patch: Parameters<OperationsGateway['updateNotaTransaction']>[1],
   ): Promise<void> => {
-    if (!this.isOffline()) {
-      return this.mutations.updateNotaTransaction(id, patch);
+    if (!this.hasLocalNota(id)) {
+      if (this.isOffline()) return this.offlineBlocked();
+      await this.mutations.updateNotaTransaction(id, patch);
+      return;
     }
-    return this.updateLocalNota(id, (transaction) => {
+    await this.updateLocalNota(id, (transaction) => {
       this.requireEditableLocalNota(transaction);
       return { ...transaction, ...patch };
     });
   };
-  updateNotaLine = (
+  updateNotaLine = async (
     transactionId: string,
     pageId: string,
     lineId: string,
     patch: Partial<NotaLine>,
   ): Promise<void> => {
-    if (!this.isOffline()) {
-      return this.mutations.updateNotaLine(
+    if (!this.hasLocalNota(transactionId)) {
+      if (this.isOffline()) return this.offlineBlocked();
+      await this.mutations.updateNotaLine(
         transactionId,
         pageId,
         lineId,
         patch,
       );
+      return;
     }
-    return this.updateLocalNota(transactionId, (transaction) => {
+    await this.updateLocalNota(transactionId, (transaction) => {
       this.requireEditableLocalNota(transaction);
       return {
         ...transaction,
@@ -433,15 +469,17 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
       };
     });
   };
-  deleteNotaLine = (
+  deleteNotaLine = async (
     transactionId: string,
     pageId: string,
     lineId: string,
   ): Promise<void> => {
-    if (!this.isOffline()) {
-      return this.mutations.deleteNotaLine(transactionId, pageId, lineId);
+    if (!this.hasLocalNota(transactionId)) {
+      if (this.isOffline()) return this.offlineBlocked();
+      await this.mutations.deleteNotaLine(transactionId, pageId, lineId);
+      return;
     }
-    return this.updateLocalNota(transactionId, (transaction) => {
+    await this.updateLocalNota(transactionId, (transaction) => {
       this.requireEditableLocalNota(transaction);
       return {
         ...transaction,
@@ -460,22 +498,23 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
       };
     });
   };
-  completeNotaTransaction = (
+  completeNotaTransaction = async (
     id: string,
     destination: NotaCompletionDestination = 'archive',
   ): Promise<void> => {
-    if (!this.isOffline()) {
-      return this.mutations.completeNotaTransaction(id, destination);
+    if (!this.hasLocalNota(id)) {
+      if (this.isOffline()) return this.offlineBlocked();
+      await this.mutations.completeNotaTransaction(id, destination);
+      return;
     }
-    return this.updateLocalNota(
+    await this.updateLocalNota(
       id,
       (transaction) => completeOfflineNota(transaction, destination, this.clock.now()),
       destination,
-    ).then(() => {
-      this.state.publishSync({
-        message:
-          'Menunggu sinkronisasi — stok dan omzet pusat belum berubah.',
-      });
+    );
+    this.state.publishSync({
+      message:
+        'Menunggu sinkronisasi — stok dan omzet pusat belum berubah.',
     });
   };
   reopenNotaTransaction = (id: string): Promise<void> =>
@@ -540,6 +579,9 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     envelope: CoreLocalEnvelope,
     restoreOutbox = false,
   ): void {
+    this.provisionalNotaIds = new Set(
+      envelope.provisionalNotas.map((nota) => nota.id),
+    );
     if (restoreOutbox) {
       this.state.restore({
         cacheVersion: 1,
@@ -561,10 +603,10 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     }
     this.state.setOfflineProjection(
       envelope.provisionalNotas,
-      envelope.deferredOutbox.length,
+      envelope.deferredOutbox.length + envelope.quarantinedOutbox.length,
       envelope.deferredOutbox.filter(
         (command) => command.status === 'quarantined',
-      ).length,
+      ).length + envelope.quarantinedOutbox.length,
       envelope.offlineConflicts.map((item) => item.conflict),
     );
     const phase = this.state.getSyncSnapshot().phase;
@@ -583,6 +625,10 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     return (await this.localStore.load()).provisionalNotas.find(
       (nota) => nota.id === id,
     );
+  }
+
+  private hasLocalNota(id: string): boolean {
+    return this.provisionalNotaIds.has(id);
   }
 
   private async requireLocalNota(id: string): Promise<NotaTransaction> {
@@ -641,15 +687,36 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   private async onAuthenticatedOnline(): Promise<void> {
     const envelope = await this.localStore.load();
     if (envelope.quarantine.active) {
-      await this.deferred.resumeAfterReapproval();
+      const resumed = await this.deferred.resumeAfterReapproval(
+        await this.transport.installationId(),
+      );
+      if (!resumed) {
+        this.polling.authenticationRevoked();
+        this.state.publishSync({
+          phase: 'revoked',
+          message:
+            'Antrean dikarantina untuk instalasi perangkat yang berbeda.',
+        });
+        return;
+      }
+      const restored = await this.localStore.load();
+      this.applyOfflineProjection(restored, true);
+      if (restored.outbox.length > 0) {
+        await this.mutations.retryPending();
+      }
     }
     await this.deferred.pump(true);
     await this.refreshOfflineProjection();
   }
 
   private async onAuthenticationRevoked(): Promise<void> {
+    this.polling.authenticationRevoked();
+    this.state.publishSync({
+      phase: 'revoked',
+      message: 'Akses perangkat dicabut. Antrean lokal dikarantina.',
+    });
     await this.deferred.quarantineRevoked();
-    await this.refreshOfflineProjection();
+    this.applyOfflineProjection(await this.localStore.load(), true);
   }
 }
 
@@ -805,18 +872,6 @@ function acknowledgeOfflineCommand(
       skus: envelope.state.skus.map((sku) =>
         sku.id === current.id ? { ...sku, stock: quantity } : sku,
       ),
-      adjustments: [
-        ...envelope.state.adjustments,
-        {
-          id: command.operationId,
-          skuId: current.id,
-          quantity: command.payload.delta,
-          before: current.stock,
-          after: quantity,
-          createdAt: command.createdAt,
-          source: 'manual',
-        },
-      ],
     },
   };
 }

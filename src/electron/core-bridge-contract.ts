@@ -9,6 +9,7 @@ import type {
 
 export const CH_CORE_IPC_CHANNELS = {
   request: 'ch-core:request',
+  installationId: 'ch-core:installation-id',
   credentialStatus: 'ch-core:credential-status',
   enrollOwner: 'ch-core:enroll-owner',
   claimPairing: 'ch-core:claim-pairing',
@@ -30,6 +31,7 @@ export interface CoreCredentialStatus {
 
 export interface ChCoreBridge {
   request(request: CoreApiRequest): Promise<CoreApiResponse>;
+  installationId(): Promise<string>;
   credentialStatus(): Promise<CoreCredentialStatus>;
   enrollOwner(
     input: OwnerEnrollmentInput,
@@ -47,6 +49,8 @@ export function createChCoreBridge(invoke: BridgeInvoke): ChCoreBridge {
   return {
     request: (input) =>
       invoke(CH_CORE_IPC_CHANNELS.request, input) as Promise<CoreApiResponse>,
+    installationId: () =>
+      invoke(CH_CORE_IPC_CHANNELS.installationId) as Promise<string>,
     credentialStatus: () =>
       invoke(
         CH_CORE_IPC_CHANNELS.credentialStatus,

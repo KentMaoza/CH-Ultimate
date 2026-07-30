@@ -159,6 +159,9 @@ describe('CH Core desktop service configuration', () => {
     });
 
     const status = await service.credentialStatus();
+    await expect(service.installationId()).resolves.toBe(
+      '11111111-1111-4111-8111-111111111111',
+    );
 
     expect(status).toEqual({
       production: true,

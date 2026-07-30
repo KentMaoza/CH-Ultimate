@@ -79,6 +79,20 @@ public final class CoreApiPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void installationId(PluginCall call) {
+        try {
+            call.resolve(
+                new JSObject().put(
+                    "installationId",
+                    loadState().installationId
+                )
+            );
+        } catch (CoreSecurityException error) {
+            call.reject(safeMessage(error));
+        }
+    }
+
+    @PluginMethod
     public void request(PluginCall call) {
         try {
             rejectUnknownKeys(call);

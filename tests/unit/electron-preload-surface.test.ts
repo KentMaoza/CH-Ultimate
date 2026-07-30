@@ -7,7 +7,7 @@ import {
 import { registerCoreIpcHandlers } from '../../src/electron/core-ipc';
 
 describe('CH Core preload surface', () => {
-  it('publishes the six-method bridge without exposing raw Electron IPC', async () => {
+  it('publishes the seven-method bridge without exposing raw Electron IPC', async () => {
     vi.resetModules();
     const exposeInMainWorld = vi.fn();
     const invoke = vi.fn().mockResolvedValue({ status: 'ok' });
@@ -26,6 +26,7 @@ describe('CH Core preload surface', () => {
       'completePairing',
       'credentialStatus',
       'enrollOwner',
+      'installationId',
       'request',
       'rotateToken',
     ]);
@@ -39,7 +40,7 @@ describe('CH Core preload surface', () => {
     vi.doUnmock('electron');
   });
 
-  it('exposes exactly six narrow methods without raw IPC', async () => {
+  it('exposes exactly seven narrow methods without raw IPC', async () => {
     const invoke = vi.fn().mockResolvedValue({ status: 'ok' });
     const bridge = createChCoreBridge(invoke);
 
@@ -48,6 +49,7 @@ describe('CH Core preload surface', () => {
       'completePairing',
       'credentialStatus',
       'enrollOwner',
+      'installationId',
       'request',
       'rotateToken',
     ]);
@@ -56,6 +58,7 @@ describe('CH Core preload surface', () => {
     expect(bridge).not.toHaveProperty('ipcRenderer');
 
     await bridge.request({ method: 'GET', path: '/v1/bootstrap' });
+    await bridge.installationId();
     await bridge.credentialStatus();
     await bridge.enrollOwner({
       mode: 'bootstrap',
@@ -71,6 +74,7 @@ describe('CH Core preload surface', () => {
 
     expect(invoke.mock.calls.map(([channel]) => channel)).toEqual([
       CH_CORE_IPC_CHANNELS.request,
+      CH_CORE_IPC_CHANNELS.installationId,
       CH_CORE_IPC_CHANNELS.credentialStatus,
       CH_CORE_IPC_CHANNELS.enrollOwner,
       CH_CORE_IPC_CHANNELS.claimPairing,
@@ -91,6 +95,7 @@ describe('CH Core main IPC registration', () => {
     };
     const service = {
       request: vi.fn(),
+      installationId: vi.fn(),
       credentialStatus: vi.fn(),
       enrollOwner: vi.fn(),
       claimPairing: vi.fn(),
@@ -122,6 +127,9 @@ describe('CH Core main IPC registration', () => {
     };
     const service = {
       request: vi.fn().mockResolvedValue({ status: 200, body: {} }),
+      installationId: vi.fn().mockResolvedValue(
+        '10101010-1010-4010-8010-101010101010',
+      ),
       credentialStatus: vi.fn().mockResolvedValue({
         production: true,
         configuration: 'ready',
@@ -159,6 +167,7 @@ describe('CH Core main IPC registration', () => {
     };
     const service = {
       request: vi.fn(),
+      installationId: vi.fn(),
       credentialStatus: vi.fn(),
       enrollOwner: vi.fn(),
       claimPairing: vi.fn(),
@@ -206,6 +215,7 @@ describe('CH Core main IPC registration', () => {
     };
     const service = {
       request: vi.fn(),
+      installationId: vi.fn(),
       credentialStatus: vi.fn(),
       enrollOwner: vi.fn(),
       claimPairing: vi.fn(),
@@ -236,6 +246,7 @@ describe('CH Core main IPC registration', () => {
     };
     const service = {
       request: vi.fn(),
+      installationId: vi.fn(),
       credentialStatus: vi.fn(),
       enrollOwner: vi.fn(),
       claimPairing: vi.fn(),

@@ -14,6 +14,7 @@ import {
 } from './core-gateway-test-support';
 
 const INSTALLATION_ID = '10101010-1010-4010-8010-101010101010';
+const OTHER_INSTALLATION_ID = '11111111-1111-4111-8111-111111111111';
 const OPERATION_ID = '20202020-2020-4020-8020-202020202020';
 const PROVISIONAL_ID = '30303030-3030-4030-8030-303030303030';
 
@@ -34,7 +35,7 @@ function localNota(customerName = '') {
   };
 }
 
-describe('Core local cache v2', () => {
+describe('Core local cache v3', () => {
   it('migrates a v1 cache without losing its canonical cursor or online outbox', () => {
     const legacy = {
       cacheVersion: 1,
@@ -68,13 +69,14 @@ describe('Core local cache v2', () => {
     expect(parseCoreLocalEnvelope(migrated)).toEqual(migrated);
   });
 
-  it('fails closed on corrupt v2 data while leaving the caller-owned value untouched', () => {
+  it('fails closed on corrupt v3 data while leaving the caller-owned value untouched', () => {
     const corrupt = {
       cacheVersion: CORE_CACHE_VERSION,
       installationId: INSTALLATION_ID,
       state: emptyCoreState(),
       serverRevision: 'not-a-cursor',
       outbox: [],
+      quarantinedOutbox: [],
       deferredOutbox: [{ operationId: OPERATION_ID }],
       provisionalNotas: [],
       offlineConflicts: [],
@@ -99,7 +101,7 @@ describe('Core local cache v2', () => {
       ],
     }));
 
-    const restarted = new CoreLocalStore(storage, () => crypto.randomUUID());
+    const restarted = new CoreLocalStore(storage, () => INSTALLATION_ID);
     const recovered = await restarted.load();
 
     expect(recovered.installationId).toBe(INSTALLATION_ID);
@@ -234,6 +236,19 @@ describe('Core deferred outbox', () => {
       delta: 2,
       reason: 'Koreksi',
     });
+    await store.update((envelope) => ({
+      ...envelope,
+      outbox: [
+        {
+          id: '60606060-6060-4060-8060-606060606060',
+          idempotencyKey: '60606060-6060-4060-8060-606060606060',
+          method: 'PATCH',
+          path: `/v1/skus/11111111-1111-4111-8111-111111111111`,
+          body: { name: 'Antrean biasa' },
+          createdAt: '2026-07-30T01:59:00.000Z',
+        },
+      ],
+    }));
     transport.enqueue({ status: 401, body: { code: 'UNAUTHORIZED' } });
 
     await outbox.pump(true);
@@ -242,19 +257,34 @@ describe('Core deferred outbox', () => {
     const quarantined = await store.load();
     expect(revoked).toBe(1);
     expect(quarantined.installationId).toBe(INSTALLATION_ID);
-    expect(quarantined.quarantine.active).toBe(true);
+    expect(quarantined.quarantine).toMatchObject({
+      active: true,
+      installationId: INSTALLATION_ID,
+    });
+    expect(quarantined.outbox).toEqual([]);
+    expect(Reflect.get(quarantined, 'quarantinedOutbox')).toHaveLength(1);
     expect(
       quarantined.deferredOutbox.map((command) => command.status),
     ).toEqual(['quarantined', 'quarantined']);
     expect(transport.requests).toHaveLength(1);
 
-    await outbox.resumeAfterReapproval();
+    await expect(
+      outbox.resumeAfterReapproval(OTHER_INSTALLATION_ID),
+    ).resolves.toBe(false);
+    expect((await store.load()).quarantine.active).toBe(true);
+    await outbox.pump(true);
+    expect(transport.requests).toHaveLength(1);
+
+    await expect(
+      outbox.resumeAfterReapproval(INSTALLATION_ID),
+    ).resolves.toBe(true);
     transport.enqueue({ status: 200, body: {} });
     transport.enqueue({ status: 200, body: {} });
     await outbox.pump(true);
 
     expect((await store.load()).installationId).toBe(INSTALLATION_ID);
     expect((await store.load()).deferredOutbox).toEqual([]);
+    expect((await store.load()).outbox).toHaveLength(1);
     expect(transport.requests[1]).toEqual(transport.requests[0]);
   });
 

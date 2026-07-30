@@ -17,5 +17,6 @@ export interface CoreApiResponse {
  * Authentication credentials intentionally do not appear in this contract.
  */
 export interface CoreApiTransport {
+  installationId(): Promise<string>;
   request(request: CoreApiRequest): Promise<CoreApiResponse>;
 }

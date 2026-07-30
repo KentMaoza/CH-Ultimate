@@ -131,6 +131,7 @@ describe('Core operations gateway bootstrap and polling', () => {
       pendingCount: 1,
     });
 
+    await Promise.resolve();
     releaseBootstrap();
     await initializing;
 

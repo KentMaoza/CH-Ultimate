@@ -262,6 +262,7 @@ export class TestClock implements CoreGatewayClock {
 }
 
 export class ScriptedTransport implements CoreApiTransport {
+  nativeInstallationId = '10101010-1010-4010-8010-101010101010';
   requests: CoreApiRequest[] = [];
   handlers: Array<
     (
@@ -293,6 +294,10 @@ export class ScriptedTransport implements CoreApiTransport {
     const handler = this.handlers.shift();
     if (!handler) throw new Error(`No response queued for ${request.path}`);
     return handler(request);
+  }
+
+  async installationId(): Promise<string> {
+    return this.nativeInstallationId;
   }
 }
 

@@ -16,6 +16,7 @@ export interface MobileCredentialStatus {
 
 export interface NativeCoreApiPlugin {
   request(request: CoreApiRequest): Promise<CoreApiResponse>;
+  installationId(): Promise<{ installationId: string }>;
   credentialStatus(): Promise<MobileCredentialStatus>;
   claimPairing(input: {
     code: string;
@@ -25,7 +26,12 @@ export interface NativeCoreApiPlugin {
   rotateToken(): Promise<{ status: 'rotated' }>;
 }
 
-export interface MobileCoreBridge extends NativeCoreApiPlugin {}
+export type MobileCoreBridge = Omit<
+  NativeCoreApiPlugin,
+  'installationId'
+> & {
+  installationId(): Promise<string>;
+};
 
 export const NativeCoreApi =
   registerPlugin<NativeCoreApiPlugin>('CoreApi');
@@ -49,6 +55,17 @@ export function createNativeCoreApiBridge(
 ): MobileCoreBridge {
   return {
     request: (request) => plugin.request(request),
+    installationId: async () => {
+      const result = await plugin.installationId();
+      if (
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          result.installationId,
+        )
+      ) {
+        throw new Error('Identitas instalasi CH Core tidak valid.');
+      }
+      return result.installationId;
+    },
     credentialStatus: async () =>
       sanitizeStatus(await plugin.credentialStatus()),
     claimPairing: async (input) => {

@@ -131,16 +131,10 @@ export class CoreDeferredOutbox {
     return this.pumping;
   }
 
-  async resumeAfterReapproval(): Promise<void> {
-    await this.store.update((envelope) => ({
-      ...envelope,
-      quarantine: { active: false },
-      deferredOutbox: envelope.deferredOutbox.map((command) =>
-        command.status === 'quarantined'
-          ? { ...command, status: 'error', lastError: undefined }
-          : command,
-      ),
-    }));
+  resumeAfterReapproval(
+    nativeInstallationId: string,
+  ): Promise<boolean> {
+    return this.store.resumeQuarantinedWork(nativeInstallationId);
   }
 
   async resolveConflict(
@@ -341,15 +335,7 @@ export class CoreDeferredOutbox {
 
   async quarantineRevoked(): Promise<void> {
     const now = this.dependencies.now().toISOString();
-    await this.store.update((envelope) => ({
-      ...envelope,
-      quarantine: { active: true, quarantinedAt: now },
-      deferredOutbox: envelope.deferredOutbox.map((command) => ({
-        ...command,
-        status: 'quarantined',
-        lastError: 'Akses perangkat dicabut.',
-      })),
-    }));
+    await this.store.quarantineCurrentWork(now);
     await this.dependencies.onRevoked?.();
   }
 }

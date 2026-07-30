@@ -18,6 +18,7 @@ afterEach(cleanup);
 function bridge(): MobileCoreBridge {
   return {
     request: vi.fn(),
+    installationId: vi.fn(),
     credentialStatus: vi.fn(),
     claimPairing: vi.fn().mockResolvedValue({
       status: 'pending',

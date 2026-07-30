@@ -10,8 +10,9 @@ signed stock delta with a required reason and captured SKU snapshot. All other
 shared writes fail closed while offline. A successful authenticated refresh is
 required before either command can transmit.
 
-The implementation is complete and the root, server, mobile, package, and
-Android gates pass. Two environmental/inherited gates remain:
+The implementation and first reviewer fix round are complete. The root,
+server-unit, mobile, package, and Android gates pass. Two
+environmental/inherited gates remain:
 
 - `CH_CORE_TEST_DATABASE_URL` is unset, so the exact isolated `chu_test`
   integration source compiled but was not executed.
@@ -26,12 +27,14 @@ claimed.
 
 ## Implemented behavior
 
-- Added a strict cache-v2 local envelope containing the canonical snapshot,
+- Added a strict cache-v3 local envelope containing the canonical snapshot,
   decimal cursor, existing online outbox, installation UUID, deferred offline
-  outbox, provisional Notas, retained offline conflicts, and quarantine state.
-- Existing cache-v1 data migrates without losing its canonical cursor or
-  online outbox. Invalid v2 data fails closed without rewriting the caller's
-  recoverable value. The same installation UUID survives app restart.
+  outbox, a separately persisted quarantined online outbox, provisional Notas,
+  retained offline conflicts, and installation-bound quarantine state.
+- Existing cache-v1/v2 data migrates without losing its canonical cursor or
+  online outbox. An active v2 quarantine migrates its normal outbox into the
+  fail-closed quarantine. Invalid v3 data fails closed without rewriting the
+  caller's recoverable value.
 - Added a FIFO deferred outbox that persists the operation UUID, exact payload,
   and send state before transport. A Nota snapshot may be replaced only before
   its first send while retaining the same operation UUID.
@@ -41,10 +44,15 @@ claimed.
 - Permanent 4xx failures remain as typed actionable offline conflicts.
   `mine` requeues the immutable command and `server` discards it; discarding a
   provisional Nota also removes its local projection.
-- Authenticated `401` quarantines every deferred command. Quarantined commands
-  cannot transmit and expose a visible count. They resume only after the same
-  installation receives a successful authenticated bootstrap following owner
-  reapproval.
+- Authenticated `401` from either queue atomically quarantines every deferred
+  command and every pending normal Core mutation. Both pumps remain fail
+  closed and expose the complete visible count. A successful bootstrap resumes
+  work only when its native installation UUID matches the installation that
+  was revoked.
+- Electron exposes that stable UUID from the existing encrypted
+  `safeStorage` credential state through one authenticated IPC method. Android
+  exposes the existing Keystore-backed installation UUID through one native
+  Capacitor method. Neither renderer/WebView transport exposes a device token.
 - Unknown, revoked, unpaired, and upgrade-required states fail closed for
   mutations. Only a definitely `offline` state enables the two local command
   paths.
@@ -60,6 +68,14 @@ claimed.
 - Offline stock requires a safe nonzero signed delta and a trimmed reason of
   at most 512 characters. It captures identifier, name, and price but never
   optimistically replaces the authoritative balance.
+- Offline stock acknowledgement applies only the authoritative returned
+  balance. It does not create a synthetic adjustment; the ordered server
+  `stock_movement` change supplies the single visible movement identity and
+  exact concurrent before/after quantities.
+- A provisional Nota remains on local routing after polling publishes online.
+  Once its command has `firstSentAt`, header, line, page, delete, and completion
+  edits all retain the immutable payload and reject with the existing
+  `Sedang sinkronisasi` guard. Completed local Notas also reject page restore.
 - Added authenticated `/v1/offline/notas` and
   `/v1/offline/stock-adjustments` routes under the existing idempotency
   receipt, payload-hash, device identity, business-lock, and transaction
@@ -83,8 +99,8 @@ claimed.
 
 ## Bounded module layout
 
-- `src/gateway/core-local-store.ts`: 326 lines
-- `src/gateway/core-outbox.ts`: 369 lines
+- `src/gateway/core-local-store.ts`: 437 lines
+- `src/gateway/core-outbox.ts`: 355 lines
 - `server/src/offline/validation.ts`: 167 lines
 - `server/src/offline/service.ts`: 97 lines
 - `server/src/offline/mariadb-stock-adjustment.ts`: 155 lines
@@ -122,6 +138,13 @@ stays below 500 lines.
     regressions. Surgical cache priming, fail-closed error discrimination, and
     projection fixes restored all legacy behavior; the combined focused
     regression set passed 63 tests before the full suite.
+11. Reviewer fix round 1 added RED regressions for full normal/deferred queue
+    quarantine, matching and mismatching native installation reapproval,
+    authoritative stock movement identity, every first-sent provisional Nota
+    edit path, and completed-Nota page restore. The four-file focused set then
+    passed 31 tests. A full run exposed six optimistic timing/cached-publication
+    regressions; a synchronous provisional-ID projection and bounded legacy
+    cache publication restored them before the final full gate.
 
 ## Exact MariaDB integration source
 
@@ -143,8 +166,8 @@ because `CH_CORE_TEST_DATABASE_URL` is absent.
 
 | Gate | Result |
 | --- | --- |
-| `npm run verify` | PASS — 56 files, 428 tests |
-| `npm run test:mobile` | PASS — 9 files, 83 tests |
+| `npm run verify` | PASS — 56 files, 433 tests |
+| `npm run test:mobile` | PASS — 9 files, 84 tests |
 | `npm run mobile:build` | PASS — 589 modules |
 | `npm run package` | PASS — Electron arm64 package |
 | `npm run server:typecheck` | PASS — source plus unit/integration sources |
@@ -154,7 +177,7 @@ because `CH_CORE_TEST_DATABASE_URL` is absent.
 | Android `test` with JDK 21 and local SDK | PASS |
 | Android `lint` with JDK 21 and local SDK | PASS |
 | `git diff --check` | PASS |
-| `npm run server:test:integration` | NOT RUN — exact isolated MariaDB URL absent |
+| `npm run server:test:integration` | BLOCKED/FAIL-CLOSED — 3 suites reject the absent exact isolated `chu_test` URL; 10 tests skipped |
 | `npm run test:e2e` | BLOCKED — five repeated legacy demo timeouts at fail-closed CH Core startup; run stopped, one interrupted and two not run |
 
 The builds retain the existing Vite CJS-deprecation, large-chunk, Gradle

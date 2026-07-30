@@ -38,6 +38,74 @@ async function offlineGateway() {
 }
 
 describe('Core offline permission matrix', () => {
+  it('quarantines the normal mutation queue on 401 and resumes it only for the same native installation', async () => {
+    const storage = new MemoryStorage(cachedState());
+    const transport = new ScriptedTransport();
+    const clock = new TestClock();
+    transport.enqueue({
+      status: 200,
+      body: populatedBootstrap('8'),
+    });
+    const gateway = createCoreOperationsGateway(transport, storage, clock);
+    await gateway.initialize();
+    transport.enqueue({ status: 401, body: { code: 'UNAUTHORIZED' } });
+
+    await expect(
+      gateway.updateSku(SKU_ID, { name: 'Tertahan' }),
+    ).rejects.toThrow('UNAUTHORIZED');
+
+    const quarantined = storage.value as unknown as CoreLocalEnvelope;
+    expect(quarantined.quarantine).toMatchObject({
+      active: true,
+      installationId: transport.nativeInstallationId,
+    });
+    expect(quarantined.outbox).toEqual([]);
+    expect(Reflect.get(quarantined, 'quarantinedOutbox')).toHaveLength(1);
+    transport.nativeInstallationId =
+      '11111111-1111-4111-8111-111111111111';
+    transport.enqueue({
+      status: 200,
+      body: populatedBootstrap('9'),
+    });
+    await gateway.retryPending();
+    expect(gateway.getSyncSnapshot().phase).toBe('revoked');
+    expect(transport.requests).toHaveLength(3);
+
+    transport.nativeInstallationId =
+      '10101010-1010-4010-8010-101010101010';
+    transport.enqueue({
+      status: 200,
+      body: populatedBootstrap('10'),
+    });
+    transport.enqueue({
+      status: 200,
+      body: {
+        serverRevision: '11',
+        entityId: SKU_ID,
+        entityVersion: '2',
+        entity: {
+          ...populatedBootstrap('10').skus[0],
+          name: 'Tertahan',
+          rowVersion: '2',
+        },
+      },
+    });
+    transport.enqueue({
+      status: 200,
+      body: {
+        serverRevision: '11',
+        nextAfter: '10',
+        changes: [],
+      },
+    });
+    await gateway.retryPending();
+
+    expect(gateway.getSyncSnapshot()).toMatchObject({ phase: 'online' });
+    expect(
+      (storage.value as unknown as CoreLocalEnvelope).quarantinedOutbox,
+    ).toEqual([]);
+  });
+
   it('fails closed before connectivity is known or when the device is revoked', async () => {
     const connecting = createCoreOperationsGateway(
       new ScriptedTransport(),
@@ -184,6 +252,124 @@ describe('Core offline permission matrix', () => {
 });
 
 describe('Core local Nota projection', () => {
+  it('keeps every first-sent provisional Nota mutation on the guarded local route', async () => {
+    const cases = [
+      {
+        name: 'header',
+        run: (
+          gateway: ReturnType<typeof createCoreOperationsGateway>,
+          notaId: string,
+        ) => gateway.updateNotaTransaction(notaId, { customerName: 'Terlambat' }),
+      },
+      {
+        name: 'line',
+        run: (
+          gateway: ReturnType<typeof createCoreOperationsGateway>,
+          notaId: string,
+          pageId: string,
+          lineId: string,
+        ) => gateway.updateNotaLine(notaId, pageId, lineId, { quantity: 3 }),
+      },
+      {
+        name: 'delete line',
+        run: (
+          gateway: ReturnType<typeof createCoreOperationsGateway>,
+          notaId: string,
+          pageId: string,
+          lineId: string,
+        ) => gateway.deleteNotaLine(notaId, pageId, lineId),
+      },
+      {
+        name: 'add page',
+        run: (
+          gateway: ReturnType<typeof createCoreOperationsGateway>,
+          notaId: string,
+        ) => gateway.addNotaPage(notaId),
+      },
+      {
+        name: 'cancel page',
+        run: (
+          gateway: ReturnType<typeof createCoreOperationsGateway>,
+          notaId: string,
+          pageId: string,
+        ) => gateway.cancelNotaPage(notaId, pageId),
+      },
+      {
+        name: 'restore page',
+        run: (
+          gateway: ReturnType<typeof createCoreOperationsGateway>,
+          notaId: string,
+          _pageId: string,
+          _lineId: string,
+          cancelledPageId?: string,
+        ) => gateway.restoreNotaPage(notaId, cancelledPageId!),
+      },
+      {
+        name: 'completion',
+        run: (
+          gateway: ReturnType<typeof createCoreOperationsGateway>,
+          notaId: string,
+        ) => gateway.completeNotaTransaction(notaId),
+      },
+    ];
+
+    for (const testCase of cases) {
+      const { gateway, transport } = await offlineGateway();
+      const nota = await gateway.createNotaTransaction();
+      const page = nota.pages[0]!;
+      const line = page.lines[0]!;
+      await gateway.updateNotaLine(nota.id, page.id, line.id, {
+        skuId: SKU_ID,
+        description: 'Produk Core',
+        quantity: 1,
+        pcsPrice: 25_000,
+        lsnPrice: 300_000,
+      });
+      const second = await gateway.addNotaPage(nota.id);
+      await gateway.addNotaPage(nota.id);
+      await gateway.cancelNotaPage(nota.id, second!.id);
+      transport.enqueue({
+        status: 200,
+        body: populatedBootstrap('9'),
+      });
+      transport.enqueue(new Error('response lost'));
+
+      await gateway.retryPending();
+
+      const requestsBeforeEdit = transport.requests.length;
+      await expect(
+        async () =>
+          testCase.run(gateway, nota.id, page.id, line.id, second!.id),
+        testCase.name,
+      ).rejects.toThrow('Sedang sinkronisasi');
+      expect(transport.requests, testCase.name).toHaveLength(
+        requestsBeforeEdit,
+      );
+      gateway.dispose();
+    }
+  });
+
+  it('does not restore a page on a completed offline Nota', async () => {
+    const { gateway } = await offlineGateway();
+    const nota = await gateway.createNotaTransaction();
+    const page = nota.pages[0]!;
+    const line = page.lines[0]!;
+    await gateway.updateNotaLine(nota.id, page.id, line.id, {
+      skuId: SKU_ID,
+      description: 'Produk Core',
+      quantity: 1,
+      pcsPrice: 25_000,
+      lsnPrice: 300_000,
+    });
+    const second = await gateway.addNotaPage(nota.id);
+    await gateway.cancelNotaPage(nota.id, second!.id);
+    await gateway.completeNotaTransaction(nota.id);
+
+    await expect(
+      gateway.restoreNotaPage(nota.id, second!.id),
+    ).rejects.toThrow('Nota offline yang selesai tidak dapat diubah.');
+  });
+
   it('persists full local edits and completion without changing central stock or omzet', async () => {
     const { gateway, storage } = await offlineGateway();
     const before = gateway.getSnapshot();
@@ -303,5 +489,87 @@ describe('Core local Nota projection', () => {
       '/v1/bootstrap',
       '/v1/offline/notas',
     ]);
+  });
+
+  it('uses the authoritative stock acknowledgement without retaining a synthetic movement', async () => {
+    const { gateway, transport } = await offlineGateway();
+    await gateway.adjustStock(SKU_ID, 2, 'Koreksi hitung');
+    transport.enqueue({
+      status: 200,
+      body: populatedBootstrap('9'),
+    });
+    transport.enqueue({
+      status: 200,
+      body: {
+        serverRevision: '11',
+        entityId: SKU_ID,
+        entityVersion: '3',
+        entity: {
+          skuId: SKU_ID,
+          quantityPcs: '20',
+          rowVersion: '3',
+          updatedAt: '2026-07-30T03:00:00.000Z',
+        },
+      },
+    });
+
+    await gateway.retryPending();
+
+    expect(gateway.getSnapshot().skus[0]?.stock).toBe(20);
+    expect(gateway.getSnapshot().adjustments).toEqual([]);
+
+    const movementId = '12121212-1212-4121-8121-121212121212';
+    transport.enqueue({
+      status: 200,
+      body: {
+        serverRevision: '11',
+        nextAfter: '11',
+        changes: [
+          {
+            revision: '10',
+            entityType: 'stock_balance',
+            entityId: SKU_ID,
+            operation: 'upsert',
+            payload: {
+              skuId: SKU_ID,
+              quantityPcs: '20',
+              rowVersion: '3',
+              updatedAt: '2026-07-30T03:00:00.000Z',
+            },
+            createdAt: '2026-07-30T03:00:00.000Z',
+          },
+          {
+            revision: '11',
+            entityType: 'stock_movement',
+            entityId: movementId,
+            operation: 'upsert',
+            payload: {
+              id: movementId,
+              skuId: SKU_ID,
+              deltaPcs: '2',
+              beforeQuantityPcs: '18',
+              afterQuantityPcs: '20',
+              reason: 'Koreksi hitung',
+              deviceId: '66666666-6666-4666-8666-666666666666',
+              operationId: '13131313-1313-4131-8131-131313131313',
+              createdAt: '2026-07-30T03:00:00.000Z',
+            },
+            createdAt: '2026-07-30T03:00:00.000Z',
+          },
+        ],
+      },
+    });
+
+    await gateway.retryPending();
+
+    expect(gateway.getSnapshot().adjustments).toEqual([
+      expect.objectContaining({
+        id: movementId,
+        quantity: 2,
+        before: 18,
+        after: 20,
+      }),
+    ]);
+    expect(gateway.getSnapshot().skus[0]?.stock).toBe(20);
   });
 });

@@ -200,3 +200,11 @@ Task 11 controller final gate after approval: 56 root files / 453 tests;
 workbook skip; exact approved workbook 1/1; mobile build; Electron package;
 Playwright 8/8; Android sync/debug+release unit tests/lint with Android Studio
 JDK 21; diff check; clean worktree before this receipt.
+Post-Task 11 acceptance audit 2026-07-31: local Mac has no Docker/Compose,
+Podman, OrbStack, MariaDB server, or equivalent runtime. Windows x64
+cross-package and ZIP succeed; Squirrel installer creation remains blocked
+without Mono/Wine or a Windows build host and is not physically tested.
+Android release creation fails closed on the four intentionally absent
+signing variables and no unsigned artifact is accepted. Requirement-by-
+requirement evidence and owner decisions are recorded in
+`docs/ch-core-acceptance-status.md`; focused runbook gate passes 8/8.

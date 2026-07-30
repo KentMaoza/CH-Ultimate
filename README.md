@@ -32,6 +32,7 @@ See:
 
 - [NAS deployment runbook](docs/ch-core-nas-deployment.md)
 - [Backup and clean-restore runbook](docs/ch-core-backup-restore.md)
+- [CH Core acceptance status](docs/ch-core-acceptance-status.md)
 
 Production printing, automatic client updates, Internet/remote CH Core access,
 and recurring BigSeller synchronization are not implemented.

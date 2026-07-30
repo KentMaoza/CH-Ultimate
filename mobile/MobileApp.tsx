@@ -204,6 +204,7 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
         onOpenRecommendations={() => navigate('recommendations')}
         onScan={() => void beginScan()}
         onSearch={() => navigate('skus', true)}
+        coreBacked={coreBacked}
       /> : null}
       {view === 'skus' && !scanOpen && !selectedSku ? <SkuCatalog focusSearch={focusSearch} onOpenSku={openSku} skus={snapshot.skus} /> : null}
       {view === 'prices' && !scanOpen && !selectedSku ? <PriceFeedView changes={visiblePriceChanges} onOpenSku={openSku} onSimulate={() => void simulatePriceChange()} skus={snapshot.skus} status={simulationStatus} unreadOnly={priceMode === 'unread'} /> : null}
@@ -212,10 +213,11 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
         onOpenSku={openSku}
         onSharePdf={share.sharePdf}
         snapshot={snapshot}
+        coreBacked={coreBacked}
       /> : null}
-      {view === 'nota' && !scanOpen && !selectedSku ? <MobileNotaView gateway={gateway} scanner={scanner} transactionId={editingNotaId ?? undefined} /> : null}
-      {view === 'archive' && !scanOpen && !selectedSku ? <MobileArchiveView gateway={gateway} onEdit={editArchivedNota} /> : null}
-      {view === 'more' && !scanOpen && !selectedSku ? <MoreView onOpenPrices={() => navigate('prices')} onOpenRecommendations={() => navigate('recommendations')} /> : null}
+      {view === 'nota' && !scanOpen && !selectedSku ? <MobileNotaView coreBacked={coreBacked} gateway={gateway} scanner={scanner} transactionId={editingNotaId ?? undefined} /> : null}
+      {view === 'archive' && !scanOpen && !selectedSku ? <MobileArchiveView coreBacked={coreBacked} gateway={gateway} onEdit={editArchivedNota} /> : null}
+      {view === 'more' && !scanOpen && !selectedSku ? <MoreView coreBacked={coreBacked} onOpenPrices={() => navigate('prices')} onOpenRecommendations={() => navigate('recommendations')} /> : null}
     </main>
     <nav aria-label="Navigasi utama" className="bottom-nav">
       <button aria-current={view === 'home' ? 'page' : undefined} onClick={() => navigate('home')}><HomeIcon />Beranda</button>

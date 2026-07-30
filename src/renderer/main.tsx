@@ -2,6 +2,10 @@ import { StrictMode, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
 import type { ChCoreBridge } from '../electron/core-bridge-contract';
+import {
+  MockOperationsGateway,
+  type OperationsGateway,
+} from '../gateway/operations-gateway';
 import { App } from './App';
 import { CoreConnectionScreen } from './CoreConnectionScreen';
 import {
@@ -14,6 +18,8 @@ import './styles.css';
 interface DesktopRendererOptions {
   bridge?: ChCoreBridge;
   mode: DesktopRuntimeMode;
+  allowTestMock?: boolean;
+  mockFactory?: () => OperationsGateway;
 }
 
 function disposeGateway(result: DesktopBootstrapResult | undefined): void {
@@ -99,10 +105,20 @@ export function mountDesktopRenderer(
   };
 }
 
-mountDesktopRenderer(
-  createRoot(document.getElementById('root')!),
-  {
-    bridge: window.chCore,
-    mode: import.meta.env.PROD ? 'production' : 'development',
-  },
-);
+const e2eTestMock =
+  new URL(window.location.href).searchParams.get(
+    'ch-ultimate-e2e-test-mock',
+  ) === '1';
+
+mountDesktopRenderer(createRoot(document.getElementById('root')!), {
+  bridge: e2eTestMock ? undefined : window.chCore,
+  mode: e2eTestMock
+    ? 'test'
+    : import.meta.env.PROD
+      ? 'production'
+      : 'development',
+  allowTestMock: e2eTestMock,
+  mockFactory: e2eTestMock
+    ? () => new MockOperationsGateway()
+    : undefined,
+});

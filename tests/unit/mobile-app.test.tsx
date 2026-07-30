@@ -25,10 +25,11 @@ function createPorts(): {
 function renderMobile(
   overrides: Partial<ReturnType<typeof createPorts>> = {},
   seedFactory: () => DemoState = createMobileDemoState,
+  coreBacked = false,
 ) {
   const gateway = new MockOperationsGateway(seedFactory);
   const ports = { ...createPorts(), ...overrides };
-  render(<MobileApp gateway={gateway} scanner={ports.scanner} notifications={ports.notifications} share={ports.share} />);
+  render(<MobileApp gateway={gateway} scanner={ports.scanner} notifications={ports.notifications} share={ports.share} coreBacked={coreBacked} />);
   return { gateway, ...ports };
 }
 
@@ -74,6 +75,44 @@ test('dashboard renders fixture counts and the two newest price changes', () => 
   expect(rows).toHaveLength(2);
   expect(rows[0]).toHaveTextContent('Dress Katun Merah');
   expect(rows[1]).toHaveTextContent('Beras Hitam Premium 1 kg');
+});
+
+test('core-backed mobile removes demo/session claims and labels central data', () => {
+  const sharePdf = vi.fn(async () => undefined);
+  renderMobile(
+    { share: { sharePdf } },
+    createRecommendationState,
+    true,
+  );
+
+  expect(screen.getByText('Data CH Core')).toBeInTheDocument();
+  expect(screen.getByText('Tersinkronisasi melalui NAS lokal.')).toBeInTheDocument();
+  expect(screen.queryByText('Mode Demo')).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Nota' }));
+  expect(screen.getByText('CH CORE · NOTA TERSINKRONISASI')).toBeInTheDocument();
+  expect(screen.queryByText('FRONTEND DEMO · SESSION ONLY')).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Arsip' }));
+  expect(screen.getByText('ARSIP CH CORE')).toBeInTheDocument();
+  expect(screen.queryByText(/SESSION ONLY/)).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Lainnya' }));
+  expect(screen.getByText('Lihat riwayat perubahan harga tersinkronisasi.')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Rekomendasi' }));
+  fireEvent.change(screen.getByLabelText('Tanggal rekomendasi'), {
+    target: { value: '2026-07-23' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Bagikan PDF Harian' }));
+
+  return waitFor(() =>
+    expect(sharePdf).toHaveBeenCalledWith(
+      expect.objectContaining({
+        shareText: 'CH Core · Data tersinkronisasi melalui NAS lokal',
+      }),
+    ),
+  );
 });
 
 test('bottom navigation has five destinations and moves legacy feeds under Lainnya', () => {
@@ -193,6 +232,7 @@ test('shares one catalogue PDF for the active recommendation tab without per-SKU
     blob: expect.any(Blob),
     fileName: 'CHU-SKU-Urgent-2026-07-23.pdf',
     title: 'SKU Urgent',
+    shareText: 'DATA DEMO · SESSION ONLY',
   });
   expect(await screen.findByRole('status')).toHaveTextContent('PDF SKU Urgent siap dibagikan.');
 });

@@ -8,11 +8,13 @@ afterEach(() => {
   vi.doUnmock('../../src/electron/core-desktop-service');
   vi.doUnmock('../../src/electron/core-ipc');
   vi.unstubAllGlobals();
+  delete process.env.CH_ULTIMATE_E2E_TEST_MOCK;
   vi.resetModules();
 });
 
 describe('Electron CH Core startup', () => {
   it('waits for app readiness and binds IPC to the created window', async () => {
+    process.env.CH_ULTIMATE_E2E_TEST_MOCK = '1';
     let resolveReady!: () => void;
     const ready = new Promise<void>((resolve) => {
       resolveReady = resolve;
@@ -123,6 +125,7 @@ describe('Electron CH Core startup', () => {
     );
     const rendererPath = windowInstance.loadFile.mock.calls[0]?.[0];
     const rendererUrl = pathToFileURL(rendererPath).href;
+    expect(rendererUrl).not.toContain('ch-ultimate-e2e-test-mock');
     expect(registerCoreIpcHandlers).toHaveBeenCalledWith(
       ipcMain,
       service,
@@ -152,5 +155,75 @@ describe('Electron CH Core startup', () => {
     expect(closed).toEqual(expect.any(Function));
     closed();
     expect(unregister).toHaveBeenCalledTimes(1);
+  });
+
+  it('adds the locked test marker only for an unpackaged explicit E2E launch', async () => {
+    process.env.CH_ULTIMATE_E2E_TEST_MOCK = '1';
+    const webContentsOn = vi.fn();
+    const windowInstance = {
+      webContents: {
+        mainFrame: {},
+        on: webContentsOn,
+        setWindowOpenHandler: vi.fn(),
+      },
+      loadURL: vi.fn(),
+      loadFile: vi.fn(),
+      on: vi.fn(),
+    };
+    const BrowserWindow = vi.fn(() => windowInstance);
+    Object.assign(BrowserWindow, {
+      getAllWindows: vi.fn(() => [windowInstance]),
+    });
+    const app = {
+      isPackaged: false,
+      getPath: vi.fn(() => '/private/ch-ultimate-e2e'),
+      quit: vi.fn(),
+      whenReady: vi.fn(() => Promise.resolve()),
+      on: vi.fn(),
+    };
+    const registerCoreIpcHandlers = vi.fn(() => vi.fn());
+
+    vi.doMock('electron', () => ({
+      app,
+      BrowserWindow,
+      ipcMain: {},
+      safeStorage: {},
+    }));
+    vi.doMock('electron-squirrel-startup', () => ({ default: false }));
+    vi.doMock('../../src/electron/core-credential-store', () => ({
+      createCoreCredentialStore: vi.fn(() => ({})),
+    }));
+    vi.doMock('../../src/electron/core-desktop-service', () => ({
+      createCoreDesktopService: vi.fn(async () => ({})),
+    }));
+    vi.doMock('../../src/electron/core-ipc', () => ({
+      registerCoreIpcHandlers,
+    }));
+    vi.stubGlobal('MAIN_WINDOW_VITE_DEV_SERVER_URL', undefined);
+    vi.stubGlobal('MAIN_WINDOW_VITE_NAME', 'main_window');
+
+    await import('../../src/main');
+    await vi.waitFor(() =>
+      expect(registerCoreIpcHandlers).toHaveBeenCalledTimes(1),
+    );
+
+    const rendererUrl = (
+      registerCoreIpcHandlers.mock.calls[0] as unknown[] | undefined
+    )?.[3] as string;
+    expect(rendererUrl).toMatch(
+      /^file:.*\?ch-ultimate-e2e-test-mock=1$/,
+    );
+    expect(windowInstance.loadURL).toHaveBeenCalledWith(rendererUrl);
+    expect(windowInstance.loadFile).not.toHaveBeenCalled();
+
+    const willNavigate = webContentsOn.mock.calls.find(
+      ([event]) => event === 'will-navigate',
+    )?.[1];
+    const deniedEvent = { preventDefault: vi.fn() };
+    willNavigate(
+      deniedEvent,
+      rendererUrl.replace('?ch-ultimate-e2e-test-mock=1', ''),
+    );
+    expect(deniedEvent.preventDefault).toHaveBeenCalledTimes(1);
   });
 });

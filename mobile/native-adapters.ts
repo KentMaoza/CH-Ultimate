@@ -74,7 +74,7 @@ export function createNativeRecommendationPdfShare(
   convertBlob: BlobToBase64 = blobToBase64,
 ): RecommendationPdfSharePort {
   return {
-    async sharePdf({ blob, fileName, title }) {
+    async sharePdf({ blob, fileName, title, shareText = 'DATA DEMO · SESSION ONLY' }) {
       const data = await convertBlob(blob);
       const written = await filesystem.writeFile({
         path: fileName,
@@ -85,7 +85,7 @@ export function createNativeRecommendationPdfShare(
       try {
         await sharePlugin.share({
           title,
-          text: 'DATA DEMO · SESSION ONLY',
+          text: shareText,
           files: [written.uri],
           dialogTitle: 'Bagikan PDF',
         });

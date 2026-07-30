@@ -145,6 +145,7 @@ test('native recommendation share writes one PDF to cache, opens Android Share, 
     blob,
     fileName: 'CHU-Rekomendasi-Harian-2026-07-23.pdf',
     title: 'Rekomendasi Harian',
+    shareText: 'CH Core · Data tersinkronisasi melalui NAS lokal',
   });
 
   expect(toBase64).toHaveBeenCalledWith(blob);
@@ -155,7 +156,7 @@ test('native recommendation share writes one PDF to cache, opens Android Share, 
   expect(share).toHaveBeenCalledOnce();
   expect(share).toHaveBeenCalledWith({
     title: 'Rekomendasi Harian',
-    text: 'DATA DEMO · SESSION ONLY',
+    text: 'CH Core · Data tersinkronisasi melalui NAS lokal',
     files: ['file:///cache/CHU-Rekomendasi-Harian-2026-07-23.pdf'],
     dialogTitle: 'Bagikan PDF',
   });

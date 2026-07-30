@@ -66,7 +66,7 @@ function AppLayout({
     setActive('notaArchive');
   };
 
-  if (active === 'nota') return <NotaWorkspace initialSelection={notaSelection} onBack={() => setActive(notaReturnsToArchive ? 'notaArchive' : 'inventory')} onOpenCompletionDestination={openCompletionDestination} />;
+  if (active === 'nota') return <NotaWorkspace coreBacked={coreBacked} initialSelection={notaSelection} onBack={() => setActive(notaReturnsToArchive ? 'notaArchive' : 'inventory')} onOpenCompletionDestination={openCompletionDestination} />;
 
   const openNota = (selection: { transactionId: string; pageId: string }, returnToArchive: boolean) => { setNotaSelection(selection); setNotaReturnsToArchive(returnToArchive); setActive('nota'); };
   const selectModule = (module: ModuleId) => {
@@ -118,7 +118,7 @@ function AppLayout({
             <div className="session-pill">Keluar / reload = data hilang</div>
           )}
         </header>
-        {active === 'inventory' ? <InventoryPage /> : active === 'skuChanges' ? <SkuChangesPage /> : active === 'shareRecommendations' ? <ShareRecommendationsPage /> : active === 'create' ? <CreateSkuPage /> : active === 'label' ? <LabelPage /> : active === 'notaArchive' ? <ArchiveNotaPage view={archiveView} onViewChange={setArchiveView} onOpenNota={openNota} /> : active === 'revenue' ? <RevenuePage onOpenSettings={() => setActive('settings')} /> : active === 'empty' ? <EmptyStockPage /> : active === 'settings' ? <SettingsPage /> : (
+        {active === 'inventory' ? <InventoryPage /> : active === 'skuChanges' ? <SkuChangesPage coreBacked={coreBacked} /> : active === 'shareRecommendations' ? <ShareRecommendationsPage /> : active === 'create' ? <CreateSkuPage coreBacked={coreBacked} /> : active === 'label' ? <LabelPage /> : active === 'notaArchive' ? <ArchiveNotaPage view={archiveView} onViewChange={setArchiveView} onOpenNota={openNota} /> : active === 'revenue' ? <RevenuePage coreBacked={coreBacked} onOpenSettings={() => setActive('settings')} /> : active === 'empty' ? <EmptyStockPage /> : active === 'settings' ? <SettingsPage coreBacked={coreBacked} /> : (
           <section className="page-placeholder"><span className="placeholder-number">0{modules.findIndex((module) => module.id === active) + 1}</span><div><h2>{current.label}</h2><p>Frontend operasional sedang aktif. Data hanya berlaku untuk sesi ini.</p></div></section>
         )}
       </main>

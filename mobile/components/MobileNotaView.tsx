@@ -36,7 +36,7 @@ function availableSlot(transaction: NotaTransaction, preferredPageId?: string) {
   return null;
 }
 
-export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: OperationsGateway; scanner: BarcodeScannerPort; transactionId?: string }) {
+export function MobileNotaView({ coreBacked = false, gateway, scanner, transactionId }: { coreBacked?: boolean; gateway: OperationsGateway; scanner: BarcodeScannerPort; transactionId?: string }) {
   const snapshot = useSyncExternalStore(gateway.subscribe, gateway.getSnapshot, gateway.getSnapshot);
   const transaction = workingTransaction(snapshot.notaTransactions, transactionId);
   const [selectedPageId, setSelectedPageId] = useState('');
@@ -271,7 +271,7 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
 
   return <section className="mobile-nota-view" aria-busy={busy || undefined}>
     <header className="mobile-header mobile-nota-header">
-      <div><span className="eyebrow">FRONTEND DEMO · SESSION ONLY</span><h1 data-page-heading tabIndex={-1}>Nota Barang</h1></div>
+      <div><span className="eyebrow">{coreBacked ? 'CH CORE · NOTA TERSINKRONISASI' : 'FRONTEND DEMO · SESSION ONLY'}</span><h1 data-page-heading tabIndex={-1}>Nota Barang</h1></div>
       <strong>{formatRupiah(transactionTotal)}</strong>
     </header>
     {notice && <p className={`mobile-nota-notice mobile-nota-notice--${noticeKind}`} role={noticeKind}>{notice}</p>}

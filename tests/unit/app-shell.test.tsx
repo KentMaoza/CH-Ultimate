@@ -47,3 +47,29 @@ test('shows synchronization status without stale demo labels for CH Core', () =>
   expect(screen.queryByText('DEMO DATA · SESSION ONLY')).not.toBeInTheDocument();
   expect(screen.queryByText('Keluar / reload = data hilang')).not.toBeInTheDocument();
 });
+
+test('uses truthful CH Core copy across persisted desktop workflows', () => {
+  const gateway = new MockOperationsGateway();
+  render(<App gateway={gateway} coreBacked />);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+  expect(screen.getByText('DATA CH CORE')).toBeInTheDocument();
+  expect(screen.getByText('Tersimpan terpusat di NAS')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Reset data demo' })).not.toBeInTheDocument();
+  expect(screen.getByText(/Node API · MariaDB/)).toBeInTheDocument();
+  expect(screen.getByText('AKSES LOKAL LAPORAN OMZET')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Buat SKU' }));
+  expect(screen.getByText('SKU akan disimpan ke CH Core dan disinkronkan ke perangkat lain.')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Perubahan SKU' }));
+  expect(screen.getByText('Catatan terpusat harga dan jumlah stok · WITA')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Laporan Omzet' }));
+  expect(screen.getByText('AKSES LOKAL LAPORAN OMZET')).toBeInTheDocument();
+  expect(screen.queryByText(/Password hilang saat aplikasi direload/)).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Nota' }));
+  expect(screen.getByText('CH CORE · TERSINKRONISASI')).toBeInTheDocument();
+  expect(screen.queryByText('DEMO DATA · SESSION ONLY')).not.toBeInTheDocument();
+});

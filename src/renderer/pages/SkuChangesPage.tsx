@@ -44,7 +44,7 @@ function ChangeSkuImage({ sku }: { sku?: Sku }) {
   return <img className="sku-image" src={sku.imageUrl} alt={`Gambar ${sku.skuNumber}`} onError={() => setFailed(true)} />;
 }
 
-export function SkuChangesPage() {
+export function SkuChangesPage({ coreBacked = false }: { coreBacked?: boolean }) {
   const { state } = useOperations();
   const [tab, setTab] = useState<ChangeTab>('price');
   const [from, setFrom] = useState('');
@@ -67,7 +67,7 @@ export function SkuChangesPage() {
 
   return <div className="feature-page sku-changes-page">
     <div className="feature-toolbar">
-      <div><strong>Riwayat perubahan SKU</strong><span>Catatan sesi harga dan jumlah stok · WITA</span></div>
+      <div><strong>Riwayat perubahan SKU</strong><span>{coreBacked ? 'Catatan terpusat harga dan jumlah stok · WITA' : 'Catatan sesi harga dan jumlah stok · WITA'}</span></div>
       {tab === 'price' && <button className="button primary" disabled={!prices.length} aria-label="Ekspor perubahan harga CSV" onClick={exportPrices}>Ekspor CSV</button>}
     </div>
     <div className="change-tabs" role="tablist" aria-label="Jenis perubahan SKU">

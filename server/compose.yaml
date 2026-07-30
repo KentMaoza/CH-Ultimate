@@ -5,9 +5,13 @@ services:
       dockerfile: server/Dockerfile
     env_file:
       - .env
+    environment:
+      CH_CORE_HOST: "127.0.0.1"
+      CH_CORE_PORT: "18080"
+      CH_CORE_DB_POOL_MAX: "4"
+      CH_CORE_PRIVATE_STORAGE_ROOT: /var/lib/ch-core/private
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:18080:3000"
+    network_mode: host
     read_only: true
     security_opt:
       - no-new-privileges:true
@@ -18,6 +22,10 @@ services:
     pids_limit: 128
     tmpfs:
       - /tmp:size=16m,mode=1777,noexec,nosuid,nodev
+    volumes:
+      - type: bind
+        source: ${CH_CORE_PRIVATE_STORAGE_HOST_PATH:?set CH_CORE_PRIVATE_STORAGE_HOST_PATH}
+        target: /var/lib/ch-core/private
     logging:
       driver: json-file
       options:

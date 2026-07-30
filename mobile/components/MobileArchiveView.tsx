@@ -4,7 +4,7 @@ import type { OperationsGateway } from '../../src/gateway/operations-gateway';
 import { notaPageTheme } from '../../src/renderer/nota/nota-page-colors';
 import { formatRupiah } from '../format';
 
-export function MobileArchiveView({ gateway, onEdit }: { gateway: OperationsGateway; onEdit: (transactionId: string) => void }) {
+export function MobileArchiveView({ coreBacked = false, gateway, onEdit }: { coreBacked?: boolean; gateway: OperationsGateway; onEdit: (transactionId: string) => void }) {
   const snapshot = useSyncExternalStore(gateway.subscribe, gateway.getSnapshot, gateway.getSnapshot);
   const archived = useMemo(() => snapshot.notaTransactions
     .filter((transaction) => transaction.status === 'completed' && (transaction.completionDestination ?? 'archive') === 'archive')
@@ -31,7 +31,7 @@ export function MobileArchiveView({ gateway, onEdit }: { gateway: OperationsGate
   }
 
   return <section className="mobile-archive-view">
-    <header className="mobile-header"><div><span className="eyebrow">ARSIP SAJA · SESSION ONLY</span><h1 data-page-heading tabIndex={-1}>Arsip Nota</h1></div></header>
+    <header className="mobile-header"><div><span className="eyebrow">{coreBacked ? 'ARSIP CH CORE' : 'ARSIP SAJA · SESSION ONLY'}</span><h1 data-page-heading tabIndex={-1}>Arsip Nota</h1></div></header>
     <p className="mobile-archive-badge">Tersedia di semua perangkat yang tersinkronisasi</p>
     {editError && <p className="mobile-nota-notice mobile-nota-notice--alert" role="alert">{editError}</p>}
     {!archived.length ? <p className="mobile-nota-empty">Arsip mobile belum memiliki nota.</p> : <>

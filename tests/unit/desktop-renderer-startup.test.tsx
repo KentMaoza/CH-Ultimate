@@ -1,10 +1,12 @@
 import { act, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 
 afterEach(() => {
   document.body.innerHTML = '';
   vi.doUnmock('../../src/renderer/core-api-bootstrap');
   vi.resetModules();
+  window.history.replaceState({}, '', '/');
 });
 
 describe('desktop renderer startup', () => {
@@ -52,5 +54,43 @@ describe('desktop renderer startup', () => {
       screen.getByText('CH Core tidak dapat dimulai. Coba lagi.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Coba lagi' })).toBeInTheDocument();
+  });
+
+  it('selects an explicit test mock only for the locked E2E renderer marker', async () => {
+    document.body.innerHTML = '<div id="root"></div>';
+    window.history.replaceState(
+      {},
+      '',
+      '/?ch-ultimate-e2e-test-mock=1',
+    );
+    Reflect.deleteProperty(window, 'chCore');
+    const gateway = new MockOperationsGateway();
+    const bootstrapDesktopGateway = vi.fn().mockResolvedValue({
+      kind: 'gateway',
+      source: 'test-mock',
+      gateway,
+    });
+    vi.doMock('../../src/renderer/core-api-bootstrap', async () => {
+      const actual = await vi.importActual<
+        typeof import('../../src/renderer/core-api-bootstrap')
+      >('../../src/renderer/core-api-bootstrap');
+      return { ...actual, bootstrapDesktopGateway };
+    });
+
+    await act(async () => {
+      await import('../../src/renderer/main');
+      await Promise.resolve();
+    });
+
+    expect(bootstrapDesktopGateway).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'test',
+        allowTestMock: true,
+        mockFactory: expect.any(Function),
+      }),
+    );
+    expect(
+      screen.getByText('DEMO DATA · SESSION ONLY'),
+    ).toBeInTheDocument();
   });
 });

@@ -3,21 +3,19 @@ import type { NotaRepository } from './service.js';
 import { NotaOperationError } from './service.js';
 import type {
   AddPageRequest,
-  CompleteNotaRequest,
   CreateNotaRequest,
   DeleteLineRequest,
-  NotaLifecycleRequest,
   PageLifecycleRequest,
   ResolveConflictRequest,
   UpdateHeaderRequest,
   UpdateLineRequest,
 } from './validation.js';
 
-import { writeOperationAudit } from '../catalogue/mariadb-operation-writes.js';
+import { planEditableConflictOverride } from './conflicts.js';
 import {
-  planEditableConflictOverride,
-  type EditableOverrideAction,
-} from './conflicts.js';
+  reapplyLifecycleConflictIntent,
+  runRequiredLifecycleAction,
+} from './mariadb-nota-conflict-lifecycle.js';
 import {
   type Dependencies,
   type Mutation,
@@ -148,11 +146,14 @@ export class MariaDbNotaConflictRepository {
     });
     if (editableAction) {
       for (const lifecycleAction of override.before) {
-        await this.runOverrideLifecycleAction(
-          connection,
-          deviceId,
-          operationId,
-          notaId,
+        await runRequiredLifecycleAction(
+          {
+            connection,
+            operations: this.operations,
+            deviceId,
+            operationId,
+            notaId,
+          },
           lifecycleAction,
           override.completionDestination,
         );
@@ -286,44 +287,23 @@ export class MariaDbNotaConflictRepository {
               rebased,
             );
       }
-    } else if (action === 'complete') {
-      await this.reapplyCompletionIntent(
-        connection,
-        deviceId,
-        operationId,
-        notaId,
-        input.destination === 'finished' ? 'finished' : 'archive',
+    } else if (
+      action === 'complete' ||
+      action === 'reopen' ||
+      action === 'cancel' ||
+      action === 'restore'
+    ) {
+      await reapplyLifecycleConflictIntent(
+        {
+          connection,
+          operations: this.operations,
+          deviceId,
+          operationId,
+          notaId,
+        },
+        action,
+        input,
       );
-    } else if (action === 'reopen') {
-      if (String(row.status) === 'completed') {
-        result = await this.operations.reopen(
-          connection,
-          deviceId,
-          operationId,
-          notaId,
-          { lifecycleVersion },
-        );
-      }
-    } else if (action === 'cancel') {
-      if (String(row.status) !== 'cancelled') {
-        result = await this.operations.cancel(
-          connection,
-          deviceId,
-          operationId,
-          notaId,
-          { lifecycleVersion },
-        );
-      }
-    } else if (action === 'restore') {
-      if (String(row.status) === 'cancelled') {
-        result = await this.operations.restore(
-          connection,
-          deviceId,
-          operationId,
-          notaId,
-          { lifecycleVersion },
-        );
-      }
     } else {
       throw new NotaOperationError(
         'CONFLICT_OVERRIDE_UNSUPPORTED',
@@ -341,127 +321,18 @@ export class MariaDbNotaConflictRepository {
     }
     if (editableAction) {
       for (const lifecycleAction of override.after) {
-        await this.runOverrideLifecycleAction(
-          connection,
-          deviceId,
-          operationId,
-          notaId,
+        await runRequiredLifecycleAction(
+          {
+            connection,
+            operations: this.operations,
+            deviceId,
+            operationId,
+            notaId,
+          },
           lifecycleAction,
           override.completionDestination,
         );
       }
-    }
-  }
-
-  private async reapplyCompletionIntent(
-    connection: ProtocolConnection,
-    deviceId: string,
-    operationId: string,
-    notaId: string,
-    destination: 'archive' | 'finished',
-  ): Promise<void> {
-    let row = await requireNota(connection, notaId);
-    if (String(row.status) === 'cancelled') {
-      await this.runOverrideLifecycleAction(
-        connection,
-        deviceId,
-        operationId,
-        notaId,
-        'restore',
-        destination,
-      );
-      row = await requireNota(connection, notaId);
-    }
-    if (
-      String(row.status) === 'completed' &&
-      String(row.completion_destination) !== destination
-    ) {
-      await this.runOverrideLifecycleAction(
-        connection,
-        deviceId,
-        operationId,
-        notaId,
-        'reopen',
-        destination,
-      );
-      row = await requireNota(connection, notaId);
-    }
-    if (['draft', 'reopened'].includes(String(row.status))) {
-      await this.runOverrideLifecycleAction(
-        connection,
-        deviceId,
-        operationId,
-        notaId,
-        'complete',
-        destination,
-      );
-      return;
-    }
-    if (
-      String(row.status) !== 'completed' ||
-      String(row.completion_destination) !== destination
-    ) {
-      throw new NotaOperationError(
-        'CONFLICT_OVERRIDE_STALE',
-        409,
-        'The requested completion state cannot be applied',
-      );
-    }
-  }
-
-  private async runOverrideLifecycleAction(
-    connection: ProtocolConnection,
-    deviceId: string,
-    operationId: string,
-    notaId: string,
-    action: EditableOverrideAction,
-    destination: 'archive' | 'finished',
-  ): Promise<void> {
-    const row = await requireNota(connection, notaId);
-    const lifecycleVersion = String(row.lifecycle_version);
-    let result: Mutation | null = null;
-    if (action === 'restore' && String(row.status) === 'cancelled') {
-      result = await this.operations.restore(
-        connection,
-        deviceId,
-        operationId,
-        notaId,
-        { lifecycleVersion },
-      );
-    } else if (action === 'reopen' && String(row.status) === 'completed') {
-      result = await this.operations.reopen(
-        connection,
-        deviceId,
-        operationId,
-        notaId,
-        { lifecycleVersion },
-      );
-    } else if (
-      action === 'complete' &&
-      ['draft', 'reopened'].includes(String(row.status))
-    ) {
-      result = await this.operations.complete(
-        connection,
-        deviceId,
-        operationId,
-        notaId,
-        { lifecycleVersion, destination },
-      );
-    } else if (action === 'cancel' && String(row.status) !== 'cancelled') {
-      result = await this.operations.cancel(
-        connection,
-        deviceId,
-        operationId,
-        notaId,
-        { lifecycleVersion },
-      );
-    }
-    if (result && result.statusCode >= 400) {
-      throw new NotaOperationError(
-        'CONFLICT_OVERRIDE_STALE',
-        409,
-        'The Nota changed again before conflict resolution',
-      );
     }
   }
 }

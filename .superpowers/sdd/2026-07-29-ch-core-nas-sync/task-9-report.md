@@ -275,3 +275,77 @@ remain non-blocking. No NAS, DSM, SMB, QuickConnect, Tailscale endpoint,
 MariaDB package, certificate, reverse proxy, firewall, or deployment setting
 was accessed or changed during this round. Task 10 and Task 11 were not
 started.
+
+## Fix round 3
+
+The third review round closed the remaining lifecycle false-success path.
+
+- A stale `reopen` intent no longer succeeds merely because the current Nota
+  is not `completed`. The server now has an explicit transition matrix:
+  completed reopens directly; reopened is already satisfied;
+  cancelled-from-completed restores then reopens; and
+  cancelled-from-reopened restores to reopened.
+- Draft and cancelled-from-draft cannot become reopened through the existing
+  lifecycle contract. Those states return typed
+  `CONFLICT_OVERRIDE_STALE` before the conflict row is marked resolved.
+- Every required restore, reopen, complete, and cancel transition now checks
+  both the returned mutation status and the subsequently locked Nota row.
+  A nominally successful mutation that did not produce the requested status
+  is rejected rather than recorded as a `mine` resolution.
+- Direct complete, reopen, cancel, and restore conflict intents all share the
+  same exhaustive lifecycle enforcement. Editable conflict transitions use it
+  as well, preserving their exact posting and audit behavior.
+- The lifecycle enforcement was extracted into a 202-line focused module; the
+  conflict repository is 338 lines, keeping both below the 500-line boundary.
+
+### Fix-round-3 TDD and guarded evidence
+
+The cancelled reopen regression first failed because the old branch reached
+the conflict update without a lifecycle mutation. It then passed after the
+explicit transition plan and typed impossible-state rejection were installed.
+The focused suite has 29 passing tests covering:
+
+- completed, already-reopened, cancelled-from-completed, and
+  cancelled-from-reopened success;
+- draft and cancelled-from-draft rejection without resolution; and
+- rejection of a `200` mutation response that leaves the Nota in the wrong
+  state.
+
+`server/test/nota-reopen-conflict.integration.test.ts` is separately guarded
+by the exact `/chu_test` database name. Its three real-MariaDB cases assert:
+
+- final lifecycle state for every `cancelled_from_status`;
+- three immutable posting rows for completed/reopened cancellation histories;
+- exactly one conflict-override audit and one resolution receipt on success;
+- no posting, override audit, resolution receipt, or `resolved_choice` for the
+  impossible draft case; and
+- replay of the same resolution key returns the original response without
+  duplicating lifecycle side effects.
+
+The guarded source compiles but was not executed because
+`CH_CORE_TEST_DATABASE_URL` is absent.
+
+### Fix-round-3 verification
+
+| Gate | Result |
+| --- | --- |
+| focused conflict/lifecycle tests | PASS — 3 files, 29 tests |
+| `npm run verify` | PASS — 54 files, 409 tests |
+| `npm run test:mobile` | PASS — 9 files, 81 tests |
+| `npm run mobile:build` | PASS — 587 modules |
+| `npm run package` | PASS — Electron arm64 package |
+| `npm run server:test` | PASS — 39 files; 265 passed, 1 intentional workbook skip |
+| server source/test typecheck | PASS |
+| `npm run server:build` | PASS |
+| `npm run android:sync` | PASS |
+| Android `test` with Android Studio JDK 21 and local SDK | PASS |
+| Android `lint` with Android Studio JDK 21 and local SDK | PASS |
+| `git diff --check` | PASS |
+| `npm run server:test:integration` | BLOCKED — exact isolated `chu_test` URL absent; command failed closed before database access |
+| `npm run test:e2e` | NOT RE-RUN — known Task 11 provisioning/pairing blocker remains at fail-closed Core startup |
+
+The existing Vite CJS-deprecation, large-chunk, and Gradle `flatDir` warnings
+remain non-blocking. No NAS, DSM, SMB, QuickConnect, Tailscale endpoint,
+MariaDB package, certificate, reverse proxy, firewall, or deployment setting
+was accessed or changed during this round. Task 10 and Task 11 were not
+started.

@@ -164,3 +164,17 @@ export function planEditableConflictOverride(input: {
   }
   return { before: [], after: [], completionDestination };
 }
+
+export function planReopenConflictOverride(input: {
+  status: string;
+  cancelledFromStatus: unknown;
+}): EditableOverrideAction[] | null {
+  if (input.status === 'reopened') return [];
+  if (input.status === 'completed') return ['reopen'];
+  if (input.status !== 'cancelled') return null;
+  if (input.cancelledFromStatus === 'completed') {
+    return ['restore', 'reopen'];
+  }
+  if (input.cancelledFromStatus === 'reopened') return ['restore'];
+  return null;
+}

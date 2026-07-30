@@ -5,6 +5,7 @@ import {
   lifecycleEditConflict,
   mergeHeaderFields,
   planEditableConflictOverride,
+  planReopenConflictOverride,
   parseNotaStoredJson,
   versionConflict,
 } from '../src/nota/conflicts.js';
@@ -163,6 +164,47 @@ describe('Nota version merges and conflicts', () => {
         after,
         completionDestination: 'finished',
       });
+    },
+  );
+
+  it.each([
+    {
+      status: 'completed',
+      cancelledFromStatus: null,
+      expected: ['reopen'],
+    },
+    {
+      status: 'reopened',
+      cancelledFromStatus: null,
+      expected: [],
+    },
+    {
+      status: 'cancelled',
+      cancelledFromStatus: 'completed',
+      expected: ['restore', 'reopen'],
+    },
+    {
+      status: 'cancelled',
+      cancelledFromStatus: 'reopened',
+      expected: ['restore'],
+    },
+    {
+      status: 'draft',
+      cancelledFromStatus: null,
+      expected: null,
+    },
+    {
+      status: 'cancelled',
+      cancelledFromStatus: 'draft',
+      expected: null,
+    },
+  ])(
+    'plans reopen mine from $status previously $cancelledFromStatus',
+    ({ status, cancelledFromStatus, expected }) => {
+      expect(planReopenConflictOverride({
+        status,
+        cancelledFromStatus,
+      })).toEqual(expected);
     },
   );
 });

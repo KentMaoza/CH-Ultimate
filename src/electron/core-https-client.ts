@@ -16,6 +16,8 @@ const DEFAULT_MAX_RESPONSE_BYTES = 2_000_000;
 const BOOTSTRAP_MAX_RESPONSE_BYTES = 5_000_000;
 const CATALOGUE_TRANSFER_MAX_BYTES = 7_100_000;
 const IMAGE_PATH = /^\/v1\/images\/[0-9a-f]{64}$/;
+const SKU_IMAGE_PATH =
+  /^\/v1\/skus\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}\/image$/;
 
 type RequestImplementation = (
   options: RequestOptions,
@@ -67,7 +69,7 @@ export function createCoreHttpsClient(options: CoreHttpsClientOptions = {}) {
       const requestLimit =
         options.maxRequestBytes ??
         (input.request.path === '/v1/imports/validate' ||
-        input.request.path === '/v1/images'
+        SKU_IMAGE_PATH.test(input.request.path)
           ? CATALOGUE_TRANSFER_MAX_BYTES
           : maxRequestBytes);
       const responseLimit =

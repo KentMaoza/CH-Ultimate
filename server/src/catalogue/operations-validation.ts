@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MAX_IMAGE_BYTES } from './image-download.js';
 
 const safeInteger = z.number().int().safe();
 const nonnegativeInteger = safeInteger.min(0);
@@ -9,6 +10,18 @@ const identifier = z
   .min(1)
   .max(16 * 1024)
   .refine((value) => value.trim().length > 0);
+const imageMimeType = z.enum([
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+]);
+const maximumImageBase64Bytes = Math.ceil(MAX_IMAGE_BYTES / 3) * 4;
+const canonicalBase64 = z
+  .string()
+  .min(1)
+  .max(maximumImageBase64Bytes)
+  .refine((value) => Buffer.from(value, 'base64').toString('base64') === value);
 
 export const createSkuBody = z
   .object({
@@ -62,6 +75,20 @@ export const updateSkuBody = z
 export const stockAdjustmentBody = z
   .object({
     delta: safeInteger.refine((value) => value !== 0),
+  })
+  .strict();
+
+export const replaceSkuImageBody = z
+  .object({
+    rowVersion: canonicalVersion,
+    base: z
+      .object({
+        imageHash: z.string().regex(/^[0-9a-f]{64}$/).nullable(),
+        sourceImageUrl: optionalUrl.nullable(),
+      })
+      .strict(),
+    mimeType: imageMimeType,
+    bytesBase64: canonicalBase64,
   })
   .strict();
 
@@ -135,6 +162,7 @@ export function templateBody(kind: 'label' | 'invoice') {
 export type CreateSkuRequest = z.infer<typeof createSkuBody>;
 export type UpdateSkuRequest = z.infer<typeof updateSkuBody>;
 export type StockAdjustmentRequest = z.infer<typeof stockAdjustmentBody>;
+export type ReplaceSkuImageRequest = z.infer<typeof replaceSkuImageBody>;
 export type TemplateUpdateRequest = {
   rowVersion: string | null;
   base:

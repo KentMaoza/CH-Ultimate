@@ -1,8 +1,13 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { identifierHash } from '../src/catalogue/catalogue-writer.js';
+import { FileCatalogueStorage } from '../src/catalogue/file-storage.js';
+import { MariaDbSkuImageOperationsRepository } from '../src/catalogue/mariadb-sku-image-operations-repository.js';
 import { MariaDbSkuOperationsRepository } from '../src/catalogue/mariadb-sku-operations-repository.js';
 import { MariaDbStockOperationsRepository } from '../src/catalogue/mariadb-stock-operations-repository.js';
 import { loadServerConfig } from '../src/config.js';
@@ -23,6 +28,7 @@ if (new URL(databaseUrl).pathname !== '/chu_test') {
 const pool = createPool(
   loadServerConfig({ CH_CORE_DATABASE_URL: databaseUrl }),
 );
+const temporaryRoots: string[] = [];
 
 function uuidHex(value: string): string {
   return value.replaceAll('-', '');
@@ -72,6 +78,9 @@ describe('authoritative catalogue operations against isolated chu_test', () => {
 
   afterAll(async () => {
     await pool.end();
+    await Promise.all(
+      temporaryRoots.splice(0).map((root) => rm(root, { recursive: true })),
+    );
   });
 
   it('preserves both concurrent signed stock deltas', async () => {
@@ -179,6 +188,94 @@ describe('authoritative catalogue operations against isolated chu_test', () => {
       quantity_pcs: 11n,
       row_version: 2n,
       movement_count: 1n,
+      receipt_count: 1n,
+    });
+  });
+
+  it('replays a lost SKU image response without duplicating its transaction', async () => {
+    const deviceId = randomUUID();
+    const skuId = randomUUID();
+    const operationId = randomUUID();
+    await insertDevice(deviceId);
+    await insertTrackedSku(skuId, `IMAGE-${skuId}`, 0);
+    const root = await mkdtemp(join(tmpdir(), 'chu-image-integration-'));
+    temporaryRoots.push(root);
+    const repository = new MariaDbSkuImageOperationsRepository(
+      new FileCatalogueStorage(root),
+    );
+    const bytes = Buffer.alloc(24);
+    Buffer.from('89504e470d0a1a0a', 'hex').copy(bytes);
+    bytes.write('IHDR', 12, 'ascii');
+    bytes.writeUInt32BE(32, 16);
+    bytes.writeUInt32BE(24, 20);
+    const hash = createHash('sha256').update(bytes).digest('hex');
+    let callbackCalls = 0;
+    const execute = () =>
+      executeIdempotent(
+        pool,
+        {
+          deviceId,
+          idempotencyKey: operationId,
+          payload: {
+            action: 'sku.image.replace',
+            skuId,
+            rowVersion: '1',
+            bytesBase64: bytes.toString('base64'),
+          },
+        },
+        (connection) => {
+          callbackCalls += 1;
+          return repository.replace(connection, deviceId, skuId, {
+            rowVersion: '1',
+            base: { imageHash: null, sourceImageUrl: null },
+            bytes,
+            mimeType: 'image/png',
+            width: 32,
+            height: 24,
+          });
+        },
+      );
+
+    const first = await execute();
+    const replay = await execute();
+    const rows = await pool.query<
+      Array<{
+        row_version: bigint;
+        image_hash: string;
+        asset_count: bigint;
+        audit_count: bigint;
+        receipt_count: bigint;
+      }>
+    >(
+      `SELECT row_version, LOWER(HEX(image_hash)) AS image_hash,
+         (SELECT COUNT(*) FROM image_assets
+          WHERE content_hash = UNHEX(?)) AS asset_count,
+         (SELECT COUNT(*) FROM audit_events
+          WHERE device_id = UNHEX(?) AND action = 'sku.image.replace'
+            AND entity_id = UNHEX(?)) AS audit_count,
+         (SELECT COUNT(*) FROM idempotency_receipts
+          WHERE device_id = UNHEX(?) AND idempotency_key = ?)
+           AS receipt_count
+       FROM skus
+       WHERE id = UNHEX(?)`,
+      [
+        hash,
+        uuidHex(deviceId),
+        uuidHex(skuId),
+        uuidHex(deviceId),
+        operationId,
+        uuidHex(skuId),
+      ],
+    );
+
+    expect(first.replayed).toBe(false);
+    expect(replay).toEqual({ ...first, replayed: true });
+    expect(callbackCalls).toBe(1);
+    expect(rows[0]).toMatchObject({
+      row_version: 2n,
+      image_hash: hash,
+      asset_count: 1n,
+      audit_count: 1n,
       receipt_count: 1n,
     });
   });

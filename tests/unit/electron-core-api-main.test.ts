@@ -87,8 +87,9 @@ describe('CH Core operation allowlist', () => {
       },
       {
         method: 'POST' as const,
-        path: '/v1/images',
+        path: '/v1/skus/11111111-1111-4111-8111-111111111111/image',
         body: { mimeType: 'image/png', bytesBase64: 'iVBORw==' },
+        idempotencyKey: '22222222-2222-4222-8222-222222222222',
       },
       { method: 'POST' as const, path: '/v1/skus', body: { name: 'Beras' } },
       {
@@ -126,6 +127,7 @@ describe('CH Core operation allowlist', () => {
       '/v1/bootstrap\nX-Test: yes',
       '/v1/not-a-route',
       `/v1/images/${'a'.repeat(63)}`,
+      '/v1/images',
     ];
 
     for (const path of paths) {

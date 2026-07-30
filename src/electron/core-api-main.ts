@@ -61,7 +61,10 @@ const operationRules: ReadonlyArray<{
     methods: ['POST'],
     path: new RegExp(`^/v1/imports/${UUID}/commit$`),
   },
-  { methods: ['POST'], path: /^\/v1\/images$/ },
+  {
+    methods: ['POST'],
+    path: new RegExp(`^/v1/skus/${UUID}/image$`),
+  },
   { methods: ['GET'], path: new RegExp(`^/v1/images/${SHA256}$`) },
   { methods: ['PATCH'], path: /^\/v1\/templates\/(?:label|invoice)$/ },
   { methods: ['POST'], path: /^\/v1\/notas$/ },

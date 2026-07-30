@@ -9,10 +9,15 @@ import {
   type ProtocolPool,
 } from '../sync/idempotency.js';
 import { MariaDbSkuOperationsRepository } from './mariadb-sku-operations-repository.js';
+import type {
+  SkuImageReplacement,
+} from './mariadb-sku-image-operations-repository.js';
 import { MariaDbStockOperationsRepository } from './mariadb-stock-operations-repository.js';
 import { MariaDbTemplateOperationsRepository } from './mariadb-template-operations-repository.js';
+import { validateCatalogueImage } from './image-metadata.js';
 import type {
   CreateSkuRequest,
+  ReplaceSkuImageRequest,
   StockAdjustmentRequest,
   TemplateUpdateRequest,
   UpdateSkuRequest,
@@ -51,6 +56,14 @@ interface CatalogueOperationRepositories {
       input: TemplateUpdateRequest,
     ): Promise<Mutation>;
   };
+  images?: {
+    replace(
+      connection: ProtocolConnection,
+      deviceId: string,
+      skuId: string,
+      input: SkuImageReplacement,
+    ): Promise<Mutation>;
+  };
 }
 
 function defaultRepositories(): CatalogueOperationRepositories {
@@ -64,10 +77,14 @@ function defaultRepositories(): CatalogueOperationRepositories {
 export class CatalogueOperationsService
   implements CatalogueOperationHttpService
 {
+  private readonly repositories: CatalogueOperationRepositories;
+
   constructor(
     private readonly pool: ProtocolPool,
-    private readonly repositories = defaultRepositories(),
-  ) {}
+    repositories: Partial<CatalogueOperationRepositories> = {},
+  ) {
+    this.repositories = { ...defaultRepositories(), ...repositories };
+  }
 
   async createSku(
     context: CatalogueMutationContext,
@@ -107,6 +124,30 @@ export class CatalogueOperationsService
           id,
           input,
         ),
+    );
+  }
+
+  async replaceSkuImage(
+    context: CatalogueMutationContext,
+    id: string,
+    input: ReplaceSkuImageRequest,
+  ): Promise<unknown> {
+    const repository = this.repositories.images;
+    if (!repository) throw new Error('SKU image operations are unavailable');
+    const bytes = Buffer.from(input.bytesBase64, 'base64');
+    const metadata = validateCatalogueImage(bytes, input.mimeType);
+    return this.execute(
+      context,
+      { action: 'sku.image.replace', id, input },
+      (connection) =>
+        repository.replace(connection, context.deviceId, id, {
+          rowVersion: input.rowVersion,
+          base: input.base,
+          bytes,
+          mimeType: metadata.mimeType,
+          width: metadata.width,
+          height: metadata.height,
+        }),
     );
   }
 

@@ -65,7 +65,9 @@ const defaultDependencies: StartupDependencies = {
         config.ownerBootstrapSecret,
       ),
       catalogue: catalogue.services,
-      operations: new CatalogueOperationsService(pool),
+      operations: new CatalogueOperationsService(pool, {
+        images: catalogue.imageOperations,
+      }),
     });
   },
   createMaintenance: (pool, config) => {

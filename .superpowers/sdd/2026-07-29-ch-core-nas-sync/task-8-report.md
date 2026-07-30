@@ -190,3 +190,74 @@ weakening the production fail-closed boundary.
 No NAS, DSM, SMB, QuickConnect, Tailscale, deployment setting, or
 `/Users/hamlet/Documents/CH Nota` content was accessed or changed in this
 fix round. Task 9 was not started.
+
+## Fix round 2/5 — durable replay and image transaction closure
+
+This round closes the three remaining Important findings without changing the
+Task 8 boundary:
+
+1. Restored outbox entries are immutable commands. Bootstrap no longer rewrites
+   a restored template's row version or base, and the queue never coalesces into
+   an item that may already have reached CH Core. A lost response therefore
+   replays the identical idempotency key and payload. If a peer write made that
+   payload stale, the unchanged retry becomes a typed conflict instead of a
+   silently rewritten command.
+2. Successful SKU and template acknowledgements apply the returned
+   authoritative entity to canonical state before any following local command
+   is prepared. Only a command created in the current process and proven not to
+   have started transport may be rebased. Its row version and base are both
+   rebuilt from the acknowledged entity and durably persisted before first
+   send.
+3. SKU image replacement is now one durable command:
+   `POST /v1/skus/:id/image`. The outbox persists the UUID idempotency key,
+   version/base, MIME type, and bounded base64 bytes before transport. CH Core
+   validates MIME, magic bytes, dimensions, and size, then uses the shared
+   idempotency and business-write transaction for the image asset row, SKU
+   version, audit event, ordered change, and receipt. The former unaudited
+   direct `POST /v1/images` write was removed.
+
+Windows and Android native request policies allow the larger request envelope
+only for the exact versioned UUID SKU-image route. Direct image mutation,
+lookalike UUID paths, traversal, and unknown routes continue to fail closed.
+
+Content bytes are written to a deterministic SHA-256 path before their database
+reference. A storage failure leaves the SKU, audit, and change tables untouched.
+A later database rollback can leave only an unreferenced content-addressed file;
+it cannot publish a partial business transaction, and a retry safely reuses the
+same path.
+
+### Fix-round TDD evidence
+
+- Restored outbox replay and sequential acknowledgement tests were RED 5/13,
+  then the authoritative catalogue and concurrency suites passed 22/22.
+- The combined image command first failed because the client still performed
+  two requests and the exact native route was absent. After implementation,
+  client/outbox/Electron focused tests passed 35/35.
+- Server HTTP, validation, service, repository, storage-failure, stale-version,
+  and direct-route rejection tests passed 52/52.
+- A guarded `chu_test` case now verifies lost-response image replay keeps one
+  receipt, one audit event, one asset row, and one SKU version increment.
+
+### Fresh fix-round verification
+
+| Gate | Result |
+| --- | --- |
+| `npm run verify` | PASS — 53 files, 400 tests |
+| `npm run server:test` | PASS — 31 files, 211 passed, 1 intentional acceptance skip |
+| `npm run server:typecheck` | PASS, including guarded integration sources |
+| `npm run server:build` | PASS |
+| `npm run mobile:build` | PASS |
+| `npm run package` | PASS — Electron arm64 package |
+| `npm run android:sync` | PASS |
+| Android `./gradlew test lint` with JDK 21 and local SDK | PASS — 469 tasks |
+| `git diff --check` | PASS |
+
+`CH_CORE_TEST_DATABASE_URL` remains unset, so the destructive guarded MariaDB
+suite was compiled but not executed. The eight legacy E2E tests were not rerun:
+round 1 already established that they require the removed implicit demo startup
+and do not provision CH Core or an identity. No production boundary was
+weakened to make that obsolete harness pass.
+
+No NAS, DSM, SMB, QuickConnect, Tailscale, deployment setting, or
+`/Users/hamlet/Documents/CH Nota` content was accessed or changed. Task 9 was
+not started.

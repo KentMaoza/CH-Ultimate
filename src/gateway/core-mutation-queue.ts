@@ -25,6 +25,7 @@ export type { CoreMutationSpec } from './core-mutation-item';
 export class CoreMutationQueue {
   private deferredById = new Map<string, MutationDeferred>();
   private durableFingerprintById = new Map<string, string>();
+  private neverSentInThisProcess = new Set<string>();
   private inFlightId?: string;
   private pumpPromise?: Promise<void>;
 
@@ -42,6 +43,7 @@ export class CoreMutationQueue {
       ? outbox.find(
           (item) =>
             item.coalesceKey === spec.coalesceKey &&
+            this.neverSentInThisProcess.has(item.id) &&
             item.id !== this.inFlightId &&
             !item.conflict,
         )
@@ -53,6 +55,7 @@ export class CoreMutationQueue {
       ? outbox.map((candidate) => (candidate.id === item.id ? item : candidate))
       : [...outbox, item];
     const pending = this.ensureDeferred(item.id);
+    if (!existing) this.neverSentInThisProcess.add(item.id);
     this.updateOutbox(next);
     void this.persistThenPump(item.id);
     return pending.promise;
@@ -149,6 +152,7 @@ export class CoreMutationQueue {
         return;
       }
       this.inFlightId = item.id;
+      this.neverSentInThisProcess.delete(item.id);
       try {
         const response = await this.transport.request({
           method: item.method,
@@ -197,10 +201,9 @@ export class CoreMutationQueue {
     item: CoreOutboxItem,
     acknowledgement: CoreMutationAcknowledgement,
   ): Promise<void> {
-    this.state.recordMutationVersion(
+    const hasAuthoritativeEntity = this.state.recordMutationAcknowledgement(
       item.path,
       acknowledgement,
-      item.optimistic,
     );
     try {
       this.recordDurable(
@@ -213,15 +216,15 @@ export class CoreMutationQueue {
                   candidate.conflict?.id !== item.resolvesConflictId),
             )
             .map((candidate) =>
-              rebaseQueuedRowVersion(
-                candidate,
-                item.path,
-                acknowledgement.entityVersion,
-              ),
+              hasAuthoritativeEntity &&
+              this.neverSentInThisProcess.has(candidate.id)
+                ? this.state.rebaseNeverSentItem(candidate, item.path)
+                : candidate,
             ),
         ),
       );
       this.durableFingerprintById.delete(item.id);
+      this.neverSentInThisProcess.delete(item.id);
     } catch (error) {
       this.state.publishSync({
         phase: 'offline',
@@ -268,6 +271,7 @@ export class CoreMutationQueue {
         ),
       );
       this.durableFingerprintById.delete(item.id);
+      this.neverSentInThisProcess.delete(item.id);
       this.state.publishSync({ phase: 'online', message: error.message });
       this.failDeferred(item.id, error);
     } catch (persistenceError) {
@@ -335,25 +339,4 @@ function coreMutationErrorMessage(code: string): string {
     FORBIDDEN: 'Perangkat ini tidak diizinkan melakukan perubahan tersebut.',
   };
   return messages[code] ?? `Perubahan ditolak oleh CH Core (${code}).`;
-}
-
-function rebaseQueuedRowVersion(
-  item: CoreOutboxItem,
-  acknowledgedPath: string,
-  entityVersion: string | undefined,
-): CoreOutboxItem {
-  if (
-    !entityVersion ||
-    item.path !== acknowledgedPath ||
-    item.body === null ||
-    typeof item.body !== 'object' ||
-    Array.isArray(item.body) ||
-    !Object.prototype.hasOwnProperty.call(item.body, 'rowVersion')
-  ) {
-    return item;
-  }
-  return {
-    ...item,
-    body: { ...item.body, rowVersion: entityVersion },
-  };
 }

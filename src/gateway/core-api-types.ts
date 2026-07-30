@@ -212,20 +212,6 @@ const catalogueImageSchema = z
       ),
   })
   .strict();
-const catalogueImageUploadSchema = z
-  .object({
-    hash: z.string().regex(/^[0-9a-f]{64}$/),
-    mimeType: z.enum([
-      'image/png',
-      'image/jpeg',
-      'image/gif',
-      'image/webp',
-    ]),
-    byteSize: z.number().int().min(1).max(5 * 1024 * 1024),
-    width: z.number().int().min(1).max(12_000),
-    height: z.number().int().min(1).max(12_000),
-  })
-  .strict();
 
 export function parseCatalogueValidation(
   body: unknown,
@@ -250,20 +236,6 @@ export function parseCatalogueImage(body: unknown): {
   return parseEnvelope(catalogueImageSchema, body, 'catalogue image');
 }
 
-export function parseCatalogueImageUpload(body: unknown): {
-  hash: string;
-  mimeType: string;
-  byteSize: number;
-  width: number;
-  height: number;
-} {
-  return parseEnvelope(
-    catalogueImageUploadSchema,
-    body,
-    'catalogue image upload',
-  );
-}
-
 const encodeId = (id: string) => encodeURIComponent(id);
 
 export const CORE_API_PATHS = {
@@ -277,7 +249,7 @@ export const CORE_API_PATHS = {
   commitCatalogue: (id: string) =>
     `/v1/imports/${encodeId(id)}/commit`,
   image: (hash: string) => `/v1/images/${encodeId(hash)}`,
-  imageUpload: '/v1/images',
+  skuImage: (id: string) => `/v1/skus/${encodeId(id)}/image`,
   template: (kind: 'label' | 'invoice') => `/v1/templates/${kind}`,
   notas: '/v1/notas',
   nota: (id: string) => `/v1/notas/${encodeId(id)}`,

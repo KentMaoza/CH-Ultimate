@@ -6,8 +6,6 @@ import type {
   CatalogueDevice,
   CatalogueValidationResult,
 } from '../catalogue/service.js';
-import { MAX_IMAGE_BYTES } from '../catalogue/image-download.js';
-import { validateCatalogueImage } from '../catalogue/image-metadata.js';
 import { MAX_XLSX_BYTES } from '../catalogue/xlsx-archive.js';
 import { authenticateRequest, requireOwner } from './request-auth.js';
 import {
@@ -18,7 +16,6 @@ import {
 import type { ProtocolIdentityService } from './protocol-types.js';
 
 const MAX_BASE64_BYTES = Math.ceil(MAX_XLSX_BYTES / 3) * 4;
-const MAX_IMAGE_BASE64_BYTES = Math.ceil(MAX_IMAGE_BYTES / 3) * 4;
 const validateBody = z
   .object({
     fileName: z.string().min(1).max(255),
@@ -47,27 +44,6 @@ const importPath = z
 const imagePath = z
   .object({ hash: z.string().regex(/^[0-9a-f]{64}$/) })
   .strict();
-const imageUploadBody = z
-  .object({
-    mimeType: z.enum([
-      'image/png',
-      'image/jpeg',
-      'image/gif',
-      'image/webp',
-    ]),
-    bytesBase64: z
-      .string()
-      .min(1)
-      .max(MAX_IMAGE_BASE64_BYTES)
-      .refine((value) => {
-        try {
-          return Buffer.from(value, 'base64').toString('base64') === value;
-        } catch {
-          return false;
-        }
-      }),
-  })
-  .strict();
 
 export interface CatalogueHttpServices {
   imports: {
@@ -82,18 +58,6 @@ export interface CatalogueHttpServices {
   };
   images: {
     read(hash: string): Promise<{ bytes: Buffer; mimeType: string }>;
-    upload(input: {
-      bytes: Buffer;
-      mimeType: string;
-      width: number;
-      height: number;
-    }): Promise<{
-      hash: string;
-      mimeType: string;
-      byteSize: number;
-      width: number;
-      height: number;
-    }>;
   };
 }
 
@@ -150,27 +114,4 @@ export function registerCatalogueRoutes(
         })
       : response.type(image.mimeType).send(image.bytes);
   });
-
-  app.post(
-    '/v1/images',
-    { bodyLimit: MAX_IMAGE_BASE64_BYTES + 1024 },
-    async (request) => {
-      requireEmptyQuery(request.query);
-      await authenticateRequest(identity, request);
-      const body = parseRequest(imageUploadBody, request.body);
-      const bytes = Buffer.from(body.bytesBase64, 'base64');
-      if (bytes.length > MAX_IMAGE_BYTES) {
-        const error = new Error('Image too large');
-        Object.assign(error, { statusCode: 413 });
-        throw error;
-      }
-      const metadata = validateCatalogueImage(bytes, body.mimeType);
-      return services.images.upload({
-        bytes,
-        mimeType: metadata.mimeType,
-        width: metadata.width,
-        height: metadata.height,
-      });
-    },
-  );
 }

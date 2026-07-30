@@ -159,7 +159,7 @@ describe('main-process CH Core HTTPS client', () => {
     ).rejects.toThrow('Respons CH Core tidak valid.');
   });
 
-  it('raises byte limits only for catalogue validation and image routes', async () => {
+  it('raises byte limits only for catalogue validation and exact image routes', async () => {
     const requestBody = {
       fileName: 'catalogue.xlsx',
       workbookBase64: 'A'.repeat(2_100_000),
@@ -223,11 +223,14 @@ describe('main-process CH Core HTTPS client', () => {
         authorization,
         request: {
           method: 'POST',
-          path: '/v1/images',
+          path: '/v1/skus/11111111-1111-4111-8111-111111111111/image',
           body: {
+            rowVersion: '1',
+            base: { imageHash: null, sourceImageUrl: null },
             mimeType: 'image/png',
             bytesBase64: 'A'.repeat(2_100_000),
           },
+          idempotencyKey: '22222222-2222-4222-8222-222222222222',
         },
       }),
     ).resolves.toEqual({ status: 200, body: {} });
@@ -244,6 +247,18 @@ describe('main-process CH Core HTTPS client', () => {
         request: {
           method: 'POST',
           path: '/v1/skus',
+          body: requestBody,
+        },
+      }),
+    ).toThrow('Permintaan CH Core terlalu besar.');
+    expect(() =>
+      ordinaryClient.send({
+        endpoint,
+        ca,
+        authorization,
+        request: {
+          method: 'POST',
+          path: `/v1/skus/${'-'.repeat(36)}/image`,
           body: requestBody,
         },
       }),

@@ -60,9 +60,9 @@ public class CoreSecurityBoundaryTest {
         );
         CoreRequestPolicy.requireApproved(
             "POST",
-            "/v1/images",
+            "/v1/skus/11111111-1111-4111-8111-111111111111/image",
             true,
-            false
+            true
         );
 
         for (String path : new String[] {
@@ -71,6 +71,7 @@ public class CoreSecurityBoundaryTest {
             "/v1/../bootstrap",
             "/v1/%2e%2e/bootstrap",
             "/v1/not-a-route",
+            "/v1/images",
             "/v1/images/" + "a".repeat(63),
             "/v1/changes?limit=500&after=0"
         }) {
@@ -166,7 +167,9 @@ public class CoreSecurityBoundaryTest {
 
     @Test
     public void imageUploadRequestGetsOnlyTheBoundedImageTransferAllowance() {
-        CoreApiClient.requireRequestSize(2_100_000, "/v1/images");
+        String imagePath =
+            "/v1/skus/11111111-1111-4111-8111-111111111111/image";
+        CoreApiClient.requireRequestSize(2_100_000, imagePath);
         assertThrows(
             CoreSecurityException.class,
             () -> CoreApiClient.requireRequestSize(
@@ -177,8 +180,15 @@ public class CoreSecurityBoundaryTest {
         assertThrows(
             CoreSecurityException.class,
             () -> CoreApiClient.requireRequestSize(
+                2_100_000,
+                "/v1/skus/------------------------------------/image"
+            )
+        );
+        assertThrows(
+            CoreSecurityException.class,
+            () -> CoreApiClient.requireRequestSize(
                 7_100_001,
-                "/v1/images"
+                imagePath
             )
         );
     }

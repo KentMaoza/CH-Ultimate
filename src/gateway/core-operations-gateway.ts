@@ -32,7 +32,6 @@ import {
   CORE_API_PATHS,
   parseCatalogueCommit,
   parseCatalogueImage,
-  parseCatalogueImageUpload,
   parseCatalogueValidation,
   parseCoreApiError,
 } from './core-api-types';
@@ -126,14 +125,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
       await this.mutations.updateSku(id, patch);
       return;
     }
-    const response = await this.transport.request({
-      method: 'POST',
-      path: CORE_API_PATHS.imageUpload,
-      body: upload,
-    });
-    this.throwForApiError(response.status, response.body);
-    const stored = parseCatalogueImageUpload(response.body);
-    await this.mutations.updateSkuImage(id, stored.hash);
+    await this.mutations.replaceSkuImage(id, upload);
   };
   adjustStock = (id: string, quantity: number): Promise<void> =>
     this.mutations.adjustStock(id, quantity);

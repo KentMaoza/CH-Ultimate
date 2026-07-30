@@ -22,6 +22,15 @@ import {
   asCoreJson,
   previewOptimisticOutbox,
 } from './core-optimistic-state';
+import { applyCoreChange } from './core-change-application';
+import {
+  coreSkuRowSchema,
+  coreTemplateRowSchema,
+} from './core-api-types';
+import {
+  invoiceTemplateSchema,
+  labelTemplateSchema,
+} from './core-domain-schemas';
 
 export class CoreGatewayState {
   private state = emptyCoreState();
@@ -85,7 +94,7 @@ export class CoreGatewayState {
 
   requireSkuWriteContext(
     id: string,
-    patch: Partial<Sku>,
+    patch: Record<string, unknown>,
   ): { rowVersion: string; base: Record<string, unknown> } {
     const version = this.skuVersions.get(id);
     if (!version) {
@@ -147,31 +156,6 @@ export class CoreGatewayState {
     };
   }
 
-  rebaseVersionedOutbox(outbox: CoreOutboxItem[]): CoreOutboxItem[] {
-    let changed = false;
-    const rebased = outbox.map((item) => {
-      const match = /^\/v1\/templates\/(label|invoice)$/.exec(item.path);
-      const kind = match?.[1];
-      if (
-        (kind !== 'label' && kind !== 'invoice') ||
-        item.body === null ||
-        typeof item.body !== 'object' ||
-        Array.isArray(item.body)
-      ) {
-        return item;
-      }
-      changed = true;
-      return {
-        ...item,
-        body: asCoreJson({
-          ...item.body,
-          ...this.getTemplateWriteContext(kind),
-        }),
-      };
-    });
-    return changed ? rebased : outbox;
-  }
-
   recordChangeVersions(changes: CoreChange[]): void {
     for (const change of changes) {
       const payload =
@@ -201,45 +185,75 @@ export class CoreGatewayState {
     }
   }
 
-  recordMutationVersion(
+  recordMutationAcknowledgement(
     path: string,
     acknowledgement: CoreMutationAcknowledgement,
-    optimistic?: CoreOptimisticChange,
-  ): void {
+  ): boolean {
     const version = acknowledgement.entityVersion;
-    if (!version) return;
-    const skuMatch = /^\/v1\/skus\/([^/]+)$/.exec(path);
+    if (!version) return false;
+    const skuMatch = /^\/v1\/skus\/([^/]+)(?:\/image)?$/.exec(path);
     if (skuMatch?.[1]) {
-      this.skuVersions.set(decodeURIComponent(skuMatch[1]), version);
-      return;
+      const skuId = decodeURIComponent(skuMatch[1]);
+      const currentVersion = this.skuVersions.get(skuId);
+      if (currentVersion && BigInt(version) < BigInt(currentVersion)) {
+        return false;
+      }
+      if (acknowledgement.entity === undefined) {
+        this.skuVersions.set(skuId, version);
+        return false;
+      }
+      const entity = coreSkuRowSchema.parse(acknowledgement.entity);
+      if (entity.id !== skuId) {
+        throw new Error('Respons SKU CH Core tidak cocok.');
+      }
+      this.skuVersions.set(skuId, version);
+      this.canonicalState = applyCoreChange(this.canonicalState, {
+        revision: acknowledgement.serverRevision ?? this.serverRevision,
+        entityType: 'sku',
+        entityId: skuId,
+        operation: 'upsert',
+        payload: entity,
+        createdAt: entity.updatedAt,
+      });
+      return true;
     }
     const stockMatch =
       /^\/v1\/skus\/([^/]+)\/stock-adjustments$/.exec(path);
     if (stockMatch?.[1]) {
       this.balanceVersions.set(decodeURIComponent(stockMatch[1]), version);
-      return;
+      return false;
     }
     const templateMatch = /^\/v1\/templates\/(label|invoice)$/.exec(path);
     if (templateMatch?.[1] === 'label' || templateMatch?.[1] === 'invoice') {
-      this.templateVersions.set(templateMatch[1], version);
-      if (
-        templateMatch[1] === 'label' &&
-        optimistic?.kind === 'label-template'
-      ) {
-        this.canonicalState = {
-          ...this.canonicalState,
-          labelTemplate: cloneCore(optimistic.template),
-        };
-      } else if (
-        templateMatch[1] === 'invoice' &&
-        optimistic?.kind === 'invoice-template'
-      ) {
-        this.canonicalState = {
-          ...this.canonicalState,
-          invoiceTemplate: cloneCore(optimistic.template),
-        };
+      const kind = templateMatch[1];
+      const currentVersion = this.templateVersions.get(kind);
+      if (currentVersion && BigInt(version) < BigInt(currentVersion)) {
+        return false;
       }
-      return;
+      if (acknowledgement.entity === undefined) {
+        this.templateVersions.set(kind, version);
+        return false;
+      }
+      const entity = coreTemplateRowSchema.parse(acknowledgement.entity);
+      if (entity.templateKind !== kind) {
+        throw new Error('Respons template CH Core tidak cocok.');
+      }
+      this.templateVersions.set(kind, version);
+      const definition =
+        kind === 'label'
+          ? labelTemplateSchema.parse(entity.definition)
+          : invoiceTemplateSchema.parse(entity.definition);
+      this.canonicalState =
+        kind === 'label'
+          ? {
+              ...this.canonicalState,
+              labelTemplate: cloneCore(definition as LabelTemplate),
+            }
+          : {
+              ...this.canonicalState,
+              invoiceTemplate: cloneCore(definition as InvoiceTemplate),
+            };
+      return true;
     }
     const entity = acknowledgement.entity;
     if (
@@ -252,6 +266,73 @@ export class CoreGatewayState {
     ) {
       this.skuVersions.set(entity.id, version);
     }
+    return false;
+  }
+
+  rebaseNeverSentItem(
+    item: CoreOutboxItem,
+    acknowledgedPath: string,
+  ): CoreOutboxItem {
+    if (
+      item.body === null ||
+      typeof item.body !== 'object' ||
+      Array.isArray(item.body)
+    ) {
+      return item;
+    }
+    const skuMatch = /^\/v1\/skus\/([^/]+)(?:\/image)?$/.exec(item.path);
+    const acknowledgedSku =
+      /^\/v1\/skus\/([^/]+)(?:\/image)?$/.exec(acknowledgedPath);
+    if (
+      skuMatch?.[1] &&
+      acknowledgedSku?.[1] === skuMatch[1]
+    ) {
+      const skuId = decodeURIComponent(skuMatch[1]);
+      if (item.path.endsWith('/image')) {
+        const context = this.requireSkuWriteContext(skuId, {
+          imageHash: null,
+          sourceImageUrl: null,
+        });
+        return {
+          ...item,
+          body: asCoreJson({
+            ...item.body,
+            rowVersion: context.rowVersion,
+            base: context.base,
+          }),
+        };
+      }
+      const patch = item.body.patch;
+      if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) {
+        return item;
+      }
+      const context = this.requireSkuWriteContext(
+        skuId,
+        patch as Partial<Sku>,
+      );
+      return {
+        ...item,
+        body: asCoreJson({
+          ...item.body,
+          rowVersion: context.rowVersion,
+          base: context.base,
+        }),
+      };
+    }
+    const templateMatch = /^\/v1\/templates\/(label|invoice)$/.exec(item.path);
+    if (
+      item.path === acknowledgedPath &&
+      (templateMatch?.[1] === 'label' || templateMatch?.[1] === 'invoice')
+    ) {
+      return {
+        ...item,
+        body: asCoreJson({
+          ...item.body,
+          ...this.getTemplateWriteContext(templateMatch[1]),
+        }),
+      };
+    }
+    return item;
   }
 
   getOutbox(): CoreOutboxItem[] {

@@ -24,6 +24,10 @@ final class CoreApiClient {
     private static final int MAX_IMAGE_RESPONSE_BYTES = 7_100_000;
     private static final int MAX_REQUEST_BYTES = 1_000_000;
     private static final int MAX_IMAGE_REQUEST_BYTES = 7_100_000;
+    private static final String SKU_IMAGE_PATH =
+        "^/v1/skus/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-" +
+        "[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-" +
+        "[0-9a-fA-F]{12}/image$";
     private final Context context;
     private final CoreDeploymentConfig config;
 
@@ -114,7 +118,8 @@ final class CoreApiClient {
 
     static void requireRequestSize(int byteSize, String path) {
         int maximum =
-            "/v1/images".equals(path)
+            path != null &&
+            path.matches(SKU_IMAGE_PATH)
                 ? MAX_IMAGE_REQUEST_BYTES
                 : MAX_REQUEST_BYTES;
         if (byteSize > maximum) {

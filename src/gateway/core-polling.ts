@@ -115,9 +115,6 @@ export class CorePollingCoordinator {
       );
       if (committed === 'stale') return;
       this.state.replaceRowVersions(bootstrap);
-      await this.envelopes.replaceOutbox((outbox) =>
-        this.state.rebaseVersionedOutbox(outbox),
-      );
       this.bootstrapped = true;
       this.state.publishSync({
         phase: 'online',

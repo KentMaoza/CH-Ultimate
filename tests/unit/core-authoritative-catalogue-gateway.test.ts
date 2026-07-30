@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import type { LabelTemplate } from '../../src/domain/types';
 import { createCoreOperationsGateway } from '../../src/gateway/core-operations-gateway';
 import {
   SKU_ID,
@@ -25,7 +26,7 @@ const SERVER_LABEL_TEMPLATE = {
 
 function labelTemplateRow(
   rowVersion: string,
-  definition = SERVER_LABEL_TEMPLATE,
+  definition: LabelTemplate = SERVER_LABEL_TEMPLATE,
 ) {
   return {
     id: TEMPLATE_ID,
@@ -65,7 +66,15 @@ describe('Core authoritative catalogue version tracking', () => {
     await gateway.initialize();
     transport.enqueue({
       status: 200,
-      body: { serverRevision: '8', entityVersion: '13' },
+      body: {
+        serverRevision: '8',
+        entityVersion: '13',
+        entity: {
+          ...populatedBootstrap().skus[0]!,
+          name: 'Produk 13',
+          rowVersion: '13',
+        },
+      },
     });
     transport.enqueue({
       status: 200,
@@ -95,13 +104,13 @@ describe('Core authoritative catalogue version tracking', () => {
     expect(transport.requests[3]).toMatchObject({
       body: {
         rowVersion: '13',
-        base: { name: 'Produk Core' },
+        base: { name: 'Produk 13' },
         patch: { name: 'Produk 14' },
       },
     });
   });
 
-  it('rebases a queued SKU edit after the preceding acknowledgement', async () => {
+  it('rebases a never-sent queued SKU edit with the acknowledged version and base', async () => {
     const { gateway, transport } = setup(
       populatedBootstrap('7', {
         skus: [
@@ -125,7 +134,11 @@ describe('Core authoritative catalogue version tracking', () => {
       body: { serverRevision: '8', nextAfter: '7', changes: [] },
     });
     transport.enqueue((request) => {
-      expect(request.body).toMatchObject({ rowVersion: '13' });
+      expect(request.body).toMatchObject({
+        rowVersion: '13',
+        base: { name: 'Produk 13' },
+        patch: { name: 'Produk 14' },
+      });
       return {
         status: 200,
         body: { serverRevision: '9', entityVersion: '14' },
@@ -138,10 +151,18 @@ describe('Core authoritative catalogue version tracking', () => {
 
     const first = gateway.updateSku(SKU_ID, { name: 'Produk 13' });
     await firstStarted.promise;
-    const second = gateway.updateSku(SKU_ID, { note: 'Perubahan lanjutan' });
+    const second = gateway.updateSku(SKU_ID, { name: 'Produk 14' });
     firstResponse.resolve({
       status: 200,
-      body: { serverRevision: '8', entityVersion: '13' },
+      body: {
+        serverRevision: '8',
+        entityVersion: '13',
+        entity: {
+          ...populatedBootstrap().skus[0]!,
+          name: 'Produk 13',
+          rowVersion: '13',
+        },
+      },
     });
 
     await Promise.all([first, second]);
@@ -160,6 +181,7 @@ describe('Core authoritative catalogue version tracking', () => {
         serverRevision: '2',
         entityVersion: '1',
         entityId: TEMPLATE_ID,
+        entity: labelTemplateRow('1', template),
       },
     });
     transport.enqueue({
@@ -223,7 +245,7 @@ describe('Core authoritative catalogue version tracking', () => {
     expect(offlineTransport.requests).toHaveLength(1);
   });
 
-  it('durably rebases a restored template edit to the successful bootstrap version', async () => {
+  it('retries a potentially-sent restored template command byte-for-byte', async () => {
     const storage = new MemoryStorage();
     const firstTransport = new ScriptedTransport();
     const first = createCoreOperationsGateway(
@@ -247,6 +269,9 @@ describe('Core authoritative catalogue version tracking', () => {
       'LAN unavailable',
     );
     first.dispose();
+    const pendingBefore = structuredClone(
+      (storage.value as { outbox: Array<Record<string, unknown>> }).outbox[0],
+    );
 
     const secondTransport = new ScriptedTransport();
     const second = createCoreOperationsGateway(
@@ -262,22 +287,19 @@ describe('Core authoritative catalogue version tracking', () => {
     });
     await second.initialize();
     expect(
-      (storage.value as { outbox: Array<{ body?: unknown }> }).outbox[0]?.body,
-    ).toMatchObject({
-      rowVersion: '2',
-      base: SERVER_LABEL_TEMPLATE,
-      definition: queuedTemplate,
-    });
+      (storage.value as { outbox: Array<Record<string, unknown>> }).outbox[0],
+    ).toEqual(pendingBefore);
 
     secondTransport.enqueue((request) => {
-      expect(request.body).toMatchObject({
-        rowVersion: '2',
-        base: SERVER_LABEL_TEMPLATE,
-        definition: queuedTemplate,
-      });
+      expect(request.idempotencyKey).toBe(pendingBefore?.idempotencyKey);
+      expect(request.body).toEqual(pendingBefore?.body);
       return {
         status: 200,
-        body: { serverRevision: '3', entityVersion: '3' },
+        body: {
+          serverRevision: '2',
+          entityVersion: '2',
+          entity: labelTemplateRow('2', queuedTemplate),
+        },
       };
     });
     secondTransport.enqueue({
@@ -285,6 +307,123 @@ describe('Core authoritative catalogue version tracking', () => {
       body: { serverRevision: '3', nextAfter: '2', changes: [] },
     });
     await second.retryPending();
+  });
+
+  it('keeps a restored stale template base and stores the peer-edit conflict', async () => {
+    const storage = new MemoryStorage();
+    const firstTransport = new ScriptedTransport();
+    const first = createCoreOperationsGateway(
+      firstTransport,
+      storage,
+      new TestClock(),
+    );
+    firstTransport.enqueue({
+      status: 200,
+      body: populatedBootstrap('1', {
+        templates: [labelTemplateRow('1')],
+      }),
+    });
+    await first.initialize();
+    firstTransport.enqueue(new Error('response lost'));
+    const mine = { ...SERVER_LABEL_TEMPLATE, fontSize: 12 };
+    await expect(first.setLabelTemplate(mine)).rejects.toThrow('response lost');
+    first.dispose();
+    const original = structuredClone(
+      (storage.value as { outbox: Array<Record<string, unknown>> }).outbox[0],
+    );
+    const peer = { ...SERVER_LABEL_TEMPLATE, fontSize: 11 };
+
+    const transport = new ScriptedTransport();
+    const gateway = createCoreOperationsGateway(
+      transport,
+      storage,
+      new TestClock(),
+    );
+    transport.enqueue({
+      status: 200,
+      body: populatedBootstrap('3', {
+        templates: [labelTemplateRow('3', peer)],
+      }),
+    });
+    await gateway.initialize();
+    transport.enqueue((request) => {
+      expect(request.idempotencyKey).toBe(original?.idempotencyKey);
+      expect(request.body).toEqual(original?.body);
+      return {
+        status: 409,
+        body: {
+          code: 'CONFLICT',
+          conflict: {
+            id: '88888888-8888-4888-8888-888888888888',
+            entityType: 'template',
+            entityId: TEMPLATE_ID,
+            base: SERVER_LABEL_TEMPLATE,
+            mine,
+            server: peer,
+          },
+        },
+      };
+    });
+
+    await expect(gateway.retryPending()).rejects.toThrow('CONFLICT');
+    expect(gateway.getSyncSnapshot()).toMatchObject({
+      phase: 'conflict',
+      conflictCount: 1,
+    });
+  });
+
+  it('rebases a never-sent queued template with the acknowledged definition', async () => {
+    const { gateway, transport } = setup(
+      populatedBootstrap('1', {
+        templates: [labelTemplateRow('1')],
+      }),
+    );
+    await gateway.initialize();
+    const firstResponse = deferred<{ status: number; body: unknown }>();
+    const firstStarted = deferred<void>();
+    const middle = { ...SERVER_LABEL_TEMPLATE, fontSize: 11 };
+    const final = { ...SERVER_LABEL_TEMPLATE, fontSize: 12 };
+    transport.enqueue(() => {
+      firstStarted.resolve();
+      return firstResponse.promise;
+    });
+    transport.enqueue({
+      status: 200,
+      body: { serverRevision: '2', nextAfter: '1', changes: [] },
+    });
+    transport.enqueue((request) => {
+      expect(request.body).toEqual({
+        rowVersion: '2',
+        base: middle,
+        definition: final,
+      });
+      return {
+        status: 200,
+        body: {
+          serverRevision: '3',
+          entityVersion: '3',
+          entity: labelTemplateRow('3', final),
+        },
+      };
+    });
+    transport.enqueue({
+      status: 200,
+      body: { serverRevision: '3', nextAfter: '1', changes: [] },
+    });
+
+    const first = gateway.setLabelTemplate(middle);
+    await firstStarted.promise;
+    const second = gateway.setLabelTemplate(final);
+    firstResponse.resolve({
+      status: 200,
+      body: {
+        serverRevision: '2',
+        entityVersion: '2',
+        entity: labelTemplateRow('2', middle),
+      },
+    });
+
+    await Promise.all([first, second]);
   });
 
   it('fails closed before transport when a SKU row version is unavailable', async () => {
@@ -318,7 +457,7 @@ describe('Core authoritative catalogue version tracking', () => {
     expect(transport.requests[1]?.body).not.toHaveProperty('balance');
   });
 
-  it('uploads a picked data image before versioning the SKU hash replacement', async () => {
+  it('queues one durable idempotent SKU image replacement command', async () => {
     const { gateway, transport } = setup();
     await gateway.initialize();
     const bytesBase64 = 'iVBORw0KGgoAAAAAAAAASUhEUgAAACAAAAAY';
@@ -326,16 +465,15 @@ describe('Core authoritative catalogue version tracking', () => {
     transport.enqueue({
       status: 200,
       body: {
-        hash: nextHash,
-        mimeType: 'image/png',
-        byteSize: 24,
-        width: 32,
-        height: 24,
+        serverRevision: '2',
+        entityVersion: '2',
+        entity: {
+          ...populatedBootstrap().skus[0]!,
+          imageHash: nextHash,
+          sourceImageUrl: null,
+          rowVersion: '2',
+        },
       },
-    });
-    transport.enqueue({
-      status: 200,
-      body: { serverRevision: '2', entityVersion: '2' },
     });
     transport.enqueue({
       status: 200,
@@ -346,23 +484,93 @@ describe('Core authoritative catalogue version tracking', () => {
       imageUrl: `data:image/png;base64,${bytesBase64}`,
     });
 
-    expect(transport.requests[1]).toEqual({
+    expect(transport.requests[1]).toMatchObject({
       method: 'POST',
-      path: '/v1/images',
-      body: { mimeType: 'image/png', bytesBase64 },
-    });
-    expect(transport.requests[2]).toMatchObject({
-      method: 'PATCH',
-      path: `/v1/skus/${SKU_ID}`,
+      path: `/v1/skus/${SKU_ID}/image`,
+      idempotencyKey: expect.any(String),
       body: {
         rowVersion: '1',
         base: {
           imageHash: 'a'.repeat(64),
           sourceImageUrl: 'https://res.bigseller.pro/a.png',
         },
-        patch: { imageHash: nextHash, sourceImageUrl: null },
+        mimeType: 'image/png',
+        bytesBase64,
       },
     });
+    expect(transport.requests).toHaveLength(3);
+  });
+
+  it('restarts and replays the exact durable image command after a lost response', async () => {
+    const storage = new MemoryStorage();
+    const firstTransport = new ScriptedTransport();
+    const first = createCoreOperationsGateway(
+      firstTransport,
+      storage,
+      new TestClock(),
+    );
+    firstTransport.enqueue({ status: 200, body: populatedBootstrap('1') });
+    await first.initialize();
+    firstTransport.enqueue(new Error('response lost'));
+    const bytesBase64 = 'iVBORw0KGgoAAAAAAAAASUhEUgAAACAAAAAY';
+    await expect(
+      first.updateSku(SKU_ID, {
+        imageUrl: `data:image/png;base64,${bytesBase64}`,
+      }),
+    ).rejects.toThrow('response lost');
+    first.dispose();
+    const pending = structuredClone(
+      (storage.value as { outbox: Array<Record<string, unknown>> }).outbox[0],
+    );
+    expect(pending).toMatchObject({
+      path: `/v1/skus/${SKU_ID}/image`,
+      idempotencyKey: expect.any(String),
+    });
+
+    const transport = new ScriptedTransport();
+    const gateway = createCoreOperationsGateway(
+      transport,
+      storage,
+      new TestClock(),
+    );
+    transport.enqueue({
+      status: 200,
+      body: populatedBootstrap('2', {
+        skus: [
+          {
+            ...populatedBootstrap().skus[0]!,
+            imageHash: 'b'.repeat(64),
+            sourceImageUrl: null,
+            rowVersion: '2',
+          },
+        ],
+      }),
+    });
+    await gateway.initialize();
+    transport.enqueue((request) => {
+      expect(request.idempotencyKey).toBe(pending?.idempotencyKey);
+      expect(request.body).toEqual(pending?.body);
+      return {
+        status: 200,
+        body: {
+          serverRevision: '2',
+          entityVersion: '2',
+          entity: {
+            ...populatedBootstrap().skus[0]!,
+            imageHash: 'b'.repeat(64),
+            sourceImageUrl: null,
+            rowVersion: '2',
+          },
+        },
+      };
+    });
+    transport.enqueue({
+      status: 200,
+      body: { serverRevision: '2', nextAfter: '2', changes: [] },
+    });
+
+    await gateway.retryPending();
+    expect(gateway.getSyncSnapshot().pendingCount).toBe(0);
   });
 
   it('maps image hash and private source metadata from bootstrap and changes', async () => {

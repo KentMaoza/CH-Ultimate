@@ -8,6 +8,7 @@ import { CatalogueMaintenance } from './catalogue-maintenance.js';
 import { CatalogueImageDownloader } from './image-download.js';
 import { CatalogueImageWorker } from './image-worker.js';
 import { MariaDbCatalogueImageRepository } from './mariadb-image-repository.js';
+import { MariaDbSkuImageOperationsRepository } from './mariadb-sku-image-operations-repository.js';
 import { MariaDbCatalogueRepository } from './mariadb-repository.js';
 import { CatalogueService } from './service.js';
 
@@ -17,6 +18,7 @@ export interface CatalogueRuntimePool
 export interface CatalogueRuntime {
   services: CatalogueHttpServices;
   maintenance: MaintenanceLifecycle;
+  imageOperations: MariaDbSkuImageOperationsRepository;
 }
 
 export function createCatalogueRuntime(
@@ -43,5 +45,6 @@ export function createCatalogueRuntime(
       ),
       imports,
     ),
+    imageOperations: new MariaDbSkuImageOperationsRepository(storage),
   };
 }

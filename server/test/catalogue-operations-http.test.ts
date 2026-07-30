@@ -24,6 +24,7 @@ function harness() {
     updateSku: vi.fn(async () => ({ serverRevision: '2' })),
     adjustStock: vi.fn(async () => ({ serverRevision: '3' })),
     updateTemplate: vi.fn(async () => ({ serverRevision: '4' })),
+    replaceSkuImage: vi.fn(async () => ({ serverRevision: '5' })),
   };
   const identity = {
     bootstrapOwner: vi.fn(),
@@ -269,6 +270,87 @@ describe('catalogue operation HTTP boundary', () => {
       'label',
       expect.objectContaining({ rowVersion: null, base: null }),
     );
+    await app.close();
+  });
+
+  it('accepts one authenticated idempotent bounded SKU image command', async () => {
+    const { app, device, operations } = harness();
+    const bytes = Buffer.alloc(24);
+    Buffer.from('89504e470d0a1a0a', 'hex').copy(bytes);
+    bytes.write('IHDR', 12, 'ascii');
+    bytes.writeUInt32BE(32, 16);
+    bytes.writeUInt32BE(24, 20);
+    const response = await app.inject({
+      method: 'POST',
+      url: `/v1/skus/${SKU_ID}/image`,
+      headers,
+      payload: {
+        rowVersion: '7',
+        base: {
+          imageHash: 'a'.repeat(64),
+          sourceImageUrl: 'https://res.bigseller.pro/a.png',
+        },
+        mimeType: 'image/png',
+        bytesBase64: bytes.toString('base64'),
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(operations.replaceSkuImage).toHaveBeenCalledWith(
+      { deviceId: device.id, idempotencyKey: KEY },
+      SKU_ID,
+      expect.objectContaining({
+        rowVersion: '7',
+        base: {
+          imageHash: 'a'.repeat(64),
+          sourceImageUrl: 'https://res.bigseller.pro/a.png',
+        },
+        mimeType: 'image/png',
+        bytesBase64: bytes.toString('base64'),
+      }),
+    );
+    await app.close();
+  });
+
+  it('rejects direct image mutation and malformed SKU image commands', async () => {
+    const { app, operations } = harness();
+    const direct = await app.inject({
+      method: 'POST',
+      url: '/v1/images',
+      headers,
+      payload: { mimeType: 'image/png', bytesBase64: 'iVBORw==' },
+    });
+    expect(direct.statusCode).toBe(404);
+
+    for (const payload of [
+      {
+        rowVersion: '1',
+        base: { imageHash: null, sourceImageUrl: null },
+        mimeType: 'image/png',
+        bytesBase64: 'not-base64',
+      },
+      {
+        rowVersion: '1',
+        base: { imageHash: null },
+        mimeType: 'image/png',
+        bytesBase64: 'iVBORw==',
+      },
+      {
+        rowVersion: '01',
+        base: { imageHash: null, sourceImageUrl: null },
+        mimeType: 'text/html',
+        bytesBase64: 'PGh0bWw+',
+      },
+    ]) {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/v1/skus/${SKU_ID}/image`,
+        headers,
+        payload,
+      });
+      expect(response.statusCode).toBeGreaterThanOrEqual(400);
+    }
+    expect(operations.replaceSkuImage).not.toHaveBeenCalled();
     await app.close();
   });
 });

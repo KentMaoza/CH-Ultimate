@@ -3,12 +3,14 @@ import { z } from 'zod';
 
 import type {
   CreateSkuRequest,
+  ReplaceSkuImageRequest,
   StockAdjustmentRequest,
   TemplateUpdateRequest,
   UpdateSkuRequest,
 } from '../catalogue/operations-validation.js';
 import {
   createSkuBody,
+  replaceSkuImageBody,
   stockAdjustmentBody,
   templateBody,
   templateKindPath,
@@ -44,6 +46,11 @@ export interface CatalogueOperationHttpService {
     context: CatalogueMutationContext,
     kind: 'label' | 'invoice',
     input: TemplateUpdateRequest,
+  ): Promise<unknown>;
+  replaceSkuImage(
+    context: CatalogueMutationContext,
+    id: string,
+    input: ReplaceSkuImageRequest,
   ): Promise<unknown>;
 }
 
@@ -90,6 +97,21 @@ export function registerCatalogueOperationRoutes(
         context,
         id,
         parseRequest(stockAdjustmentBody, request.body),
+      );
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    '/v1/skus/:id/image',
+    { bodyLimit: 7_100_000 },
+    async (request) => {
+      requireEmptyQuery(request.query);
+      const context = await mutationContext(identity, request);
+      const { id } = parseRequest(uuidPath, request.params);
+      return service.replaceSkuImage(
+        context,
+        id,
+        parseRequest(replaceSkuImageBody, request.body),
       );
     },
   );

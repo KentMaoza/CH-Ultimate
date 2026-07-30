@@ -24,11 +24,11 @@
 - One LSN equals 12 PCS. Negative stock remains allowed and auditable.
 - Acknowledged Nota completion, stock movements, omzet, audit event, change event, and idempotency receipt commit in one database transaction.
 - The supplied workbook is the only initial production import:
-  `/Users/hamlet/Downloads/SKU_Gudang20260728053648037.xlsx`
+  `/Users/hamlet/Downloads/SKU_Gudang20260730092414031.xlsx`
   with SHA-256
-  `d9dc0d6f3b85a948f362369de9633b8b23bd516ef375878bbf700fbbae24da61`.
+  `64fcb734d84462060f76fa7f27495ee1e2dff6201ad2d7a2d13d5c6c27923817`.
 - Import mapping is fixed: `Nomor SKU` primary identifier, `Kode Produk` scan/search alias, `Judul` name, positive `Harga Jual Referensi` else `Modal Referensi` price, `Semua Total Stok` stock, and the corresponding note/image/created columns.
-- Import acceptance is exactly 3,144 products, zero duplicate primary identifiers, 2,786 image jobs, 358 missing images, and three rows where positive sale price differs from positive modal price.
+- Import acceptance is exactly 3,144 products, zero duplicate primary identifiers, 2,786 image jobs, 358 missing images, three rows where positive sale price differs from positive modal price, selected-price total Rp276,267,011, and stock total 4,115 PCS.
 - Image fetches allow only HTTPS `res.bigseller.pro`, public resolved destinations, at most three validated redirects, image MIME/magic bytes, bounded dimensions, 5 MiB, and ten seconds. Store content-hash filenames and preserve the source URL.
 - Do not deploy or upgrade DSM/packages without authenticated preflight. Do not call the system production until independent Hyper Backup plus a clean restore drill passes.
 - Current baseline is 29 Vitest files/235 tests and a successful mobile production build.

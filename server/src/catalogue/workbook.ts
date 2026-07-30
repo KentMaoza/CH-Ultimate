@@ -5,7 +5,10 @@ import {
   assertSafeXlsxArchive,
   CatalogueValidationError,
 } from './xlsx-archive.js';
-import { assertSafeXlsxPackage } from './xlsx-package-policy.js';
+import {
+  assertSafeXlsxPackage,
+  MAX_CELL_TEXT_BYTES,
+} from './xlsx-package-policy.js';
 
 export {
   assertSafeXlsxArchive,
@@ -62,8 +65,6 @@ const REQUIRED_COLUMNS = [
   'Waktu Dibuat',
 ] as const;
 const MAX_DATA_ROWS = 10_000;
-const MAX_CELL_TEXT_BYTES = 16 * 1024;
-
 function cellText(value: ExcelJS.CellValue): string {
   if (value == null) return '';
   if (value instanceof Date) return value.toISOString();

@@ -186,7 +186,8 @@ export class MariaDbCatalogueImportStore {
     const rows = await this.pool.query<Array<{ staged_path: unknown }>>(
       `SELECT staged_path
        FROM imports
-       WHERE expires_at <= ?
+       WHERE status = 'staged'
+         AND expires_at <= ?
        ORDER BY expires_at, id`,
       [expiredAt],
     );

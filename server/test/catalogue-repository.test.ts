@@ -182,14 +182,11 @@ describe('MariaDB catalogue repository', () => {
     );
   });
 
-  it('refreshes an expired stage and lists expired byte paths without deleting import provenance', async () => {
+  it('refreshes and lists only expired uncommitted stage byte paths', async () => {
     const query = vi
       .fn()
       .mockResolvedValueOnce({ affectedRows: 1 })
-      .mockResolvedValueOnce([
-        { staged_path: record.stagedPath },
-        { staged_path: 'imports/staged/committed.xlsx' },
-      ]);
+      .mockResolvedValueOnce([{ staged_path: record.stagedPath }]);
     const repository = new MariaDbCatalogueRepository({ query } as never);
     const refreshed = {
       ...record,
@@ -204,14 +201,11 @@ describe('MariaDB catalogue repository', () => {
       repository.listExpiredStagePaths(
         new Date('2026-08-02T00:00:00.000Z'),
       ),
-    ).resolves.toEqual([
-      record.stagedPath,
-      'imports/staged/committed.xlsx',
-    ]);
+    ).resolves.toEqual([record.stagedPath]);
 
     expect(query.mock.calls[0]?.[0]).toContain("status = 'staged'");
-    expect(query.mock.calls[1]?.[0]).toContain('WHERE expires_at <= ?');
-    expect(query.mock.calls[1]?.[0]).not.toContain("status = 'staged'");
+    expect(query.mock.calls[1]?.[0]).toContain('expires_at <= ?');
+    expect(query.mock.calls[1]?.[0]).toContain("status = 'staged'");
   });
 
   it('atomically writes SKU provenance, aliases, stock, price, image job, audit, and changes', async () => {

@@ -1,9 +1,14 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
+import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 
-import { parseCatalogueWorkbook } from '../src/catalogue/workbook.js';
+import {
+  assertSafeXlsxArchive,
+  assertSafeXlsxPackage,
+  parseCatalogueWorkbook,
+} from '../src/catalogue/workbook.js';
 
 const workbookPath = process.env.CH_CATALOGUE_ACCEPTANCE_XLSX;
 const acceptance = workbookPath ? describe : describe.skip;
@@ -15,6 +20,10 @@ acceptance('approved catalogue workbook acceptance', () => {
       '64fcb734d84462060f76fa7f27495ee1e2dff6201ad2d7a2d13d5c6c27923817',
     );
 
+    assertSafeXlsxArchive(bytes);
+    await expect(
+      assertSafeXlsxPackage(await JSZip.loadAsync(bytes)),
+    ).resolves.toBeUndefined();
     const workbook = await parseCatalogueWorkbook(bytes);
 
     expect(workbook.preview).toMatchObject({

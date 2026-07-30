@@ -505,4 +505,98 @@ describe('catalogue XLSX archive preflight', () => {
       assertSafeXlsxPackage(relationshipArchive),
     ).rejects.toMatchObject({ code: 'XLSX_MACRO_NOT_ALLOWED' });
   });
+
+  it('bounds decoded rich shared strings before ExcelJS parses them', async () => {
+    const archive = await JSZip.loadAsync(await catalogueFixture());
+    const sharedStrings = await archive
+      .file('xl/sharedStrings.xml')!
+      .async('string');
+    archive.file(
+      'xl/sharedStrings.xml',
+      sharedStrings.replace(
+        /<si>[\s\S]*?<\/si>/,
+        `<si><r><t>${'A'.repeat(8_192)}</t></r><r><t>${'&amp;'.repeat(
+          8_193,
+        )}</t></r></si>`,
+      ),
+    );
+
+    await expect(assertSafeXlsxPackage(archive)).rejects.toMatchObject({
+      code: 'CELL_TEXT_TOO_LONG',
+    });
+  });
+
+  it('aggregates rich shared-string fragments using decoded XML entity bytes', async () => {
+    const archive = await JSZip.loadAsync(await catalogueFixture());
+    const sharedStrings = await archive
+      .file('xl/sharedStrings.xml')!
+      .async('string');
+    archive.file(
+      'xl/sharedStrings.xml',
+      sharedStrings.replace(
+        /<si>[\s\S]*?<\/si>/,
+        `<si><r><t>${'A'.repeat(8_192)}</t></r><r><t>${'&amp;'.repeat(
+          8_192,
+        )}</t></r></si>`,
+      ),
+    );
+
+    await expect(assertSafeXlsxPackage(archive)).resolves.toBeUndefined();
+  });
+
+  it('rejects malformed shared-string XML and bounded compressed shared-string expansion', async () => {
+    const malformed = await JSZip.loadAsync(await catalogueFixture());
+    const sharedStrings = await malformed
+      .file('xl/sharedStrings.xml')!
+      .async('string');
+    malformed.file(
+      'xl/sharedStrings.xml',
+      sharedStrings.replace(
+        /<si>[\s\S]*?<\/si>/,
+        '<si><r><t>&unknown;</t></r></si>',
+      ),
+    );
+    await expect(assertSafeXlsxPackage(malformed)).rejects.toMatchObject({
+      code: 'MALFORMED_XLSX',
+    });
+
+    const unbalanced = await JSZip.loadAsync(await catalogueFixture());
+    const unbalancedStrings = await unbalanced
+      .file('xl/sharedStrings.xml')!
+      .async('string');
+    unbalanced.file(
+      'xl/sharedStrings.xml',
+      unbalancedStrings.replace(
+        /<si>[\s\S]*?<\/si>/,
+        '<si><t>tidak lengkap</si>',
+      ),
+    );
+    await expect(assertSafeXlsxPackage(unbalanced)).rejects.toMatchObject({
+      code: 'MALFORMED_XLSX',
+    });
+
+    const mismatched = await JSZip.loadAsync(await catalogueFixture());
+    const mismatchedStrings = await mismatched
+      .file('xl/sharedStrings.xml')!
+      .async('string');
+    mismatched.file(
+      'xl/sharedStrings.xml',
+      mismatchedStrings.replace(
+        /<si>[\s\S]*?<\/si>/,
+        '<si><r><t>tidak lengkap</t></x></si>',
+      ),
+    );
+    await expect(assertSafeXlsxPackage(mismatched)).rejects.toMatchObject({
+      code: 'MALFORMED_XLSX',
+    });
+
+    const oversized = await JSZip.loadAsync(await catalogueFixture());
+    oversized.file(
+      'xl/sharedStrings.xml',
+      `<sst><si><t>${' '.repeat(32 * 1024 * 1024)}</t></si></sst>`,
+    );
+    await expect(assertSafeXlsxPackage(oversized)).rejects.toMatchObject({
+      code: 'XLSX_SHARED_STRINGS_TOO_LARGE',
+    });
+  });
 });

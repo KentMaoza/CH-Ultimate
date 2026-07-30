@@ -170,3 +170,43 @@ isolation, and the subsequent complete 381-test desktop rerun passed.
 `CH_CORE_TEST_DATABASE_URL` remains unset, so the guarded destructive MariaDB
 integration suite was not run. No MariaDB integration success, NAS access,
 deployment, or production readiness is claimed in this fix round.
+
+## Fix round 2/5 — shared strings and committed source preservation
+
+Two remaining Important findings were closed:
+
+- `xl/sharedStrings.xml` is now inspected before `workbook.xlsx.load`.
+  Its expanded XML is limited to 32 MiB under the existing 64 MiB aggregate
+  archive ceiling. Preflight decodes strict UTF-8 and XML named/numeric
+  entities, aggregates all rich-text `<t>` fragments belonging to one `<si>`,
+  rejects malformed structure/entities, and rejects decoded cell text above
+  16 KiB. The focused test proves a 16,385-byte rich shared string is rejected
+  directly by `assertSafeXlsxPackage`, not by the later ExcelJS parse.
+- Expiry maintenance now selects only imports whose current status is
+  `staged`. Expired uncommitted bytes remain purgeable and the same approved
+  workbook can be restaged under its existing provenance. Expired commit
+  rejection also cleans only its uncommitted staged source. Once an import is
+  committed, maintenance no longer deletes the exact source workbook: its
+  provenance path and original bytes remain readable after the 24-hour stage
+  TTL. This supersedes the round-one statement that maintenance deleted
+  private XLSX bytes after commit.
+
+### Fresh fix-round 2 verification
+
+| Gate | Result |
+| --- | --- |
+| `npm run verify` | PASS — 51 files, 381 tests |
+| server tests with supplied workbook enabled | PASS — 26 files, 172 tests |
+| server typecheck and build | PASS |
+| supplied-workbook package preflight and exact acceptance | PASS |
+| focused shared-string workbook tests | PASS — 21 tests |
+| focused catalogue lifecycle/storage/repository tests | PASS — 17 tests |
+| `git diff --check` | PASS |
+
+Android, mobile packaging, and Electron packaging were not rerun because this
+round changes only server-side XLSX preflight and catalogue expiry selection;
+their full round-one gates remain recorded above.
+
+`CH_CORE_TEST_DATABASE_URL` remains unset, so the guarded destructive MariaDB
+integration suite was not run. No NAS was accessed, and no Task 8 or deployment
+work was performed.

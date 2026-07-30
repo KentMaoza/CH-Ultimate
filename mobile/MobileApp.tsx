@@ -13,16 +13,18 @@ import { ShareRecommendationsView } from './components/ShareRecommendationsView'
 import { MobileNotaView } from './components/MobileNotaView';
 import { MobileArchiveView } from './components/MobileArchiveView';
 import { MoreView } from './components/MoreView';
+import { OperationsSyncStatus } from './components/OperationsSyncStatus';
 import { formatRupiah } from './format';
 
 type MainView = 'home' | 'skus' | 'nota' | 'archive' | 'more' | 'prices' | 'recommendations';
 type PriceMode = 'all' | 'unread';
 
-export function MobileApp({ gateway, scanner, notifications, share }: {
+export function MobileApp({ gateway, scanner, notifications, share, coreBacked = false }: {
   gateway: OperationsGateway;
   scanner: BarcodeScannerPort;
   notifications: LocalNotificationPort;
   share: RecommendationPdfSharePort;
+  coreBacked?: boolean;
 }) {
   const snapshot = useSyncExternalStore(gateway.subscribe, gateway.getSnapshot, gateway.getSnapshot);
   const [view, setView] = useState<MainView>('home');
@@ -182,7 +184,16 @@ export function MobileApp({ gateway, scanner, notifications, share }: {
     }
   }
 
-  return <div className="mobile-app">
+  return <div className={`mobile-app${coreBacked ? ' mobile-app--core' : ''}`}>
+    {coreBacked ? (
+      <OperationsSyncStatus gateway={gateway} />
+    ) : (
+      <div
+        className="mobile-sync-status mobile-sync-status--demo"
+      >
+        <span>Demo lokal</span>
+      </div>
+    )}
     <main className="mobile-content" ref={mainContentRef}>
       {selectedSku ? <SkuDetail changes={snapshot.priceChanges} onBack={closeSkuDetail} onScanAgain={openManualScan} sku={selectedSku} /> : scanOpen ? <ScanSurface error={scanError} initialCode={scanCode} key={scanCode} onManualLookup={manualLookup} onRetry={() => void beginScan()} /> : view === 'home' ? <DashboardView
         snapshot={snapshot}

@@ -14,7 +14,7 @@
     "package": "electron-forge package",
     "make:windows": "electron-forge make --platform=win32 --arch=x64",
     "test": "vitest run",
-    "test:mobile": "vitest run tests/unit/mobile-demo-state.test.ts tests/unit/mobile-app.test.tsx tests/unit/mobile-nota-ui.test.tsx tests/unit/mobile-archive-ui.test.tsx tests/unit/mobile-native-adapters.test.ts tests/unit/mobile-bootstrap.test.ts tests/unit/mobile-config.test.ts",
+    "test:mobile": "vitest run tests/unit/mobile-demo-state.test.ts tests/unit/mobile-app.test.tsx tests/unit/mobile-nota-ui.test.tsx tests/unit/mobile-archive-ui.test.tsx tests/unit/mobile-native-adapters.test.ts tests/unit/mobile-bootstrap.test.ts tests/unit/mobile-config.test.ts tests/unit/mobile-core-api-adapter.test.ts tests/unit/mobile-core-connection-ui.test.tsx",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",

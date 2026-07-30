@@ -50,6 +50,142 @@ input:focus-visible,
   background: #fff;
 }
 
+.mobile-app--core .demo-banner {
+  display: none;
+}
+
+.mobile-sync-status {
+  display: flex;
+  min-height: 36px;
+  padding: calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 7px) 16px 7px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-bottom: 1px solid #111;
+  background: #fff;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mobile-sync-status small {
+  color: #5e5e5e;
+  font-size: 0.7rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.mobile-sync-status button {
+  min-height: 32px;
+  padding: 3px 9px;
+  border: 1px solid #111;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.mobile-sync-status--demo {
+  color: #fff;
+  background: #111;
+}
+
+.mobile-sync-status--conflict,
+.mobile-sync-status--revoked,
+.mobile-sync-status--upgrade-required {
+  border-bottom-width: 3px;
+}
+
+.mobile-core-connection {
+  display: grid;
+  min-height: 100dvh;
+  padding: calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 20px) 18px calc(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + 20px);
+  place-items: center;
+  background: #f3f3f3;
+}
+
+.mobile-core-connection__card {
+  display: grid;
+  width: min(100%, 420px);
+  padding: 24px;
+  gap: 14px;
+  border: 2px solid #111;
+  background: #fff;
+  box-shadow: 8px 8px 0 #111;
+}
+
+.mobile-core-connection__mark {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  color: #fff;
+  background: #111;
+  font-size: 0.86rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.mobile-core-connection__eyebrow {
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+}
+
+.mobile-core-connection__card h1,
+.mobile-core-connection__card p {
+  margin: 0;
+}
+
+.mobile-core-connection__card h1 {
+  font-size: 1.65rem;
+  line-height: 1.1;
+}
+
+.mobile-core-connection__public-id,
+.mobile-core-connection__feedback {
+  padding: 10px;
+  border-left: 4px solid #111;
+  background: #f3f3f3;
+  overflow-wrap: anywhere;
+}
+
+.mobile-core-connection__form {
+  display: grid;
+  gap: 12px;
+}
+
+.mobile-core-connection__form label {
+  display: grid;
+  gap: 5px;
+}
+
+.mobile-core-connection__form label > span {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.mobile-core-connection__form input {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px;
+  border: 1px solid #111;
+  border-radius: 0;
+  background: #fff;
+}
+
+.mobile-core-connection__card > button,
+.mobile-core-connection__form button {
+  width: 100%;
+  min-height: 50px;
+  padding: 10px 14px;
+  border: 1px solid #111;
+  color: #fff;
+  background: #111;
+  font-weight: 850;
+}
+
 .mobile-content {
   padding: calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 24px) 16px calc(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + 100px);
 }

@@ -64,6 +64,26 @@ describe('CH Core guarded deployment documentation', () => {
     expect(deployment).toMatch(/no SSH|tanpa SSH/i);
   });
 
+  it('documents one restricted non-root DSM identity and concrete mount preflight', async () => {
+    const deployment = await repositoryText(
+      'docs/ch-core-nas-deployment.md',
+    );
+
+    expect(deployment).toContain('CH_CORE_RUNTIME_UID');
+    expect(deployment).toContain('CH_CORE_RUNTIME_GID');
+    expect(deployment).toMatch(/nonzero numeric|numeric nonzero/i);
+    expect(deployment).toMatch(/dedicated.+service user/is);
+    expect(deployment).toMatch(/Task Scheduler.+id -u/is);
+    expect(deployment).toMatch(/Task Scheduler.+id -g/is);
+    expect(deployment).toMatch(/create.+write.+delete/is);
+    expect(deployment).toMatch(/private.+directory.+backup target/is);
+    expect(deployment).toMatch(/same.+UID.+GID/is);
+    expect(deployment).toContain('docker compose run --rm ch-core');
+    expect(deployment).toContain(
+      'docker compose --profile ops run --rm ch-core-ops',
+    );
+  });
+
   it('requires an independent clean restore drill with business invariants', async () => {
     const restore = await repositoryText(
       'docs/ch-core-backup-restore.md',
@@ -85,6 +105,41 @@ describe('CH Core guarded deployment documentation', () => {
       expect(restore).toContain(invariant);
     }
     expect(restore).toMatch(/production.+blocked.+drill/is);
+  });
+
+  it('runs dump and restore only through the opt-in ops container', async () => {
+    const restore = await repositoryText(
+      'docs/ch-core-backup-restore.md',
+    );
+
+    expect(restore).toContain(
+      'docker compose --profile ops run --rm ch-core-ops',
+    );
+    expect(restore).toContain('/opt/ch-core-ops/dump-database.sh');
+    expect(restore).toContain('/opt/ch-core-ops/verify-dump.sh');
+    expect(restore).toContain('/opt/ch-core-ops/restore-scratch.sh');
+    expect(restore).toContain('/backup/');
+    expect(restore).not.toMatch(/^server\/scripts\//m);
+    expect(restore).toMatch(/does not run by default|tidak berjalan.*default/i);
+  });
+
+  it('documents completed bundles and separated least-privilege credentials', async () => {
+    const restore = await repositoryText(
+      'docs/ch-core-backup-restore.md',
+    );
+
+    expect(restore).toContain('CH_CORE_BACKUP_DATABASE_URL');
+    expect(restore).toContain('CH_CORE_RESTORE_DATABASE_URL');
+    expect(restore).toContain('chu_restore_[a-z0-9_]+');
+    expect(restore).toMatch(/read-only.+\/chu/is);
+    expect(restore).toMatch(/scratch-only.+exact schema/is);
+    expect(restore).toMatch(/already exist.+empty/is);
+    expect(restore).toMatch(/global.+other-schema/is);
+    expect(restore).toMatch(/COMPLETE.+last/is);
+    expect(restore).toMatch(/incomplete.+reject/is);
+    expect(restore).toMatch(/partial.+NEW scratch/is);
+    expect(restore).toMatch(/never.+CREATE DATABASE|does not.+CREATE DATABASE/is);
+    expect(restore).toMatch(/never.+DROP DATABASE|does not.+DROP DATABASE/is);
   });
 
   it('states the current Core architecture, test-only demo boundary, workbook, and unfinished gates', async () => {

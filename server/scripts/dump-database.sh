@@ -4,30 +4,33 @@ set -eu
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 . "$script_dir/database-common.sh"
 
-[ "$#" -eq 1 ] || die 'Usage: dump-database.sh /absolute/path/dump.sql'
-destination=$1
-case "$destination" in
-  /*) ;;
-  *) die 'Dump destination must be an absolute path.' ;;
-esac
+[ "$#" -eq 1 ] ||
+  die 'Usage: dump-database.sh /absolute/new-backup.bundle'
+bundle=$1
+require_absolute_path "$bundle" 'Backup bundle path'
 
-checksum="${destination}.sha256"
-[ ! -e "$destination" ] || die 'Refusing to overwrite an existing dump.'
-[ ! -e "$checksum" ] || die 'Refusing to overwrite an existing checksum.'
-destination_dir=$(dirname -- "$destination")
-[ -d "$destination_dir" ] || die 'Dump destination directory does not exist.'
+bundle_parent=$(dirname -- "$bundle")
+[ -d "$bundle_parent" ] && [ ! -L "$bundle_parent" ] ||
+  die 'Backup bundle parent must be a regular directory.'
 
-dump_tmp=$(mktemp "$destination_dir/.ch-core-dump.XXXXXX")
-checksum_tmp=$(mktemp "$destination_dir/.ch-core-checksum.XXXXXX")
+umask 077
+mkdir -- "$bundle" 2>/dev/null ||
+  die 'Backup bundle already exists or could not be reserved.'
+chmod 700 "$bundle"
+
+dump_path=$bundle/dump.sql
+checksum_path=$bundle/dump.sql.sha256
+marker_path=$bundle/COMPLETE
 defaults_tmp=$(mktemp "${TMPDIR:-/tmp}/ch-core-client.XXXXXX")
 cleanup() {
-  rm -f -- "$dump_tmp" "$checksum_tmp" "$defaults_tmp"
+  rm -f -- "$defaults_tmp"
 }
 trap cleanup EXIT HUP INT TERM
 
-write_client_defaults "$defaults_tmp"
-database=$(database_name) || die 'CH_CORE_DATABASE_URL database name is unsafe.'
-mariadb-dump \
+write_client_defaults "$defaults_tmp" CH_CORE_BACKUP_DATABASE_URL
+database=$(database_name CH_CORE_BACKUP_DATABASE_URL backup)
+dump_binary=$(database_binary CH_CORE_MARIADB_DUMP_BIN mariadb-dump)
+"$dump_binary" \
   --defaults-extra-file="$defaults_tmp" \
   --single-transaction \
   --quick \
@@ -35,11 +38,13 @@ mariadb-dump \
   --triggers \
   --events \
   --hex-blob \
-  "$database" >"$dump_tmp"
+  "$database" >"$dump_path"
+chmod 600 "$dump_path"
 
-hash=$(sha256_file "$dump_tmp")
-printf '%s  %s\n' "$hash" "$(basename -- "$destination")" >"$checksum_tmp"
-chmod 600 "$dump_tmp" "$checksum_tmp"
-mv -- "$dump_tmp" "$destination"
-mv -- "$checksum_tmp" "$checksum"
-printf 'Dump and checksum created: %s\n' "$destination"
+hash=$(sha256_file "$dump_path")
+printf '%s  dump.sql\n' "$hash" >"$checksum_path"
+chmod 600 "$checksum_path"
+
+printf 'CH_CORE_BACKUP_COMPLETE_V1\n' >"$marker_path"
+chmod 600 "$marker_path"
+printf 'Completed backup bundle: %s\n' "$bundle"

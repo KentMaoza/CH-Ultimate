@@ -32,7 +32,7 @@ export function MobileArchiveView({ coreBacked = false, gateway, onEdit }: { cor
 
   return <section className="mobile-archive-view">
     <header className="mobile-header"><div><span className="eyebrow">{coreBacked ? 'ARSIP CH CORE' : 'ARSIP SAJA · SESSION ONLY'}</span><h1 data-page-heading tabIndex={-1}>Arsip Nota</h1></div></header>
-    <p className="mobile-archive-badge">Tersedia di semua perangkat yang tersinkronisasi</p>
+    <p className="mobile-archive-badge">{coreBacked ? 'Tersedia di semua perangkat yang tersinkronisasi' : 'Arsip hanya tersedia pada sesi demo lokal ini'}</p>
     {editError && <p className="mobile-nota-notice mobile-nota-notice--alert" role="alert">{editError}</p>}
     {!archived.length ? <p className="mobile-nota-empty">Arsip mobile belum memiliki nota.</p> : <>
       <div className="mobile-archive-list" aria-label="Daftar arsip nota">{archived.map((transaction) => {

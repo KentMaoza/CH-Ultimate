@@ -116,9 +116,17 @@ LAN HTTPS 8443 after the security gates pass. The container is non-root,
 read-only, resource-bounded, and has one persistent writable private-file
 mount.
 
+Both runtime and one-off operations use the same explicitly configured
+nonzero numeric DSM service UID/GID. The dedicated `ch-core-ops` Compose
+profile contains the MariaDB clients and committed backup scripts; it does not
+run by default and has one explicit backup bind. The normal runtime image does
+not contain those database operations tools.
+
 Copy `server/.env.example` to an untracked `.env` only in an approved
-deployment staging area. Never commit credentials, database dumps, private
-keys, certificates, or live configuration.
+deployment staging area. Backup and scratch restore use separate
+least-privilege database URLs. Dumps are completed directory bundles rather
+than replaceable single files. Never commit credentials, database dumps,
+private keys, certificates, or live configuration.
 
 ## Main business behavior
 

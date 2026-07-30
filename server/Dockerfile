@@ -21,10 +21,32 @@ COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/server/package.json ./package.json
 COPY --from=build --chown=node:node /app/server/dist ./dist
 COPY --from=build --chown=node:node /app/server/migrations ./migrations
+COPY --chmod=0555 server/scripts/container-entrypoint.sh /usr/local/bin/ch-core-container-entrypoint
 
 USER node
+ENTRYPOINT ["/usr/local/bin/ch-core-container-entrypoint"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:18080/health/ready',{signal:AbortSignal.timeout(3000)}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
 
 CMD ["node", "dist/index.js"]
+
+FROM node:24-bookworm-slim AS ops
+
+ENV NODE_ENV=production
+ENV NODE_OPTIONS=--max-old-space-size=160
+ENV CH_CORE_MARIADB_BIN=/usr/bin/mariadb
+ENV CH_CORE_MARIADB_DUMP_BIN=/usr/bin/mariadb-dump
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends mariadb-client \
+    && command -v mariadb >/dev/null \
+    && command -v mariadb-dump >/dev/null \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --chmod=0555 server/scripts/container-entrypoint.sh /usr/local/bin/ch-core-container-entrypoint
+COPY --chmod=0555 server/scripts /opt/ch-core-ops
+
+USER node
+ENTRYPOINT ["/usr/local/bin/ch-core-container-entrypoint"]
+CMD ["/opt/ch-core-ops/health-check.sh"]

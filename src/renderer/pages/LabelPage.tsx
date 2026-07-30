@@ -5,7 +5,7 @@ import { formatRupiah } from '../format';
 import { useOperations } from '../operations-context';
 import { InvoiceTemplateBuilder } from './InvoiceTemplateBuilder';
 
-export function LabelPage() {
+export function LabelPage({ coreBacked = false }: { coreBacked?: boolean }) {
   const { state, gateway } = useOperations();
   const [mode, setMode] = useState<'label' | 'invoice'>('label');
   const [skuId, setSkuId] = useState(state.skus[0]?.id ?? '');
@@ -26,7 +26,7 @@ export function LabelPage() {
       );
   };
   const toggleField = (field: LabelTemplate['fields'][number]) => update({ fields: template.fields.includes(field) ? template.fields.filter((item) => item !== field) : [...template.fields, field] });
-  if (mode === 'invoice') return <><div className="template-tabs" role="tablist" aria-label="Jenis template"><button role="tab" aria-selected={false} onClick={() => setMode('label')}>Label</button><button role="tab" aria-selected>Invoice</button></div><InvoiceTemplateBuilder /></>;
+  if (mode === 'invoice') return <><div className="template-tabs" role="tablist" aria-label="Jenis template"><button role="tab" aria-selected={false} onClick={() => setMode('label')}>Label</button><button role="tab" aria-selected>Invoice</button></div><InvoiceTemplateBuilder coreBacked={coreBacked} /></>;
   return (
     <><div className="template-tabs" role="tablist" aria-label="Jenis template"><button role="tab" aria-selected onClick={() => setMode('label')}>Label</button><button role="tab" aria-selected={false} onClick={() => setMode('invoice')}>Invoice</button></div><div className="feature-page label-layout">
       <section className="builder-panel">

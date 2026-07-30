@@ -68,6 +68,62 @@ application path. The container root filesystem remains read-only.
 
 Do not expose port 18080 or MariaDB to any client network.
 
+## Dedicated service identity and mount permissions
+
+Do not assume the image's `node` UID can write a DSM ACL path. Before creating
+the project:
+
+1. In DSM Control Panel, create one dedicated restricted DSM service user,
+   `ch_core_service`. It must not be an administrator and must not receive
+   interactive DSM, SSH, SMB, or unrelated share access.
+2. Create a private CH Core directory and the independent backup target
+   directory. Grant that named service user only the private directory and
+   backup target it needs. Deny broad `homes` and unrelated shares.
+3. Obtain the service user's UID and primary GID with one bounded administrator
+   Task Scheduler job that records `id -u ch_core_service` and
+   `id -g ch_core_service` into a mode-0600 receipt in a restricted
+   administrator staging directory. Run it once, inspect the receipt in DSM,
+   then disable/delete the task and receipt. This has no SSH dependency.
+4. Set those nonzero numeric values as `CH_CORE_RUNTIME_UID` and
+   `CH_CORE_RUNTIME_GID` in the untracked `.env`. Compose applies the same UID
+   and GID to both `ch-core` and `ch-core-ops`; the container entrypoint rejects
+   missing, zero, nonnumeric, or mismatched values.
+5. Before startup, use bounded one-off Container Manager/Compose runs to
+   create, write, and delete one known test file from the runtime private mount
+   and one from the ops backup mount. Review the exact paths first. Do not use
+   recursive deletion. A failure blocks deployment; do not make the container
+   root writable to compensate.
+
+Run these exact one-off commands from the Compose project directory through a
+reviewed DSM Task Scheduler job or Container Manager action:
+
+```sh
+docker compose run --rm ch-core /bin/sh -eu -c '
+probe=/var/lib/ch-core/private/.ch-core-permission-probe
+[ ! -e "$probe" ]
+printf "%s\n" "private-write-ok" >"$probe"
+[ "$(cat "$probe")" = "private-write-ok" ]
+rm -f -- "$probe"
+[ ! -e "$probe" ]
+'
+
+docker compose --profile ops run --rm ch-core-ops /bin/sh -eu -c '
+probe=/backup/.ch-core-permission-probe
+[ ! -e "$probe" ]
+printf "%s\n" "backup-write-ok" >"$probe"
+[ "$(cat "$probe")" = "backup-write-ok" ]
+rm -f -- "$probe"
+[ ! -e "$probe" ]
+'
+```
+
+Each command passes through the UID/GID-validating entrypoint before its shell
+runs. Each deletes only its fixed known probe path.
+
+The production service retains a read-only root filesystem after this
+preflight. Only its explicit private bind is writable. The opt-in ops service
+also has a read-only root and only its explicit backup bind is writable.
+
 ## Certificate procedure
 
 Perform CA work on an offline or separately protected administrator
@@ -119,14 +175,15 @@ Only after all blocking prerequisites are ready:
 2. Bind MariaDB to host loopback only. Create the `chu` database and a
    dedicated least-privilege `chu_app` account; do not reuse a DSM
    administrator.
-3. Create a private Btrfs directory for CH Core files and restrict it to the
-   service administrator. Do not use the broad `homes` share.
+3. Create the dedicated service identity and exact ACLs described above.
+   Record its numeric UID/GID receipt and complete both mount-write preflights.
 4. Copy the versioned deployment artifact through a bounded staging location.
    Create `.env` from `.env.example`; use unique secrets and never commit it.
 5. In Container Manager, create the project from `server/compose.yaml`.
-   Confirm host networking, no published ports, non-root user, read-only root,
-   dropped capabilities, 256 MiB memory, 160 MiB Node heap, 0.75 CPU, four DB
-   connections, and bounded logs before starting it.
+   Confirm host networking, no published ports, the explicit nonzero numeric
+   runtime user, read-only root, dropped capabilities, 256 MiB memory, 160 MiB
+   Node heap, 0.75 CPU, four DB connections, and bounded logs before starting
+   it. The `ch-core-ops` profile must not run by default.
 6. Verify `/health/live` and `/health/ready` locally, then verify HTTPS through
    8443 from the business LAN.
 

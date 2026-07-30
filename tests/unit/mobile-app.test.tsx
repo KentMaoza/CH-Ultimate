@@ -95,6 +95,7 @@ test('core-backed mobile removes demo/session claims and labels central data', (
 
   fireEvent.click(screen.getByRole('button', { name: 'Arsip' }));
   expect(screen.getByText('ARSIP CH CORE')).toBeInTheDocument();
+  expect(screen.getByText('Tersedia di semua perangkat yang tersinkronisasi')).toBeInTheDocument();
   expect(screen.queryByText(/SESSION ONLY/)).not.toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: 'Lainnya' }));
@@ -113,6 +114,57 @@ test('core-backed mobile removes demo/session claims and labels central data', (
       }),
     ),
   );
+});
+
+test('core-backed price history cannot invoke the demo price mutation', () => {
+  const { gateway } = renderMobile({}, createMobileDemoState, true);
+  const updateSku = vi.spyOn(gateway, 'updateSku');
+
+  openMoreDestination('Perubahan Harga');
+
+  expect(
+    screen.queryByRole('button', {
+      name: 'Simulasikan perubahan harga',
+    }),
+  ).not.toBeInTheDocument();
+  expect(updateSku).not.toHaveBeenCalled();
+});
+
+test('Core and demo price/archive empty states describe their real storage scope', () => {
+  const emptyHistory = () => ({
+    ...createMobileDemoState(),
+    priceChanges: [],
+  });
+  const { unmount } = render(
+    <MobileApp
+      {...createPorts()}
+      gateway={new MockOperationsGateway(emptyHistory)}
+      coreBacked
+    />,
+  );
+
+  openMoreDestination('Perubahan Harga');
+  expect(
+    screen.getByText('Belum ada riwayat perubahan harga tersinkronisasi.'),
+  ).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'SKU' }));
+  fireEvent.click(
+    screen.getByRole('button', { name: /Beras Hitam Premium 1 kg/ }),
+  );
+  expect(
+    screen.getByText('Belum ada perubahan harga tersinkronisasi.'),
+  ).toBeInTheDocument();
+  unmount();
+
+  renderMobile({}, emptyHistory);
+  fireEvent.click(screen.getByRole('button', { name: 'Arsip' }));
+  expect(
+    screen.getByText('Arsip hanya tersedia pada sesi demo lokal ini'),
+  ).toBeInTheDocument();
+  openMoreDestination('Perubahan Harga');
+  expect(
+    screen.getByText('Belum ada riwayat perubahan harga pada sesi ini.'),
+  ).toBeInTheDocument();
 });
 
 test('bottom navigation has five destinations and moves legacy feeds under Lainnya', () => {

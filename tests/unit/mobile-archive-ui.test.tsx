@@ -31,7 +31,7 @@ async function createCompleted(gateway: MockOperationsGateway, customerName: str
   return transaction;
 }
 
-test('mobile archive shows only archived completed notes with shared-sync copy', async () => {
+test('demo mobile archive shows only archived completed notes with local-session copy', async () => {
   const gateway = new MockOperationsGateway(createMobileDemoState);
   await createCompleted(gateway, 'Pelanggan Arsip', 'archive');
   await createCompleted(gateway, 'Pelanggan Selesai', 'finished');
@@ -46,7 +46,9 @@ test('mobile archive shows only archived completed notes with shared-sync copy',
   expect(screen.queryByText('Pelanggan Selesai')).not.toBeInTheDocument();
   expect(screen.queryByText('Pelanggan Sampah')).not.toBeInTheDocument();
   expect(screen.queryByRole('tab')).not.toBeInTheDocument();
-  expect(screen.getByText('Tersedia di semua perangkat yang tersinkronisasi')).toBeInTheDocument();
+  expect(
+    screen.getByText('Arsip hanya tersedia pada sesi demo lokal ini'),
+  ).toBeInTheDocument();
 });
 
 test('archived note details open inline below the customer and close when tapped again', async () => {

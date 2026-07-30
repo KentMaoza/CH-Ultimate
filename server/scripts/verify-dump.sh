@@ -4,18 +4,40 @@ set -eu
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 . "$script_dir/database-common.sh"
 
-[ "$#" -eq 1 ] || die 'Usage: verify-dump.sh /absolute/path/dump.sql'
-dump=$1
-case "$dump" in
-  /*) ;;
-  *) die 'Dump path must be absolute.' ;;
-esac
-[ -f "$dump" ] && [ ! -L "$dump" ] || die 'Dump must be a regular non-symlink file.'
-checksum="${dump}.sha256"
-[ -f "$checksum" ] && [ ! -L "$checksum" ] || die 'Checksum sidecar is missing or unsafe.'
+[ "$#" -eq 1 ] ||
+  die 'Usage: verify-dump.sh /absolute/completed-backup.bundle'
+bundle=$1
+require_absolute_path "$bundle" 'Backup bundle path'
+[ -d "$bundle" ] && [ ! -L "$bundle" ] ||
+  die 'Backup bundle must be a regular non-symlink directory.'
 
-expected=$(awk 'NR == 1 && NF == 2 { print $1 }' "$checksum")
-[ "${#expected}" -eq 64 ] || die 'Checksum sidecar is invalid.'
-actual=$(sha256_file "$dump")
-[ "$actual" = "$expected" ] || die 'Dump checksum does not match.'
-printf 'Checksum verified: %s\n' "$dump"
+dump_path=$bundle/dump.sql
+checksum_path=$bundle/dump.sql.sha256
+marker_path=$bundle/COMPLETE
+
+entry_count=$(find "$bundle" -mindepth 1 -maxdepth 1 -print | wc -l | tr -d ' ')
+[ "$entry_count" = '3' ] ||
+  die 'Backup bundle contains unexpected or incomplete entries.'
+for required_path in "$dump_path" "$checksum_path" "$marker_path"; do
+  [ -f "$required_path" ] && [ ! -L "$required_path" ] ||
+    die 'Backup bundle entries must be regular non-symlink files.'
+done
+
+marker=$(cat "$marker_path")
+[ "$marker" = 'CH_CORE_BACKUP_COMPLETE_V1' ] ||
+  die 'Backup bundle completion marker is missing or invalid.'
+
+checksum_lines=$(wc -l <"$checksum_path" | tr -d ' ')
+[ "$checksum_lines" = '1' ] || die 'Backup checksum sidecar is invalid.'
+expected=$(awk 'NR == 1 && NF == 2 && $2 == "dump.sql" { print $1 }' "$checksum_path")
+case "$expected" in
+  ????????????????????????????????????????????????????????????????) ;;
+  *) die 'Backup checksum sidecar is invalid.' ;;
+esac
+case "$expected" in
+  *[!0-9a-fA-F]*) die 'Backup checksum sidecar is invalid.' ;;
+esac
+
+actual=$(sha256_file "$dump_path")
+[ "$actual" = "$expected" ] || die 'Backup dump checksum does not match.'
+printf 'Completed backup bundle verified: %s\n' "$bundle"

@@ -170,6 +170,7 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
   }
 
   async function simulatePriceChange() {
+    if (coreBacked) return;
     const sku = snapshot.skus.find((candidate) => !candidate.archived);
     if (!sku) return;
     const nextPrice = sku.referencePrice + 1_000;
@@ -195,7 +196,7 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
       </div>
     )}
     <main className="mobile-content" ref={mainContentRef}>
-      {selectedSku ? <SkuDetail changes={snapshot.priceChanges} onBack={closeSkuDetail} onScanAgain={openManualScan} sku={selectedSku} /> : scanOpen ? <ScanSurface error={scanError} initialCode={scanCode} key={scanCode} onManualLookup={manualLookup} onRetry={() => void beginScan()} /> : view === 'home' ? <DashboardView
+      {selectedSku ? <SkuDetail changes={snapshot.priceChanges} coreBacked={coreBacked} onBack={closeSkuDetail} onScanAgain={openManualScan} sku={selectedSku} /> : scanOpen ? <ScanSurface error={scanError} initialCode={scanCode} key={scanCode} onManualLookup={manualLookup} onRetry={() => void beginScan()} /> : view === 'home' ? <DashboardView
         snapshot={snapshot}
         unreadCount={unreadCount}
         onOpenPrices={() => navigate('prices')}
@@ -207,7 +208,7 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
         coreBacked={coreBacked}
       /> : null}
       {view === 'skus' && !scanOpen && !selectedSku ? <SkuCatalog focusSearch={focusSearch} onOpenSku={openSku} skus={snapshot.skus} /> : null}
-      {view === 'prices' && !scanOpen && !selectedSku ? <PriceFeedView changes={visiblePriceChanges} onOpenSku={openSku} onSimulate={() => void simulatePriceChange()} skus={snapshot.skus} status={simulationStatus} unreadOnly={priceMode === 'unread'} /> : null}
+      {view === 'prices' && !scanOpen && !selectedSku ? <PriceFeedView changes={visiblePriceChanges} coreBacked={coreBacked} onOpenSku={openSku} onSimulate={coreBacked ? undefined : () => void simulatePriceChange()} skus={snapshot.skus} status={simulationStatus} unreadOnly={priceMode === 'unread'} /> : null}
       {view === 'recommendations' && !scanOpen && !selectedSku ? <ShareRecommendationsView
         onBack={() => navigate('home')}
         onOpenSku={openSku}

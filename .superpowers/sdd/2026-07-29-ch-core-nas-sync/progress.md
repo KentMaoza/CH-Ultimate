@@ -153,3 +153,26 @@ Docker Compose config and ARM64 image build are unrun because local `docker`
 is unavailable. All physical/NAS gates remain blocked and unchanged.
 Task 11 boundary: no NAS, DSM, SMB, router, Tailscale, certificate, physical
 client, MariaDB instance, or CH Nota access/change/deployment occurred.
+
+Task 11 fix round 1/5: all 6 Important findings addressed, pending scoped
+re-review. Core mobile no longer exposes or invokes demo price simulation.
+Core/demo invoice, price-history, SKU-detail, and archive copy is truthful.
+Database operations now use an opt-in, bounded `ch-core-ops` profile and
+separate Node 24 ops image with MariaDB clients; the normal runtime retains
+only its private writable bind and no backup client/scripts. Both services use
+the same explicit nonzero numeric DSM service UID/GID, validated before any
+app/client command. Dump output is a mkdir-reserved completed bundle; verify
+rejects incomplete/extra/symlink/mismatch state. Restore derives only an
+existing empty `chu_restore_[a-z0-9_]+` schema from its separate scratch-only
+URL, rejects broad grants, never creates/drops schemas, and requires a NEW name
+after a partial import.
+Task 11 fix round 1 gate: UI RED 3 then GREEN 2 files / 39 tests; operations
+RED 10/11 then GREEN deployment/runbook 2 files / 20 tests. Full gate passes:
+56 root files / 452 tests; 9 mobile files / 87 tests; 43 server files / 293
+tests plus 1 intentional workbook skip; exact workbook 1/1; Playwright 8/8;
+root/server typecheck and server/mobile builds; Electron darwin-arm64 package;
+Android sync/debug+release unit tests/lint with Android Studio JDK 21; shell
+syntax and diff checks. Exact `/chu_test` remains fail-closed (3 suites, 10
+skips) and Docker Compose/ARM64 remains unrun because `docker` is unavailable.
+No NAS/DSM/SMB/router/Tailscale/certificate/physical client/MariaDB instance/
+CH Nota access, change, or deployment occurred.

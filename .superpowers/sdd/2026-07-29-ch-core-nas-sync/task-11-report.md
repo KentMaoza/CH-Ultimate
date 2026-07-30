@@ -109,23 +109,71 @@ GREEN:
   physical/NAS gates.
 - Static result: 4/4.
 
+## Review fix round 1/5
+
+Six Important findings were addressed, pending scoped re-review:
+
+1. Core-backed Android no longer renders the demo-only price simulation
+   control. It passes no simulation handler, and the internal function returns
+   before `updateSku` when `coreBacked` is true. Browser/test demo retains the
+   simulation.
+2. Database operations now run only in a dedicated Node 24 `ops` image target
+   containing `mariadb-client` and the committed scripts. The normal runtime
+   does not include the client or backup scripts.
+3. `ch-core-ops` is an opt-in Compose profile with host networking, no
+   published ports, read-only root, dropped capabilities,
+   no-new-privileges, bounded resources/tmpfs/logs, and one explicit backup
+   bind. It does not run by default.
+4. Dump and restore credentials are separate. Backup accepts only a read-only
+   URL targeting `/chu`. Restore accepts only a scratch-only URL whose path
+   matches `chu_restore_[a-z0-9_]+`; it verifies the schema already exists,
+   is empty, and has no global/other-schema/role/proxy grants. The scripts
+   contain no production/scratch `CREATE DATABASE` or `DROP DATABASE` path.
+5. Dump output is a `mkdir`-reserved new bundle containing mode-0600
+   `dump.sql`, `dump.sql.sha256`, and `COMPLETE` published last. Verification
+   rejects incomplete, extra, symlinked, invalid-marker, or checksum-mismatch
+   bundles. A partial restore explicitly requires reviewed DBA cleanup and a
+   NEW scratch name.
+6. Runtime and ops use the same explicit nonzero numeric DSM service UID/GID.
+   The entrypoint rejects zero, nonnumeric, missing, or mismatched identity
+   before app/client commands. The runbook requires one restricted DSM service
+   user, bounded Task Scheduler UID/GID receipt, exact private/backup ACLs, and
+   create/write/delete mount probes while keeping both roots read-only.
+
+Truthful copy was also corrected for Core invoice templates, mobile price
+history/SKU detail, and Core-versus-demo archive scope.
+
+RED evidence:
+
+- UI matrix: 3 expected failures for Core simulation, Core price scope, and
+  Core invoice copy.
+- Operations artifacts: 10 expected failures / 1 existing invariant pass.
+- Runbook matrix: 3 expected failures, followed by one exact-command
+  preflight failure after tightening the specification.
+
+GREEN focused evidence:
+
+- UI: 2 files / 39 tests.
+- Deployment artifacts and runbooks: 2 files / 20 tests.
+- Shell syntax and root typecheck pass.
+
 ## Final local verification
 
 | Gate | Result |
 | --- | --- |
 | Exact approved workbook acceptance | PASS — 1/1; SHA-256 and exact 3,144 / 2,786 / 358 / 3 / Rp276,267,011 / 4,115 PCS |
-| `npm run verify` | PASS — 56 files / 449 tests |
-| `npm run test:mobile` | PASS — 9 files / 85 tests |
+| `npm run verify` | PASS — 56 files / 452 tests |
+| `npm run test:mobile` | PASS — 9 files / 87 tests |
 | `npm run mobile:build` | PASS — 589 modules |
 | `npm run package` | PASS — Electron darwin-arm64 package |
 | `npm run test:e2e` | PASS — 8/8 |
-| `npm run server:test` | PASS — 43 files / 284 tests, 1 intentional workbook skip |
+| `npm run server:test` | PASS — 43 files / 293 tests, 1 intentional workbook skip |
 | `npm run server:test:integration` | FAIL-CLOSED — no exact isolated `/chu_test`; 3 suites rejected configuration and 10 tests skipped |
 | `npm run android:sync` | PASS with Android Studio JDK 21 and local SDK |
 | `npm run android:test` | PASS — debug and release JVM tests |
 | `npm run android:lint` | PASS — BUILD SUCCESSFUL |
 | `git diff --check` | PASS |
-| Secret/private artifact scan | PASS — no tracked `.env`, private key, certificate, dump, or dump checksum |
+| Secret/private artifact scan | PASS — no tracked live `.env`, private key, certificate, dump, or dump checksum |
 | Docker Compose config / ARM64 image | NOT RUN — local `docker` command unavailable |
 
 Known non-failing warnings remain the existing Vite CJS deprecation/large

@@ -69,7 +69,29 @@ test('uses truthful CH Core copy across persisted desktop workflows', () => {
   expect(screen.getByText('AKSES LOKAL LAPORAN OMZET')).toBeInTheDocument();
   expect(screen.queryByText(/Password hilang saat aplikasi direload/)).not.toBeInTheDocument();
 
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Template Label & Invoice' }),
+  );
+  fireEvent.click(screen.getByRole('tab', { name: 'Invoice' }));
+  expect(
+    screen.getByText('Tersimpan di CH Core · output produksi belum aktif'),
+  ).toBeInTheDocument();
+  expect(screen.queryByText(/Session-only/)).not.toBeInTheDocument();
+
   fireEvent.click(screen.getByRole('button', { name: 'Nota' }));
   expect(screen.getByText('CH CORE · TERSINKRONISASI')).toBeInTheDocument();
   expect(screen.queryByText('DEMO DATA · SESSION ONLY')).not.toBeInTheDocument();
+});
+
+test('demo invoice preview remains explicitly session-only', () => {
+  render(<App gateway={new MockOperationsGateway()} />);
+
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Template Label & Invoice' }),
+  );
+  fireEvent.click(screen.getByRole('tab', { name: 'Invoice' }));
+
+  expect(
+    screen.getByText('Session-only · output produksi belum aktif'),
+  ).toBeInTheDocument();
 });

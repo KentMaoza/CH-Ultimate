@@ -3,13 +3,17 @@ services:
     build:
       context: ..
       dockerfile: server/Dockerfile
+      target: runtime
     env_file:
       - .env
     environment:
+      CH_CORE_RUNTIME_UID: ${CH_CORE_RUNTIME_UID:?set a nonzero numeric CH_CORE_RUNTIME_UID}
+      CH_CORE_RUNTIME_GID: ${CH_CORE_RUNTIME_GID:?set a nonzero numeric CH_CORE_RUNTIME_GID}
       CH_CORE_HOST: "127.0.0.1"
       CH_CORE_PORT: "18080"
       CH_CORE_DB_POOL_MAX: "4"
       CH_CORE_PRIVATE_STORAGE_ROOT: /var/lib/ch-core/private
+    user: "${CH_CORE_RUNTIME_UID:?set CH_CORE_RUNTIME_UID}:${CH_CORE_RUNTIME_GID:?set CH_CORE_RUNTIME_GID}"
     restart: unless-stopped
     network_mode: host
     read_only: true
@@ -31,3 +35,39 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  ch-core-ops:
+    profiles:
+      - ops
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+      target: ops
+    env_file:
+      - .env
+    environment:
+      CH_CORE_RUNTIME_UID: ${CH_CORE_RUNTIME_UID:?set a nonzero numeric CH_CORE_RUNTIME_UID}
+      CH_CORE_RUNTIME_GID: ${CH_CORE_RUNTIME_GID:?set a nonzero numeric CH_CORE_RUNTIME_GID}
+      CH_CORE_MARIADB_BIN: /usr/bin/mariadb
+      CH_CORE_MARIADB_DUMP_BIN: /usr/bin/mariadb-dump
+    user: "${CH_CORE_RUNTIME_UID:?set CH_CORE_RUNTIME_UID}:${CH_CORE_RUNTIME_GID:?set CH_CORE_RUNTIME_GID}"
+    network_mode: host
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 128m
+    cpus: 0.25
+    pids_limit: 64
+    tmpfs:
+      - /tmp:size=8m,mode=1777,noexec,nosuid,nodev
+    volumes:
+      - type: bind
+        source: ${CH_CORE_BACKUP_HOST_PATH:?set CH_CORE_BACKUP_HOST_PATH}
+        target: /backup
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"

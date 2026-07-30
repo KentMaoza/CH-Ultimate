@@ -196,6 +196,14 @@ export function InventoryPage() {
     try { await gateway.updateSku(editing.id, { skuNumber: editNumber, name: editName, note: editNote, referencePrice: Number(editPrice) }); setEditing(null); }
     catch (error) { setMessage(error instanceof Error ? error.message : 'Perubahan gagal disimpan.'); }
   }
+  async function toggleArchived(sku: Sku) {
+    try {
+      await gateway.setArchived(sku.id, !sku.archived);
+      setMessage(`SKU ${sku.skuNumber} ${sku.archived ? 'dipulihkan' : 'diarsipkan'}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Perubahan status SKU gagal.');
+    }
+  }
   const parsedPrintQuantity = Number(printQuantity);
   const validPrintQuantity = printQuantity !== '' && Number.isInteger(parsedPrintQuantity) && parsedPrintQuantity >= 1 && parsedPrintQuantity <= 10000;
   const barcodeCount = validPrintQuantity ? parsedPrintQuantity : 0;
@@ -225,7 +233,7 @@ export function InventoryPage() {
           <tr key={sku.id}>
             <td><SkuImage gateway={gateway} sku={sku} onSelect={() => openImagePicker(sku)} /></td><td className="sku-number" title={sku.skuNumber}>{sku.skuNumber}</td><td>{sku.name}<small>{sku.tracked ? 'Stok dilacak' : 'Tanpa stok'}</small></td>
             <td>{formatRupiah(sku.referencePrice)}</td><td data-testid={`sku-stock-${sku.id}`} className={`stock-value ${sku.stock < 0 ? 'negative' : ''}`}>{sku.tracked ? sku.stock : '—'}</td><td>{sku.note || '—'}</td><td>{formatDate(sku.sourceCreatedAt || sku.createdAt)}</td>
-            <td><div className="row-actions">{!sku.archived && <><button aria-label={`Edit ${sku.skuNumber}`} onClick={() => openEdit(sku)}>Edit</button><button aria-label={`Print barcode ${sku.skuNumber}`} onClick={() => openBarcodePrint(sku)}>Barcode</button></>}{sku.tracked && !sku.archived && <><button aria-label={`Tambah stok ${sku.skuNumber}`} onClick={() => openAdjustment(sku, 1)}>+ Stok</button><button aria-label={`Kurangi stok ${sku.skuNumber}`} onClick={() => openAdjustment(sku, -1)}>− Stok</button></>}<button onClick={() => void gateway.setArchived(sku.id, !sku.archived)}>{sku.archived ? 'Pulihkan' : 'Arsip'}</button></div></td>
+            <td><div className="row-actions">{!sku.archived && <><button aria-label={`Edit ${sku.skuNumber}`} onClick={() => openEdit(sku)}>Edit</button><button aria-label={`Print barcode ${sku.skuNumber}`} onClick={() => openBarcodePrint(sku)}>Barcode</button></>}{sku.tracked && !sku.archived && <><button aria-label={`Tambah stok ${sku.skuNumber}`} onClick={() => openAdjustment(sku, 1)}>+ Stok</button><button aria-label={`Kurangi stok ${sku.skuNumber}`} onClick={() => openAdjustment(sku, -1)}>− Stok</button></>}<button onClick={() => void toggleArchived(sku)}>{sku.archived ? 'Pulihkan' : 'Arsip'}</button></div></td>
           </tr>
         ))}</tbody></table>
         {!filtered.length && <div className="empty-state">Tidak ada SKU yang cocok.</div>}

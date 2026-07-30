@@ -57,7 +57,11 @@ export class CoreEnvelopeCoordinator {
       let envelope: CoreCacheEnvelope;
       do {
         outboxVersion = this.state.getOutboxVersion();
-        next = update(this.state.getOutbox());
+        const current = this.state.getOutbox();
+        next = update(current);
+        if (next === current) {
+          return this.state.envelope();
+        }
         envelope = this.state.envelope(
           undefined,
           undefined,

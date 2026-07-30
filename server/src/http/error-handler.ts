@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { IdentityError } from '../auth/identity.js';
 import { CatalogueError } from '../catalogue/service.js';
 import { CatalogueValidationError } from '../catalogue/xlsx-archive.js';
+import { ImageDownloadError } from '../catalogue/image-download.js';
 import {
   CatalogueConflictError,
   CatalogueOperationError,
@@ -26,7 +27,10 @@ export function installProtocolErrorHandler(app: FastifyInstance): void {
     ) {
       return reply.code(error.statusCode).send({ code: error.code });
     }
-    if (error instanceof CatalogueValidationError) {
+    if (
+      error instanceof CatalogueValidationError ||
+      error instanceof ImageDownloadError
+    ) {
       return reply.code(422).send({ code: error.code });
     }
     if (error instanceof CatalogueConflictError) {

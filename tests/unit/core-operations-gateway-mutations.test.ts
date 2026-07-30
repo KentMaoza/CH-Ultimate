@@ -195,6 +195,7 @@ describe('Core operations gateway mutation coordination', () => {
     transport.enqueue((request) => {
       expect(request.body).toEqual({
         rowVersion: null,
+        base: null,
         definition: secondTemplate,
       });
       return mutationResponse.promise;

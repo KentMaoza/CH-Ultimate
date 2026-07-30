@@ -16,6 +16,7 @@ export interface Sku {
   note: string;
   imageUrl: string;
   imageHash?: string;
+  sourceImageUrl?: string | null;
   sourceCreatedAt?: string;
   createdAt: string;
   archived: boolean;

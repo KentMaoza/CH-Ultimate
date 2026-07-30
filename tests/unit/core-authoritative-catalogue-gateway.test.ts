@@ -11,6 +11,34 @@ import {
   populatedBootstrap,
 } from './core-gateway-test-support';
 
+const SERVER_LABEL_TEMPLATE = {
+  medium: 'thermal' as const,
+  widthMm: 50,
+  heightMm: 30,
+  columns: 1,
+  marginMm: 2,
+  gapMm: 2,
+  fontSize: 9,
+  alignment: 'center' as const,
+  fields: ['qr' as const, 'name' as const],
+};
+
+function labelTemplateRow(
+  rowVersion: string,
+  definition = SERVER_LABEL_TEMPLATE,
+) {
+  return {
+    id: TEMPLATE_ID,
+    templateKind: 'label',
+    name: 'Label',
+    definition,
+    rowVersion,
+    archivedAt: null,
+    createdAt: '2026-07-29T00:00:00.000Z',
+    updatedAt: '2026-07-29T00:00:00.000Z',
+  };
+}
+
 function setup(bootstrap = populatedBootstrap('1')) {
   const transport = new ScriptedTransport();
   const gateway = createCoreOperationsGateway(
@@ -48,7 +76,11 @@ describe('Core authoritative catalogue version tracking', () => {
     expect(transport.requests[1]).toMatchObject({
       method: 'PATCH',
       path: `/v1/skus/${SKU_ID}`,
-      body: { rowVersion: '12', patch: { name: 'Produk 13' } },
+      body: {
+        rowVersion: '12',
+        base: { name: 'Produk Core' },
+        patch: { name: 'Produk 13' },
+      },
     });
 
     transport.enqueue({
@@ -61,7 +93,11 @@ describe('Core authoritative catalogue version tracking', () => {
     });
     await gateway.updateSku(SKU_ID, { name: 'Produk 14' });
     expect(transport.requests[3]).toMatchObject({
-      body: { rowVersion: '13', patch: { name: 'Produk 14' } },
+      body: {
+        rowVersion: '13',
+        base: { name: 'Produk Core' },
+        patch: { name: 'Produk 14' },
+      },
     });
   });
 
@@ -135,7 +171,7 @@ describe('Core authoritative catalogue version tracking', () => {
 
     expect(transport.requests[1]).toMatchObject({
       path: '/v1/templates/label',
-      body: { rowVersion: null, definition: template },
+      body: { rowVersion: null, base: null, definition: template },
     });
     const next = { ...template, fontSize: 12 };
     transport.enqueue({
@@ -148,8 +184,107 @@ describe('Core authoritative catalogue version tracking', () => {
     });
     await gateway.setLabelTemplate(next);
     expect(transport.requests[3]).toMatchObject({
-      body: { rowVersion: '1', definition: next },
+      body: { rowVersion: '1', base: template, definition: next },
     });
+  });
+
+  it('fails closed on cached template state until a bootstrap confirms its version', async () => {
+    const storage = new MemoryStorage();
+    const onlineTransport = new ScriptedTransport();
+    const online = createCoreOperationsGateway(
+      onlineTransport,
+      storage,
+      new TestClock(),
+    );
+    onlineTransport.enqueue({
+      status: 200,
+      body: populatedBootstrap('1', {
+        templates: [labelTemplateRow('4')],
+      }),
+    });
+    await online.initialize();
+    online.dispose();
+
+    const offlineTransport = new ScriptedTransport();
+    const offline = createCoreOperationsGateway(
+      offlineTransport,
+      storage,
+      new TestClock(),
+    );
+    offlineTransport.enqueue(new Error('LAN unavailable'));
+    await offline.initialize();
+
+    await expect(
+      offline.setLabelTemplate({
+        ...offline.getSnapshot().labelTemplate,
+        fontSize: 12,
+      }),
+    ).rejects.toThrow('Versi template belum tersedia');
+    expect(offlineTransport.requests).toHaveLength(1);
+  });
+
+  it('durably rebases a restored template edit to the successful bootstrap version', async () => {
+    const storage = new MemoryStorage();
+    const firstTransport = new ScriptedTransport();
+    const first = createCoreOperationsGateway(
+      firstTransport,
+      storage,
+      new TestClock(),
+    );
+    firstTransport.enqueue({
+      status: 200,
+      body: populatedBootstrap('1', {
+        templates: [labelTemplateRow('1')],
+      }),
+    });
+    await first.initialize();
+    firstTransport.enqueue(new Error('LAN unavailable'));
+    const queuedTemplate = {
+      ...first.getSnapshot().labelTemplate,
+      fontSize: 12,
+    };
+    await expect(first.setLabelTemplate(queuedTemplate)).rejects.toThrow(
+      'LAN unavailable',
+    );
+    first.dispose();
+
+    const secondTransport = new ScriptedTransport();
+    const second = createCoreOperationsGateway(
+      secondTransport,
+      storage,
+      new TestClock(),
+    );
+    secondTransport.enqueue({
+      status: 200,
+      body: populatedBootstrap('2', {
+        templates: [labelTemplateRow('2')],
+      }),
+    });
+    await second.initialize();
+    expect(
+      (storage.value as { outbox: Array<{ body?: unknown }> }).outbox[0]?.body,
+    ).toMatchObject({
+      rowVersion: '2',
+      base: SERVER_LABEL_TEMPLATE,
+      definition: queuedTemplate,
+    });
+
+    secondTransport.enqueue((request) => {
+      expect(request.body).toMatchObject({
+        rowVersion: '2',
+        base: SERVER_LABEL_TEMPLATE,
+        definition: queuedTemplate,
+      });
+      return {
+        status: 200,
+        body: { serverRevision: '3', entityVersion: '3' },
+      };
+    });
+    secondTransport.enqueue({
+      status: 200,
+      body: { serverRevision: '3', nextAfter: '2', changes: [] },
+    });
+    await second.retryPending();
   });
 
   it('fails closed before transport when a SKU row version is unavailable', async () => {
@@ -181,6 +316,91 @@ describe('Core authoritative catalogue version tracking', () => {
     });
     expect(transport.requests[1]?.body).not.toHaveProperty('quantity');
     expect(transport.requests[1]?.body).not.toHaveProperty('balance');
+  });
+
+  it('uploads a picked data image before versioning the SKU hash replacement', async () => {
+    const { gateway, transport } = setup();
+    await gateway.initialize();
+    const bytesBase64 = 'iVBORw0KGgoAAAAAAAAASUhEUgAAACAAAAAY';
+    const nextHash = 'b'.repeat(64);
+    transport.enqueue({
+      status: 200,
+      body: {
+        hash: nextHash,
+        mimeType: 'image/png',
+        byteSize: 24,
+        width: 32,
+        height: 24,
+      },
+    });
+    transport.enqueue({
+      status: 200,
+      body: { serverRevision: '2', entityVersion: '2' },
+    });
+    transport.enqueue({
+      status: 200,
+      body: { serverRevision: '2', nextAfter: '1', changes: [] },
+    });
+
+    await gateway.updateSku(SKU_ID, {
+      imageUrl: `data:image/png;base64,${bytesBase64}`,
+    });
+
+    expect(transport.requests[1]).toEqual({
+      method: 'POST',
+      path: '/v1/images',
+      body: { mimeType: 'image/png', bytesBase64 },
+    });
+    expect(transport.requests[2]).toMatchObject({
+      method: 'PATCH',
+      path: `/v1/skus/${SKU_ID}`,
+      body: {
+        rowVersion: '1',
+        base: {
+          imageHash: 'a'.repeat(64),
+          sourceImageUrl: 'https://res.bigseller.pro/a.png',
+        },
+        patch: { imageHash: nextHash, sourceImageUrl: null },
+      },
+    });
+  });
+
+  it('maps image hash and private source metadata from bootstrap and changes', async () => {
+    const { gateway, transport } = setup();
+    await gateway.initialize();
+    expect(gateway.getSnapshot().skus[0]).toMatchObject({
+      imageHash: 'a'.repeat(64),
+      sourceImageUrl: 'https://res.bigseller.pro/a.png',
+    });
+    transport.enqueue({
+      status: 200,
+      body: {
+        serverRevision: '2',
+        nextAfter: '2',
+        changes: [
+          {
+            revision: '2',
+            entityType: 'sku',
+            entityId: SKU_ID,
+            operation: 'upsert',
+            payload: {
+              ...populatedBootstrap().skus[0]!,
+              imageHash: 'b'.repeat(64),
+              sourceImageUrl: null,
+              rowVersion: '2',
+            },
+            createdAt: '2026-07-30T03:00:00.000Z',
+          },
+        ],
+      },
+    });
+
+    await gateway.retryPending();
+
+    expect(gateway.getSnapshot().skus[0]).toMatchObject({
+      imageHash: 'b'.repeat(64),
+      sourceImageUrl: null,
+    });
   });
 
   it('drops a permanent identifier rejection and returns actionable Indonesian copy', async () => {

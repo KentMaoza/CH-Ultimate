@@ -16,7 +16,7 @@ export interface PreparedCatalogueRow {
 }
 
 export function normalizeIdentifier(value: string): string {
-  return value.normalize('NFKC').toLocaleLowerCase('id-ID');
+  return value.trim().normalize('NFKC').toLocaleLowerCase('id-ID');
 }
 
 export function identifierHash(value: string): Buffer {

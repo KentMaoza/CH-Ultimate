@@ -4,10 +4,15 @@ const safeInteger = z.number().int().safe();
 const nonnegativeInteger = safeInteger.min(0);
 const canonicalVersion = z.string().regex(/^[1-9]\d*$/);
 const optionalUrl = z.union([z.literal(''), z.string().url().max(2_048)]);
+const identifier = z
+  .string()
+  .min(1)
+  .max(16 * 1024)
+  .refine((value) => value.trim().length > 0);
 
 export const createSkuBody = z
   .object({
-    skuNumber: z.string().min(1).max(16 * 1024),
+    skuNumber: identifier,
     name: z.string().trim().min(1).max(512),
     referencePrice: nonnegativeInteger,
     openingStock: safeInteger,
@@ -17,24 +22,42 @@ export const createSkuBody = z
   })
   .strict();
 
+const skuFields = {
+  skuNumber: identifier.optional(),
+  name: z.string().trim().min(1).max(512).optional(),
+  referencePrice: nonnegativeInteger.optional(),
+  note: z.string().max(16 * 1024).optional(),
+  imageUrl: optionalUrl.optional(),
+  imageHash: z.string().regex(/^[0-9a-f]{64}$/).nullable().optional(),
+  sourceImageUrl: optionalUrl.nullable().optional(),
+  archived: z.boolean().optional(),
+};
+
 const skuPatch = z
-  .object({
-    skuNumber: z.string().min(1).max(16 * 1024).optional(),
-    name: z.string().trim().min(1).max(512).optional(),
-    referencePrice: nonnegativeInteger.optional(),
-    note: z.string().max(16 * 1024).optional(),
-    imageUrl: optionalUrl.optional(),
-    archived: z.boolean().optional(),
-  })
+  .object(skuFields)
   .strict()
   .refine((value) => Object.keys(value).length > 0);
 
 export const updateSkuBody = z
   .object({
     rowVersion: canonicalVersion,
+    base: z.object(skuFields).strict(),
     patch: skuPatch,
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    const baseKeys = Object.keys(value.base).sort();
+    const patchKeys = Object.keys(value.patch).sort();
+    if (
+      baseKeys.length !== patchKeys.length ||
+      baseKeys.some((key, index) => key !== patchKeys[index])
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'base must contain exactly the patched fields',
+      });
+    }
+  });
 
 export const stockAdjustmentBody = z
   .object({
@@ -54,7 +77,8 @@ const labelDefinition = z
     alignment: z.enum(['left', 'center', 'right']),
     fields: z
       .array(z.enum(['qr', 'name', 'sku', 'price', 'chu']))
-      .max(5),
+      .max(5)
+      .refine((fields) => new Set(fields).size === fields.length),
   })
   .strict();
 
@@ -76,7 +100,12 @@ const invoiceDefinition = z
           })
           .strict(),
       )
-      .max(4),
+      .max(4)
+      .refine(
+        (elements) =>
+          new Set(elements.map((element) => element.id)).size ===
+          elements.length,
+      ),
   })
   .strict();
 
@@ -85,12 +114,22 @@ export const templateKindPath = z
   .strict();
 
 export function templateBody(kind: 'label' | 'invoice') {
+  const definition = kind === 'label' ? labelDefinition : invoiceDefinition;
   return z
     .object({
       rowVersion: canonicalVersion.nullable(),
-      definition: kind === 'label' ? labelDefinition : invoiceDefinition,
+      base: definition.nullable(),
+      definition,
     })
-    .strict();
+    .strict()
+    .superRefine((value, context) => {
+      if ((value.rowVersion === null) !== (value.base === null)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'base must match row version knowledge',
+        });
+      }
+    });
 }
 
 export type CreateSkuRequest = z.infer<typeof createSkuBody>;
@@ -98,5 +137,9 @@ export type UpdateSkuRequest = z.infer<typeof updateSkuBody>;
 export type StockAdjustmentRequest = z.infer<typeof stockAdjustmentBody>;
 export type TemplateUpdateRequest = {
   rowVersion: string | null;
+  base:
+    | z.infer<typeof labelDefinition>
+    | z.infer<typeof invoiceDefinition>
+    | null;
   definition: z.infer<typeof labelDefinition> | z.infer<typeof invoiceDefinition>;
 };

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CatalogueConflictError,
+  CatalogueOperationError,
 } from '../src/catalogue/mariadb-sku-operations-repository.js';
 import { MariaDbTemplateOperationsRepository } from '../src/catalogue/mariadb-template-operations-repository.js';
 import type { ProtocolConnection } from '../src/sync/idempotency.js';
@@ -21,7 +22,7 @@ const definition = {
 };
 
 function connectionWith(
-  row?: Record<string, unknown>,
+  row?: Record<string, unknown> | Record<string, unknown>[],
 ) {
   const queries: Array<{ sql: string; values: readonly unknown[] }> = [];
   let revision = 40n;
@@ -30,7 +31,7 @@ function connectionWith(
       const compact = sql.replace(/\s+/g, ' ').trim();
       queries.push({ sql: compact, values });
       if (compact.includes('FROM templates') && compact.includes('FOR UPDATE')) {
-        return (row ? [row] : []) as T;
+        return (Array.isArray(row) ? row : row ? [row] : []) as T;
       }
       if (compact.startsWith('INSERT INTO change_log')) {
         revision += 1n;
@@ -54,7 +55,7 @@ describe('MariaDB authoritative template repository', () => {
       test.connection,
       DEVICE_ID,
       'label',
-      { rowVersion: null, definition },
+      { rowVersion: null, base: null, definition },
     );
 
     expect(result.body).toMatchObject({
@@ -95,7 +96,11 @@ describe('MariaDB authoritative template repository', () => {
       test.connection,
       DEVICE_ID,
       'label',
-      { rowVersion: '3', definition },
+      {
+        rowVersion: '3',
+        base: { ...definition, fontSize: 9 },
+        definition,
+      },
     );
 
     expect(result.body).toMatchObject({ entityVersion: '4' });
@@ -133,9 +138,61 @@ describe('MariaDB authoritative template repository', () => {
     await expect(
       repository.update(test.connection, DEVICE_ID, 'invoice', {
         rowVersion: null,
+        base: null,
         definition: JSON.parse(String(row.definition_json)),
       }),
     ).rejects.toBeInstanceOf(CatalogueConflictError);
+    await repository
+      .update(test.connection, DEVICE_ID, 'invoice', {
+        rowVersion: '5',
+        base: {
+          ...JSON.parse(String(row.definition_json)),
+          bankAccount: 'Base lama',
+        },
+        definition: JSON.parse(String(row.definition_json)),
+      })
+      .catch((error: CatalogueConflictError) => {
+        expect(error.conflict.base).toMatchObject({
+          bankAccount: 'Base lama',
+        });
+      });
+    expect(
+      test.queries.some(({ sql }) => /^(INSERT|UPDATE)/.test(sql)),
+    ).toBe(false);
+  });
+
+  it('rejects pre-existing duplicate active templates instead of picking one', async () => {
+    const activeRow = {
+      id_hex: TEMPLATE_ID.replaceAll('-', ''),
+      template_kind: 'label',
+      name: 'Label',
+      definition_json: JSON.stringify(definition),
+      row_version: 2,
+      archived_at: null,
+      created_at: new Date('2026-01-01T00:00:00.000Z'),
+      updated_at: new Date('2026-01-01T00:00:00.000Z'),
+    };
+    const test = connectionWith([
+      activeRow,
+      {
+        ...activeRow,
+        id_hex: '33333333333343338333333333333333',
+      },
+    ]);
+    const repository = new MariaDbTemplateOperationsRepository();
+
+    await repository
+      .update(test.connection, DEVICE_ID, 'label', {
+        rowVersion: '2',
+        base: definition,
+        definition,
+      })
+      .catch((error: CatalogueOperationError) => {
+        expect(error).toBeInstanceOf(CatalogueOperationError);
+        expect(error.code).toBe('TEMPLATE_DUPLICATE_ACTIVE');
+        expect(error.statusCode).toBe(500);
+      });
+
     expect(
       test.queries.some(({ sql }) => /^(INSERT|UPDATE)/.test(sql)),
     ).toBe(false);

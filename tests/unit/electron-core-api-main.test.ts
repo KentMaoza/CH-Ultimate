@@ -85,6 +85,11 @@ describe('CH Core operation allowlist', () => {
         method: 'GET' as const,
         path: `/v1/images/${'a'.repeat(64)}`,
       },
+      {
+        method: 'POST' as const,
+        path: '/v1/images',
+        body: { mimeType: 'image/png', bytesBase64: 'iVBORw==' },
+      },
       { method: 'POST' as const, path: '/v1/skus', body: { name: 'Beras' } },
       {
         method: 'PATCH' as const,

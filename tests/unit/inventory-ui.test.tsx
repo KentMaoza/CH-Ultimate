@@ -53,6 +53,46 @@ test('keeps the stock dialog open and shows an actionable server error', async (
   expect(screen.getByRole('dialog', { name: 'Tambah stok' })).toBeInTheDocument();
 });
 
+test('keeps an SKU visible and surfaces an archive rejection', async () => {
+  const gateway = new MockOperationsGateway();
+  vi.spyOn(gateway, 'setArchived').mockRejectedValue(
+    new Error('Versi SKU berubah. Sinkronkan ulang lalu coba lagi.'),
+  );
+  render(<App gateway={gateway} />);
+  const row = screen.getByRole('row', { name: /BRS-108-BLK/ });
+
+  fireEvent.click(within(row).getByRole('button', { name: 'Arsip' }));
+
+  expect(
+    await screen.findByText(
+      'Versi SKU berubah. Sinkronkan ulang lalu coba lagi.',
+    ),
+  ).toBeInTheDocument();
+  expect(screen.getByRole('row', { name: /BRS-108-BLK/ })).toBeInTheDocument();
+});
+
+test('confirms successful archive and restore mutations', async () => {
+  const gateway = new MockOperationsGateway();
+  render(<App gateway={gateway} />);
+  const activeRow = screen.getByRole('row', { name: /BRS-108-BLK/ });
+
+  fireEvent.click(within(activeRow).getByRole('button', { name: 'Arsip' }));
+
+  expect(
+    await screen.findByText('SKU BRS-108-BLK diarsipkan.'),
+  ).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Status'), {
+    target: { value: 'archived' },
+  });
+  const archivedRow = screen.getByRole('row', { name: /BRS-108-BLK/ });
+  fireEvent.click(
+    within(archivedRow).getByRole('button', { name: 'Pulihkan' }),
+  );
+  expect(
+    await screen.findByText('SKU BRS-108-BLK dipulihkan.'),
+  ).toBeInTheDocument();
+});
+
 test('lists filtered price and quantity changes and exposes price export', async () => {
   const gateway = new MockOperationsGateway();
   await gateway.updateSku('sku-1', { imageUrl: 'https://example.test/beras.jpg' });

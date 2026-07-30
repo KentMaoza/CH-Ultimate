@@ -135,7 +135,7 @@ function seedOriginalVersionThree(pool: FakeMigrationPool): void {
 }
 
 describe('runMigrations', () => {
-  it('applies versions 1 through 6 once and makes the second run a no-op', async () => {
+  it('applies versions 1 through 7 once and makes the second run a no-op', async () => {
     const pool = new FakeMigrationPool();
 
     const first = await runMigrations(pool);
@@ -144,15 +144,15 @@ describe('runMigrations', () => {
 
     expect(first).toEqual({
       fromVersion: 0,
-      toVersion: 6,
-      appliedVersions: [1, 2, 3, 4, 5, 6],
+      toVersion: 7,
+      appliedVersions: [1, 2, 3, 4, 5, 6, 7],
     });
     expect(second).toEqual({
-      fromVersion: 6,
-      toVersion: 6,
+      fromVersion: 7,
+      toVersion: 7,
       appliedVersions: [],
     });
-    expect(pool.applied.size).toBe(6);
+    expect(pool.applied.size).toBe(7);
     expect(pool.migrationStatementCount).toBe(statementsAfterFirstRun);
   });
 
@@ -172,16 +172,16 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 0,
-      toVersion: 6,
-      appliedVersions: [1, 2, 3, 4, 5, 6],
+      toVersion: 7,
+      appliedVersions: [1, 2, 3, 4, 5, 6, 7],
     });
   });
 
   it('refuses a database schema newer than this binary and releases the lock', async () => {
-    const pool = new FakeMigrationPool(7);
+    const pool = new FakeMigrationPool(8);
 
     await expect(runMigrations(pool)).rejects.toThrow(
-      'Database schema version 7 is newer than supported version 6',
+      'Database schema version 8 is newer than supported version 7',
     );
 
     expect(pool.lockHeld).toBe(false);
@@ -224,11 +224,11 @@ describe('runMigrations', () => {
 
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 1,
-      toVersion: 6,
-      appliedVersions: [2, 3, 4, 5, 6],
+      toVersion: 7,
+      appliedVersions: [2, 3, 4, 5, 6, 7],
     });
 
-    expect(pool.applied.size).toBe(6);
+    expect(pool.applied.size).toBe(7);
     expect(pool.migrationStatementCount).toBeGreaterThan(2);
   });
 
@@ -245,8 +245,8 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 1,
-      toVersion: 6,
-      appliedVersions: [2, 3, 4, 5, 6],
+      toVersion: 7,
+      appliedVersions: [2, 3, 4, 5, 6, 7],
     });
   });
 
@@ -256,8 +256,8 @@ describe('runMigrations', () => {
 
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 2,
-      toVersion: 6,
-      appliedVersions: [3, 4, 5, 6],
+      toVersion: 7,
+      appliedVersions: [3, 4, 5, 6, 7],
     });
   });
 
@@ -274,8 +274,8 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 2,
-      toVersion: 6,
-      appliedVersions: [3, 4, 5, 6],
+      toVersion: 7,
+      appliedVersions: [3, 4, 5, 6, 7],
     });
   });
 
@@ -292,8 +292,8 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 3,
-      toVersion: 6,
-      appliedVersions: [4, 5, 6],
+      toVersion: 7,
+      appliedVersions: [4, 5, 6, 7],
     });
   });
 });
@@ -328,6 +328,23 @@ second', "third;fourth");
 });
 
 describe('initial schema', () => {
+  it('enforces one active template per kind in v7', async () => {
+    const sql = await readFile(
+      new URL(
+        '../migrations/007_active_template_kind.sql',
+        import.meta.url,
+      ),
+      'utf8',
+    );
+
+    expect(sql).toMatch(
+      /active_template_kind[\s\S]*GENERATED ALWAYS AS[\s\S]*archived_at IS NULL[\s\S]*template_kind[\s\S]*STORED/,
+    );
+    expect(sql).toMatch(
+      /UNIQUE (?:KEY|INDEX) IF NOT EXISTS uq_templates_active_kind\s+\(active_template_kind\)/,
+    );
+  });
+
   it('installs the singleton business lock and image processing lease', async () => {
     const sql = await readFile(
       new URL('../migrations/006_business_write_safety.sql', import.meta.url),

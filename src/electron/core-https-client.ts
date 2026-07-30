@@ -66,7 +66,8 @@ export function createCoreHttpsClient(options: CoreHttpsClientOptions = {}) {
     send(input: CoreMainSendInput): Promise<CoreApiResponse> {
       const requestLimit =
         options.maxRequestBytes ??
-        (input.request.path === '/v1/imports/validate'
+        (input.request.path === '/v1/imports/validate' ||
+        input.request.path === '/v1/images'
           ? CATALOGUE_TRANSFER_MAX_BYTES
           : maxRequestBytes);
       const responseLimit =

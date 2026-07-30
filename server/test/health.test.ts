@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildApp } from '../src/app.js';
-import type { SchemaQueryPool } from '../src/db/migrate.js';
+import {
+  LATEST_SCHEMA_VERSION,
+  type SchemaQueryPool,
+} from '../src/db/migrate.js';
 
 function poolReturning(rows: unknown[]): SchemaQueryPool {
   return {
@@ -33,7 +36,7 @@ describe('health routes', () => {
 
   it('reports readiness when the database schema matches the binary', async () => {
     const app = buildApp({
-      pool: poolReturning([{ version: 6 }]),
+      pool: poolReturning([{ version: LATEST_SCHEMA_VERSION }]),
     });
 
     const response = await app.inject({ method: 'GET', url: '/health/ready' });
@@ -65,7 +68,7 @@ describe('health routes', () => {
 
   it('is not ready when the database schema is newer than the binary', async () => {
     const app = buildApp({
-      pool: poolReturning([{ version: 7 }]),
+      pool: poolReturning([{ version: LATEST_SCHEMA_VERSION + 1 }]),
     });
 
     const response = await app.inject({ method: 'GET', url: '/health/ready' });

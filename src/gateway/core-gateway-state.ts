@@ -1,4 +1,9 @@
-import type { DemoState } from '../domain/types';
+import type {
+  DemoState,
+  InvoiceTemplate,
+  LabelTemplate,
+  Sku,
+} from '../domain/types';
 import type { SyncSnapshot } from './operations-gateway-contract';
 import type {
   CoreBootstrap,
@@ -10,9 +15,13 @@ import {
   cloneCore,
   coreCacheEnvelope,
   type CoreCacheEnvelope,
+  type CoreOptimisticChange,
   type CoreOutboxItem,
 } from './core-cache';
-import { previewOptimisticOutbox } from './core-optimistic-state';
+import {
+  asCoreJson,
+  previewOptimisticOutbox,
+} from './core-optimistic-state';
 
 export class CoreGatewayState {
   private state = emptyCoreState();
@@ -23,6 +32,7 @@ export class CoreGatewayState {
   private skuVersions = new Map<string, string>();
   private balanceVersions = new Map<string, string>();
   private templateVersions = new Map<'label' | 'invoice', string>();
+  private templateVersionKnowledge = new Set<'label' | 'invoice'>();
   private syncSnapshot: SyncSnapshot = {
     phase: 'connecting',
     serverRevision: '0',
@@ -62,6 +72,7 @@ export class CoreGatewayState {
       bootstrap.balances.map((row) => [row.skuId, row.rowVersion]),
     );
     this.templateVersions = new Map();
+    this.templateVersionKnowledge = new Set(['label', 'invoice']);
     for (const row of bootstrap.templates) {
       if (
         row.archivedAt === null &&
@@ -72,18 +83,93 @@ export class CoreGatewayState {
     }
   }
 
-  requireSkuVersion(id: string): string {
+  requireSkuWriteContext(
+    id: string,
+    patch: Partial<Sku>,
+  ): { rowVersion: string; base: Record<string, unknown> } {
     const version = this.skuVersions.get(id);
     if (!version) {
       throw new Error(
         'Versi SKU belum tersedia. Sinkronkan ulang lalu coba lagi.',
       );
     }
-    return version;
+    const sku = this.canonicalState.skus.find((candidate) => candidate.id === id);
+    if (!sku) {
+      throw new Error('SKU tidak ditemukan. Sinkronkan ulang lalu coba lagi.');
+    }
+    const allowed = new Set([
+      'skuNumber',
+      'name',
+      'referencePrice',
+      'note',
+      'imageUrl',
+      'imageHash',
+      'sourceImageUrl',
+      'archived',
+    ]);
+    const base: Record<string, unknown> = {};
+    for (const field of Object.keys(patch)) {
+      if (!allowed.has(field)) {
+        throw new Error(`Field SKU ${field} tidak dapat diubah.`);
+      }
+      base[field] =
+        field === 'imageHash'
+          ? sku.imageHash ?? null
+          : field === 'sourceImageUrl'
+            ? sku.sourceImageUrl ?? null
+            : sku[field as keyof Sku];
+    }
+    return { rowVersion: version, base };
   }
 
-  getTemplateVersion(kind: 'label' | 'invoice'): string | null {
-    return this.templateVersions.get(kind) ?? null;
+  getTemplateWriteContext(
+    kind: 'label' | 'invoice',
+  ): {
+    rowVersion: string | null;
+    base: LabelTemplate | InvoiceTemplate | null;
+  } {
+    if (!this.templateVersionKnowledge.has(kind)) {
+      throw new Error(
+        'Versi template belum tersedia. Sinkronkan ulang lalu coba lagi.',
+      );
+    }
+    const rowVersion = this.templateVersions.get(kind) ?? null;
+    return {
+      rowVersion,
+      base:
+        rowVersion === null
+          ? null
+          : cloneCore(
+              kind === 'label'
+                ? this.canonicalState.labelTemplate
+                : this.canonicalState.invoiceTemplate,
+            ),
+    };
+  }
+
+  rebaseVersionedOutbox(outbox: CoreOutboxItem[]): CoreOutboxItem[] {
+    let changed = false;
+    const rebased = outbox.map((item) => {
+      const match = /^\/v1\/templates\/(label|invoice)$/.exec(item.path);
+      const kind = match?.[1];
+      if (
+        (kind !== 'label' && kind !== 'invoice') ||
+        item.body === null ||
+        typeof item.body !== 'object' ||
+        Array.isArray(item.body)
+      ) {
+        return item;
+      }
+      changed = true;
+      return {
+        ...item,
+        body: asCoreJson({
+          ...item.body,
+          ...this.getTemplateWriteContext(kind),
+        }),
+      };
+    });
+    return changed ? rebased : outbox;
   }
 
   recordChangeVersions(changes: CoreChange[]): void {
@@ -118,6 +204,7 @@ export class CoreGatewayState {
   recordMutationVersion(
     path: string,
     acknowledgement: CoreMutationAcknowledgement,
+    optimistic?: CoreOptimisticChange,
   ): void {
     const version = acknowledgement.entityVersion;
     if (!version) return;
@@ -135,6 +222,23 @@ export class CoreGatewayState {
     const templateMatch = /^\/v1\/templates\/(label|invoice)$/.exec(path);
     if (templateMatch?.[1] === 'label' || templateMatch?.[1] === 'invoice') {
       this.templateVersions.set(templateMatch[1], version);
+      if (
+        templateMatch[1] === 'label' &&
+        optimistic?.kind === 'label-template'
+      ) {
+        this.canonicalState = {
+          ...this.canonicalState,
+          labelTemplate: cloneCore(optimistic.template),
+        };
+      } else if (
+        templateMatch[1] === 'invoice' &&
+        optimistic?.kind === 'invoice-template'
+      ) {
+        this.canonicalState = {
+          ...this.canonicalState,
+          invoiceTemplate: cloneCore(optimistic.template),
+        };
+      }
       return;
     }
     const entity = acknowledgement.entity;

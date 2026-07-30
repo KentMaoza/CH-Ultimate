@@ -69,12 +69,11 @@ export function mapCoreBootstrapToDemoState(
   bootstrap: CoreBootstrap,
 ): DemoState {
   /*
-   * HEAD mapping:
+   * Authoritative mapping:
    * - SKU + identifier + balance rows become SKU fields, aliases, and stock.
    * - Nota header/page/line rows become transactions and 15 renderer slots;
    *   blank slots are presentation controls, not seeded business records.
-   * - The current API has no stock/price history or posting collections, so
-   *   adjustments, priceChanges, and posting snapshots remain empty.
+   * - Stock movements and price history become the renderer audit lists.
    * - Missing label/invoice rows retain only the neutral defaults above.
    */
   const state = emptyCoreState();
@@ -139,6 +138,7 @@ export function mapCoreBootstrapToDemoState(
     note: row.sourceNote ?? '',
     imageUrl: '',
     ...(row.imageHash ? { imageHash: row.imageHash } : {}),
+    sourceImageUrl: row.sourceImageUrl ?? null,
     ...(row.sourceCreatedAt
       ? { sourceCreatedAt: row.sourceCreatedAt }
       : {}),

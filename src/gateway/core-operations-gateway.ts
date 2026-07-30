@@ -32,6 +32,7 @@ import {
   CORE_API_PATHS,
   parseCatalogueCommit,
   parseCatalogueImage,
+  parseCatalogueImageUpload,
   parseCatalogueValidation,
   parseCoreApiError,
 } from './core-api-types';
@@ -48,6 +49,20 @@ export { mapCoreBootstrapToDemoState } from './core-bootstrap-mapping';
 
 export interface CoreOperationsGateway extends OperationsGateway {
   dispose(): void;
+}
+
+function parseImageDataUrl(
+  value: string | undefined,
+): { mimeType: string; bytesBase64: string } | null {
+  if (!value?.startsWith('data:')) return null;
+  const match =
+    /^data:(image\/(?:png|jpeg|gif|webp));base64,((?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?)$/.exec(
+      value,
+    );
+  if (!match?.[1] || !match[2] || match[2].length > 7_000_000) {
+    throw new Error('Data gambar tidak valid atau terlalu besar.');
+  }
+  return { mimeType: match[1], bytesBase64: match[2] };
 }
 
 class CoreOperationsGatewayImpl implements CoreOperationsGateway {
@@ -105,8 +120,21 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   ): Promise<void> => this.mutations.resolveConflict(id, choice);
   createSku = (input: CreateSkuInput): Promise<Sku> =>
     this.mutations.createSku(input);
-  updateSku = (id: string, patch: Partial<Sku>): Promise<void> =>
-    this.mutations.updateSku(id, patch);
+  updateSku = async (id: string, patch: Partial<Sku>): Promise<void> => {
+    const upload = parseImageDataUrl(patch.imageUrl);
+    if (!upload) {
+      await this.mutations.updateSku(id, patch);
+      return;
+    }
+    const response = await this.transport.request({
+      method: 'POST',
+      path: CORE_API_PATHS.imageUpload,
+      body: upload,
+    });
+    this.throwForApiError(response.status, response.body);
+    const stored = parseCatalogueImageUpload(response.body);
+    await this.mutations.updateSkuImage(id, stored.hash);
+  };
   adjustStock = (id: string, quantity: number): Promise<void> =>
     this.mutations.adjustStock(id, quantity);
   setArchived = (id: string, archived: boolean): Promise<void> =>

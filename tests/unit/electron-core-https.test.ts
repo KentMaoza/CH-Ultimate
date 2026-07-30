@@ -209,6 +209,29 @@ describe('main-process CH Core HTTPS client', () => {
       }),
     ).resolves.toMatchObject({ status: 200 });
 
+    const imageUpload = respondingRequest({
+      status: 200,
+      chunks: ['{}'],
+    });
+    const imageUploadClient = createCoreHttpsClient({
+      requestImpl: imageUpload.requestImpl,
+    });
+    await expect(
+      imageUploadClient.send({
+        endpoint,
+        ca,
+        authorization,
+        request: {
+          method: 'POST',
+          path: '/v1/images',
+          body: {
+            mimeType: 'image/png',
+            bytesBase64: 'A'.repeat(2_100_000),
+          },
+        },
+      }),
+    ).resolves.toEqual({ status: 200, body: {} });
+
     const ordinary = respondingRequest({ status: 200, chunks: ['{}'] });
     const ordinaryClient = createCoreHttpsClient({
       requestImpl: ordinary.requestImpl,

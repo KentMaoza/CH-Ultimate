@@ -22,6 +22,8 @@ final class CoreApiClient {
     private static final int MAX_RESPONSE_BYTES = 2_000_000;
     private static final int MAX_BOOTSTRAP_RESPONSE_BYTES = 5_000_000;
     private static final int MAX_IMAGE_RESPONSE_BYTES = 7_100_000;
+    private static final int MAX_REQUEST_BYTES = 1_000_000;
+    private static final int MAX_IMAGE_REQUEST_BYTES = 7_100_000;
     private final Context context;
     private final CoreDeploymentConfig config;
 
@@ -63,11 +65,7 @@ final class CoreApiClient {
                 byte[] encoded = body
                     .toString()
                     .getBytes(StandardCharsets.UTF_8);
-                if (encoded.length > 1_000_000) {
-                    throw new CoreSecurityException(
-                        "Permintaan CH Core terlalu besar."
-                    );
-                }
+                requireRequestSize(encoded.length, path);
                 connection.setDoOutput(true);
                 connection.setRequestProperty(
                     "Content-Type",
@@ -110,6 +108,18 @@ final class CoreApiClient {
         if (status >= 300 && status <= 399) {
             throw new CoreSecurityException(
                 "Respons CH Core tidak valid."
+            );
+        }
+    }
+
+    static void requireRequestSize(int byteSize, String path) {
+        int maximum =
+            "/v1/images".equals(path)
+                ? MAX_IMAGE_REQUEST_BYTES
+                : MAX_REQUEST_BYTES;
+        if (byteSize > maximum) {
+            throw new CoreSecurityException(
+                "Permintaan CH Core terlalu besar."
             );
         }
     }

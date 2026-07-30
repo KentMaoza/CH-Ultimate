@@ -32,6 +32,7 @@ final class CoreRequestPolicy {
             Set.of("GET"),
             Pattern.compile("^/v1/images/" + SHA256 + "$")
         ),
+        new Rule(Set.of("POST"), Pattern.compile("^/v1/images$")),
         new Rule(
             Set.of("PATCH"),
             Pattern.compile("^/v1/templates/(?:label|invoice)$")

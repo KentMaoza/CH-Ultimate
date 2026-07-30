@@ -40,7 +40,7 @@ function harness() {
     rotateDeviceToken: vi.fn(),
   };
   const app = buildApp({
-    pool: { query: async <T>() => [{ version: 6 }] as T },
+    pool: { query: async <T>() => [{ version: 7 }] as T },
     protocol: {
       identity,
       sync: { bootstrap: vi.fn(), changes: vi.fn() },
@@ -106,6 +106,7 @@ describe('catalogue operation HTTP boundary', () => {
       headers,
       payload: {
         rowVersion: '7',
+        base: { name: 'Beras', referencePrice: 12000 },
         patch: { name: 'Beras Premium', referencePrice: 13000 },
       },
     });
@@ -121,6 +122,7 @@ describe('catalogue operation HTTP boundary', () => {
       SKU_ID,
       {
         rowVersion: '7',
+        base: { name: 'Beras', referencePrice: 12000 },
         patch: { name: 'Beras Premium', referencePrice: 13000 },
       },
     );
@@ -129,9 +131,25 @@ describe('catalogue operation HTTP boundary', () => {
 
   it.each([
     {
+      method: 'POST' as const,
+      url: '/v1/skus',
+      payload: {
+        skuNumber: '   ',
+        name: 'Beras',
+        referencePrice: 1,
+        openingStock: 0,
+        tracked: true,
+      },
+    },
+    {
       method: 'PATCH' as const,
       url: `/v1/skus/${SKU_ID}`,
       payload: { rowVersion: '01', patch: { name: 'Beras' } },
+    },
+    {
+      method: 'PATCH' as const,
+      url: `/v1/skus/${SKU_ID}`,
+      payload: { rowVersion: '1', patch: { name: 'Beras' } },
     },
     {
       method: 'PATCH' as const,
@@ -152,6 +170,46 @@ describe('catalogue operation HTTP boundary', () => {
       method: 'PATCH' as const,
       url: '/v1/templates/receipt',
       payload: { rowVersion: null, definition: {} },
+    },
+    {
+      method: 'PATCH' as const,
+      url: '/v1/templates/label',
+      payload: {
+        rowVersion: null,
+        base: null,
+        definition: {
+          medium: 'thermal',
+          widthMm: 50,
+          heightMm: 30,
+          columns: 1,
+          marginMm: 2,
+          gapMm: 1,
+          fontSize: 10,
+          alignment: 'center',
+          fields: ['qr', 'qr'],
+        },
+      },
+    },
+    {
+      method: 'PATCH' as const,
+      url: '/v1/templates/invoice',
+      payload: {
+        rowVersion: null,
+        base: null,
+        definition: {
+          widthMm: 210,
+          heightMm: 297,
+          fontSize: 10,
+          logoUrl: '',
+          bankAccount: '',
+          address: '',
+          phone: '',
+          elements: [
+            { id: 'logo', visible: true },
+            { id: 'logo', visible: false },
+          ],
+        },
+      },
     },
   ])('rejects invalid mutation $url', async ({ method, url, payload }) => {
     const { app, operations } = harness();
@@ -184,6 +242,7 @@ describe('catalogue operation HTTP boundary', () => {
       headers,
       payload: {
         rowVersion: null,
+        base: null,
         definition: {
           medium: 'thermal',
           widthMm: 50,
@@ -208,7 +267,7 @@ describe('catalogue operation HTTP boundary', () => {
     expect(operations.updateTemplate).toHaveBeenCalledWith(
       { deviceId: device.id, idempotencyKey: KEY },
       'label',
-      expect.objectContaining({ rowVersion: null }),
+      expect.objectContaining({ rowVersion: null, base: null }),
     );
     await app.close();
   });

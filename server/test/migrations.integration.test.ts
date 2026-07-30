@@ -139,9 +139,9 @@ describe('MariaDB migrations against isolated chu_test', () => {
       ['ch-core-schema-migrations'],
     );
 
-    expect(first.appliedVersions).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(first.appliedVersions).toEqual([1, 2, 3, 4, 5, 6, 7]);
     expect(second.appliedVersions).toEqual([]);
-    expect(Number(rows[0]?.migration_count)).toBe(6);
+    expect(Number(rows[0]?.migration_count)).toBe(7);
     expect(Number(lockRows[0]?.is_free)).toBe(1);
   });
 
@@ -174,9 +174,9 @@ describe('MariaDB migrations against isolated chu_test', () => {
       'SELECT COUNT(*) AS migration_count FROM schema_migrations',
     );
 
-    expect(recovered.appliedVersions).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(recovered.appliedVersions).toEqual([1, 2, 3, 4, 5, 6, 7]);
     expect(Number(finalTables[0]?.table_count)).toBe(1);
-    expect(Number(finalReceipts[0]?.migration_count)).toBe(6);
+    expect(Number(finalReceipts[0]?.migration_count)).toBe(7);
   });
 
   it('reruns version 2 after its first real ALTER TABLE committed', async () => {
@@ -193,8 +193,8 @@ describe('MariaDB migrations against isolated chu_test', () => {
 
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 1,
-      toVersion: 6,
-      appliedVersions: [2, 3, 4, 5, 6],
+      toVersion: 7,
+      appliedVersions: [2, 3, 4, 5, 6, 7],
     });
   });
 
@@ -236,12 +236,49 @@ describe('MariaDB migrations against isolated chu_test', () => {
     expect(Number(rows[0]?.device_count)).toBe(0);
   });
 
-  it('upgrades an original v1 schema through v6 and rejects a cross-Nota line', async () => {
+  it('rejects pre-existing active template duplicates before recording v7', async () => {
+    await applyOriginalVersionOne();
+    const firstId = randomUUID().replaceAll('-', '');
+    const secondId = randomUUID().replaceAll('-', '');
+    await pool.query(
+      `INSERT INTO templates
+         (id, template_kind, name, definition_json)
+       VALUES
+         (UNHEX(?), 'label', 'First', JSON_OBJECT()),
+         (UNHEX(?), 'label', 'Second', JSON_OBJECT())`,
+      [firstId, secondId],
+    );
+
+    await expect(runMigrations(pool)).rejects.toThrow();
+    const partial = await pool.query<
+      Array<{ latest_version: bigint; active_count: bigint }>
+    >(
+      `SELECT
+         (SELECT MAX(version) FROM schema_migrations) AS latest_version,
+         (SELECT COUNT(*) FROM templates
+          WHERE template_kind = 'label' AND archived_at IS NULL)
+           AS active_count`,
+    );
+    expect(Number(partial[0]?.latest_version)).toBe(6);
+    expect(Number(partial[0]?.active_count)).toBe(2);
+
+    await pool.query(
+      'UPDATE templates SET archived_at = UTC_TIMESTAMP(6) WHERE id = UNHEX(?)',
+      [secondId],
+    );
+    await expect(runMigrations(pool)).resolves.toEqual({
+      fromVersion: 6,
+      toVersion: 7,
+      appliedVersions: [7],
+    });
+  });
+
+  it('upgrades an original v1 schema through v7 and rejects a cross-Nota line', async () => {
     await applyOriginalVersionOne();
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 1,
-      toVersion: 6,
-      appliedVersions: [2, 3, 4, 5, 6],
+      toVersion: 7,
+      appliedVersions: [2, 3, 4, 5, 6, 7],
     });
     const deviceId = randomUUID().replaceAll('-', '');
     const notaAId = randomUUID().replaceAll('-', '');

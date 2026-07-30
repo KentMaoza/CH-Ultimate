@@ -70,11 +70,18 @@ export class CoreMutationCoordinator {
   }
 
   async updateSku(id: string, patch: Partial<Sku>): Promise<void> {
-    const rowVersion = this.state.requireSkuVersion(id);
+    const context = this.state.requireSkuWriteContext(id, patch);
     await this.command({
       method: 'PATCH',
       path: CORE_API_PATHS.sku(id),
-      body: { rowVersion, patch },
+      body: { ...context, patch },
+    });
+  }
+
+  updateSkuImage(id: string, imageHash: string): Promise<void> {
+    return this.updateSku(id, {
+      imageHash,
+      sourceImageUrl: null,
     });
   }
 
@@ -90,30 +97,32 @@ export class CoreMutationCoordinator {
     return this.updateSku(id, { archived });
   }
 
-  setLabelTemplate(template: LabelTemplate): Promise<void> {
-    return this.command({
+  async setLabelTemplate(template: LabelTemplate): Promise<void> {
+    const context = this.state.getTemplateWriteContext('label');
+    await this.command({
       method: 'PATCH',
       path: CORE_API_PATHS.template('label'),
       body: {
-        rowVersion: this.state.getTemplateVersion('label'),
+        ...context,
         definition: template,
       },
       coalesceKey: 'template:label',
       optimistic: { kind: 'label-template', template },
-    }).then(() => undefined);
+    });
   }
 
-  setInvoiceTemplate(template: InvoiceTemplate): Promise<void> {
-    return this.command({
+  async setInvoiceTemplate(template: InvoiceTemplate): Promise<void> {
+    const context = this.state.getTemplateWriteContext('invoice');
+    await this.command({
       method: 'PATCH',
       path: CORE_API_PATHS.template('invoice'),
       body: {
-        rowVersion: this.state.getTemplateVersion('invoice'),
+        ...context,
         definition: template,
       },
       coalesceKey: 'template:invoice',
       optimistic: { kind: 'invoice-template', template },
-    }).then(() => undefined);
+    });
   }
 
   async createNotaTransaction(): Promise<NotaTransaction> {

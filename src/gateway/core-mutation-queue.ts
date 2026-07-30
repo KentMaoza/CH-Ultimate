@@ -197,7 +197,11 @@ export class CoreMutationQueue {
     item: CoreOutboxItem,
     acknowledgement: CoreMutationAcknowledgement,
   ): Promise<void> {
-    this.state.recordMutationVersion(item.path, acknowledgement);
+    this.state.recordMutationVersion(
+      item.path,
+      acknowledgement,
+      item.optimistic,
+    );
     try {
       this.recordDurable(
         await this.envelopes.replaceOutbox((outbox) =>

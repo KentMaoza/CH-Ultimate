@@ -79,7 +79,7 @@ function appWithProtocol(protocol = createProtocol()) {
     app: buildApp({
       pool: {
         async query<T>() {
-          return [{ version: 6 }] as T;
+          return [{ version: 7 }] as T;
         },
       },
       protocol,

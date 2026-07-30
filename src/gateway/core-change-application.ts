@@ -48,6 +48,7 @@ function applySku(state: DemoState, change: CoreChange): DemoState {
     note: row.sourceNote ?? current?.note ?? '',
     imageUrl: current?.imageUrl ?? '',
     ...(row.imageHash ? { imageHash: row.imageHash } : {}),
+    sourceImageUrl: row.sourceImageUrl ?? null,
     ...(row.sourceCreatedAt
       ? { sourceCreatedAt: row.sourceCreatedAt }
       : {}),

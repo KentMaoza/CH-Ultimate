@@ -34,6 +34,7 @@ interface CatalogueImagePool extends ProtocolPool, SchemaQueryPool {}
 
 export interface CatalogueImageReadStorage {
   readImage(storagePath: string): Promise<Buffer>;
+  writeImage?(hash: string, bytes: Buffer): Promise<string>;
 }
 
 async function rollback(connection: ProtocolConnection): Promise<void> {
@@ -51,6 +52,47 @@ export class MariaDbCatalogueImageRepository
     private readonly pool: CatalogueImagePool,
     private readonly storage: CatalogueImageReadStorage,
   ) {}
+
+  async upload(input: {
+    bytes: Buffer;
+    mimeType: string;
+    width: number;
+    height: number;
+  }): Promise<{
+    hash: string;
+    mimeType: string;
+    byteSize: number;
+    width: number;
+    height: number;
+  }> {
+    if (!this.storage.writeImage) {
+      throw new Error('Image storage is not writable');
+    }
+    const hash = createHash('sha256').update(input.bytes).digest('hex');
+    const storagePath = await this.storage.writeImage(hash, input.bytes);
+    await this.pool.query(
+      `INSERT INTO image_assets
+         (content_hash, mime_type, byte_size, width, height, storage_path)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         content_hash = VALUES(content_hash)`,
+      [
+        Buffer.from(hash, 'hex'),
+        input.mimeType,
+        input.bytes.length,
+        input.width,
+        input.height,
+        storagePath,
+      ],
+    );
+    return {
+      hash,
+      mimeType: input.mimeType,
+      byteSize: input.bytes.length,
+      width: input.width,
+      height: input.height,
+    };
+  }
 
   async claimNext(): Promise<CatalogueImageJob | null> {
     const connection = await this.pool.getConnection();

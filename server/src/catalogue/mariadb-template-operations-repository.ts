@@ -4,6 +4,7 @@ import { databaseDate, hexToUuid } from '../auth/mariadb-row-utils.js';
 import type { IdempotentMutation, ProtocolConnection } from '../sync/idempotency.js';
 import {
   CatalogueConflictError,
+  CatalogueOperationError,
 } from './mariadb-sku-operations-repository.js';
 import {
   writeOperationAudit,
@@ -59,6 +60,13 @@ export class MariaDbTemplateOperationsRepository {
        FOR UPDATE`,
       [kind],
     );
+    if (rows.length > 1) {
+      throw new CatalogueOperationError(
+        'TEMPLATE_DUPLICATE_ACTIVE',
+        500,
+        `Multiple active ${kind} templates exist`,
+      );
+    }
     const current = rows[0];
     const currentVersion = current
       ? BigInt(String(current.row_version)).toString()
@@ -70,7 +78,7 @@ export class MariaDbTemplateOperationsRepository {
         entityId: current
           ? hexToUuid(current.id_hex)
           : this.dependencies.uuid(),
-        base: { rowVersion: input.rowVersion },
+        base: input.base,
         mine: input.definition,
         server: current
           ? {

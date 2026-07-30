@@ -16,6 +16,15 @@ const owner = {
   tokenKind: 'current' as const,
 };
 
+function png(width = 32, height = 24): Buffer {
+  const bytes = Buffer.alloc(24);
+  Buffer.from('89504e470d0a1a0a', 'hex').copy(bytes);
+  bytes.write('IHDR', 12, 'ascii');
+  bytes.writeUInt32BE(width, 16);
+  bytes.writeUInt32BE(height, 20);
+  return bytes;
+}
+
 function harness() {
   const validate = vi.fn(async () => ({
     importId: '33333333-3333-4333-8333-333333333333',
@@ -48,6 +57,13 @@ function harness() {
     bytes: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
     mimeType: 'image/png',
   }));
+  const upload = vi.fn(async () => ({
+    hash: 'c'.repeat(64),
+    mimeType: 'image/png',
+    byteSize: 24,
+    width: 32,
+    height: 24,
+  }));
   const identity = {
     bootstrapOwner: vi.fn(),
     authenticate: vi.fn(async (token: string) => {
@@ -66,17 +82,17 @@ function harness() {
     rotateDeviceToken: vi.fn(),
   };
   const app = buildApp({
-    pool: { query: async <T>() => [{ version: 6 }] as T },
+    pool: { query: async <T>() => [{ version: 7 }] as T },
     protocol: {
       identity,
       sync: { bootstrap: vi.fn(), changes: vi.fn() },
     },
     catalogue: {
       imports: { validate, commit },
-      images: { read },
+      images: { read, upload },
     },
   });
-  return { app, commit, read, validate };
+  return { app, commit, read, upload, validate };
 }
 
 describe('catalogue HTTP boundary', () => {
@@ -185,6 +201,83 @@ describe('catalogue HTTP boundary', () => {
     });
     expect(response.headers['cache-control']).toContain('private');
     expect(response.headers['x-content-type-options']).toBe('nosniff');
+    await app.close();
+  });
+
+  it('accepts only authenticated bounded images with matching MIME and magic bytes', async () => {
+    const { app, upload } = harness();
+    const bytes = png();
+    const payload = {
+      mimeType: 'image/png',
+      bytesBase64: bytes.toString('base64'),
+    };
+
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/v1/images',
+          payload,
+        })
+      ).statusCode,
+    ).toBe(401);
+    const accepted = await app.inject({
+      method: 'POST',
+      url: '/v1/images',
+      headers: { authorization: 'Bearer client-token' },
+      payload,
+    });
+    expect(accepted.statusCode).toBe(200);
+    expect(accepted.json()).toMatchObject({
+      hash: 'c'.repeat(64),
+      mimeType: 'image/png',
+      width: 32,
+      height: 24,
+    });
+    expect(upload).toHaveBeenCalledWith({
+      bytes,
+      mimeType: 'image/png',
+      width: 32,
+      height: 24,
+    });
+
+    for (const invalid of [
+      { mimeType: 'image/png', bytesBase64: 'not-base64' },
+      {
+        mimeType: 'image/jpeg',
+        bytesBase64: bytes.toString('base64'),
+      },
+      {
+        mimeType: 'text/html',
+        bytesBase64: Buffer.from('<html>').toString('base64'),
+      },
+    ]) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/v1/images',
+        headers: { authorization: 'Bearer client-token' },
+        payload: invalid,
+      });
+      expect(response.statusCode).toBeGreaterThanOrEqual(400);
+    }
+    expect(upload).toHaveBeenCalledOnce();
+    await app.close();
+  });
+
+  it('rejects an oversized image upload before storage', async () => {
+    const { app, upload } = harness();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/images',
+      headers: { authorization: 'Bearer client-token' },
+      payload: {
+        mimeType: 'image/png',
+        bytesBase64: Buffer.alloc(5 * 1024 * 1024 + 1).toString('base64'),
+      },
+    });
+
+    expect(response.statusCode).toBe(413);
+    expect(upload).not.toHaveBeenCalled();
     await app.close();
   });
 

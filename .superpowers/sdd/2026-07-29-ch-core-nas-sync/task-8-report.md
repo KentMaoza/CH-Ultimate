@@ -106,3 +106,87 @@ The root test run retains only the existing Vite CJS API deprecation warning.
 - `/Users/hamlet/Documents/CH Nota` was not accessed or modified.
 - Nota operations, offline/outbox expansion, pairing, packaging, and rollout
   remain outside Task 8.
+
+## Fix round 1/5 — reviewer closure
+
+This round supersedes the earlier “no migration” decision. All seven Important
+review findings and the safe minor findings are closed in the implementation:
+
+1. Identifier normalization now trims, applies NFKC, and lowercases using the
+   Indonesian locale. Renaming to an existing alias on the same SKU promotes
+   that row; a normalized-equivalent primary rename updates that row in place;
+   another SKU's identifier still rejects before writes.
+2. Versioned SKU and template mutations now send the actual canonical base
+   fields. Strict validation requires matching SKU base/patch keys and
+   consistent template version/base knowledge, so conflicts can show meaningful
+   base, mine, and server values.
+3. Unknown template version state is distinct from a confirmed absent template.
+   Cached/offline template writes fail closed until bootstrap. Restored template
+   outbox entries are rebased to the bootstrap version and persisted before
+   send; acknowledged optimistic templates become the next canonical base.
+4. Inventory image replacement is functional end to end. The clients accept a
+   bounded image data URL, native transports allow only the exact authenticated
+   upload route, CH Core validates base64, MIME, magic bytes, dimensions, and
+   size, private storage deduplicates by SHA-256, and the SKU update replaces
+   its image hash/source metadata.
+5. Inventory archive/restore now awaits the gateway write and reports success
+   or rejection. A failed write no longer appears successful or silently
+   disappears from operator feedback.
+6. A guarded real-MariaDB suite was added for concurrent signed stock deltas,
+   lost-response replay counts, identifier-conflict rollback, and duplicate
+   active-template migration failure/recovery. It refuses any database name
+   except exactly `chu_test`.
+7. Migration `007_active_template_kind.sql` adds a generated active-kind column
+   plus a unique index, making one active template per kind a durable database
+   invariant. The repository also explicitly rejects pre-existing duplicate
+   active rows instead of selecting the first.
+
+Safe minor closure:
+
+- Whitespace-only identifiers are rejected.
+- Duplicate label fields and duplicate invoice element IDs are rejected.
+- The stale bootstrap mapping comment now describes stock and price history.
+- The former dense SKU repository is split into create, update, identifier,
+  and payload modules.
+- Bootstrap outbox rebasing avoids an unnecessary second state publication
+  when no versioned template entry changed.
+
+### Fix-round TDD evidence
+
+- Identifier repository: RED 2/8, then GREEN 8/8.
+- Strict conflict/template contracts: GREEN 23/23 server and 16/16 gateway
+  focused checks after their initial contract failures.
+- Template knowledge and durable bootstrap rebase: GREEN 22/22.
+- Image route/storage: GREEN 33/33; SKU/route behavior: GREEN 21/21; gateway
+  mapping/upload/UI: GREEN 37/37; Electron transport: GREEN 12/12.
+- Archive/restore UI: RED 2/14, then GREEN 14/14.
+- Migration/template invariant: RED 4/28, then GREEN 28/28.
+- Full client verification exposed one duplicate bootstrap notification; the
+  focused bootstrap tests then passed 23/23 and the repeated full suite passed.
+
+### Fresh fix-round verification
+
+| Gate | Result |
+| --- | --- |
+| `npm --prefix server test` | PASS — 30 files; 206 passed, 1 intentional acceptance skip |
+| `npm --prefix server run typecheck` | PASS, including guarded integration sources |
+| `npm --prefix server run build` | PASS |
+| `npm run verify` | PASS — 53 files, 397 tests |
+| `npm run mobile:build` | PASS |
+| `npm run package` | PASS — Electron arm64 package |
+| Android `./gradlew test lint` with Android Studio JBR and local SDK | PASS — 469 tasks |
+| `git diff --check` | PASS |
+
+`CH_CORE_TEST_DATABASE_URL` remains unset. Therefore the new guarded MariaDB
+tests were compiled but not executed, and no live database claim is made.
+
+`npm run test:e2e` was also run and all eight legacy demo-path tests timed out
+while waiting for mock business screens. The packaged client now correctly
+starts behind CH Core connection/pairing instead of silently selecting demo
+data; that existing E2E harness does not provision a Core service or identity.
+This is recorded as a harness/environment blocker, not worked around by
+weakening the production fail-closed boundary.
+
+No NAS, DSM, SMB, QuickConnect, Tailscale, deployment setting, or
+`/Users/hamlet/Documents/CH Nota` content was accessed or changed in this
+fix round. Task 9 was not started.

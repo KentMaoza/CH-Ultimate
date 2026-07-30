@@ -24,6 +24,7 @@ import {
   type CatalogueImageJob,
   type CatalogueImageRepository,
 } from '../src/catalogue/image-worker.js';
+import { MariaDbCatalogueImageRepository } from '../src/catalogue/mariadb-image-repository.js';
 
 const roots: string[] = [];
 
@@ -297,6 +298,52 @@ describe('content-addressed catalogue image storage', () => {
     await expect(storage.readImage('../secret')).rejects.toMatchObject({
       code: 'INVALID_STORAGE_PATH',
     });
+  });
+
+  it('deduplicates uploaded image metadata by content hash', async () => {
+    const bytes = png();
+    const hash = createHash('sha256').update(bytes).digest('hex');
+    const storage = {
+      readImage: vi.fn(),
+      writeImage: vi.fn(async () =>
+        `images/sha256/${hash.slice(0, 2)}/${hash}.bin`),
+    };
+    const query = vi.fn(
+      async (_sql: string, _values: readonly unknown[] = []) => [],
+    );
+    const repository = new MariaDbCatalogueImageRepository(
+      {
+        query,
+      } as never,
+      storage,
+    );
+
+    const first = await repository.upload({
+      bytes,
+      mimeType: 'image/png',
+      width: 32,
+      height: 24,
+    });
+    const replay = await repository.upload({
+      bytes,
+      mimeType: 'image/png',
+      width: 32,
+      height: 24,
+    });
+
+    expect(first).toEqual({
+      hash,
+      mimeType: 'image/png',
+      byteSize: bytes.length,
+      width: 32,
+      height: 24,
+    });
+    expect(replay).toEqual(first);
+    expect(storage.writeImage).toHaveBeenCalledTimes(2);
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(query.mock.calls[0]?.[0]).toContain(
+      'ON DUPLICATE KEY UPDATE',
+    );
   });
 });
 

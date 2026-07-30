@@ -60,6 +60,15 @@ export interface CoreOperationsGateway extends OperationsGateway {
   dispose(): void;
 }
 
+export class CoreGatewayNetworkBlockedError extends Error {
+  readonly code = 'UPGRADE_REQUIRED';
+
+  constructor() {
+    super('Cache aplikasi tidak kompatibel. Jaringan CH Core dinonaktifkan.');
+    this.name = 'CoreGatewayNetworkBlockedError';
+  }
+}
+
 function parseImageDataUrl(
   value: string | undefined,
 ): { mimeType: string; bytesBase64: string } | null {
@@ -180,11 +189,12 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   dispose = (): void => this.polling.dispose();
   flushNota = async (id: string): Promise<void> => {
     if (this.hasLocalNota(id)) return;
+    this.requireNetworkAllowed();
     await this.mutations.flushNota(id);
   };
   retryPending = async (): Promise<void> => {
     const phase = this.state.getSyncSnapshot().phase;
-    if (phase === 'upgrade-required') return;
+    this.requireNetworkAllowed();
     if (phase === 'revoked') {
       await this.polling.retryPending();
       return;
@@ -333,6 +343,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
 
   async loadSkuImage(sku: Sku): Promise<string> {
     if (!sku.imageHash) return sku.imageUrl;
+    this.requireNetworkAllowed();
     const response = await this.transport.request({
       method: 'GET',
       path: CORE_API_PATHS.image(sku.imageHash),
@@ -551,6 +562,12 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
       );
     }
     throw new Error('Status sinkronisasi belum mengizinkan perubahan.');
+  }
+
+  private requireNetworkAllowed(): void {
+    if (this.state.getSyncSnapshot().phase === 'upgrade-required') {
+      throw new CoreGatewayNetworkBlockedError();
+    }
   }
 
   private offlineBlocked<T>(detail?: unknown): Promise<T> {

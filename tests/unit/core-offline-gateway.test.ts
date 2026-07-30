@@ -7,6 +7,7 @@ import {
 import { createCoreOperationsGateway } from '../../src/gateway/core-operations-gateway';
 import { CoreDeferredOutbox } from '../../src/gateway/core-outbox';
 import {
+  NOTA_ID,
   SKU_ID,
   MemoryStorage,
   ScriptedTransport,
@@ -25,6 +26,23 @@ function cachedState() {
     ),
     serverRevision: '7',
     outbox: [],
+  };
+}
+
+function pendingV1NotaCache() {
+  return {
+    ...cachedState(),
+    outbox: [
+      {
+        id: '20202020-2020-4020-8020-202020202020',
+        idempotencyKey: '20202020-2020-4020-8020-202020202020',
+        method: 'PATCH' as const,
+        path: `/v1/notas/${NOTA_ID}/header`,
+        body: { patch: { customerName: 'Jangan pindahkan' } },
+        createdAt: '2026-07-30T01:00:00.000Z',
+        notaId: NOTA_ID,
+      },
+    ],
   };
 }
 
@@ -52,22 +70,7 @@ async function settleUntil(predicate: () => boolean): Promise<void> {
 
 describe('Core offline permission matrix', () => {
   it('fails closed visibly without rewriting or retrying a v1 cache that owns pending work', async () => {
-    const pendingV1 = {
-      cacheVersion: 1 as const,
-      state: cachedState().state,
-      serverRevision: '7',
-      outbox: [
-        {
-          id: '20202020-2020-4020-8020-202020202020',
-          idempotencyKey: '20202020-2020-4020-8020-202020202020',
-          method: 'PATCH' as const,
-          path: `/v1/skus/${SKU_ID}`,
-          body: { patch: { name: 'Jangan pindahkan' } },
-          createdAt: '2026-07-30T01:00:00.000Z',
-        },
-      ],
-    };
-    const storage = new MemoryStorage(pendingV1);
+    const storage = new MemoryStorage(pendingV1NotaCache());
     const before = JSON.stringify(storage.value);
     const transport = new ScriptedTransport();
     const gateway = createCoreOperationsGateway(
@@ -86,12 +89,41 @@ describe('Core offline permission matrix', () => {
     expect(storage.saves).toEqual([]);
     expect(transport.requests).toEqual([]);
 
-    await expect(gateway.retryPending()).resolves.toBeUndefined();
+    await expect(gateway.flushNota(NOTA_ID)).rejects.toMatchObject({
+      name: 'CoreGatewayNetworkBlockedError',
+      code: 'UPGRADE_REQUIRED',
+    });
+    await expect(gateway.retryPending()).rejects.toMatchObject({
+      name: 'CoreGatewayNetworkBlockedError',
+      code: 'UPGRADE_REQUIRED',
+    });
 
     expect(gateway.getSyncSnapshot()).toMatchObject({
       phase: 'upgrade-required',
       message: 'Cache aplikasi tidak kompatibel.',
     });
+    expect(JSON.stringify(storage.value)).toBe(before);
+    expect(storage.saves).toEqual([]);
+    expect(transport.requests).toEqual([]);
+  });
+
+  it('does not fetch a cached SKU image after v1 ownership validation fails', async () => {
+    const storage = new MemoryStorage(pendingV1NotaCache());
+    const before = JSON.stringify(storage.value);
+    const transport = new ScriptedTransport();
+    const gateway = createCoreOperationsGateway(
+      transport,
+      storage,
+      new TestClock(),
+    );
+    await gateway.initialize();
+    const sku = gateway.getSnapshot().skus[0]!;
+
+    await expect(gateway.loadSkuImage(sku)).rejects.toMatchObject({
+      name: 'CoreGatewayNetworkBlockedError',
+      code: 'UPGRADE_REQUIRED',
+    });
+
     expect(JSON.stringify(storage.value)).toBe(before);
     expect(storage.saves).toEqual([]);
     expect(transport.requests).toEqual([]);

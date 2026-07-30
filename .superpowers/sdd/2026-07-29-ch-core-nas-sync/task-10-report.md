@@ -10,8 +10,8 @@ signed stock delta with a required reason and captured SKU snapshot. All other
 shared writes fail closed while offline. A successful authenticated refresh is
 required before either command can transmit.
 
-The implementation and first reviewer fix rounds are complete. Reviewer fix
-round 3 addresses its one reported finding and is pending re-review. The root,
+The implementation and reviewer fix rounds are complete. Reviewer fix round 4
+addresses its one reported finding and is pending re-review. The root,
 server-unit, mobile, package, and Android gates pass. Two
 environmental/inherited gates remain:
 
@@ -36,9 +36,10 @@ claimed.
   recoverable work. Because those legacy formats were not native-bound, any v1
   normal outbox or v2 normal/deferred outbox, provisional Nota, conflict, or
   active quarantine fails closed visibly without rewriting or transmitting.
-  Retry remains inert in that upgrade-required state. Invalid v3 data and a
-  native UUID mismatch also fail closed visibly without rewriting the caller's
-  value.
+  Retry, Nota flush, and authenticated image fetch reject with a typed
+  `UPGRADE_REQUIRED` network-blocked error in that state. Invalid v3 data and
+  a native UUID mismatch also fail closed visibly without rewriting the
+  caller's value.
 - Added a FIFO deferred outbox that persists the operation UUID, exact payload,
   and send state before transport. A Nota snapshot may be replaced only before
   its first send while retaining the same operation UUID.
@@ -164,11 +165,18 @@ stays below 500 lines.
     442 tests. All three findings are addressed pending re-review.
 13. Reviewer fix round 3 added RED coverage for an ownership-less v1 pending
     outbox. It proves visible initialization refusal, byte-identical retained
-    storage, zero saves/requests, and an inert retry. The shared legacy-work
+    storage, zero saves/requests, and a blocked retry. The shared legacy-work
     guard made the two-file slice pass 30 tests; updating the prior clean-cache
     publication fixture made the three-file focused set pass 42 tests. The
     final root suite passed 444 tests. The one finding is addressed pending
     re-review.
+14. Reviewer fix round 4 audited every public transport, polling, mutation,
+    and deferred-pump entry. RED proved that Nota flush could hang and cached
+    image loading could reach transport after v1 ownership refusal. One typed
+    central guard now protects the three bypasses: flush, retry, and image
+    fetch. Normal bootstrap and revoked-device reapproval remain unchanged.
+    The focused set passed 40 tests and the final root suite passed 445 tests.
+    The one finding is addressed pending re-review.
 
 ## Exact MariaDB integration source
 
@@ -190,7 +198,7 @@ because `CH_CORE_TEST_DATABASE_URL` is absent.
 
 | Gate | Result |
 | --- | --- |
-| `npm run verify` | PASS — 56 files, 444 tests |
+| `npm run verify` | PASS — 56 files, 445 tests |
 | `npm run test:mobile` | PASS — 9 files, 84 tests |
 | `npm run mobile:build` | PASS — 589 modules |
 | `npm run package` | PASS — Electron arm64 package |

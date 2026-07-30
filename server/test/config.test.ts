@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { loadServerConfig } from '../src/config.js';
+import {
+  APPROVED_INITIAL_CATALOGUE_SHA256,
+  loadServerConfig,
+} from '../src/config.js';
 
 describe('loadServerConfig', () => {
   it('uses the fixed API and pool defaults for a valid MariaDB URL', () => {
@@ -16,6 +19,8 @@ describe('loadServerConfig', () => {
         'mariadb://chu_app:secret@192.0.2.10:3306/chu_test',
       dbPoolMax: 4,
       privateStorageRoot: '/var/lib/ch-core/private',
+      initialCatalogueSha256:
+        '64fcb734d84462060f76fa7f27495ee1e2dff6201ad2d7a2d13d5c6c27923817',
     });
   });
 
@@ -78,8 +83,8 @@ describe('loadServerConfig', () => {
     ).toThrow('Invalid CH Core server configuration');
   });
 
-  it('accepts only an absolute private storage root and optional catalogue hash', () => {
-    const hash = 'a'.repeat(64);
+  it('accepts only an absolute private storage root and the approved catalogue hash', () => {
+    const hash = APPROVED_INITIAL_CATALOGUE_SHA256;
     const config = loadServerConfig({
       CH_CORE_DATABASE_URL:
         'mariadb://chu_app:secret@192.0.2.10:3306/chu_test',
@@ -103,6 +108,13 @@ describe('loadServerConfig', () => {
         CH_CORE_DATABASE_URL:
           'mariadb://chu_app:secret@192.0.2.10:3306/chu_test',
         CH_CORE_INITIAL_CATALOGUE_SHA256: 'not-a-hash',
+      }),
+    ).toThrow('Invalid CH Core server configuration');
+    expect(() =>
+      loadServerConfig({
+        CH_CORE_DATABASE_URL:
+          'mariadb://chu_app:secret@192.0.2.10:3306/chu_test',
+        CH_CORE_INITIAL_CATALOGUE_SHA256: 'a'.repeat(64),
       }),
     ).toThrow('Invalid CH Core server configuration');
   });

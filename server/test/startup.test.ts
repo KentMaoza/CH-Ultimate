@@ -6,6 +6,7 @@ import {
   type RuntimePool,
   type StartupDependencies,
 } from '../src/index.js';
+import { APPROVED_INITIAL_CATALOGUE_SHA256 } from '../src/config.js';
 
 interface StartupScenario {
   migrationError?: Error;
@@ -54,6 +55,8 @@ function startupScenario(scenario: StartupScenario): {
           databaseUrl: 'mariadb://user:password@db.internal/chu_test',
           dbPoolMax: 4,
           privateStorageRoot: '/private/ch-core',
+          initialCatalogueSha256:
+            APPROVED_INITIAL_CATALOGUE_SHA256,
         };
       },
       createPool() {
@@ -118,6 +121,7 @@ describe('startServer', () => {
       databaseUrl: 'mariadb://user:password@db.internal/chu_test',
       dbPoolMax: 4,
       privateStorageRoot: '/private/ch-core',
+      initialCatalogueSha256: APPROVED_INITIAL_CATALOGUE_SHA256,
       ownerBootstrapSecret: 'b'.repeat(32),
     });
     deps.buildApp = (buildDependencies) => {

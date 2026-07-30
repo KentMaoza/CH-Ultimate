@@ -66,7 +66,7 @@ function harness() {
     rotateDeviceToken: vi.fn(),
   };
   const app = buildApp({
-    pool: { query: async <T>() => [{ version: 5 }] as T },
+    pool: { query: async <T>() => [{ version: 6 }] as T },
     protocol: {
       identity,
       sync: { bootstrap: vi.fn(), changes: vi.fn() },

@@ -98,6 +98,9 @@ class ConcurrentReceiptPool implements ProtocolPool {
               : []
           ) as T;
         }
+        if (sql.includes('FROM business_write_lock')) {
+          return [{ singleton_id: 1 }] as T;
+        }
         if (sql.startsWith('INSERT INTO business_probe')) {
           this.businessCalls += 1;
           this.firstBusiness.resolve();

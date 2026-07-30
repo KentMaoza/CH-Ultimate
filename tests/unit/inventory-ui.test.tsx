@@ -265,3 +265,18 @@ test('loads an imported SKU image through the gateway cache boundary', async () 
     expect.objectContaining({ imageHash: 'a'.repeat(64) }),
   );
 });
+
+test('hides the entire import flow when the authenticated device is not an owner', () => {
+  const gateway = new MockOperationsGateway();
+  Object.assign(gateway.capabilities, {
+    canImportInitialCatalogue: false,
+    canStageInitialCatalogue: false,
+  });
+
+  render(<App gateway={gateway} />);
+
+  expect(screen.queryByLabelText('Import XLSX')).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Import XLSX' }),
+  ).not.toBeInTheDocument();
+});

@@ -20,6 +20,7 @@ import org.json.JSONTokener;
 final class CoreApiClient {
     private static final int TIMEOUT_MS = 8_000;
     private static final int MAX_RESPONSE_BYTES = 2_000_000;
+    private static final int MAX_BOOTSTRAP_RESPONSE_BYTES = 5_000_000;
     private static final int MAX_IMAGE_RESPONSE_BYTES = 7_100_000;
     private final Context context;
     private final CoreDeploymentConfig config;
@@ -86,7 +87,7 @@ final class CoreApiClient {
             Object responseBody = readJson(
                 stream,
                 connection.getContentType(),
-                maximumResponseBytes(path)
+                path
             );
             return new Response(status, responseBody);
         } catch (CoreSecurityException error) {
@@ -140,10 +141,10 @@ final class CoreApiClient {
         return context;
     }
 
-    private Object readJson(
+    static Object readJson(
         InputStream input,
         String contentType,
-        int maximumBytes
+        String path
     ) throws Exception {
         if (input == null) return JSONObject.NULL;
         if (
@@ -156,7 +157,28 @@ final class CoreApiClient {
                 "Respons CH Core tidak valid."
             );
         }
-        byte[] bytes;
+        byte[] bytes = readBoundedResponse(input, path);
+        if (bytes.length == 0) return JSONObject.NULL;
+        Object parsed = new JSONTokener(
+            new String(bytes, StandardCharsets.UTF_8)
+        ).nextValue();
+        if (
+            !(parsed instanceof JSONObject) &&
+            !(parsed instanceof JSONArray)
+        ) {
+            throw new CoreSecurityException(
+                "Respons CH Core tidak valid."
+            );
+        }
+        return parsed;
+    }
+
+    static byte[] readBoundedResponse(
+        InputStream input,
+        String path
+    ) throws Exception {
+        if (input == null) return new byte[0];
+        int maximumBytes = maximumResponseBytes(path);
         try (
             InputStream stream = input;
             ByteArrayOutputStream output = new ByteArrayOutputStream()
@@ -173,24 +195,14 @@ final class CoreApiClient {
                 }
                 output.write(buffer, 0, count);
             }
-            bytes = output.toByteArray();
+            return output.toByteArray();
         }
-        if (bytes.length == 0) return JSONObject.NULL;
-        Object parsed = new JSONTokener(
-            new String(bytes, StandardCharsets.UTF_8)
-        ).nextValue();
-        if (
-            !(parsed instanceof JSONObject) &&
-            !(parsed instanceof JSONArray)
-        ) {
-            throw new CoreSecurityException(
-                "Respons CH Core tidak valid."
-            );
-        }
-        return parsed;
     }
 
     private static int maximumResponseBytes(String path) {
+        if ("/v1/bootstrap".equals(path)) {
+            return MAX_BOOTSTRAP_RESPONSE_BYTES;
+        }
         if (path != null && path.matches("^/v1/images/[0-9a-f]{64}$")) {
             return MAX_IMAGE_RESPONSE_BYTES;
         }

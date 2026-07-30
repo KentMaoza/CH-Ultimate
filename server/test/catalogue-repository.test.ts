@@ -73,6 +73,7 @@ type QueryResult = unknown;
 function commitHarness(options: {
   lockedStatus?: 'staged' | 'committed';
   liveTransactions?: boolean;
+  existingCatalogue?: boolean;
   failOn?: RegExp;
 } = {}) {
   const events: string[] = [];
@@ -105,6 +106,9 @@ function commitHarness(options: {
       const compact = sql.replace(/\s+/g, ' ').trim();
       queries.push({ sql: compact, values });
       if (options.failOn?.test(compact)) throw new Error('database failed');
+      if (compact.includes('FROM business_write_lock')) {
+        return [{ singleton_id: 1 }] as T;
+      }
       if (compact.includes('FROM imports') && compact.includes('FOR UPDATE')) {
         return [
           {
@@ -124,7 +128,9 @@ function commitHarness(options: {
         ] as T;
       }
       if (compact.includes('AS has_existing_catalogue')) {
-        return [{ has_existing_catalogue: 0 }] as T;
+        return [
+          { has_existing_catalogue: options.existingCatalogue ? 1 : 0 },
+        ] as T;
       }
       return { affectedRows: 1 } as T;
     },
@@ -174,6 +180,38 @@ describe('MariaDB catalogue repository', () => {
         record.stagedPath,
       ]),
     );
+  });
+
+  it('refreshes an expired stage and lists expired byte paths without deleting import provenance', async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ affectedRows: 1 })
+      .mockResolvedValueOnce([
+        { staged_path: record.stagedPath },
+        { staged_path: 'imports/staged/committed.xlsx' },
+      ]);
+    const repository = new MariaDbCatalogueRepository({ query } as never);
+    const refreshed = {
+      ...record,
+      sourceFileName: 'catalogue-refresh.xlsx',
+      expiresAt: '2026-08-01T01:00:00.000Z',
+    };
+
+    await expect(repository.refreshStage(refreshed)).resolves.toEqual(
+      refreshed,
+    );
+    await expect(
+      repository.listExpiredStagePaths(
+        new Date('2026-08-02T00:00:00.000Z'),
+      ),
+    ).resolves.toEqual([
+      record.stagedPath,
+      'imports/staged/committed.xlsx',
+    ]);
+
+    expect(query.mock.calls[0]?.[0]).toContain("status = 'staged'");
+    expect(query.mock.calls[1]?.[0]).toContain('WHERE expires_at <= ?');
+    expect(query.mock.calls[1]?.[0]).not.toContain("status = 'staged'");
   });
 
   it('atomically writes SKU provenance, aliases, stock, price, image job, audit, and changes', async () => {
@@ -235,6 +273,18 @@ describe('MariaDB catalogue repository', () => {
         sql.startsWith('UPDATE imports SET status ='),
       ),
     ).toBe(true);
+    const lockIndex = queries.findIndex(({ sql }) =>
+      sql.includes('FROM business_write_lock'),
+    );
+    const liveCheckIndex = queries.findIndex(({ sql }) =>
+      sql.includes('AS has_live_transactions'),
+    );
+    const firstWriteIndex = queries.findIndex(({ sql }) =>
+      sql.startsWith('INSERT INTO skus'),
+    );
+    expect(lockIndex).toBeGreaterThanOrEqual(0);
+    expect(lockIndex).toBeLessThan(liveCheckIndex);
+    expect(lockIndex).toBeLessThan(firstWriteIndex);
   });
 
   it('returns a locked committed result as an idempotent replay', async () => {
@@ -291,5 +341,38 @@ describe('MariaDB catalogue repository', () => {
       ),
     ).rejects.toThrow('database failed');
     expect(events).toEqual(['begin', 'rollback', 'release']);
+  });
+
+  it('forces stale clients to bootstrap before publishing replacement rows', async () => {
+    const { queries, repository } = commitHarness({
+      existingCatalogue: true,
+    });
+
+    await repository.commit(
+      record,
+      workbook,
+      new Date('2026-07-30T02:00:00.000Z'),
+    );
+
+    const deleteIndex = queries.findIndex(
+      ({ sql }) => sql === 'DELETE FROM change_log',
+    );
+    const epochIndex = queries.findIndex(
+      ({ sql, values }) =>
+        sql.startsWith('INSERT INTO change_log') &&
+        values[0] === 'catalogue_epoch',
+    );
+    const skuInsertIndex = queries.findIndex(({ sql }) =>
+      sql.startsWith('INSERT INTO skus'),
+    );
+    expect(deleteIndex).toBeGreaterThanOrEqual(0);
+    expect(epochIndex).toBeGreaterThan(deleteIndex);
+    expect(epochIndex).toBeLessThan(skuInsertIndex);
+    expect(queries[epochIndex]?.values).toEqual([
+      'catalogue_epoch',
+      importId,
+      JSON.stringify({ importId }),
+      new Date('2026-07-30T02:00:00.000Z'),
+    ]);
   });
 });

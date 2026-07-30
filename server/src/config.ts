@@ -2,6 +2,9 @@ import { isAbsolute, resolve } from 'node:path';
 
 import { z } from 'zod';
 
+export const APPROVED_INITIAL_CATALOGUE_SHA256 =
+  '64fcb734d84462060f76fa7f27495ee1e2dff6201ad2d7a2d13d5c6c27923817';
+
 const databaseUrl = z.string().min(1).refine((value) => {
   try {
     const parsed = new URL(value);
@@ -32,9 +35,8 @@ const environmentSchema = z.object({
     )
     .default('/var/lib/ch-core/private'),
   CH_CORE_INITIAL_CATALOGUE_SHA256: z
-    .string()
-    .regex(/^[0-9a-f]{64}$/)
-    .optional(),
+    .literal(APPROVED_INITIAL_CATALOGUE_SHA256)
+    .default(APPROVED_INITIAL_CATALOGUE_SHA256),
   CH_CORE_OWNER_BOOTSTRAP_SECRET: z.preprocess(
     (value) => (value === '' ? undefined : value),
     z
@@ -50,7 +52,7 @@ export interface ServerConfig {
   databaseUrl: string;
   dbPoolMax: number;
   privateStorageRoot: string;
-  initialCatalogueSha256?: string;
+  initialCatalogueSha256: string;
   ownerBootstrapSecret?: string;
 }
 
@@ -68,12 +70,8 @@ export function loadServerConfig(
     databaseUrl: result.data.CH_CORE_DATABASE_URL,
     dbPoolMax: result.data.CH_CORE_DB_POOL_MAX,
     privateStorageRoot: result.data.CH_CORE_PRIVATE_STORAGE_ROOT,
-    ...(result.data.CH_CORE_INITIAL_CATALOGUE_SHA256 === undefined
-      ? {}
-      : {
-          initialCatalogueSha256:
-            result.data.CH_CORE_INITIAL_CATALOGUE_SHA256,
-        }),
+    initialCatalogueSha256:
+      result.data.CH_CORE_INITIAL_CATALOGUE_SHA256,
     ...(result.data.CH_CORE_OWNER_BOOTSTRAP_SECRET === undefined
       ? {}
       : {

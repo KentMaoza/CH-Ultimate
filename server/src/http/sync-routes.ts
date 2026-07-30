@@ -14,8 +14,11 @@ export function registerSyncRoutes(
 ): void {
   app.get('/v1/bootstrap', async (request) => {
     requireEmptyQuery(request.query);
-    await authenticateRequest(services.identity, request);
-    return services.sync.bootstrap();
+    const authenticated = await authenticateRequest(services.identity, request);
+    return {
+      ...(await services.sync.bootstrap()),
+      deviceRole: authenticated.device.role,
+    };
   });
 
   app.get('/v1/changes', async (request) => {

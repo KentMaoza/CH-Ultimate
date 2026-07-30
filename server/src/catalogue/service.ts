@@ -60,12 +60,15 @@ export interface CatalogueValidationResult {
 export interface PrivateCatalogueStorage {
   writeStaged(sha256: string, bytes: Buffer): Promise<string>;
   readStaged(stagedPath: string): Promise<Buffer>;
+  deleteStaged(stagedPath: string): Promise<void>;
 }
 
 export interface CatalogueRepository {
   findByHash(sha256: string): Promise<CatalogueImportRecord | null>;
   findById(id: string): Promise<CatalogueImportRecord | null>;
   createStage(record: CatalogueImportRecord): Promise<CatalogueImportRecord>;
+  refreshStage(record: CatalogueImportRecord): Promise<CatalogueImportRecord>;
+  listExpiredStagePaths(expiredAt: Date): Promise<string[]>;
   commit(
     record: CatalogueImportRecord,
     workbook: CatalogueWorkbook,
@@ -78,7 +81,7 @@ export interface CatalogueServiceOptions {
   storage: PrivateCatalogueStorage;
   now?: () => Date;
   randomUuid?: () => string;
-  expectedWorkbookSha256?: string;
+  expectedWorkbookSha256: string;
 }
 
 function requireOwner(device: CatalogueDevice): void {
@@ -129,7 +132,6 @@ export class CatalogueService {
     this.now = options.now ?? (() => new Date());
     this.randomUuid = options.randomUuid ?? randomUUID;
     if (
-      options.expectedWorkbookSha256 !== undefined &&
       !SHA256_PATTERN.test(options.expectedWorkbookSha256)
     ) {
       throw new Error('Expected workbook SHA-256 is invalid');
@@ -144,7 +146,6 @@ export class CatalogueService {
     const sourceFileName = requireSourceFileName(input.fileName);
     const sha256 = workbookHash(input.bytes);
     if (
-      this.options.expectedWorkbookSha256 !== undefined &&
       sha256 !== this.options.expectedWorkbookSha256
     ) {
       throw new CatalogueError(
@@ -154,14 +155,41 @@ export class CatalogueService {
       );
     }
     const existing = await this.options.repository.findByHash(sha256);
-    if (existing) return publicStage(existing);
-
+    const now = this.now();
+    if (
+      existing &&
+      (existing.status === 'committed' ||
+        new Date(existing.expiresAt).getTime() > now.getTime())
+    ) {
+      return publicStage(existing);
+    }
     const workbook = await parseCatalogueWorkbook(input.bytes);
+    if (existing) {
+      await this.options.storage.deleteStaged(existing.stagedPath);
+      const stagedPath = await this.options.storage.writeStaged(
+        sha256,
+        input.bytes,
+      );
+      const refreshed: CatalogueImportRecord = {
+        ...existing,
+        sourceFileName,
+        stagedPath,
+        status: 'staged',
+        preview: workbook.preview,
+        createdByDeviceId: device.id,
+        createdAt: now.toISOString(),
+        expiresAt: new Date(now.getTime() + STAGE_TTL_MS).toISOString(),
+        committedAt: null,
+        result: null,
+      };
+      return publicStage(
+        await this.options.repository.refreshStage(refreshed),
+      );
+    }
     const stagedPath = await this.options.storage.writeStaged(
       sha256,
       input.bytes,
     );
-    const createdAt = this.now();
     const record: CatalogueImportRecord = {
       id: this.randomUuid(),
       workbookSha256: sha256,
@@ -170,8 +198,8 @@ export class CatalogueService {
       status: 'staged',
       preview: workbook.preview,
       createdByDeviceId: device.id,
-      createdAt: createdAt.toISOString(),
-      expiresAt: new Date(createdAt.getTime() + STAGE_TTL_MS).toISOString(),
+      createdAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + STAGE_TTL_MS).toISOString(),
       committedAt: null,
       result: null,
     };
@@ -198,6 +226,7 @@ export class CatalogueService {
     }
     const now = this.now();
     if (new Date(record.expiresAt).getTime() <= now.getTime()) {
+      await this.options.storage.deleteStaged(record.stagedPath);
       throw new CatalogueError('IMPORT_EXPIRED', 410, 'Tahap import telah kedaluwarsa.');
     }
     const bytes = await this.options.storage.readStaged(record.stagedPath);
@@ -210,5 +239,15 @@ export class CatalogueService {
     }
     const workbook = await parseCatalogueWorkbook(bytes);
     return this.options.repository.commit(record, workbook, now);
+  }
+
+  async purgeExpiredStagedBytes(): Promise<number> {
+    const paths = await this.options.repository.listExpiredStagePaths(
+      this.now(),
+    );
+    for (const path of paths) {
+      await this.options.storage.deleteStaged(path);
+    }
+    return paths.length;
   }
 }

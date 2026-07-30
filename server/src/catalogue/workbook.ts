@@ -5,11 +5,13 @@ import {
   assertSafeXlsxArchive,
   CatalogueValidationError,
 } from './xlsx-archive.js';
+import { assertSafeXlsxPackage } from './xlsx-package-policy.js';
 
 export {
   assertSafeXlsxArchive,
   CatalogueValidationError,
 } from './xlsx-archive.js';
+export { assertSafeXlsxPackage } from './xlsx-package-policy.js';
 
 export interface CataloguePriceMismatch {
   rowNumber: number;
@@ -71,9 +73,59 @@ function cellText(value: ExcelJS.CellValue): string {
   return String(value).trim();
 }
 
-function integer(value: ExcelJS.CellValue): number {
-  const parsed = Number(cellText(value).replace(/[^\d.-]/g, ''));
-  return Number.isSafeInteger(parsed) ? parsed : 0;
+function integer(
+  value: ExcelJS.CellValue,
+  field: string,
+  rowNumber: number,
+): number {
+  if (typeof value === 'number') {
+    if (Number.isSafeInteger(value)) return value;
+  } else if (typeof value === 'string') {
+    const text = value.trim();
+    if (/^-?\d+$/.test(text)) {
+      const parsed = BigInt(text);
+      if (
+        parsed >= BigInt(Number.MIN_SAFE_INTEGER) &&
+        parsed <= BigInt(Number.MAX_SAFE_INTEGER)
+      ) {
+        return Number(parsed);
+      }
+    }
+  }
+  throw new CatalogueValidationError(
+    'INVALID_INTEGER',
+    `Baris ${rowNumber}: ${field} wajib berupa bilangan bulat aman.`,
+  );
+}
+
+function price(
+  value: ExcelJS.CellValue,
+  field: string,
+  rowNumber: number,
+  allowBlank = false,
+): number {
+  if (allowBlank && (value === null || value === undefined || value === '')) {
+    return 0;
+  }
+  const parsed = integer(value, field, rowNumber);
+  if (parsed < 0) {
+    throw new CatalogueValidationError(
+      'NEGATIVE_PRICE',
+      `Baris ${rowNumber}: ${field} tidak boleh negatif.`,
+    );
+  }
+  return parsed;
+}
+
+function safeTotal(total: number, value: number): number {
+  const next = total + value;
+  if (!Number.isSafeInteger(next)) {
+    throw new CatalogueValidationError(
+      'NUMERIC_TOTAL_OVERFLOW',
+      'Total numerik workbook melebihi batas aman.',
+    );
+  }
+  return next;
 }
 
 function imageSource(value: string): string | null {
@@ -98,17 +150,7 @@ export async function parseCatalogueWorkbook(
   const buffer = Buffer.from(bytes);
   assertSafeXlsxArchive(buffer);
   const archive = await JSZip.loadAsync(buffer);
-  for (const [name, entry] of Object.entries(archive.files)) {
-    if (!entry.dir && name.toLowerCase().endsWith('.rels')) {
-      const relationships = await entry.async('string');
-      if (/TargetMode\s*=\s*["']External["']/i.test(relationships)) {
-        throw new CatalogueValidationError(
-          'XLSX_EXTERNAL_LINK_NOT_ALLOWED',
-          'Tautan eksternal XLSX tidak diizinkan.',
-        );
-      }
-    }
-  }
+  await assertSafeXlsxPackage(archive);
   const workbook = new ExcelJS.Workbook();
   try {
     await workbook.xlsx.load(buffer as unknown as ExcelJS.Buffer);
@@ -236,8 +278,17 @@ export async function parseCatalogueWorkbook(
     productCodes.add(productKey);
     identifiers.add(primaryKey);
     identifiers.add(productKey);
-    const modalPrice = integer(value(source, 'Modal Referensi'));
-    const salePrice = integer(value(source, 'Harga Jual Referensi'));
+    const modalPrice = price(
+      value(source, 'Modal Referensi'),
+      'Modal Referensi',
+      rowNumber,
+    );
+    const salePrice = price(
+      value(source, 'Harga Jual Referensi'),
+      'Harga Jual Referensi',
+      rowNumber,
+      true,
+    );
     const selectedPrice = salePrice > 0 ? salePrice : modalPrice;
     const rawImageSource = cellText(value(source, 'Tautan Gambar'));
     const validImageSource = imageSource(rawImageSource);
@@ -259,7 +310,11 @@ export async function parseCatalogueWorkbook(
       productCode,
       name: cellText(value(source, 'Judul')),
       selectedPrice,
-      stockPcs: integer(value(source, 'Semua Total Stok')),
+      stockPcs: integer(
+        value(source, 'Semua Total Stok'),
+        'Semua Total Stok',
+        rowNumber,
+      ),
       note: cellText(value(source, 'Catatan SKU Gudang')),
       imageSourceUrl: validImageSource,
       sourceCreatedAt: cellText(value(source, 'Waktu Dibuat')),
@@ -274,10 +329,13 @@ export async function parseCatalogueWorkbook(
       missingImageCount: rows.filter((row) => row.imageSourceUrl === null).length,
       priceMismatchCount: priceMismatches.length,
       selectedPriceTotal: rows.reduce(
-        (total, row) => total + row.selectedPrice,
+        (total, row) => safeTotal(total, row.selectedPrice),
         0,
       ),
-      stockTotal: rows.reduce((total, row) => total + row.stockPcs, 0),
+      stockTotal: rows.reduce(
+        (total, row) => safeTotal(total, row.stockPcs),
+        0,
+      ),
       maximumCellTextLength,
       warnings,
       priceMismatches,

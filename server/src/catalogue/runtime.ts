@@ -4,6 +4,7 @@ import type { CatalogueHttpServices } from '../http/catalogue-routes.js';
 import type { MaintenanceLifecycle } from '../maintenance.js';
 import type { ProtocolPool } from '../sync/idempotency.js';
 import { FileCatalogueStorage } from './file-storage.js';
+import { CatalogueMaintenance } from './catalogue-maintenance.js';
 import { CatalogueImageDownloader } from './image-download.js';
 import { CatalogueImageWorker } from './image-worker.js';
 import { MariaDbCatalogueImageRepository } from './mariadb-image-repository.js';
@@ -27,19 +28,20 @@ export function createCatalogueRuntime(
   const imports = new CatalogueService({
     repository: new MariaDbCatalogueRepository(pool),
     storage,
-    ...(config.initialCatalogueSha256
-      ? { expectedWorkbookSha256: config.initialCatalogueSha256 }
-      : {}),
+    expectedWorkbookSha256: config.initialCatalogueSha256,
   });
   return {
     services: {
       imports,
       images: imageRepository,
     },
-    maintenance: new CatalogueImageWorker(
-      imageRepository,
-      new CatalogueImageDownloader(),
-      storage,
+    maintenance: new CatalogueMaintenance(
+      new CatalogueImageWorker(
+        imageRepository,
+        new CatalogueImageDownloader(),
+        storage,
+      ),
+      imports,
     ),
   };
 }

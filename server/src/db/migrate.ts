@@ -5,7 +5,7 @@ import { splitMariaDbStatements } from './migration-sql.js';
 
 export { splitMariaDbStatements } from './migration-sql.js';
 
-export const LATEST_SCHEMA_VERSION = 5;
+export const LATEST_SCHEMA_VERSION = 6;
 export const MIGRATION_LOCK_NAME = 'ch-core-schema-migrations';
 
 const MIGRATION_LOCK_TIMEOUT_SECONDS = 30;
@@ -15,6 +15,7 @@ const migrations = [
   { version: 3, name: '003_identity_sync_protocol.sql' },
   { version: 4, name: '004_replay_safe_protocol.sql' },
   { version: 5, name: '005_catalogue_import.sql' },
+  { version: 6, name: '006_business_write_safety.sql' },
 ] as const;
 
 export interface SchemaQueryPool {

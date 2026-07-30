@@ -79,7 +79,7 @@ function appWithProtocol(protocol = createProtocol()) {
     app: buildApp({
       pool: {
         async query<T>() {
-          return [{ version: 5 }] as T;
+          return [{ version: 6 }] as T;
         },
       },
       protocol,
@@ -101,6 +101,25 @@ describe('CH Core protocol routes', () => {
     expect(response.statusCode).toBe(403);
     expect(response.json()).toEqual({ code: 'FORBIDDEN' });
     expect(protocol.identity.createPairing).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('carries the authenticated device role in each bootstrap envelope', async () => {
+    const { app } = appWithProtocol();
+
+    const ownerResponse = await app.inject({
+      method: 'GET',
+      url: '/v1/bootstrap',
+      headers: { authorization: 'Bearer owner-token' },
+    });
+    const clientResponse = await app.inject({
+      method: 'GET',
+      url: '/v1/bootstrap',
+      headers: { authorization: 'Bearer client-token' },
+    });
+
+    expect(ownerResponse.json()).toMatchObject({ deviceRole: 'owner' });
+    expect(clientResponse.json()).toMatchObject({ deviceRole: 'client' });
     await app.close();
   });
 

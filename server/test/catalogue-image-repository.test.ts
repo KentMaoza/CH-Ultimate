@@ -51,6 +51,9 @@ function harness() {
     ): Promise<T> => {
       const compact = sql.replace(/\s+/g, ' ').trim();
       queries.push({ sql: compact, values });
+      if (compact.includes('FROM business_write_lock')) {
+        return [{ singleton_id: 1 }] as T;
+      }
       if (
         compact.includes('FROM image_jobs') &&
         compact.includes('FOR UPDATE SKIP LOCKED')
@@ -130,8 +133,17 @@ describe('MariaDB catalogue image repository', () => {
     expect(
       queries.some(
         ({ sql }) =>
+          sql.includes("status = 'processing'") &&
+          sql.includes('claimed_at') &&
+          sql.includes('INTERVAL 15 MINUTE'),
+      ),
+    ).toBe(true);
+    expect(
+      queries.some(
+        ({ sql }) =>
           sql.startsWith('UPDATE image_jobs') &&
-          sql.includes("status = 'processing'"),
+          sql.includes("status = 'processing'") &&
+          sql.includes('claimed_at = CURRENT_TIMESTAMP(6)'),
       ),
     ).toBe(true);
   });
@@ -142,6 +154,14 @@ describe('MariaDB catalogue image repository', () => {
     await repository.complete(job, asset);
 
     expect(events).toEqual(['begin', 'commit', 'release']);
+    const lockIndex = queries.findIndex(({ sql }) =>
+      sql.includes('FROM business_write_lock'),
+    );
+    const skuIndex = queries.findIndex(({ sql }) =>
+      sql.startsWith('UPDATE skus'),
+    );
+    expect(lockIndex).toBeGreaterThanOrEqual(0);
+    expect(lockIndex).toBeLessThan(skuIndex);
     expect(
       queries.some(
         ({ sql }) =>
@@ -182,6 +202,7 @@ describe('MariaDB catalogue image repository', () => {
       sql.startsWith('UPDATE image_jobs'),
     );
     expect(update?.sql).toContain("THEN 'retry'");
+    expect(update?.sql).toContain('claimed_at = NULL');
     expect(update?.values).toEqual(
       expect.arrayContaining(['IMAGE_TIMEOUT', job.id]),
     );

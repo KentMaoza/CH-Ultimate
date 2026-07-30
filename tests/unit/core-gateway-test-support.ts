@@ -19,6 +19,7 @@ export const TEMPLATE_ID = '77777777-7777-4777-8777-777777777777';
 
 interface TestBootstrapBody {
   serverRevision: string;
+  deviceRole: 'owner' | 'client';
   skuIdentifiers: Array<Record<string, unknown>>;
   skus: Array<Record<string, unknown>>;
   balances: Array<Record<string, unknown>>;
@@ -35,6 +36,7 @@ export function bootstrapBody(
 ): TestBootstrapBody {
   return {
     serverRevision,
+    deviceRole: 'owner',
     skuIdentifiers: [],
     skus: [],
     balances: [],
@@ -44,6 +46,38 @@ export function bootstrapBody(
     templates: [],
     ...overrides,
   };
+}
+
+export function exactCatalogueBootstrap(
+  serverRevision = '2',
+  deviceRole: 'owner' | 'client' = 'owner',
+): TestBootstrapBody {
+  const skuId = (index: number) =>
+    `10000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`;
+  return bootstrapBody(serverRevision, {
+    deviceRole,
+    skus: Array.from({ length: 3_144 }, (_, index) => ({
+      id: skuId(index),
+      primaryIdentifier: `SKU-${String(index + 1).padStart(4, '0')}`,
+      name: `Produk ${index + 1}`,
+      priceRupiah: String(index + 1),
+      imageHash: index === 0 ? 'a'.repeat(64) : null,
+      sourceImageUrl:
+        index === 0 ? 'https://example.test/images/produk-1.jpg' : null,
+      sourceNote: '',
+      sourceCreatedAt: '2026-07-30 09:24',
+      rowVersion: '1',
+      archivedAt: null,
+      createdAt: '2026-07-30T01:24:00.000Z',
+      updatedAt: '2026-07-30T01:24:00.000Z',
+    })),
+    balances: Array.from({ length: 3_144 }, (_, index) => ({
+      skuId: skuId(index),
+      quantityPcs: '0',
+      rowVersion: '1',
+      updatedAt: '2026-07-30T01:24:00.000Z',
+    })),
+  });
 }
 
 export function populatedBootstrap(

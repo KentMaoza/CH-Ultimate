@@ -15,6 +15,7 @@ import {
   ScriptedTransport,
   TestClock,
   deferred,
+  exactCatalogueBootstrap,
   populatedBootstrap,
 } from './core-gateway-test-support';
 
@@ -83,7 +84,7 @@ describe('Core operations gateway mutation coordination', () => {
       replayed: false,
     };
     transport.enqueue({ status: 200, body: receipt });
-    transport.enqueue({ status: 200, body: populatedBootstrap('2') });
+    transport.enqueue({ status: 200, body: exactCatalogueBootstrap('2') });
     await expect(
       gateway.commitInitialCatalogue(validation.importId),
     ).resolves.toEqual(receipt);
@@ -92,6 +93,7 @@ describe('Core operations gateway mutation coordination', () => {
       path: `/v1/imports/${validation.importId}/commit`,
     });
     expect(transport.requests.at(-1)?.path).toBe('/v1/bootstrap');
+    expect(gateway.getSnapshot().skus).toHaveLength(3_144);
 
     transport.enqueue({
       status: 200,

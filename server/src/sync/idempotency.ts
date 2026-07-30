@@ -17,6 +17,7 @@ import {
   assertUuid,
   writeMutationSideEffects,
 } from './idempotency-writes.js';
+import { acquireBusinessWriteLock } from './business-write-lock.js';
 
 export {
   IdempotencyError,
@@ -79,6 +80,7 @@ export async function executeIdempotent<T>(
         );
         reservationAcquired = true;
 
+        await acquireBusinessWriteLock(connection);
         const result = await mutation(connection);
         assertMutation(result);
         await writeMutationSideEffects(

@@ -110,3 +110,63 @@ No NAS was accessed or modified. The implementation writes only through
 `CH_CORE_PRIVATE_STORAGE_ROOT`; Task 11 must point that setting at the approved
 private mounted volume and run the isolated MariaDB integration plus live
 deployment verification before any NAS or production-readiness claim.
+
+## Fix round 1/5 — reviewer closure
+
+All Critical and Important round-one findings were addressed:
+
+- Electron and Android now give only exact `/v1/bootstrap` responses a bounded
+  5,000,000-byte ceiling; ordinary Core responses remain capped at 2,000,000
+  bytes. Both transports test a 3,144-SKU envelope, and a catalogue commit test
+  proves the immediate canonical reload keeps all 3,144 rows.
+- Bootstrap carries the authenticated `owner`/`client` role. Core import
+  capability starts disabled, is enabled only after an owner bootstrap, and
+  the inventory import input/button are absent for clients. Server owner
+  enforcement remains unchanged.
+- Migration 006 installs one InnoDB `business_write_lock` row. Catalogue
+  commit, image-to-SKU publication, and the reusable generic idempotent
+  business-mutation path acquire it inside their transactions before business
+  reads/writes. Lock ordering and two-writer serialization are covered by
+  focused tests.
+- Catalogue replacement emits a `catalogue_epoch` change after clearing the
+  old change log. Existing clients treat it as a bootstrap-required boundary,
+  and the convergence test proves removed SKUs do not survive replacement.
+- XLSX package policy now runs before ExcelJS and bounds every worksheet XML,
+  workbook-wide physical/sparse rows and cells, formulas, relationship types,
+  external targets, and macro/ActiveX/OLE content types regardless of payload
+  path. Strict integer parsing rejects malformed, fractional, nonnumeric,
+  unsafe, negative-price, and aggregate-overflow values while retaining valid
+  negative stock and the approved workbook's blank-sale/modal fallback.
+- `64fcb734d84462060f76fa7f27495ee1e2dff6201ad2d7a2d13d5c6c27923817`
+  is now the only accepted initial-catalogue hash. It is the required runtime
+  value and safe default; any override mismatch fails configuration startup.
+- Expired stages can be validated again under their existing provenance.
+  Expired private XLSX bytes are deleted on rejected commit and by scheduled
+  maintenance, including after commit, while import/result metadata remains.
+- Image jobs record `claimed_at`, reclaim missing or 15-minute-stale processing
+  leases, and clear the lease on success/failure.
+- The former 472-line downloader is split into URL/address policy, pinned HTTPS
+  transport, image metadata validation, and a 100-line orchestrator. The
+  catalogue repository is split into staged-import persistence, bulk catalogue
+  writing, and a 223-line transaction orchestrator.
+
+### Fresh fix-round verification
+
+| Gate | Result |
+| --- | --- |
+| `npm run verify` | PASS — 51 files, 381 tests |
+| server tests with supplied workbook enabled | PASS — 26 files, 169 tests |
+| server typecheck and build | PASS |
+| supplied-workbook exact acceptance | PASS — 3,144 rows and approved hash/totals |
+| Android `test` and `lint` with Android Studio JDK 21 | PASS |
+| `npm run mobile:build` | PASS — 587 modules |
+| `npm run package` | PASS — Electron arm64 package |
+| `git diff --check` | PASS |
+
+The first full desktop run had one unrelated, timing-sensitive Nota dialog
+focus assertion fail while 380 tests passed. That test passed immediately in
+isolation, and the subsequent complete 381-test desktop rerun passed.
+
+`CH_CORE_TEST_DATABASE_URL` remains unset, so the guarded destructive MariaDB
+integration suite was not run. No MariaDB integration success, NAS access,
+deployment, or production readiness is claimed in this fix round.

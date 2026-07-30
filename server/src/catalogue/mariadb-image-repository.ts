@@ -10,6 +10,7 @@ import type {
   ProtocolConnection,
   ProtocolPool,
 } from '../sync/idempotency.js';
+import { acquireBusinessWriteLock } from '../sync/business-write-lock.js';
 import { CatalogueError } from './service.js';
 import type {
   CatalogueImageAsset,
@@ -68,8 +69,19 @@ export class MariaDbCatalogueImageRepository
         `SELECT HEX(id) AS id_hex, HEX(sku_id) AS sku_id_hex,
                 source_url, attempt_count
          FROM image_jobs
-         WHERE status IN ('pending', 'retry')
+         WHERE (
+           status IN ('pending', 'retry')
            AND next_attempt_at <= CURRENT_TIMESTAMP(6)
+         ) OR (
+           status = 'processing'
+           AND (
+             claimed_at IS NULL
+             OR claimed_at <= DATE_SUB(
+               CURRENT_TIMESTAMP(6),
+               INTERVAL 15 MINUTE
+             )
+           )
+         )
          ORDER BY created_at, id
          LIMIT 1
          FOR UPDATE SKIP LOCKED`,
@@ -85,6 +97,7 @@ export class MariaDbCatalogueImageRepository
         `UPDATE image_jobs
          SET status = 'processing',
              attempt_count = attempt_count + 1,
+             claimed_at = CURRENT_TIMESTAMP(6),
              last_error_code = NULL
          WHERE id = UNHEX(REPLACE(?, '-', ''))`,
         [id],
@@ -114,6 +127,7 @@ export class MariaDbCatalogueImageRepository
     try {
       await connection.beginTransaction();
       transactionStarted = true;
+      await acquireBusinessWriteLock(connection);
       const hash = Buffer.from(asset.contentHash, 'hex');
       await connection.query(
         `INSERT INTO image_assets
@@ -131,7 +145,8 @@ export class MariaDbCatalogueImageRepository
       );
       await connection.query(
         `UPDATE image_jobs
-         SET status = 'stored', content_hash = ?, last_error_code = NULL
+         SET status = 'stored', content_hash = ?, claimed_at = NULL,
+             last_error_code = NULL
          WHERE id = UNHEX(REPLACE(?, '-', ''))`,
         [hash, job.id],
       );
@@ -206,6 +221,7 @@ export class MariaDbCatalogueImageRepository
              ELSE 'failed'
            END,
            last_error_code = ?,
+           claimed_at = NULL,
            next_attempt_at = DATE_ADD(
              CURRENT_TIMESTAMP(6),
              INTERVAL LEAST(POWER(2, attempt_count), 24) HOUR

@@ -227,6 +227,44 @@ describe('main-process CH Core HTTPS client', () => {
     ).toThrow('Permintaan CH Core terlalu besar.');
   });
 
+  it('accepts the exact 3,144-SKU bootstrap envelope without raising ordinary route limits', async () => {
+    const bootstrap = JSON.stringify({
+      serverRevision: '1',
+      skus: Array.from({ length: 3_144 }, (_, index) => ({
+        id: index,
+        name: 'X'.repeat(1_015),
+      })),
+    });
+    expect(Buffer.byteLength(bootstrap)).toBeGreaterThan(3_200_000);
+    expect(Buffer.byteLength(bootstrap)).toBeLessThan(3_500_000);
+
+    const accepted = respondingRequest({
+      status: 200,
+      chunks: [bootstrap],
+    });
+    await expect(
+      createCoreHttpsClient({ requestImpl: accepted.requestImpl }).send({
+        endpoint,
+        ca,
+        authorization,
+        request: { method: 'GET', path: '/v1/bootstrap' },
+      }),
+    ).resolves.toMatchObject({ status: 200 });
+
+    const rejected = respondingRequest({
+      status: 200,
+      chunks: [bootstrap],
+    });
+    await expect(
+      createCoreHttpsClient({ requestImpl: rejected.requestImpl }).send({
+        endpoint,
+        ca,
+        authorization,
+        request: { method: 'GET', path: '/v1/changes?after=0&limit=500' },
+      }),
+    ).rejects.toThrow('Respons CH Core tidak valid.');
+  });
+
   it('destroys timed-out requests and returns a generic connection error', async () => {
     let timeout: (() => void) | undefined;
     const destroy = vi.fn();

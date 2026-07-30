@@ -45,7 +45,11 @@ async function workbookBytes(): Promise<Buffer> {
   return Buffer.from(await workbook.xlsx.writeBuffer());
 }
 
-function harness(expectedWorkbookSha256?: string) {
+function harness(
+  expectedWorkbookSha256: string,
+  initialNow = new Date('2026-07-30T01:30:00.000Z'),
+) {
+  let currentNow = initialNow;
   const records = new Map<string, CatalogueImportRecord>();
   const committed = new Map<string, CatalogueCommitResult>();
   const stored = new Map<string, Buffer>();
@@ -56,6 +60,9 @@ function harness(expectedWorkbookSha256?: string) {
       return path;
     }),
     readStaged: vi.fn(async (path) => Buffer.from(stored.get(path)!)),
+    deleteStaged: vi.fn(async (path) => {
+      stored.delete(path);
+    }),
   };
   const repository: CatalogueRepository = {
     findByHash: vi.fn(async (hash) =>
@@ -67,6 +74,18 @@ function harness(expectedWorkbookSha256?: string) {
       records.set(record.id, structuredClone(record));
       return record;
     }),
+    refreshStage: vi.fn(async (record) => {
+      records.set(record.id, structuredClone(record));
+      return record;
+    }),
+    listExpiredStagePaths: vi.fn(async (expiredAt) =>
+      [...records.values()]
+        .filter(
+          (record) =>
+            new Date(record.expiresAt).getTime() <= expiredAt.getTime(),
+        )
+        .map((record) => record.stagedPath),
+    ),
     commit: vi.fn(async (record, workbook, committedAt) => {
       const existing = committed.get(record.id);
       if (existing) return { ...existing, replayed: true };
@@ -92,12 +111,15 @@ function harness(expectedWorkbookSha256?: string) {
     service: new CatalogueService({
       repository,
       storage,
-      now: () => new Date('2026-07-30T01:30:00.000Z'),
+      now: () => currentNow,
       randomUuid: () => '22222222-2222-4222-8222-222222222222',
-      ...(expectedWorkbookSha256 ? { expectedWorkbookSha256 } : {}),
+      expectedWorkbookSha256,
     }),
     repository,
     storage,
+    setNow: (next: Date) => {
+      currentNow = next;
+    },
   };
 }
 
@@ -131,7 +153,8 @@ describe('staged catalogue service', () => {
 
   it('commits once and returns the original result on replay', async () => {
     const bytes = await workbookBytes();
-    const { service, repository } = harness();
+    const sha256 = createHash('sha256').update(bytes).digest('hex');
+    const { service, repository } = harness(sha256);
     const stage = await service.validate(owner, {
       fileName: 'catalogue.xlsx',
       bytes,
@@ -163,6 +186,85 @@ describe('staged catalogue service', () => {
     ).rejects.toMatchObject({
       code: 'UNEXPECTED_WORKBOOK_HASH',
       statusCode: 422,
+    });
+  });
+
+  it('refreshes an expired matching stage and purges its old private bytes', async () => {
+    const bytes = await workbookBytes();
+    const sha256 = createHash('sha256').update(bytes).digest('hex');
+    const { service, repository, storage, setNow } = harness(sha256);
+    const first = await service.validate(owner, {
+      fileName: 'catalogue.xlsx',
+      bytes,
+    });
+    setNow(new Date('2026-07-31T01:30:00.001Z'));
+
+    const refreshed = await service.validate(owner, {
+      fileName: 'catalogue-refresh.xlsx',
+      bytes,
+    });
+
+    expect(refreshed).toMatchObject({
+      importId: first.importId,
+      sourceFileName: 'catalogue-refresh.xlsx',
+      expiresAt: '2026-08-01T01:30:00.001Z',
+      status: 'staged',
+    });
+    expect(storage.deleteStaged).toHaveBeenCalledWith(
+      `staged/${sha256}.xlsx`,
+    );
+    expect(storage.writeStaged).toHaveBeenCalledTimes(2);
+    expect(repository.refreshStage).toHaveBeenCalledOnce();
+  });
+
+  it('purges expired staged bytes on commit rejection and by maintenance without deleting provenance', async () => {
+    const bytes = await workbookBytes();
+    const sha256 = createHash('sha256').update(bytes).digest('hex');
+    const { service, repository, storage, setNow } = harness(sha256);
+    const expiredStage = await service.validate(owner, {
+      fileName: 'catalogue.xlsx',
+      bytes,
+    });
+    setNow(new Date('2026-07-31T01:30:00.001Z'));
+
+    await expect(
+      service.commit(owner, expiredStage.importId),
+    ).rejects.toMatchObject({ code: 'IMPORT_EXPIRED', statusCode: 410 });
+    expect(storage.deleteStaged).toHaveBeenCalledOnce();
+
+    setNow(new Date('2026-08-01T01:30:00.001Z'));
+    await service.purgeExpiredStagedBytes();
+    expect(storage.deleteStaged).toHaveBeenCalledTimes(2);
+    await expect(
+      repository.findById(expiredStage.importId),
+    ).resolves.toMatchObject({
+      id: expiredStage.importId,
+      status: 'staged',
+      workbookSha256: sha256,
+    });
+  });
+
+  it('retains committed provenance after its private staged bytes expire', async () => {
+    const bytes = await workbookBytes();
+    const sha256 = createHash('sha256').update(bytes).digest('hex');
+    const { service, repository, storage, setNow } = harness(sha256);
+    const stage = await service.validate(owner, {
+      fileName: 'catalogue.xlsx',
+      bytes,
+    });
+    await service.commit(owner, stage.importId);
+    setNow(new Date('2026-07-31T01:30:00.001Z'));
+
+    await service.purgeExpiredStagedBytes();
+
+    expect(storage.deleteStaged).toHaveBeenCalledWith(
+      `staged/${sha256}.xlsx`,
+    );
+    await expect(repository.findById(stage.importId)).resolves.toMatchObject({
+      id: stage.importId,
+      status: 'committed',
+      workbookSha256: sha256,
+      result: expect.objectContaining({ importId: stage.importId }),
     });
   });
 });

@@ -8,6 +8,7 @@ import {
   MemoryStorage,
   ScriptedTransport,
   TestClock,
+  bootstrapBody,
   populatedBootstrap,
 } from './core-gateway-test-support';
 
@@ -75,6 +76,59 @@ describe('Core gateway resync and observable state boundaries', () => {
       id: pendingBefore.id,
       idempotencyKey: pendingBefore.idempotencyKey,
     });
+  });
+
+  it('replaces stale catalogue state after a catalogue epoch change', async () => {
+    const { gateway, transport, clock } = setup();
+    transport.enqueue({ status: 200, body: populatedBootstrap('20') });
+    await gateway.initialize();
+
+    const replacementSku = {
+      ...populatedBootstrap().skus[0]!,
+      id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      primaryIdentifier: 'SKU-REPLACEMENT',
+      name: 'Produk pengganti',
+    };
+    transport.enqueue({
+      status: 200,
+      body: {
+        serverRevision: '21',
+        nextAfter: '21',
+        changes: [
+          {
+            revision: '21',
+            entityType: 'catalogue_epoch',
+            entityId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+            operation: 'upsert',
+            payload: {
+              importId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+            },
+            createdAt: '2026-07-30T02:00:00.000Z',
+          },
+        ],
+      },
+    });
+    transport.enqueue({
+      status: 200,
+      body: bootstrapBody('21', {
+        skus: [replacementSku],
+        skuIdentifiers: [],
+        balances: [],
+      }),
+    });
+
+    await clock.runNext();
+
+    expect(gateway.getSnapshot().skus).toHaveLength(1);
+    expect(gateway.getSnapshot().skus[0]).toMatchObject({
+      id: replacementSku.id,
+      skuNumber: replacementSku.primaryIdentifier,
+      name: replacementSku.name,
+    });
+    expect(gateway.getSnapshot().skus.some(({ id }) => id === SKU_ID)).toBe(
+      false,
+    );
+    expect(gateway.getSyncSnapshot().serverRevision).toBe('21');
   });
 
   it('caps repeated offline polling delays at thirty seconds', async () => {

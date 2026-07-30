@@ -6,6 +6,8 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import java.net.URI;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.junit.Test;
 
@@ -122,5 +124,37 @@ public class CoreSecurityBoundaryTest {
         assertFalse(status.containsKey("endpoint"));
         assertFalse(status.toString().contains("native-secret"));
         assertTrue(status.toString().contains(state.deviceId));
+    }
+
+    @Test
+    public void bootstrapTransportAcceptsExactly3144SkusButOrdinaryRoutesStayBounded()
+        throws Exception {
+        StringBuilder json = new StringBuilder("{\"serverRevision\":\"1\",\"skus\":[");
+        for (int index = 0; index < 3_144; index += 1) {
+            if (index > 0) json.append(',');
+            json.append("{\"id\":")
+                .append(index)
+                .append(",\"name\":\"")
+                .append("X".repeat(1_015))
+                .append("\"}");
+        }
+        json.append("]}");
+        byte[] bytes = json.toString().getBytes(StandardCharsets.UTF_8);
+        assertTrue(bytes.length > 3_200_000);
+        assertTrue(bytes.length < 3_500_000);
+
+        byte[] accepted = CoreApiClient.readBoundedResponse(
+            new ByteArrayInputStream(bytes),
+            "/v1/bootstrap"
+        );
+        assertEquals(bytes.length, accepted.length);
+
+        assertThrows(
+            CoreSecurityException.class,
+            () -> CoreApiClient.readBoundedResponse(
+                new ByteArrayInputStream(bytes),
+                "/v1/changes?after=0&limit=500"
+            )
+        );
     }
 }

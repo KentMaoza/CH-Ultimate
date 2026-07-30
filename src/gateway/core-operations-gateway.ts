@@ -54,7 +54,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   readonly capabilities: OperationsGatewayCapabilities = {
     canResetDemoData: false,
     canImportInitialCatalogue: false,
-    canStageInitialCatalogue: true,
+    canStageInitialCatalogue: false,
   };
 
   private readonly state = new CoreGatewayState();
@@ -73,6 +73,9 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
       clock,
       this.state,
       envelopes,
+      (role) => {
+        this.capabilities.canStageInitialCatalogue = role === 'owner';
+      },
     );
     this.mutations = new CoreMutationCoordinator(
       new CoreMutationQueue(

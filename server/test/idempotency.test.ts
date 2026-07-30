@@ -17,6 +17,7 @@ interface Receipt {
 
 interface FakeState {
   businessRows: string[];
+  businessWriteLocks: number;
   audits: unknown[][];
   changes: unknown[][];
   receipts: Map<string, Receipt>;
@@ -25,6 +26,7 @@ interface FakeState {
 function cloneState(state: FakeState): FakeState {
   return {
     businessRows: [...state.businessRows],
+    businessWriteLocks: state.businessWriteLocks,
     audits: state.audits.map((row) => [...row]),
     changes: state.changes.map((row) => [...row]),
     receipts: new Map(
@@ -44,6 +46,7 @@ function cloneState(state: FakeState): FakeState {
 class FakeProtocolPool implements ProtocolPool {
   state: FakeState = {
     businessRows: [],
+    businessWriteLocks: 0,
     audits: [],
     changes: [],
     receipts: new Map(),
@@ -84,6 +87,10 @@ class FakeProtocolPool implements ProtocolPool {
                 ]
               : []
           ) as T;
+        }
+        if (sql.includes('FROM business_write_lock')) {
+          this.state.businessWriteLocks += 1;
+          return [{ singleton_id: 1 }] as T;
         }
         if (sql.startsWith('DELETE FROM idempotency_receipts')) {
           const key = `${String(values[0])}:${String(values[1])}`;
@@ -246,6 +253,24 @@ describe('executeIdempotent', () => {
     expect(pool.state.audits).toHaveLength(1);
     expect(pool.state.changes).toHaveLength(1);
     expect(pool.state.receipts).toHaveLength(1);
+    expect(pool.state.businessWriteLocks).toBe(1);
+  });
+
+  it('acquires the shared transaction lock before entering a business mutation', async () => {
+    const pool = new FakeProtocolPool();
+
+    await execute(pool, { amount: '1000' }, async (connection) => {
+      expect(pool.state.businessWriteLocks).toBe(1);
+      await connection.query('INSERT INTO business_probe (id) VALUES (?)', [
+        entityId,
+      ]);
+      return {
+        statusCode: 200,
+        body: { ok: true },
+        audits: [],
+        changes: [],
+      };
+    });
   });
 
   it('rolls back every row when any atomic side effect fails', async () => {

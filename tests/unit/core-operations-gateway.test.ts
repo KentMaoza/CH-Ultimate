@@ -26,6 +26,24 @@ function createGateway(
 }
 
 describe('Core operations gateway bootstrap and polling', () => {
+  it('enables staged catalogue import only after an owner bootstrap', async () => {
+    const owner = createGateway();
+    owner.transport.enqueue({
+      status: 200,
+      body: populatedBootstrap('1'),
+    });
+    expect(owner.gateway.capabilities.canStageInitialCatalogue).toBe(false);
+    await owner.gateway.initialize();
+    expect(owner.gateway.capabilities.canStageInitialCatalogue).toBe(true);
+
+    const client = createGateway();
+    client.transport.enqueue({
+      status: 200,
+      body: populatedBootstrap('1', { deviceRole: 'client' }),
+    });
+    await client.gateway.initialize();
+    expect(client.gateway.capabilities.canStageInitialCatalogue).toBe(false);
+  });
   it('publishes a valid cached snapshot before replacing it with canonical bootstrap data', async () => {
     const cached: CoreCacheEnvelope = {
       cacheVersion: 1,

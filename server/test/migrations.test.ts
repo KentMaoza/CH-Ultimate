@@ -135,7 +135,7 @@ function seedOriginalVersionThree(pool: FakeMigrationPool): void {
 }
 
 describe('runMigrations', () => {
-  it('applies versions 1 through 5 once and makes the second run a no-op', async () => {
+  it('applies versions 1 through 6 once and makes the second run a no-op', async () => {
     const pool = new FakeMigrationPool();
 
     const first = await runMigrations(pool);
@@ -144,15 +144,15 @@ describe('runMigrations', () => {
 
     expect(first).toEqual({
       fromVersion: 0,
-      toVersion: 5,
-      appliedVersions: [1, 2, 3, 4, 5],
+      toVersion: 6,
+      appliedVersions: [1, 2, 3, 4, 5, 6],
     });
     expect(second).toEqual({
-      fromVersion: 5,
-      toVersion: 5,
+      fromVersion: 6,
+      toVersion: 6,
       appliedVersions: [],
     });
-    expect(pool.applied.size).toBe(5);
+    expect(pool.applied.size).toBe(6);
     expect(pool.migrationStatementCount).toBe(statementsAfterFirstRun);
   });
 
@@ -172,16 +172,16 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 0,
-      toVersion: 5,
-      appliedVersions: [1, 2, 3, 4, 5],
+      toVersion: 6,
+      appliedVersions: [1, 2, 3, 4, 5, 6],
     });
   });
 
   it('refuses a database schema newer than this binary and releases the lock', async () => {
-    const pool = new FakeMigrationPool(6);
+    const pool = new FakeMigrationPool(7);
 
     await expect(runMigrations(pool)).rejects.toThrow(
-      'Database schema version 6 is newer than supported version 5',
+      'Database schema version 7 is newer than supported version 6',
     );
 
     expect(pool.lockHeld).toBe(false);
@@ -224,11 +224,11 @@ describe('runMigrations', () => {
 
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 1,
-      toVersion: 5,
-      appliedVersions: [2, 3, 4, 5],
+      toVersion: 6,
+      appliedVersions: [2, 3, 4, 5, 6],
     });
 
-    expect(pool.applied.size).toBe(5);
+    expect(pool.applied.size).toBe(6);
     expect(pool.migrationStatementCount).toBeGreaterThan(2);
   });
 
@@ -245,8 +245,8 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 1,
-      toVersion: 5,
-      appliedVersions: [2, 3, 4, 5],
+      toVersion: 6,
+      appliedVersions: [2, 3, 4, 5, 6],
     });
   });
 
@@ -256,8 +256,8 @@ describe('runMigrations', () => {
 
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 2,
-      toVersion: 5,
-      appliedVersions: [3, 4, 5],
+      toVersion: 6,
+      appliedVersions: [3, 4, 5, 6],
     });
   });
 
@@ -274,8 +274,8 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 2,
-      toVersion: 5,
-      appliedVersions: [3, 4, 5],
+      toVersion: 6,
+      appliedVersions: [3, 4, 5, 6],
     });
   });
 
@@ -292,8 +292,8 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 3,
-      toVersion: 5,
-      appliedVersions: [4, 5],
+      toVersion: 6,
+      appliedVersions: [4, 5, 6],
     });
   });
 });
@@ -328,6 +328,19 @@ second', "third;fourth");
 });
 
 describe('initial schema', () => {
+  it('installs the singleton business lock and image processing lease', async () => {
+    const sql = await readFile(
+      new URL('../migrations/006_business_write_safety.sql', import.meta.url),
+      'utf8',
+    );
+
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS business_write_lock');
+    expect(sql).toContain(
+      'INSERT IGNORE INTO business_write_lock (singleton_id) VALUES (1)',
+    );
+    expect(sql).toContain('claimed_at TIMESTAMP(6) NULL');
+  });
+
   it('preserves the exact published version 1 checksum', async () => {
     const sql = await readFile(
       new URL('../migrations/001_initial.sql', import.meta.url),

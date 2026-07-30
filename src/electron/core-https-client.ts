@@ -13,6 +13,7 @@ const RESPONSE_ERROR = 'Respons CH Core tidak valid.';
 const DEFAULT_TIMEOUT_MS = 8_000;
 const DEFAULT_MAX_REQUEST_BYTES = 1_000_000;
 const DEFAULT_MAX_RESPONSE_BYTES = 2_000_000;
+const BOOTSTRAP_MAX_RESPONSE_BYTES = 5_000_000;
 const CATALOGUE_TRANSFER_MAX_BYTES = 7_100_000;
 const IMAGE_PATH = /^\/v1\/images\/[0-9a-f]{64}$/;
 
@@ -70,7 +71,9 @@ export function createCoreHttpsClient(options: CoreHttpsClientOptions = {}) {
           : maxRequestBytes);
       const responseLimit =
         options.maxResponseBytes ??
-        (IMAGE_PATH.test(input.request.path)
+        (input.request.path === '/v1/bootstrap'
+          ? BOOTSTRAP_MAX_RESPONSE_BYTES
+          : IMAGE_PATH.test(input.request.path)
           ? CATALOGUE_TRANSFER_MAX_BYTES
           : maxResponseBytes);
       const body = serializeBody(input.request.body, requestLimit);

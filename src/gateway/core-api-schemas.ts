@@ -148,6 +148,7 @@ export const coreBootstrapSchema = z
   .object({
     ...apiSchemaMarker,
     serverRevision: canonicalDecimalSchema,
+    deviceRole: z.enum(['owner', 'client']),
     skuIdentifiers: z.array(coreSkuIdentifierRowSchema),
     skus: z.array(coreSkuRowSchema),
     balances: z.array(coreBalanceRowSchema),

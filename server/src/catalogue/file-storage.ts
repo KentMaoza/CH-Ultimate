@@ -113,6 +113,27 @@ export class FileCatalogueStorage implements PrivateCatalogueStorage {
     }
   }
 
+  async deleteStaged(stagedPath: string): Promise<void> {
+    if (!STAGED_PATH_PATTERN.test(stagedPath)) invalidPath();
+    const absolutePath = join(this.root, stagedPath);
+    if (!absolutePath.startsWith(`${this.root}/`)) invalidPath();
+    try {
+      await unlink(absolutePath);
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        Reflect.get(error, 'code') === 'ENOENT'
+      ) {
+        return;
+      }
+      throw new CatalogueStorageError(
+        'STAGED_FILE_UNAVAILABLE',
+        'Workbook tahap tidak dapat dihapus.',
+      );
+    }
+  }
+
   async writeImage(hash: string, bytes: Buffer): Promise<string> {
     if (
       !HASH_PATTERN.test(hash) ||

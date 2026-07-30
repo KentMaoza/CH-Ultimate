@@ -37,6 +37,7 @@ export class CorePollingCoordinator {
     private readonly clock: CoreGatewayClock,
     private readonly state: CoreGatewayState,
     private readonly envelopes: CoreEnvelopeCoordinator,
+    private readonly onDeviceRole: (role: 'owner' | 'client') => void,
   ) {
     this.scheduler = new CoreSyncScheduler(
       clock,
@@ -105,6 +106,7 @@ export class CorePollingCoordinator {
         throw new Error(error.code);
       }
       const bootstrap = parseCoreBootstrap(response.body);
+      this.onDeviceRole(bootstrap.deviceRole);
       const next = mapCoreBootstrapToDemoState(bootstrap);
       const committed = await this.envelopes.commitCanonical(
         expectedRevision,

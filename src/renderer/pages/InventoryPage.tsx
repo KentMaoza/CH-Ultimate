@@ -189,15 +189,18 @@ export function InventoryPage() {
   const parsedPrintQuantity = Number(printQuantity);
   const validPrintQuantity = printQuantity !== '' && Number.isInteger(parsedPrintQuantity) && parsedPrintQuantity >= 1 && parsedPrintQuantity <= 10000;
   const barcodeCount = validPrintQuantity ? parsedPrintQuantity : 0;
+  const canImportCatalogue =
+    gateway.capabilities.canImportInitialCatalogue ||
+    gateway.capabilities.canStageInitialCatalogue;
 
   return (
     <div className="feature-page">
       <div className="feature-toolbar">
         <div><strong>{state.skus.length.toLocaleString('id-ID')} SKU</strong><span>{state.sourceLabel}</span></div>
         <div className="toolbar-actions">
-          <input ref={fileInput} className="visually-hidden" type="file" accept=".xlsx" aria-label="Import XLSX" onChange={(event) => void importFile(event.target.files?.[0])} />
+          {canImportCatalogue && <input ref={fileInput} className="visually-hidden" type="file" accept=".xlsx" aria-label="Import XLSX" onChange={(event) => void importFile(event.target.files?.[0])} />}
           <input ref={imageInput} className="visually-hidden" type="file" accept="image/*" aria-label="Pilih file gambar SKU" onChange={(event) => void replaceImage(event.target.files?.[0])} />
-          <button className="button secondary" onClick={() => fileInput.current?.click()}>Import XLSX</button>
+          {canImportCatalogue && <button className="button secondary" onClick={() => fileInput.current?.click()}>Import XLSX</button>}
         </div>
       </div>
       {message && <div className="notice" role="status">{message}</div>}

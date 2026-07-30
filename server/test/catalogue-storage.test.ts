@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, stat } from 'node:fs/promises';
+import { access, mkdtemp, readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -45,5 +45,24 @@ describe('private catalogue storage', () => {
         code: 'INVALID_STORAGE_PATH',
       });
     }
+  });
+
+  it('idempotently purges only a validated staged workbook path', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'chu-catalogue-'));
+    roots.push(root);
+    const storage = new FileCatalogueStorage(root);
+    const bytes = Buffer.from('expired private workbook');
+    const hash = createHash('sha256').update(bytes).digest('hex');
+    const relativePath = await storage.writeStaged(hash, bytes);
+
+    await storage.deleteStaged(relativePath);
+    await storage.deleteStaged(relativePath);
+
+    await expect(access(join(root, relativePath))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    await expect(storage.deleteStaged('../private.xlsx')).rejects.toMatchObject(
+      { code: 'INVALID_STORAGE_PATH' },
+    );
   });
 });

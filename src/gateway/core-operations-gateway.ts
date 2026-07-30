@@ -23,6 +23,7 @@ import { CoreMutationCoordinator } from './core-mutation-coordinator';
 import { CoreMutationQueue } from './core-mutation-queue';
 import { CoreDeferredOutbox } from './core-outbox';
 import {
+  CoreLocalOwnershipError,
   CoreLocalStore,
   type CoreDeferredCommand,
   type CoreLocalEnvelope,
@@ -101,12 +102,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
       {
         now: () => clock.now(),
         acknowledge: acknowledgeOfflineCommand,
-        onRevoked: () => {
-          this.state.publishSync({
-            phase: 'revoked',
-            message: 'Akses perangkat dicabut. Antrean offline dikarantina.',
-          });
-        },
+        onRevoked: () => this.onPersistedAuthenticationRevoked(),
       },
     );
     const canonicalStorage = this.localStore.canonicalStorage();
@@ -166,7 +162,12 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
         installationId,
       );
     } catch (error) {
-      if (!(error instanceof ZodError)) throw error;
+      if (
+        !(error instanceof ZodError) &&
+        !(error instanceof CoreLocalOwnershipError)
+      ) {
+        throw error;
+      }
       this.state.publishSync({
         phase: 'upgrade-required',
         message: 'Cache aplikasi tidak kompatibel.',
@@ -518,17 +519,23 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     });
   };
   reopenNotaTransaction = (id: string): Promise<void> =>
-    this.isOffline()
-      ? this.offlineBlocked()
-      : this.mutations.reopenNotaTransaction(id);
+    this.hasLocalNota(id)
+      ? this.rejectLocalNotaLifecycle(id)
+      : this.isOffline()
+        ? this.offlineBlocked()
+        : this.mutations.reopenNotaTransaction(id);
   cancelNotaTransaction = (id: string): Promise<void> =>
-    this.isOffline()
-      ? this.offlineBlocked()
-      : this.mutations.cancelNotaTransaction(id);
+    this.hasLocalNota(id)
+      ? this.rejectLocalNotaLifecycle(id)
+      : this.isOffline()
+        ? this.offlineBlocked()
+        : this.mutations.cancelNotaTransaction(id);
   restoreNotaTransaction = (id: string): Promise<void> =>
-    this.isOffline()
-      ? this.offlineBlocked()
-      : this.mutations.restoreNotaTransaction(id);
+    this.hasLocalNota(id)
+      ? this.rejectLocalNotaLifecycle(id)
+      : this.isOffline()
+        ? this.offlineBlocked()
+        : this.mutations.restoreNotaTransaction(id);
 
   private isOffline(): boolean {
     const phase = this.state.getSyncSnapshot().phase;
@@ -643,6 +650,19 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     }
   }
 
+  private async rejectLocalNotaLifecycle(id: string): Promise<void> {
+    const envelope = await this.localStore.load();
+    const command = envelope.deferredOutbox.find(
+      (candidate) =>
+        candidate.kind === 'offline-nota' &&
+        candidate.payload.provisionalId === id,
+    );
+    if (command?.firstSentAt) {
+      throw new Error('Sedang sinkronisasi. Tunggu konfirmasi CH Core.');
+    }
+    return this.offlineBlocked();
+  }
+
   private async updateLocalNota(
     id: string,
     update: (transaction: NotaTransaction) => NotaTransaction,
@@ -710,12 +730,15 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   }
 
   private async onAuthenticationRevoked(): Promise<void> {
+    await this.deferred.quarantineRevoked();
+  }
+
+  private async onPersistedAuthenticationRevoked(): Promise<void> {
     this.polling.authenticationRevoked();
     this.state.publishSync({
       phase: 'revoked',
       message: 'Akses perangkat dicabut. Antrean lokal dikarantina.',
     });
-    await this.deferred.quarantineRevoked();
     this.applyOfflineProjection(await this.localStore.load(), true);
   }
 }

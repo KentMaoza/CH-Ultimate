@@ -35,7 +35,116 @@ function localNota(customerName = '') {
   };
 }
 
+function legacyV2Envelope() {
+  return {
+    cacheVersion: 2 as const,
+    installationId: OTHER_INSTALLATION_ID,
+    state: emptyCoreState(),
+    serverRevision: '17',
+    outbox: [],
+    deferredOutbox: [],
+    provisionalNotas: [],
+    offlineConflicts: [],
+    quarantine: { active: false },
+  };
+}
+
 describe('Core local cache v3', () => {
+  it('rebinds only a clean v2 canonical cache to the native installation UUID', () => {
+    const migrated = migrateCoreCache(
+      legacyV2Envelope(),
+      () => INSTALLATION_ID,
+    );
+
+    expect(migrated).toMatchObject({
+      cacheVersion: 3,
+      installationId: INSTALLATION_ID,
+      serverRevision: '17',
+      outbox: [],
+      quarantinedOutbox: [],
+      deferredOutbox: [],
+      provisionalNotas: [],
+      offlineConflicts: [],
+      quarantine: { active: false },
+    });
+  });
+
+  it.each([
+    {
+      name: 'normal outbox',
+      patch: {
+        outbox: [
+          {
+            id: OPERATION_ID,
+            idempotencyKey: OPERATION_ID,
+            method: 'POST' as const,
+            path: '/v1/notas',
+            body: {},
+            createdAt: '2026-07-30T01:00:00.000Z',
+          },
+        ],
+      },
+    },
+    {
+      name: 'deferred outbox',
+      patch: {
+        deferredOutbox: [
+          {
+            kind: 'offline-nota' as const,
+            operationId: OPERATION_ID,
+            idempotencyKey: OPERATION_ID,
+            createdAt: '2026-07-30T01:00:00.000Z',
+            status: 'deferred' as const,
+            payload: {
+              provisionalId: PROVISIONAL_ID,
+              snapshot: localNota(),
+              completed: false,
+              destination: 'archive' as const,
+              skuSnapshots: [],
+            },
+          },
+        ],
+      },
+    },
+    {
+      name: 'provisional Nota',
+      patch: { provisionalNotas: [localNota()] },
+    },
+    {
+      name: 'offline conflict',
+      patch: {
+        offlineConflicts: [
+          {
+            operationId: OPERATION_ID,
+            conflict: {
+              id: OPERATION_ID,
+              entityType: 'nota',
+              entityId: PROVISIONAL_ID,
+              base: null,
+              mine: null,
+              server: null,
+            },
+          },
+        ],
+      },
+    },
+    {
+      name: 'active quarantine',
+      patch: {
+        quarantine: {
+          active: true as const,
+          quarantinedAt: '2026-07-30T01:00:00.000Z',
+        },
+      },
+    },
+  ])('refuses to rebind v2 ownership with $name', ({ patch }) => {
+    const legacy = { ...legacyV2Envelope(), ...patch };
+
+    expect(() =>
+      migrateCoreCache(legacy, () => INSTALLATION_ID),
+    ).toThrow('pending work');
+  });
+
   it('migrates a v1 cache without losing its canonical cursor or online outbox', () => {
     const legacy = {
       cacheVersion: 1,

@@ -142,6 +142,12 @@ export class CoreMutationQueue {
 
   private async runPump(): Promise<void> {
     while (true) {
+      if (this.state.getSyncSnapshot().phase === 'revoked') {
+        this.failAllDeferred(
+          new Error('Akses perangkat dicabut. Antrean lokal dikarantina.'),
+        );
+        return;
+      }
       const item = this.state
         .getOutbox()
         .find((candidate) => !candidate.conflict);
@@ -245,7 +251,9 @@ export class CoreMutationQueue {
       return;
     }
     this.resolveDeferred(item.id, acknowledgement);
-    void this.refresh();
+    if (this.state.getSyncSnapshot().phase !== 'revoked') {
+      void this.refresh();
+    }
   }
 
   private async storeConflict(

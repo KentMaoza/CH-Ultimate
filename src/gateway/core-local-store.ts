@@ -19,6 +19,8 @@ import type { CoreConflict, CoreJsonValue } from './core-api-types';
 
 export const CORE_CACHE_VERSION = 3;
 
+export class CoreLocalOwnershipError extends Error {}
+
 export type CoreDeferredStatus =
   | 'deferred'
   | 'sending'
@@ -255,20 +257,24 @@ export function migrateCoreCache(
   const installationId = uuid.parse(uuidFactory());
   const v2 = legacyV2EnvelopeSchema.safeParse(value);
   if (v2.success) {
+    if (
+      v2.data.outbox.length > 0 ||
+      v2.data.deferredOutbox.length > 0 ||
+      v2.data.provisionalNotas.length > 0 ||
+      v2.data.offlineConflicts.length > 0 ||
+      v2.data.quarantine.active
+    ) {
+      throw new CoreLocalOwnershipError(
+        'Legacy cache contains pending work with unverified ownership.',
+      );
+    }
     return {
       ...cloneCore(v2.data),
       cacheVersion: CORE_CACHE_VERSION,
       installationId,
-      outbox: v2.data.quarantine.active ? [] : cloneCore(v2.data.outbox),
-      quarantinedOutbox: v2.data.quarantine.active
-        ? cloneCore(v2.data.outbox)
-        : [],
-      quarantine: v2.data.quarantine.active
-        ? {
-            ...v2.data.quarantine,
-            installationId,
-          }
-        : { active: false },
+      outbox: [],
+      quarantinedOutbox: [],
+      quarantine: { active: false },
     };
   }
   const legacy = legacyV1EnvelopeSchema.parse(value);
@@ -327,7 +333,9 @@ export class CoreLocalStore {
         ? emptyCoreLocalEnvelope(emptyCoreState(), installationId)
         : migrateCoreCache(raw, () => installationId);
     if (envelope.installationId !== installationId) {
-      throw new Error('Cache belongs to a different installation.');
+      throw new CoreLocalOwnershipError(
+        'Cache belongs to a different installation.',
+      );
     }
     this.envelope = envelope;
     return cloneCore(envelope);

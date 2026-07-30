@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import type { CoreLocalEnvelope } from '../../src/gateway/core-local-store';
+import {
+  CoreLocalStore,
+  type CoreLocalEnvelope,
+} from '../../src/gateway/core-local-store';
 import { createCoreOperationsGateway } from '../../src/gateway/core-operations-gateway';
+import { CoreDeferredOutbox } from '../../src/gateway/core-outbox';
 import {
   SKU_ID,
   MemoryStorage,
   ScriptedTransport,
   TestClock,
+  deferred,
   populatedBootstrap,
 } from './core-gateway-test-support';
 import { mapCoreBootstrapToDemoState } from '../../src/gateway/core-bootstrap-mapping';
@@ -37,7 +42,169 @@ async function offlineGateway() {
   return { gateway, storage, transport };
 }
 
+async function settleUntil(predicate: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (predicate()) return;
+    await Promise.resolve();
+  }
+  throw new Error('Condition did not settle.');
+}
+
 describe('Core offline permission matrix', () => {
+  it('fails closed visibly without rewriting or sending a v2 cache that owns pending work', async () => {
+    const pendingV2 = {
+      cacheVersion: 2 as const,
+      installationId: '11111111-1111-4111-8111-111111111111',
+      state: cachedState().state,
+      serverRevision: '7',
+      outbox: [
+        {
+          id: '20202020-2020-4020-8020-202020202020',
+          idempotencyKey: '20202020-2020-4020-8020-202020202020',
+          method: 'PATCH' as const,
+          path: `/v1/skus/${SKU_ID}`,
+          body: { patch: { name: 'Jangan pindahkan' } },
+          createdAt: '2026-07-30T01:00:00.000Z',
+        },
+      ],
+      deferredOutbox: [],
+      provisionalNotas: [],
+      offlineConflicts: [],
+      quarantine: { active: false },
+    };
+    const storage = new MemoryStorage(pendingV2 as never);
+    const before = structuredClone(storage.value);
+    const transport = new ScriptedTransport();
+    const gateway = createCoreOperationsGateway(
+      transport,
+      storage,
+      new TestClock(),
+    );
+
+    await expect(gateway.initialize()).resolves.toBeUndefined();
+
+    expect(gateway.getSyncSnapshot()).toMatchObject({
+      phase: 'upgrade-required',
+      message: 'Cache aplikasi tidak kompatibel.',
+    });
+    expect(storage.value).toEqual(before);
+    expect(transport.requests).toEqual([]);
+  });
+
+  it('fails closed visibly without rewriting or sending a v3 cache owned by another native installation', async () => {
+    const storage = new MemoryStorage();
+    const originalInstallation =
+      '10101010-1010-4010-8010-101010101010';
+    const store = new CoreLocalStore(
+      storage,
+      () => originalInstallation,
+    );
+    await store.update((envelope) => envelope);
+    const before = structuredClone(storage.value);
+    const transport = new ScriptedTransport();
+    transport.nativeInstallationId =
+      '11111111-1111-4111-8111-111111111111';
+    const gateway = createCoreOperationsGateway(
+      transport,
+      storage,
+      new TestClock(),
+    );
+
+    await expect(gateway.initialize()).resolves.toBeUndefined();
+
+    expect(gateway.getSyncSnapshot()).toMatchObject({
+      phase: 'upgrade-required',
+      message: 'Cache aplikasi tidak kompatibel.',
+    });
+    expect(storage.value).toEqual(before);
+    expect(transport.requests).toEqual([]);
+  });
+
+  it('stops a live normal queue when a concurrent deferred command receives 401', async () => {
+    const storage = new MemoryStorage();
+    const installationId = '10101010-1010-4010-8010-101010101010';
+    const preparedStore = new CoreLocalStore(storage, () => installationId);
+    const preparedDeferred = new CoreDeferredOutbox(
+      preparedStore,
+      new ScriptedTransport(),
+      {
+        now: () => new Date('2026-07-30T02:00:00.000Z'),
+        uuid: () => '20202020-2020-4020-8020-202020202020',
+      },
+    );
+    await preparedDeferred.deferStock({
+      skuId: SKU_ID,
+      skuIdentifier: 'SKU-001',
+      skuName: 'Produk Core',
+      referencePrice: 25_000,
+      delta: 1,
+      reason: 'Koreksi',
+    });
+
+    const transport = new ScriptedTransport();
+    const deferredResponse = deferred<{
+      status: number;
+      body: unknown;
+    }>();
+    const normalAResponse = deferred<{
+      status: number;
+      body: unknown;
+    }>();
+    transport.enqueue({ status: 200, body: populatedBootstrap('8') });
+    transport.enqueue(() => deferredResponse.promise);
+    const gateway = createCoreOperationsGateway(
+      transport,
+      storage,
+      new TestClock(),
+    );
+    const initializing = gateway.initialize();
+    await settleUntil(() => transport.requests.length === 2);
+
+    transport.enqueue(() => normalAResponse.promise);
+    const mutationA = gateway.updateSku(SKU_ID, { name: 'Mutasi A' });
+    await settleUntil(() => transport.requests.length === 3);
+    const mutationB = gateway.setArchived(SKU_ID, true);
+    await settleUntil(
+      () =>
+        (
+          storage.value as unknown as CoreLocalEnvelope
+        ).outbox?.length === 2,
+    );
+
+    deferredResponse.resolve({
+      status: 401,
+      body: { code: 'UNAUTHORIZED' },
+    });
+    await initializing;
+
+    const quarantined = storage.value as unknown as CoreLocalEnvelope;
+    expect(quarantined.outbox).toEqual([]);
+    expect(quarantined.quarantinedOutbox).toHaveLength(2);
+    expect(gateway.getSyncSnapshot().phase).toBe('revoked');
+
+    normalAResponse.resolve({
+      status: 200,
+      body: {
+        serverRevision: '9',
+        entityId: SKU_ID,
+        entityVersion: '2',
+        entity: {
+          ...populatedBootstrap('8').skus[0],
+          name: 'Mutasi A',
+          rowVersion: '2',
+        },
+      },
+    });
+
+    await expect(mutationA).resolves.toBeUndefined();
+    await expect(mutationB).rejects.toThrow('Akses perangkat dicabut');
+    expect(transport.requests).toHaveLength(3);
+    expect(gateway.getSyncSnapshot().phase).toBe('revoked');
+    expect(
+      (storage.value as unknown as CoreLocalEnvelope).quarantinedOutbox,
+    ).toHaveLength(2);
+  });
+
   it('quarantines the normal mutation queue on 401 and resumes it only for the same native installation', async () => {
     const storage = new MemoryStorage(cachedState());
     const transport = new ScriptedTransport();
@@ -310,6 +477,27 @@ describe('Core local Nota projection', () => {
           gateway: ReturnType<typeof createCoreOperationsGateway>,
           notaId: string,
         ) => gateway.completeNotaTransaction(notaId),
+      },
+      {
+        name: 'reopen transaction',
+        run: (
+          gateway: ReturnType<typeof createCoreOperationsGateway>,
+          notaId: string,
+        ) => gateway.reopenNotaTransaction(notaId),
+      },
+      {
+        name: 'cancel transaction',
+        run: (
+          gateway: ReturnType<typeof createCoreOperationsGateway>,
+          notaId: string,
+        ) => gateway.cancelNotaTransaction(notaId),
+      },
+      {
+        name: 'restore transaction',
+        run: (
+          gateway: ReturnType<typeof createCoreOperationsGateway>,
+          notaId: string,
+        ) => gateway.restoreNotaTransaction(notaId),
       },
     ];
 

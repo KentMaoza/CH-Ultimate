@@ -10,8 +10,9 @@ signed stock delta with a required reason and captured SKU snapshot. All other
 shared writes fail closed while offline. A successful authenticated refresh is
 required before either command can transmit.
 
-The implementation and first reviewer fix round are complete. The root,
-server-unit, mobile, package, and Android gates pass. Two
+The implementation and first reviewer fix round are complete. Reviewer fix
+round 2 addresses all three reported findings and is pending re-review. The
+root, server-unit, mobile, package, and Android gates pass. Two
 environmental/inherited gates remain:
 
 - `CH_CORE_TEST_DATABASE_URL` is unset, so the exact isolated `chu_test`
@@ -31,10 +32,12 @@ claimed.
   decimal cursor, existing online outbox, installation UUID, deferred offline
   outbox, a separately persisted quarantined online outbox, provisional Notas,
   retained offline conflicts, and installation-bound quarantine state.
-- Existing cache-v1/v2 data migrates without losing its canonical cursor or
-  online outbox. An active v2 quarantine migrates its normal outbox into the
-  fail-closed quarantine. Invalid v3 data fails closed without rewriting the
-  caller's recoverable value.
+- Existing cache-v1 data migrates without losing its canonical cursor or
+  online outbox. Clean v2 canonical read data migrates only when it contains no
+  recoverable work. Because v2 identity was not native-bound, any v2 normal/deferred
+  outbox, provisional Nota, conflict, or active quarantine fails closed
+  without rewriting or transmitting. Invalid v3 data and a native UUID
+  mismatch also fail closed visibly without rewriting the caller's value.
 - Added a FIFO deferred outbox that persists the operation UUID, exact payload,
   and send state before transport. A Nota snapshot may be replaced only before
   its first send while retaining the same operation UUID.
@@ -49,6 +52,12 @@ claimed.
   closed and expose the complete visible count. A successful bootstrap resumes
   work only when its native installation UUID matches the installation that
   was revoked.
+- A deferred-command `401` uses one post-persistence callback to reset polling
+  and restore the persisted quarantine into live gateway state. The normal
+  mutation queue checks revocation before every iteration, so a concurrent
+  in-flight A may acknowledge idempotently while queued B never transmits;
+  both durable quarantine entries remain intact and no revoked post-ack refresh
+  runs.
 - Electron exposes that stable UUID from the existing encrypted
   `safeStorage` credential state through one authenticated IPC method. Android
   exposes the existing Keystore-backed installation UUID through one native
@@ -76,6 +85,8 @@ claimed.
   Once its command has `firstSentAt`, header, line, page, delete, and completion
   edits all retain the immutable payload and reject with the existing
   `Sedang sinkronisasi` guard. Completed local Notas also reject page restore.
+  Provisional reopen, cancellation, and restoration follow the same guarded
+  local route and never send a provisional UUID to server lifecycle endpoints.
 - Added authenticated `/v1/offline/notas` and
   `/v1/offline/stock-adjustments` routes under the existing idempotency
   receipt, payload-hash, device identity, business-lock, and transaction
@@ -99,7 +110,7 @@ claimed.
 
 ## Bounded module layout
 
-- `src/gateway/core-local-store.ts`: 437 lines
+- `src/gateway/core-local-store.ts`: 466 lines
 - `src/gateway/core-outbox.ts`: 355 lines
 - `server/src/offline/validation.ts`: 167 lines
 - `server/src/offline/service.ts`: 97 lines
@@ -145,6 +156,11 @@ stays below 500 lines.
     passed 31 tests. A full run exposed six optimistic timing/cached-publication
     regressions; a synchronous provisional-ID projection and bounded legacy
     cache publication restored them before the final full gate.
+12. Reviewer fix round 2 added a deterministic RED interleaving for deferred
+    401 versus normal A/B, three provisional lifecycle RED cases, five v2
+    recoverable-ownership cases, and visible v2/v3 initialization refusal.
+    The focused regression set passed 48 tests and the final root suite passed
+    442 tests. All three findings are addressed pending re-review.
 
 ## Exact MariaDB integration source
 
@@ -166,7 +182,7 @@ because `CH_CORE_TEST_DATABASE_URL` is absent.
 
 | Gate | Result |
 | --- | --- |
-| `npm run verify` | PASS — 56 files, 433 tests |
+| `npm run verify` | PASS — 56 files, 442 tests |
 | `npm run test:mobile` | PASS — 9 files, 84 tests |
 | `npm run mobile:build` | PASS — 589 modules |
 | `npm run package` | PASS — Electron arm64 package |

@@ -6,6 +6,7 @@ interface IpcMainPort {
     channel: string,
     listener: (event: unknown, input?: unknown) => unknown,
   ): void;
+  removeHandler?(channel: string): void;
 }
 
 interface TrustedWebContents {
@@ -81,7 +82,7 @@ export function registerCoreIpcHandlers(
   ipcMain: IpcMainPort,
   service: ChCoreBridge,
   trustedSender: TrustedWebContents,
-): void {
+): () => void {
   const authorized =
     <T>(handler: (input?: unknown) => T) =>
     async (event: unknown, input?: unknown): Promise<T> => {
@@ -125,4 +126,10 @@ export function registerCoreIpcHandlers(
     CH_CORE_IPC_CHANNELS.rotateToken,
     authorized(() => service.rotateToken()),
   );
+
+  return () => {
+    for (const channel of Object.values(CH_CORE_IPC_CHANNELS)) {
+      ipcMain.removeHandler?.(channel);
+    }
+  };
 }

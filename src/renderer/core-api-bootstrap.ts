@@ -5,6 +5,7 @@ import type {
 import type {
   CoreGatewayClock,
   CoreGatewayStorage,
+  CoreOperationsGateway,
 } from '../gateway/core-operations-gateway';
 import { createCoreOperationsGateway } from '../gateway/core-operations-gateway';
 import type { OperationsGateway } from '../gateway/operations-gateway';
@@ -18,7 +19,12 @@ export type DesktopRuntimeMode = 'production' | 'development' | 'test';
 export type DesktopBootstrapResult =
   | {
       kind: 'gateway';
-      source: 'core' | 'test-mock';
+      source: 'core';
+      gateway: CoreOperationsGateway;
+    }
+  | {
+      kind: 'gateway';
+      source: 'test-mock';
       gateway: OperationsGateway;
     }
   | {

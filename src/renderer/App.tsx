@@ -13,6 +13,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { ArchiveNotaPage, initialArchiveNotaView, type ArchiveNotaViewState } from './pages/ArchiveNotaPage';
 import { ShareRecommendationsPage } from './pages/ShareRecommendationsPage';
 import { RevenueAccessProvider } from './revenue-access';
+import { OperationsSyncStatus } from './OperationsSyncStatus';
 
 export type ModuleId = 'inventory' | 'skuChanges' | 'shareRecommendations' | 'create' | 'label' | 'nota' | 'notaArchive' | 'revenue' | 'empty' | 'settings';
 type NavIconName = 'warehouse' | 'history' | 'share' | 'add' | 'template' | 'nota' | 'archive' | 'revenue' | 'empty' | 'settings';
@@ -46,7 +47,13 @@ function NavIcon({ name }: { name: NavIconName }) {
   </svg>;
 }
 
-function AppLayout() {
+function AppLayout({
+  gateway,
+  coreBacked,
+}: {
+  gateway: OperationsGateway;
+  coreBacked: boolean;
+}) {
   const [active, setActive] = useState<ModuleId>('inventory');
   const [collapsed, setCollapsed] = useState(false);
   const [archiveView, setArchiveView] = useState<ArchiveNotaViewState>(initialArchiveNotaView);
@@ -91,12 +98,25 @@ function AppLayout() {
             </button>
           ))}
         </nav>
-        <div className="demo-badge">{collapsed ? 'DEMO' : 'DEMO DATA · SESSION ONLY'}</div>
+        {!coreBacked && (
+          <div className="demo-badge">
+            {collapsed ? 'DEMO' : 'DEMO DATA · SESSION ONLY'}
+          </div>
+        )}
       </aside>
       <main className="app-main">
         <header className="page-header">
-          <div><span className="eyebrow">CH ULTIMATE / DEMO</span><h1>{current.label}</h1></div>
-          <div className="session-pill">Keluar / reload = data hilang</div>
+          <div>
+            <span className="eyebrow">
+              {coreBacked ? 'CH ULTIMATE / CH CORE' : 'CH ULTIMATE / DEMO'}
+            </span>
+            <h1>{current.label}</h1>
+          </div>
+          {coreBacked ? (
+            <OperationsSyncStatus gateway={gateway} />
+          ) : (
+            <div className="session-pill">Keluar / reload = data hilang</div>
+          )}
         </header>
         {active === 'inventory' ? <InventoryPage /> : active === 'skuChanges' ? <SkuChangesPage /> : active === 'shareRecommendations' ? <ShareRecommendationsPage /> : active === 'create' ? <CreateSkuPage /> : active === 'label' ? <LabelPage /> : active === 'notaArchive' ? <ArchiveNotaPage view={archiveView} onViewChange={setArchiveView} onOpenNota={openNota} /> : active === 'revenue' ? <RevenuePage onOpenSettings={() => setActive('settings')} /> : active === 'empty' ? <EmptyStockPage /> : active === 'settings' ? <SettingsPage /> : (
           <section className="page-placeholder"><span className="placeholder-number">0{modules.findIndex((module) => module.id === active) + 1}</span><div><h2>{current.label}</h2><p>Frontend operasional sedang aktif. Data hanya berlaku untuk sesi ini.</p></div></section>
@@ -106,6 +126,12 @@ function AppLayout() {
   );
 }
 
-export function App({ gateway }: { gateway?: OperationsGateway }) {
-  return <OperationsProvider gateway={gateway}><RevenueAccessProvider><AppLayout /></RevenueAccessProvider></OperationsProvider>;
+export function App({
+  gateway,
+  coreBacked = false,
+}: {
+  gateway: OperationsGateway;
+  coreBacked?: boolean;
+}) {
+  return <OperationsProvider gateway={gateway}><RevenueAccessProvider><AppLayout gateway={gateway} coreBacked={coreBacked} /></RevenueAccessProvider></OperationsProvider>;
 }

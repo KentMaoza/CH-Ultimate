@@ -4,6 +4,11 @@ import type { ChCoreBridge } from '../../src/electron/core-bridge-contract';
 import type { OperationsGateway } from '../../src/gateway/operations-gateway';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 import { bootstrapDesktopGateway } from '../../src/renderer/core-api-bootstrap';
+import {
+  MemoryStorage,
+  TestClock,
+  populatedBootstrap,
+} from './core-gateway-test-support';
 
 function bridge(
   status: Awaited<ReturnType<ChCoreBridge['credentialStatus']>>,
@@ -85,5 +90,38 @@ describe('desktop CH Core bootstrap', () => {
       gateway,
     });
     expect(mockFactory).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates the Core gateway for a paired production bridge', async () => {
+    const chCore = bridge({
+      production: true,
+      configuration: 'ready',
+      credential: 'paired',
+      deviceId: '11111111-1111-4111-8111-111111111111',
+    });
+    chCore.request = vi.fn().mockResolvedValue({
+      status: 200,
+      body: populatedBootstrap('4'),
+    });
+
+    const result = await bootstrapDesktopGateway({
+      bridge: chCore,
+      mode: 'production',
+      storage: new MemoryStorage(),
+      clock: new TestClock(),
+    });
+
+    expect(result.kind).toBe('gateway');
+    if (result.kind !== 'gateway') return;
+    expect(result.source).toBe('core');
+    expect(chCore.request).toHaveBeenCalledWith({
+      method: 'GET',
+      path: '/v1/bootstrap',
+    });
+    expect(result.gateway.getSyncSnapshot()).toMatchObject({
+      phase: 'online',
+      serverRevision: '4',
+    });
+    if (result.source === 'core') result.gateway.dispose();
   });
 });

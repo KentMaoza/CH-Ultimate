@@ -3,7 +3,7 @@ import { App } from '../../src/renderer/App';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 
 test('adjusts a tracked SKU into a negative balance in the current session', async () => {
-  render(<App />);
+  render(<App gateway={new MockOperationsGateway()} />);
   expect(screen.getByTestId('sku-stock-sku-1')).toHaveTextContent('24');
   const row = screen.getByRole('row', { name: /BRS-108-BLK/ });
   fireEvent.click(within(row).getByRole('button', { name: 'Kurangi stok BRS-108-BLK' }));
@@ -13,7 +13,7 @@ test('adjusts a tracked SKU into a negative balance in the current session', asy
 });
 
 test('uses explicit add and subtract stock actions without requiring signed input', async () => {
-  render(<App />);
+  render(<App gateway={new MockOperationsGateway()} />);
   const row = screen.getByRole('row', { name: /BRS-108-BLK/ });
   fireEvent.click(within(row).getByRole('button', { name: 'Tambah stok BRS-108-BLK' }));
   fireEvent.change(screen.getByLabelText('Jumlah stok ditambah'), { target: { value: '5' } });
@@ -65,7 +65,7 @@ test('lists filtered price and quantity changes and exposes price export', async
 
 test('prints a chosen quantity of warehouse SKU barcodes', () => {
   const print = vi.spyOn(window, 'print').mockImplementation(() => {});
-  render(<App />);
+  render(<App gateway={new MockOperationsGateway()} />);
   const row = screen.getByRole('row', { name: /BRS-108-BLK/ });
   fireEvent.click(within(row).getByRole('button', { name: 'Print barcode BRS-108-BLK' }));
   const dialog = screen.getByRole('dialog', { name: 'Print barcode produk' });
@@ -86,7 +86,7 @@ test('prints a chosen quantity of warehouse SKU barcodes', () => {
 });
 
 test('creates a SKU and shows it in the warehouse list', async () => {
-  render(<App />);
+  render(<App gateway={new MockOperationsGateway()} />);
   fireEvent.click(screen.getByRole('button', { name: 'Buat SKU' }));
   fireEvent.change(screen.getByLabelText('Nomor SKU'), { target: { value: 'NEW-001' } });
   fireEvent.change(screen.getByLabelText('Nama SKU'), { target: { value: 'Produk Baru' } });
@@ -99,7 +99,7 @@ test('creates a SKU and shows it in the warehouse list', async () => {
 });
 
 test('title-cases SKU names during create and edit without changing codes or notes', async () => {
-  render(<App />);
+  render(<App gateway={new MockOperationsGateway()} />);
   fireEvent.click(screen.getByRole('button', { name: 'Buat SKU' }));
   fireEvent.change(screen.getByLabelText('Nomor SKU'), { target: { value: 'ch001' } });
   fireEvent.change(screen.getByLabelText('Nama SKU'), { target: { value: 'produk hITAM ch001 XL' } });
@@ -125,7 +125,7 @@ test('title-cases SKU names during create and edit without changing codes or not
 });
 
 test('edits a SKU number while keeping the old value searchable', async () => {
-  render(<App />);
+  render(<App gateway={new MockOperationsGateway()} />);
   const row = screen.getByRole('row', { name: /BRS-108-BLK/ });
   fireEvent.click(within(row).getByRole('button', { name: 'Edit BRS-108-BLK' }));
   fireEvent.change(screen.getByLabelText('Edit nomor SKU'), { target: { value: 'BRS-NEW' } });

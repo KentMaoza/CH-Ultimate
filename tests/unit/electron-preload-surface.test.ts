@@ -7,6 +7,38 @@ import {
 import { registerCoreIpcHandlers } from '../../src/electron/core-ipc';
 
 describe('CH Core preload surface', () => {
+  it('publishes the six-method bridge without exposing raw Electron IPC', async () => {
+    vi.resetModules();
+    const exposeInMainWorld = vi.fn();
+    const invoke = vi.fn().mockResolvedValue({ status: 'ok' });
+    vi.doMock('electron', () => ({
+      contextBridge: { exposeInMainWorld },
+      ipcRenderer: { invoke },
+    }));
+
+    await import('../../src/preload');
+
+    expect(exposeInMainWorld).toHaveBeenCalledTimes(1);
+    const [key, bridge] = exposeInMainWorld.mock.calls[0]!;
+    expect(key).toBe('chCore');
+    expect(Object.keys(bridge).sort()).toEqual([
+      'claimPairing',
+      'completePairing',
+      'credentialStatus',
+      'enrollOwner',
+      'request',
+      'rotateToken',
+    ]);
+    expect(bridge).not.toHaveProperty('ipcRenderer');
+    await bridge.credentialStatus();
+    expect(invoke).toHaveBeenCalledWith(
+      CH_CORE_IPC_CHANNELS.credentialStatus,
+      undefined,
+    );
+
+    vi.doUnmock('electron');
+  });
+
   it('exposes exactly six narrow methods without raw IPC', async () => {
     const invoke = vi.fn().mockResolvedValue({ status: 'ok' });
     const bridge = createChCoreBridge(invoke);
@@ -49,6 +81,33 @@ describe('CH Core preload surface', () => {
 });
 
 describe('CH Core main IPC registration', () => {
+  it('returns cleanup for the fixed handlers when the trusted window closes', () => {
+    const removeHandler = vi.fn();
+    const ipcMain = {
+      handle: vi.fn(),
+      removeHandler,
+    };
+    const service = {
+      request: vi.fn(),
+      credentialStatus: vi.fn(),
+      enrollOwner: vi.fn(),
+      claimPairing: vi.fn(),
+      completePairing: vi.fn(),
+      rotateToken: vi.fn(),
+    };
+
+    const unregister = registerCoreIpcHandlers(
+      ipcMain,
+      service,
+      { mainFrame: {} },
+    );
+    unregister();
+
+    expect(removeHandler.mock.calls.map(([channel]) => channel).sort()).toEqual(
+      Object.values(CH_CORE_IPC_CHANNELS).sort(),
+    );
+  });
+
   it('registers only the fixed bridge channels', async () => {
     const handlers = new Map<string, (...args: unknown[]) => unknown>();
     const ipcMain = {

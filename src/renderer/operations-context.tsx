@@ -1,11 +1,11 @@
-import { createContext, useContext, useMemo, useSyncExternalStore, type ReactNode } from 'react';
-import { MockOperationsGateway, type OperationsGateway } from '../gateway/operations-gateway';
+import { createContext, useContext, useSyncExternalStore, type ReactNode } from 'react';
+import type { OperationsGateway } from '../gateway/operations-gateway';
 
 const GatewayContext = createContext<OperationsGateway | null>(null);
 
-export function OperationsProvider({ children, gateway }: { children: ReactNode; gateway?: OperationsGateway }) {
-  const value = useMemo(() => gateway ?? new MockOperationsGateway(), [gateway]);
-  return <GatewayContext.Provider value={value}>{children}</GatewayContext.Provider>;
+export function OperationsProvider({ children, gateway }: { children: ReactNode; gateway: OperationsGateway }) {
+  if (!gateway) throw new Error('OperationsGateway is required.');
+  return <GatewayContext.Provider value={gateway}>{children}</GatewayContext.Provider>;
 }
 
 export function useOperations() {
@@ -14,4 +14,3 @@ export function useOperations() {
   const state = useSyncExternalStore(gateway.subscribe, gateway.getSnapshot, gateway.getSnapshot);
   return { state, gateway };
 }
-

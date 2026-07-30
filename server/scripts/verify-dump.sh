@@ -7,7 +7,7 @@ script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 [ "$#" -eq 1 ] ||
   die 'Usage: verify-dump.sh /absolute/completed-backup.bundle'
 bundle=$1
-require_absolute_path "$bundle" 'Backup bundle path'
+require_backup_bundle_path "$bundle" /backup
 [ -d "$bundle" ] && [ ! -L "$bundle" ] ||
   die 'Backup bundle must be a regular non-symlink directory.'
 

@@ -21,8 +21,15 @@ function renderNota(
   scanner: BarcodeScannerPort = { scan: async () => null },
   seedFactory: () => DemoState = createMobileDemoState,
   gateway = new MockOperationsGateway(seedFactory),
+  coreBacked = false,
 ) {
-  render(<MobileNotaView gateway={gateway} scanner={scanner} />);
+  render(
+    <MobileNotaView
+      coreBacked={coreBacked}
+      gateway={gateway}
+      scanner={scanner}
+    />,
+  );
   return gateway;
 }
 
@@ -183,31 +190,59 @@ test('the sixteenth unique item automatically creates B and keeps fifteen number
   expect(screen.getByRole('button', { name: 'Bagian B' })).toHaveStyle({ '--mobile-nota-accent': '#1565C0' });
 });
 
-test('mobile completion synchronizes the archived Nota for all clients', async () => {
+test('demo mobile completion stays local and never claims synchronization', async () => {
   const gateway = renderNota();
   await screen.findByRole('heading', { name: 'Nota Barang' });
   await addManual('Barang Demo');
   fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
   const dialog = screen.getByRole('dialog', { name: 'Selesaikan nota mobile?' });
   expect(within(dialog).getAllByRole('button')).toHaveLength(2);
+  expect(dialog).toHaveTextContent(
+    'Nota disimpan ke Arsip pada sesi demo lokal ini.',
+  );
+  expect(dialog).not.toHaveTextContent(/semua perangkat|sinkronisasi/i);
   fireEvent.click(within(dialog).getByRole('button', { name: 'Simpan ke Arsip' }));
 
   expect(await screen.findByRole('status')).toHaveTextContent(
-    'Nota tersimpan di Arsip dan tersedia di semua perangkat.',
+    'Nota tersimpan di Arsip sesi demo lokal.',
+  );
+  expect(screen.getByRole('status')).not.toHaveTextContent(
+    /semua perangkat|sinkronisasi/i,
   );
   expect(gateway.getSnapshot().notaTransactions.find((item) => item.status === 'completed')).toMatchObject({
     completionDestination: 'archive',
   });
 });
 
+test('Core mobile completion describes the shared archived Nota', async () => {
+  renderNota(undefined, createMobileDemoState, undefined, true);
+  await screen.findByRole('heading', { name: 'Nota Barang' });
+  await addManual('Barang Core');
+  fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
+  const dialog = screen.getByRole('dialog', {
+    name: 'Selesaikan nota mobile?',
+  });
+  expect(dialog).toHaveTextContent(
+    'Nota disimpan ke Arsip dan tersedia di semua perangkat setelah sinkronisasi.',
+  );
+  fireEvent.click(
+    within(dialog).getByRole('button', { name: 'Simpan ke Arsip' }),
+  );
+
+  expect(await screen.findByRole('status')).toHaveTextContent(
+    'Nota tersimpan di Arsip dan tersedia di semua perangkat.',
+  );
+});
+
 test('mobile completion labels central stock and omzet as pending while offline', async () => {
-  const gateway = renderNota();
+  const gateway = new MockOperationsGateway(createMobileDemoState);
   gateway.getSyncSnapshot = () => ({
     phase: 'offline',
     serverRevision: '7',
     pendingCount: 1,
     conflictCount: 0,
   });
+  renderNota(undefined, createMobileDemoState, gateway, true);
   await screen.findByRole('heading', { name: 'Nota Barang' });
   await addManual('Barang Offline');
   fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));

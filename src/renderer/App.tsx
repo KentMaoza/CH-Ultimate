@@ -118,7 +118,7 @@ function AppLayout({
             <div className="session-pill">Keluar / reload = data hilang</div>
           )}
         </header>
-        {active === 'inventory' ? <InventoryPage /> : active === 'skuChanges' ? <SkuChangesPage coreBacked={coreBacked} /> : active === 'shareRecommendations' ? <ShareRecommendationsPage /> : active === 'create' ? <CreateSkuPage coreBacked={coreBacked} /> : active === 'label' ? <LabelPage coreBacked={coreBacked} /> : active === 'notaArchive' ? <ArchiveNotaPage view={archiveView} onViewChange={setArchiveView} onOpenNota={openNota} /> : active === 'revenue' ? <RevenuePage coreBacked={coreBacked} onOpenSettings={() => setActive('settings')} /> : active === 'empty' ? <EmptyStockPage /> : active === 'settings' ? <SettingsPage coreBacked={coreBacked} /> : (
+        {active === 'inventory' ? <InventoryPage /> : active === 'skuChanges' ? <SkuChangesPage coreBacked={coreBacked} /> : active === 'shareRecommendations' ? <ShareRecommendationsPage /> : active === 'create' ? <CreateSkuPage coreBacked={coreBacked} /> : active === 'label' ? <LabelPage coreBacked={coreBacked} /> : active === 'notaArchive' ? <ArchiveNotaPage view={archiveView} onViewChange={setArchiveView} onOpenNota={openNota} /> : active === 'revenue' ? <RevenuePage coreBacked={coreBacked} onOpenSettings={() => setActive('settings')} /> : active === 'empty' ? <EmptyStockPage coreBacked={coreBacked} /> : active === 'settings' ? <SettingsPage coreBacked={coreBacked} /> : (
           <section className="page-placeholder"><span className="placeholder-number">0{modules.findIndex((module) => module.id === active) + 1}</span><div><h2>{current.label}</h2><p>Frontend operasional sedang aktif. Data hanya berlaku untuk sesi ini.</p></div></section>
         )}
       </main>

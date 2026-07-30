@@ -7,6 +7,7 @@ import {
   lstat,
   mkdir,
   mkdtemp,
+  realpath,
   readFile,
   symlink,
   unlink,
@@ -68,6 +69,28 @@ async function createCompleteBundle(
     { mode: 0o600 },
   );
   return bundle;
+}
+
+async function createScriptHarness(
+  directory: string,
+  backupRoot: string,
+): Promise<string> {
+  const harnessRoot = path.join(directory, 'scripts');
+  await mkdir(harnessRoot);
+  for (const script of [
+    'database-common.sh',
+    'dump-database.sh',
+    'verify-dump.sh',
+    'restore-scratch.sh',
+  ]) {
+    const source = await text(`scripts/${script}`);
+    const harnessSource = source.replaceAll(
+      'require_backup_bundle_path "$bundle" /backup',
+      `require_backup_bundle_path "$bundle" ${backupRoot}`,
+    );
+    await createExecutable(harnessRoot, script, harnessSource);
+  }
+  return harnessRoot;
 }
 
 describe('local CH Core deployment artifacts', () => {
@@ -169,6 +192,25 @@ describe('local CH Core deployment artifacts', () => {
     expect(env).not.toMatch(/kentmaoza|192\.168\.1\.14|64fcb734/i);
   });
 
+  it('allowlists runtime and ops credentials without sharing one env file', async () => {
+    const compose = await text('compose.yaml');
+    const runtimeBlock = compose.slice(
+      compose.indexOf('  ch-core:'),
+      compose.indexOf('  ch-core-ops:'),
+    );
+    const opsBlock = compose.slice(compose.indexOf('  ch-core-ops:'));
+
+    expect(compose).not.toContain('env_file:');
+    expect(runtimeBlock).toContain('CH_CORE_DATABASE_URL:');
+    expect(runtimeBlock).toContain('CH_CORE_OWNER_BOOTSTRAP_SECRET:');
+    expect(runtimeBlock).not.toContain('CH_CORE_BACKUP_DATABASE_URL');
+    expect(runtimeBlock).not.toContain('CH_CORE_RESTORE_DATABASE_URL');
+    expect(opsBlock).toContain('CH_CORE_BACKUP_DATABASE_URL:');
+    expect(opsBlock).toContain('CH_CORE_RESTORE_DATABASE_URL:');
+    expect(opsBlock).not.toMatch(/^\s+CH_CORE_DATABASE_URL:/m);
+    expect(opsBlock).not.toContain('CH_CORE_OWNER_BOOTSTRAP_SECRET');
+  });
+
   it('ships executable scripts without secrets in command arguments', async () => {
     for (const script of [
       'container-entrypoint.sh',
@@ -185,8 +227,54 @@ describe('local CH Core deployment artifacts', () => {
     }
   });
 
+  it('accepts only one safe direct bundle child under a canonical backup root', async () => {
+    const directory = await realpath(
+      await mkdtemp(path.join(os.tmpdir(), 'ch-core-path-policy-')),
+    );
+    const root = path.join(directory, 'backup');
+    await mkdir(root);
+    const linkedRoot = path.join(directory, 'linked-backup');
+    await symlink(root, linkedRoot);
+    const linkedTarget = path.join(root, 'linked.bundle');
+    await symlink(path.join(directory, 'outside.bundle'), linkedTarget);
+    const validate = (candidate: string, backupRoot = root) =>
+      run('sh', [
+        '-c',
+        '. "$1"; require_backup_bundle_path "$2" "$3"',
+        'validate-backup-path',
+        path.join(scriptsRoot, 'database-common.sh'),
+        candidate,
+        backupRoot,
+      ]);
+
+    await expect(validate(path.join(root, 'safe-name.bundle'))).resolves.toBeDefined();
+    for (const candidate of [
+      root,
+      path.join(directory, 'outside.bundle'),
+      path.join(root, '..', 'outside.bundle'),
+      path.join(root, 'nested', 'unsafe.bundle'),
+      path.join(root, 'unsafe name.bundle'),
+      linkedTarget,
+    ]) {
+      await expect(validate(candidate)).rejects.toBeDefined();
+    }
+    await expect(
+      validate(path.join(linkedRoot, 'safe.bundle'), linkedRoot),
+    ).rejects.toBeDefined();
+
+    const dump = await text('scripts/dump-database.sh');
+    const verify = await text('scripts/verify-dump.sh');
+    const restore = await text('scripts/restore-scratch.sh');
+    for (const source of [dump, verify, restore]) {
+      expect(source).toContain('require_backup_bundle_path "$bundle" /backup');
+    }
+  });
+
   it('atomically reserves a new dump bundle and publishes completion last', async () => {
-    const directory = await mkdtemp(path.join(os.tmpdir(), 'ch-core-dump-'));
+    const directory = await realpath(
+      await mkdtemp(path.join(os.tmpdir(), 'ch-core-dump-')),
+    );
+    const harnessRoot = await createScriptHarness(directory, directory);
     const fakeDump = await createExecutable(
       directory,
       'mariadb-dump',
@@ -194,7 +282,7 @@ describe('local CH Core deployment artifacts', () => {
     );
     const bundle = path.join(directory, 'new.bundle');
 
-    await run(path.join(scriptsRoot, 'dump-database.sh'), [bundle], {
+    await run(path.join(harnessRoot, 'dump-database.sh'), [bundle], {
       env: backupEnvironment({ CH_CORE_MARIADB_DUMP_BIN: fakeDump }),
     });
 
@@ -205,18 +293,21 @@ describe('local CH Core deployment artifacts', () => {
     expect((await lstat(path.join(bundle, 'dump.sql.sha256'))).isFile()).toBe(
       true,
     );
-    await run(path.join(scriptsRoot, 'verify-dump.sh'), [bundle]);
+    await run(path.join(harnessRoot, 'verify-dump.sh'), [bundle]);
   });
 
   it('never overwrites a pre-existing bundle directory', async () => {
-    const directory = await mkdtemp(path.join(os.tmpdir(), 'ch-core-race-'));
+    const directory = await realpath(
+      await mkdtemp(path.join(os.tmpdir(), 'ch-core-race-')),
+    );
+    const harnessRoot = await createScriptHarness(directory, directory);
     const bundle = path.join(directory, 'reserved.bundle');
     await mkdir(bundle);
     const sentinel = path.join(bundle, 'owner-data');
     await writeFile(sentinel, 'untouched');
 
     await expect(
-      run(path.join(scriptsRoot, 'dump-database.sh'), [bundle], {
+      run(path.join(harnessRoot, 'dump-database.sh'), [bundle], {
         env: backupEnvironment(),
       }),
     ).rejects.toMatchObject({
@@ -226,12 +317,15 @@ describe('local CH Core deployment artifacts', () => {
   });
 
   it('rejects incomplete bundles, unsafe symlinks, and checksum mismatch', async () => {
-    const directory = await mkdtemp(path.join(os.tmpdir(), 'ch-core-verify-'));
+    const directory = await realpath(
+      await mkdtemp(path.join(os.tmpdir(), 'ch-core-verify-')),
+    );
+    const harnessRoot = await createScriptHarness(directory, directory);
     const incomplete = path.join(directory, 'incomplete.bundle');
     await mkdir(incomplete);
     await writeFile(path.join(incomplete, 'dump.sql'), 'SELECT 1;\n');
     await expect(
-      run(path.join(scriptsRoot, 'verify-dump.sh'), [incomplete]),
+      run(path.join(harnessRoot, 'verify-dump.sh'), [incomplete]),
     ).rejects.toMatchObject({
       stderr: expect.stringMatching(/incomplete|marker/i),
     });
@@ -244,7 +338,7 @@ describe('local CH Core deployment artifacts', () => {
       path.join(linked, 'dump.sql'),
     );
     await expect(
-      run(path.join(scriptsRoot, 'verify-dump.sh'), [linked]),
+      run(path.join(harnessRoot, 'verify-dump.sh'), [linked]),
     ).rejects.toMatchObject({
       stderr: expect.stringMatching(/symlink|regular/i),
     });
@@ -256,7 +350,7 @@ describe('local CH Core deployment artifacts', () => {
     );
     await writeFile(path.join(mismatched, 'dump.sql'), 'tampered\n');
     await expect(
-      run(path.join(scriptsRoot, 'verify-dump.sh'), [mismatched]),
+      run(path.join(harnessRoot, 'verify-dump.sh'), [mismatched]),
     ).rejects.toMatchObject({
       stderr: expect.stringContaining('checksum'),
     });
@@ -264,7 +358,7 @@ describe('local CH Core deployment artifacts', () => {
     const extra = await createCompleteBundle(directory, 'extra.bundle');
     await writeFile(path.join(extra, 'unexpected.txt'), 'not part of bundle');
     await expect(
-      run(path.join(scriptsRoot, 'verify-dump.sh'), [extra]),
+      run(path.join(harnessRoot, 'verify-dump.sh'), [extra]),
     ).rejects.toMatchObject({
       stderr: expect.stringMatching(/unexpected|exactly/i),
     });
@@ -273,7 +367,10 @@ describe('local CH Core deployment artifacts', () => {
   it('makes production restore structurally impossible and never creates or drops schemas', async () => {
     const restore = await text('scripts/restore-scratch.sh');
     const common = await text('scripts/database-common.sh');
-    const directory = await mkdtemp(path.join(os.tmpdir(), 'ch-core-restore-'));
+    const directory = await realpath(
+      await mkdtemp(path.join(os.tmpdir(), 'ch-core-restore-')),
+    );
+    const harnessRoot = await createScriptHarness(directory, directory);
     const bundle = await createCompleteBundle(directory);
 
     expect(restore).toContain('CH_CORE_RESTORE_DATABASE_URL');
@@ -281,7 +378,7 @@ describe('local CH Core deployment artifacts', () => {
     expect(restore).not.toMatch(/CREATE\s+DATABASE|DROP\s+DATABASE/i);
     expect(common).not.toMatch(/CREATE\s+DATABASE|DROP\s+DATABASE/i);
     await expect(
-      run(path.join(scriptsRoot, 'restore-scratch.sh'), [bundle], {
+      run(path.join(harnessRoot, 'restore-scratch.sh'), [bundle], {
         env: {
           ...process.env,
           CH_CORE_RESTORE_DATABASE_URL:
@@ -294,9 +391,10 @@ describe('local CH Core deployment artifacts', () => {
   });
 
   it('rejects broad restore grants and gives explicit partial-import recovery', async () => {
-    const directory = await mkdtemp(
-      path.join(os.tmpdir(), 'ch-core-restore-policy-'),
+    const directory = await realpath(
+      await mkdtemp(path.join(os.tmpdir(), 'ch-core-restore-policy-')),
     );
+    const harnessRoot = await createScriptHarness(directory, directory);
     const bundle = await createCompleteBundle(directory);
     const importSentinel = path.join(directory, 'import-started');
     const fakeMaria = await createExecutable(
@@ -324,7 +422,7 @@ cat >/dev/null
     };
 
     await expect(
-      run(path.join(scriptsRoot, 'restore-scratch.sh'), [bundle], {
+      run(path.join(harnessRoot, 'restore-scratch.sh'), [bundle], {
         env: {
           ...baseEnvironment,
           FAKE_GRANTS:
@@ -337,7 +435,7 @@ cat >/dev/null
     await expect(access(importSentinel)).rejects.toBeDefined();
 
     await expect(
-      run(path.join(scriptsRoot, 'restore-scratch.sh'), [bundle], {
+      run(path.join(harnessRoot, 'restore-scratch.sh'), [bundle], {
         env: {
           ...baseEnvironment,
           FAKE_GRANTS:

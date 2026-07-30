@@ -78,6 +78,14 @@ test('uses truthful CH Core copy across persisted desktop workflows', () => {
   ).toBeInTheDocument();
   expect(screen.queryByText(/Session-only/)).not.toBeInTheDocument();
 
+  fireEvent.click(screen.getByRole('button', { name: 'Barang Kosong' }));
+  expect(screen.getByTestId('empty-report-preview')).toHaveTextContent(
+    'Data CH Core · Export PDF belum aktif',
+  );
+  expect(screen.getByTestId('empty-report-preview')).not.toHaveTextContent(
+    'Demo preview',
+  );
+
   fireEvent.click(screen.getByRole('button', { name: 'Nota' }));
   expect(screen.getByText('CH CORE · TERSINKRONISASI')).toBeInTheDocument();
   expect(screen.queryByText('DEMO DATA · SESSION ONLY')).not.toBeInTheDocument();

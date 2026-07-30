@@ -13,6 +13,34 @@ require_absolute_path() {
   esac
 }
 
+require_backup_bundle_path() {
+  bundle_path=$1
+  backup_root=${2:-/backup}
+  require_absolute_path "$bundle_path" 'Backup bundle path'
+  [ -d "$backup_root" ] && [ ! -L "$backup_root" ] ||
+    die 'Backup root must be an existing regular non-symlink directory.'
+  canonical_root=$(CDPATH= cd -P -- "$backup_root" && pwd)
+  [ "$canonical_root" = "$backup_root" ] ||
+    die 'Backup root must be canonical and may not contain symlink ancestors.'
+
+  case "$bundle_path" in
+    "$backup_root"/*.bundle) ;;
+    *)
+      die 'Backup bundle must be exactly /backup/<safe-name>.bundle.'
+      ;;
+  esac
+  bundle_name=${bundle_path#"$backup_root"/}
+  case "$bundle_name" in
+    ''|.*|*/*|*[!A-Za-z0-9._-]*|.bundle)
+      die 'Backup bundle must be exactly /backup/<safe-name>.bundle.'
+      ;;
+  esac
+  [ "$(dirname -- "$bundle_path")" = "$backup_root" ] ||
+    die 'Nested backup bundle paths are not allowed.'
+  [ ! -L "$bundle_path" ] ||
+    die 'Backup bundle target may not be a symlink.'
+}
+
 write_client_defaults() {
   defaults_path=$1
   database_env_name=$2

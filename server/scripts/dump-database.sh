@@ -7,7 +7,7 @@ script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 [ "$#" -eq 1 ] ||
   die 'Usage: dump-database.sh /absolute/new-backup.bundle'
 bundle=$1
-require_absolute_path "$bundle" 'Backup bundle path'
+require_backup_bundle_path "$bundle" /backup
 
 bundle_parent=$(dirname -- "$bundle")
 [ -d "$bundle_parent" ] && [ ! -L "$bundle_parent" ] ||

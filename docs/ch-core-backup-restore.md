@@ -75,7 +75,12 @@ Do not include the private CA signing key.
 
 ## Completed dump bundle
 
-Choose a new absolute directory below `/backup`; never reuse a name:
+Choose exactly one new direct child named
+`/backup/<safe-name>.bundle`; never reuse a name. The safe name may contain
+only ASCII letters, digits, `.`, `_`, and `-`, must not begin with `.`, and
+must not contain spaces, `..` traversal, slashes, or nested directories.
+`/backup` must resolve canonically without symlink ancestors, and neither the
+bundle target nor any bundle entry may be a symlink:
 
 ```sh
 docker compose --profile ops run --rm ch-core-ops \

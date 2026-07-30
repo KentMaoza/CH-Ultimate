@@ -176,3 +176,16 @@ syntax and diff checks. Exact `/chu_test` remains fail-closed (3 suites, 10
 skips) and Docker Compose/ARM64 remains unrun because `docker` is unavailable.
 No NAS/DSM/SMB/router/Tailscale/certificate/physical client/MariaDB instance/
 CH Nota access, change, or deployment occurred.
+
+Task 11 fix round 2/5: 4 Important findings addressed, pending scoped
+re-review. Demo Nota completion is explicitly local-session-only while Core
+completion retains shared/pending-sync copy; Empty Stock distinguishes Core
+data from Demo preview. Compose now uses separate explicit runtime and ops
+credential allowlists with no shared `env_file`. All database bundle entry
+points require exactly one safe direct `/backup/<name>.bundle` child under a
+canonical non-symlink root and reject root/outside/traversal/nested/unsafe
+names plus symlink roots/targets.
+Task 11 fix round 2 gate: UI RED 2/24 then GREEN 3 files / 24 tests;
+deployment RED 2/15 then GREEN 1 file / 15 tests. No NAS, DSM, SMB, router,
+Tailscale, certificate, physical client, MariaDB instance, CH Nota, or
+replacement workbook access/change/deployment occurred.

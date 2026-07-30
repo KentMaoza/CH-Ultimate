@@ -6,7 +6,7 @@ import { addFilteredSelection, filterEmptyStockItems, NO_SUPPLIER, supplierCodeF
 const MAX_RESTOCK_QUANTITY = 9_999;
 type StockCondition = 'empty' | 'one' | 'two' | 'low';
 
-export function EmptyStockPage() {
+export function EmptyStockPage({ coreBacked = false }: { coreBacked?: boolean }) {
   const { state } = useOperations();
   const items = useMemo(() => buildEmptyStockItems(state, 2), [state]);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -81,6 +81,6 @@ export function EmptyStockPage() {
     <section className="a4-preview" data-testid="empty-report-preview"><header><div className="brand-mark dark">CHU</div><div><strong>LAPORAN BARANG KOSONG</strong><span>{new Intl.DateTimeFormat('id-ID', { dateStyle: 'long', timeZone: 'Asia/Makassar' }).format(new Date())}</span></div></header>{chosen.length ? chosen.map(({ sku }) => {
       const quantity = quantities[sku.id] ?? 0;
       return <div className="report-item" key={sku.id}><div className="image-placeholder">CHU</div><div><strong>{sku.skuNumber}</strong><span>{sku.name}</span><small>Stok saat ini: {sku.stock}</small></div><div className="report-restock"><b>Jumlah: {quantity}</b><div><button type="button" aria-label={`Kurangi jumlah restock ${sku.skuNumber}`} disabled={quantity === 0} onClick={() => setRestockQuantity(sku.id, quantity - 1)}>−</button><input aria-label={`Jumlah restock ${sku.skuNumber}`} inputMode="numeric" value={quantity} onChange={(event) => setRestockQuantity(sku.id, event.target.value)} /><button type="button" aria-label={`Tambah jumlah restock ${sku.skuNumber}`} disabled={quantity === MAX_RESTOCK_QUANTITY} onClick={() => setRestockQuantity(sku.id, quantity + 1)}>+</button></div></div></div>;
-    }) : <p className="preview-empty">Pilih SKU untuk menampilkan preview laporan.</p>}<footer>CH Ultimate · Demo preview · Export PDF belum aktif</footer></section>
+    }) : <p className="preview-empty">Pilih SKU untuk menampilkan preview laporan.</p>}<footer>CH Ultimate · {coreBacked ? 'Data CH Core' : 'Demo preview'} · Export PDF belum aktif</footer></section>
   </div>;
 }

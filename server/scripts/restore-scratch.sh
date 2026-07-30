@@ -7,6 +7,7 @@ script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 [ "$#" -eq 1 ] ||
   die 'Usage: restore-scratch.sh /absolute/completed-backup.bundle'
 bundle=$1
+require_backup_bundle_path "$bundle" /backup
 "$script_dir/verify-dump.sh" "$bundle"
 
 defaults_tmp=$(mktemp "${TMPDIR:-/tmp}/ch-core-client.XXXXXX")

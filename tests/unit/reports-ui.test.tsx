@@ -25,6 +25,9 @@ test('shows revenue cards and tracked empty-stock report preview', () => {
   fireEvent.click(screen.getByLabelText('Pilih ACC-204-SLV'));
   expect(screen.getByTestId('empty-report-preview')).toHaveTextContent('ACC-204-SLV');
   expect(screen.getByTestId('empty-report-preview')).toHaveTextContent('Jumlah: 0');
+  expect(screen.getByTestId('empty-report-preview')).toHaveTextContent(
+    'Demo preview',
+  );
 });
 
 test('settings identifies the session data source and can reset it', async () => {

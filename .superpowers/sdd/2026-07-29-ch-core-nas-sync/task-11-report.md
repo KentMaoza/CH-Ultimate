@@ -73,12 +73,18 @@ GREEN:
   four DB connections, bounded logs, no-new-privileges, and all capabilities
   dropped.
 - Node performs the local readiness healthcheck without curl.
-- Dump requires an absolute unused destination, never supplies password as an
-  argument/output, uses a mode-600 temporary defaults file, writes a SHA-256
-  sidecar, and atomically renames files without overwrite.
-- Restore verifies checksum first, accepts only new lowercase
-  `chu_restore_*`, refuses existing schemas, and never drops production.
-- Static/script result: 7/7. All scripts pass `sh -n`.
+- Compose passes an explicit credential allowlist: runtime receives only its
+  application URL/bootstrap secret, while the opt-in ops service receives only
+  backup/restore URLs. The services do not share an `env_file`.
+- Dump accepts exactly one safe direct `/backup/<name>.bundle` child under a
+  canonical non-symlink `/backup` root. It reserves that directory with
+  `mkdir`, never supplies passwords as arguments/output, uses a mode-0600
+  temporary defaults file, writes the dump and SHA-256 sidecar, then publishes
+  `COMPLETE` last without replacement or recursive cleanup.
+- Restore verifies the completed bundle first, accepts only an already
+  existing empty URL-derived lowercase `chu_restore_*` schema with constrained
+  grants, and never creates, drops, or overwrites a schema.
+- Deployment artifact result: 15/15. All scripts pass `sh -n`.
 - Server source/test typecheck, 284 unit tests plus one intentional workbook
   skip, and server build passed.
 - Docker/Compose/ARM64 runtime verification was not run because `docker` is
@@ -156,6 +162,33 @@ GREEN focused evidence:
 - UI: 2 files / 39 tests.
 - Deployment artifacts and runbooks: 2 files / 20 tests.
 - Shell syntax and root typecheck pass.
+
+## Review fix round 2/5
+
+Four Important findings were addressed, pending scoped re-review:
+
+1. Demo/browser Nota completion now says it is stored only in the local demo
+   session. Only Core-backed completion claims shared-device availability or
+   pending central synchronization.
+2. Empty Stock labels `Demo preview` only in demo mode; Core mode identifies
+   CH Core data and does not claim that PDF export exists.
+3. Compose no longer shares one `env_file`. Runtime and opt-in ops services
+   receive separate explicit credential allowlists.
+4. Dump, verification, and restore scripts all require exactly one safe direct
+   `/backup/<name>.bundle` child, reject root/outside/traversal/nested/unsafe
+   names, and reject symlink roots or targets.
+
+RED evidence:
+
+- UI: 2 expected failures / 22 passes for stale demo Nota and Core Empty Stock
+  copy.
+- Deployment artifacts: 2 expected failures / 13 passes for shared Compose
+  environment and missing strict backup-path policy.
+
+GREEN focused evidence:
+
+- UI: 3 files / 24 tests.
+- Deployment artifacts: 1 file / 15 tests.
 
 ## Final local verification
 

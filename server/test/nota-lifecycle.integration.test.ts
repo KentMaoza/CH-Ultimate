@@ -4,7 +4,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import mariadb, { type Pool } from 'mariadb';
 
 import { runMigrations } from '../src/db/migrate.js';
-import { NotaOperationsService } from '../src/nota/service.js';
+import {
+  NotaConflictError,
+  NotaOperationsService,
+} from '../src/nota/service.js';
 import type { ProtocolPool } from '../src/sync/idempotency.js';
 
 const databaseUrl = process.env.CH_CORE_TEST_DATABASE_URL;
@@ -101,6 +104,7 @@ integration('Nota lifecycle against isolated chu_test MariaDB', () => {
       lsnPrice: 120_000,
     };
     await service.updateLine(context(), notaId, pageId, lineId, {
+      lifecycleVersion: '1',
       pageVersion: '1',
       lineVersion: '1',
       base: {
@@ -115,6 +119,13 @@ integration('Nota lifecycle against isolated chu_test MariaDB', () => {
       },
       mine: firstLine,
     });
+    const lineSnapshot = await pool.query<Array<{ sku_identifier_snapshot: string }>>(
+      `SELECT sku_identifier_snapshot
+       FROM nota_lines
+       WHERE id = UNHEX(REPLACE(?, '-', ''))`,
+      [lineId],
+    );
+    expect(lineSnapshot[0]?.sku_identifier_snapshot).toBe('NOTA-INTEGRATION');
 
     const completionContext = context();
     await service.complete(completionContext, notaId, {
@@ -122,18 +133,26 @@ integration('Nota lifecycle against isolated chu_test MariaDB', () => {
       destination: 'archive',
     });
     await service.reopen(context(), notaId, { lifecycleVersion: '2' });
+    await service.cancel(context(), notaId, { lifecycleVersion: '3' });
+    await service.restore(context(), notaId, { lifecycleVersion: '4' });
+    await pool.query(
+      `UPDATE skus SET primary_identifier = 'NOTA-RENAMED'
+       WHERE id = UNHEX(REPLACE(?, '-', ''))`,
+      [skuId],
+    );
     await service.updateLine(context(), notaId, pageId, lineId, {
+      lifecycleVersion: '5',
       pageVersion: '1',
       lineVersion: '2',
       base: firstLine,
       mine: { ...firstLine, quantity: 3 },
     });
     await service.complete(context(), notaId, {
-      lifecycleVersion: '3',
+      lifecycleVersion: '5',
       destination: 'archive',
     });
-    await service.cancel(context(), notaId, { lifecycleVersion: '4' });
-    await service.restore(context(), notaId, { lifecycleVersion: '5' });
+    await service.cancel(context(), notaId, { lifecycleVersion: '6' });
+    await service.restore(context(), notaId, { lifecycleVersion: '7' });
     await service.complete(completionContext, notaId, {
       lifecycleVersion: '1',
       destination: 'archive',
@@ -156,7 +175,182 @@ integration('Nota lifecycle against isolated chu_test MariaDB', () => {
     );
     expect(String(rows[0]!.quantity_pcs)).toBe('97');
     expect(String(rows[0]!.revenue_rupiah)).toBe('30000');
-    expect(Number(rows[0]!.posting_count)).toBe(4);
-    expect(Number(rows[0]!.movement_count)).toBe(4);
+    expect(Number(rows[0]!.posting_count)).toBe(6);
+    expect(Number(rows[0]!.movement_count)).toBe(6);
+    const postingSnapshots = await pool.query<Array<{
+      posting_kind: string;
+      snapshot_json: string | Record<string, unknown>;
+    }>>(
+      `SELECT posting_kind, snapshot_json
+       FROM nota_postings
+       WHERE nota_id = UNHEX(REPLACE(?, '-', ''))
+         AND posting_kind IN ('complete', 'recomplete')
+       ORDER BY lifecycle_version`,
+      [notaId],
+    );
+    const snapshots = postingSnapshots.map((row) =>
+      typeof row.snapshot_json === 'string'
+        ? JSON.parse(row.snapshot_json) as Record<string, unknown>
+        : row.snapshot_json);
+    expect(
+      (snapshots[0]?.lines as Array<Record<string, unknown>>)[0]
+        ?.skuIdentifierSnapshot,
+    ).toBe('NOTA-INTEGRATION');
+    expect(
+      (snapshots[1]?.lines as Array<Record<string, unknown>>)[0]
+        ?.skuIdentifierSnapshot,
+    ).toBe('NOTA-RENAMED');
+    const changeTypes = await pool.query<Array<{ entity_type: string }>>(
+      `SELECT DISTINCT entity_type
+       FROM change_log
+       WHERE entity_type IN ('nota_posting', 'revenue_posting')`,
+    );
+    expect(changeTypes.map((row) => row.entity_type).sort()).toEqual([
+      'nota_posting',
+      'revenue_posting',
+    ]);
+  });
+
+  it('durably resolves full multi-field conflict intent for mine and server', async () => {
+    const deviceId = randomUUID();
+    await pool.query(
+      `INSERT INTO devices
+         (id, role, installation_id, display_name, platform, token_hash,
+          token_expires_at, approved_at)
+       VALUES
+         (UNHEX(REPLACE(?, '-', '')), 'client',
+          UNHEX(REPLACE(?, '-', '')), 'Conflict integration', 'test',
+          UNHEX(SHA2(?, 256)), DATE_ADD(UTC_TIMESTAMP(6), INTERVAL 1 DAY),
+          UTC_TIMESTAMP(6))`,
+      [deviceId, randomUUID(), randomUUID()],
+    );
+    const service = new NotaOperationsService(pool as unknown as ProtocolPool);
+    const context = () => ({ deviceId, idempotencyKey: randomUUID() });
+    const created = await service.create(context(), {}) as {
+      entity: { id: string };
+    };
+    const notaId = created.entity.id;
+    await service.updateHeader(context(), notaId, {
+      lifecycleVersion: '1',
+      fields: {
+        customerName: { version: '1', base: '', mine: 'Server' },
+      },
+    });
+    let mineConflict: NotaConflictError | undefined;
+    try {
+      await service.updateHeader(context(), notaId, {
+        lifecycleVersion: '1',
+        fields: {
+          customerName: { version: '1', base: '', mine: 'Mine' },
+          customerPlace: { version: '1', base: '', mine: 'Denpasar' },
+        },
+      });
+    } catch (error) {
+      if (error instanceof NotaConflictError) mineConflict = error;
+      else throw error;
+    }
+    expect(mineConflict?.conflict.entityType).toBe('nota');
+    const mineResolution = await service.resolveConflict(
+      context(),
+      mineConflict!.conflict.id,
+      { choice: 'mine' },
+    ) as {
+      serverRevision: string;
+      entity: { customerName: string; customerPlace: string };
+      versionState: {
+        fieldVersions: Record<string, string>;
+        pageVersions: Record<string, string>;
+        lineVersions: Record<string, string>;
+      };
+    };
+    expect(mineResolution.entity).toMatchObject({
+      customerName: 'Mine',
+      customerPlace: 'Denpasar',
+    });
+    expect(mineResolution.versionState.fieldVersions).toMatchObject({
+      customerName: '3',
+      customerPlace: '2',
+    });
+    expect(Object.keys(mineResolution.versionState.pageVersions)).toHaveLength(1);
+    expect(Object.keys(mineResolution.versionState.lineVersions)).toHaveLength(15);
+    expect(BigInt(mineResolution.serverRevision)).toBeGreaterThan(0n);
+
+    let serverConflict: NotaConflictError | undefined;
+    try {
+      await service.updateHeader(context(), notaId, {
+        lifecycleVersion: '1',
+        fields: {
+          customerName: { version: '1', base: '', mine: 'Discard me' },
+        },
+      });
+    } catch (error) {
+      if (error instanceof NotaConflictError) serverConflict = error;
+      else throw error;
+    }
+    const serverResolution = await service.resolveConflict(
+      context(),
+      serverConflict!.conflict.id,
+      { choice: 'server' },
+    ) as {
+      serverRevision: string;
+      entity: { customerName: string };
+    };
+    expect(serverResolution.entity.customerName).toBe('Mine');
+    const replay = await service.resolveConflict(
+      context(),
+      serverConflict!.conflict.id,
+      { choice: 'server' },
+    ) as { serverRevision: string; entity: { customerName: string } };
+    expect(replay.entity.customerName).toBe('Mine');
+    expect(BigInt(replay.serverRevision)).toBeGreaterThan(0n);
+  });
+
+  it('allocates concurrent Nota numbers and posts one concurrent completion', async () => {
+    const deviceId = randomUUID();
+    await pool.query(
+      `INSERT INTO devices
+         (id, role, installation_id, display_name, platform, token_hash,
+          token_expires_at, approved_at)
+       VALUES
+         (UNHEX(REPLACE(?, '-', '')), 'client',
+          UNHEX(REPLACE(?, '-', '')), 'Concurrency integration', 'test',
+          UNHEX(SHA2(?, 256)), DATE_ADD(UTC_TIMESTAMP(6), INTERVAL 1 DAY),
+          UTC_TIMESTAMP(6))`,
+      [deviceId, randomUUID(), randomUUID()],
+    );
+    const service = new NotaOperationsService(pool as unknown as ProtocolPool);
+    const context = () => ({ deviceId, idempotencyKey: randomUUID() });
+    const created = await Promise.all([
+      service.create(context(), {}),
+      service.create(context(), {}),
+    ]) as Array<{ entity: { id: string; baseNumber: string } }>;
+    expect(new Set(created.map((item) => item.entity.baseNumber)).size).toBe(2);
+
+    const notaId = created[0]!.entity.id;
+    const completions = await Promise.allSettled([
+      service.complete(context(), notaId, {
+        lifecycleVersion: '1',
+        destination: 'archive',
+      }),
+      service.complete(context(), notaId, {
+        lifecycleVersion: '1',
+        destination: 'finished',
+      }),
+    ]);
+    expect(completions.filter((item) => item.status === 'fulfilled')).toHaveLength(1);
+    expect(
+      completions.filter(
+        (item) =>
+          item.status === 'rejected' &&
+          item.reason instanceof NotaConflictError,
+      ),
+    ).toHaveLength(1);
+    const count = await pool.query<Array<{ posting_count: number }>>(
+      `SELECT COUNT(*) AS posting_count
+       FROM nota_postings
+       WHERE nota_id = UNHEX(REPLACE(?, '-', ''))`,
+      [notaId],
+    );
+    expect(Number(count[0]?.posting_count)).toBe(1);
   });
 });

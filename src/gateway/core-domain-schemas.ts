@@ -65,6 +65,32 @@ export const notaTransactionSchema = z
   })
   .strict();
 
+export const notaPostingSchema = z
+  .object({
+    id: z.string().uuid(),
+    notaId: z.string().uuid(),
+    postingKind: z.string(),
+    amountRupiah: z.number().int(),
+    lines: z.array(notaLineSchema),
+    stockEffects: z.record(z.string().uuid(), z.number().int()),
+    trackedLineIds: z.record(z.string().uuid(), z.string().uuid()),
+    lifecycleVersion: z.string().regex(/^(0|[1-9]\d*)$/),
+    reversesPostingId: z.string().uuid().optional(),
+    postedAt: timestampSchema,
+  })
+  .strict();
+
+export const revenuePostingSchema = z
+  .object({
+    id: z.string().uuid(),
+    notaId: z.string().uuid(),
+    notaPostingId: z.string().uuid(),
+    amountRupiah: z.number().int(),
+    postingKind: z.string(),
+    postedAt: timestampSchema,
+  })
+  .strict();
+
 export const labelTemplateSchema = z
   .object({
     medium: z.enum(['thermal', 'a4']),
@@ -127,6 +153,8 @@ export const demoStateSchema = z
         .strict(),
     ),
     notaTransactions: z.array(notaTransactionSchema),
+    notaPostings: z.array(notaPostingSchema).optional(),
+    revenuePostings: z.array(revenuePostingSchema).optional(),
     labelTemplate: labelTemplateSchema,
     invoiceTemplate: invoiceTemplateSchema,
     sourceLabel: z.string(),

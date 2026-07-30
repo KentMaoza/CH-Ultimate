@@ -121,6 +121,7 @@ export const coreNotaRowSchema = z
     notaNumber: z.string(),
     businessDate: z.string().date(),
     status: z.enum(['draft', 'completed', 'reopened', 'cancelled']),
+    completionDestination: z.enum(['archive', 'finished']).nullable(),
     header: notaHeaderSchema,
     fieldVersions: z.record(z.string(), canonicalDecimalSchema),
     structureVersion: canonicalDecimalSchema,
@@ -171,6 +172,56 @@ export const coreNotaLineRowSchema = z
   })
   .strict();
 
+const signedDecimalSchema = z
+  .string()
+  .regex(/^(0|-?[1-9]\d*)$/, 'Expected a canonical signed decimal string');
+
+export const coreNotaPostingLineSchema = z
+  .object({
+    id: uuidSchema,
+    pageId: uuidSchema,
+    skuId: uuidSchema.nullable(),
+    skuIdentifierSnapshot: z.string(),
+    skuNameSnapshot: z.string(),
+    kindSnapshot: z.string(),
+    quantityPcs: canonicalDecimalSchema,
+    unitKind: z.enum(['pcs', 'lsn']),
+    unitPriceRupiah: canonicalDecimalSchema,
+    pcsPriceRupiah: canonicalDecimalSchema,
+    lsnPriceRupiah: canonicalDecimalSchema,
+    lineTotalRupiah: canonicalDecimalSchema,
+    linePosition: z.number().int().min(0).max(14),
+  })
+  .strict();
+
+export const coreNotaPostingRowSchema = z
+  .object({
+    id: uuidSchema,
+    notaId: uuidSchema,
+    postingKind: z.string().min(1),
+    amountRupiah: signedDecimalSchema,
+    snapshot: z.object({
+      lines: z.array(coreNotaPostingLineSchema),
+      stockEffects: z.record(z.string().uuid(), signedDecimalSchema),
+      trackedLineIds: z.record(z.string().uuid(), uuidSchema),
+    }).strict(),
+    lifecycleVersion: canonicalDecimalSchema,
+    reversesPostingId: uuidSchema.nullable(),
+    postedAt: isoTimestampSchema,
+  })
+  .strict();
+
+export const coreRevenuePostingRowSchema = z
+  .object({
+    id: uuidSchema,
+    notaId: uuidSchema,
+    notaPostingId: uuidSchema,
+    amountRupiah: signedDecimalSchema,
+    postingKind: z.string().min(1),
+    postedAt: isoTimestampSchema,
+  })
+  .strict();
+
 export const coreTemplateRowSchema = z
   .object({
     id: uuidSchema,
@@ -197,6 +248,8 @@ export const coreBootstrapSchema = z
     notas: z.array(coreNotaRowSchema),
     notaPages: z.array(coreNotaPageRowSchema),
     notaLines: z.array(coreNotaLineRowSchema),
+    notaPostings: z.array(coreNotaPostingRowSchema).default([]),
+    revenuePostings: z.array(coreRevenuePostingRowSchema).default([]),
     templates: z.array(coreTemplateRowSchema),
   })
   .strict();
@@ -249,6 +302,18 @@ export const mutationAcknowledgementSchema = z
     entity: coreJsonValueSchema.optional(),
     entityVersion: canonicalDecimalSchema.optional(),
     entityId: uuidSchema.optional(),
+    versionState: z.object({
+      notaId: uuidSchema,
+      fieldVersions: z.record(z.string(), canonicalDecimalSchema),
+      structureVersion: canonicalDecimalSchema,
+      lifecycleVersion: canonicalDecimalSchema,
+      pageVersions: z.record(z.string().uuid(), canonicalDecimalSchema),
+      pageLifecycleVersions: z.record(
+        z.string().uuid(),
+        canonicalDecimalSchema,
+      ),
+      lineVersions: z.record(z.string().uuid(), canonicalDecimalSchema),
+    }).strict().optional(),
   })
   .strict();
 

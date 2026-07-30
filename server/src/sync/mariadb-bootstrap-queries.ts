@@ -1,5 +1,6 @@
 import {
   databaseDate,
+  databaseDateOnly,
   hexToUuid,
   nullableDatabaseDate,
   nullableHexToUuid,
@@ -15,6 +16,13 @@ function parseJson(value: unknown): unknown {
     return JSON.parse(value.toString('utf8'));
   }
   return value;
+}
+
+function jsonRecord(value: unknown): Record<string, unknown> {
+  const parsed = parseJson(value);
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? parsed as Record<string, unknown>
+    : {};
 }
 
 function requiredUuid(value: unknown): string {
@@ -63,6 +71,7 @@ export async function readBootstrapCollections(
   );
   const notaRows = await connection.query<Array<Record<string, unknown>>>(
     `SELECT HEX(id) AS id_hex, nota_number, business_date, status,
+            completion_destination,
             header_json, field_versions, structure_version,
             lifecycle_version, subtotal_rupiah, total_rupiah,
             HEX(created_by_device_id) AS created_by_device_id_hex,
@@ -85,6 +94,20 @@ export async function readBootstrapCollections(
             deleted_at, created_at, updated_at
      FROM nota_lines
      ORDER BY nota_id, page_id, line_position`,
+  );
+  const postingRows = await connection.query<Array<Record<string, unknown>>>(
+    `SELECT HEX(id) AS id_hex, HEX(nota_id) AS nota_id_hex, posting_kind,
+            amount_rupiah, snapshot_json, lifecycle_version,
+            HEX(reverses_posting_id) AS reverses_posting_id_hex, posted_at
+     FROM nota_postings
+     ORDER BY nota_id, lifecycle_version, posted_at, id`,
+  );
+  const revenueRows = await connection.query<Array<Record<string, unknown>>>(
+    `SELECT HEX(id) AS id_hex, HEX(nota_id) AS nota_id_hex,
+            HEX(nota_posting_id) AS nota_posting_id_hex, amount_rupiah,
+            posting_kind, posted_at
+     FROM revenue_postings
+     ORDER BY posted_at, id`,
   );
   const templateRows = await connection.query<
     Array<Record<string, unknown>>
@@ -156,8 +179,13 @@ export async function readBootstrapCollections(
     notas: notaRows.map((row) => ({
       id: requiredUuid(row.id_hex),
       notaNumber: String(row.nota_number),
-      businessDate: String(row.business_date),
+      businessDate: databaseDateOnly(row.business_date),
       status: String(row.status),
+      completionDestination:
+        row.completion_destination === null ||
+        row.completion_destination === undefined
+          ? null
+          : String(row.completion_destination),
       header: parseJson(row.header_json),
       fieldVersions: parseJson(row.field_versions),
       structureVersion: BigInt(String(row.structure_version)),
@@ -199,6 +227,31 @@ export async function readBootstrapCollections(
       deletedAt: nullableDatabaseDate(row.deleted_at),
       createdAt: databaseDate(row.created_at),
       updatedAt: databaseDate(row.updated_at),
+    })),
+    notaPostings: postingRows.map((row) => {
+      const snapshot = jsonRecord(parseJson(row.snapshot_json));
+      return {
+        id: requiredUuid(row.id_hex),
+        notaId: requiredUuid(row.nota_id_hex),
+        postingKind: String(row.posting_kind),
+        amountRupiah: BigInt(String(row.amount_rupiah)),
+        snapshot: {
+          lines: Array.isArray(snapshot.lines) ? snapshot.lines : [],
+          stockEffects: jsonRecord(snapshot.stockEffects),
+          trackedLineIds: jsonRecord(snapshot.trackedLineIds),
+        },
+        lifecycleVersion: BigInt(String(row.lifecycle_version)),
+        reversesPostingId: nullableHexToUuid(row.reverses_posting_id_hex),
+        postedAt: databaseDate(row.posted_at),
+      };
+    }),
+    revenuePostings: revenueRows.map((row) => ({
+      id: requiredUuid(row.id_hex),
+      notaId: requiredUuid(row.nota_id_hex),
+      notaPostingId: requiredUuid(row.nota_posting_id_hex),
+      amountRupiah: BigInt(String(row.amount_rupiah)),
+      postingKind: String(row.posting_kind),
+      postedAt: databaseDate(row.posted_at),
     })),
     templates: templateRows.map((row) => ({
       id: requiredUuid(row.id_hex),

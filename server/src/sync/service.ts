@@ -9,6 +9,8 @@ export interface BootstrapCollections {
   notas: unknown[];
   notaPages: unknown[];
   notaLines: unknown[];
+  notaPostings?: unknown[];
+  revenuePostings?: unknown[];
   templates: unknown[];
 }
 
@@ -124,6 +126,8 @@ export class SyncService {
         notas: collections.notas.map(jsonSafe),
         notaPages: collections.notaPages.map(jsonSafe),
         notaLines: collections.notaLines.map(jsonSafe),
+        notaPostings: (collections.notaPostings ?? []).map(jsonSafe),
+        revenuePostings: (collections.revenuePostings ?? []).map(jsonSafe),
         templates: collections.templates.map(jsonSafe),
       };
     });

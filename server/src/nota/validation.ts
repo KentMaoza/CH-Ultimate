@@ -4,16 +4,9 @@ const version = z.string().regex(/^[1-9]\d*$/);
 const nullableVersion = version.nullable();
 const safeInteger = z.number().int().safe();
 const nonnegativeInteger = safeInteger.min(0);
-const fieldName = z.enum([
-  'customerName',
-  'customerPlace',
-  'transactionDate',
-  'payment',
-]);
-const headerValue = z.union([
-  z.string().max(512),
-  z.enum(['unclassified', 'cash', 'transfer', 'credit']),
-]);
+const boundedHeaderText = z.string().max(512);
+const payment = z.enum(['unclassified', 'cash', 'transfer', 'credit']);
+const transactionDate = z.string().date();
 
 export const createNotaBody = z.object({}).strict();
 export const notaAndPagePath = z
@@ -27,19 +20,28 @@ export const notaLinePath = z
   })
   .strict();
 
-export const addPageBody = z.object({ structureVersion: version }).strict();
+export const addPageBody = z
+  .object({ lifecycleVersion: version, structureVersion: version })
+  .strict();
 export const pageLifecycleBody = z
-  .object({ structureVersion: version, pageVersion: version })
+  .object({
+    lifecycleVersion: version,
+    structureVersion: version,
+    pageVersion: version,
+  })
   .strict();
 
-const fieldEdit = z
-  .object({ version, base: headerValue, mine: headerValue })
-  .strict();
+const fieldEdit = <T extends z.ZodType>(value: T) =>
+  z.object({ version, base: value, mine: value }).strict();
 export const updateHeaderBody = z
   .object({
-    fields: z
-      .partialRecord(fieldName, fieldEdit)
-      .refine((fields) => Object.keys(fields).length > 0),
+    lifecycleVersion: version,
+    fields: z.object({
+      customerName: fieldEdit(boundedHeaderText).optional(),
+      customerPlace: fieldEdit(boundedHeaderText).optional(),
+      transactionDate: fieldEdit(transactionDate).optional(),
+      payment: fieldEdit(payment).optional(),
+    }).strict().refine((fields) => Object.keys(fields).length > 0),
   })
   .strict();
 
@@ -54,14 +56,36 @@ export const notaLineValue = z
     pcsPrice: nonnegativeInteger,
     lsnPrice: nonnegativeInteger,
   })
-  .strict();
-const notaLineBaseValue = notaLineValue.extend({
+  .strict()
+  .superRefine((line, context) => {
+    const quantityPcs =
+      line.unit === 'lsn' ? BigInt(line.quantity) * 12n : BigInt(line.quantity);
+    const unitPrice =
+      line.unit === 'lsn' ? BigInt(line.lsnPrice) : BigInt(line.pcsPrice);
+    const total = BigInt(line.quantity) * unitPrice;
+    if (quantityPcs > BigInt(Number.MAX_SAFE_INTEGER)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['quantity'],
+        message: 'quantity PCS exceeds safe integer range',
+      });
+    }
+    if (total > BigInt(Number.MAX_SAFE_INTEGER)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['quantity'],
+        message: 'line total exceeds safe integer range',
+      });
+    }
+  });
+const notaLineBaseValue = notaLineValue.safeExtend({
   description: z.string().max(512),
   quantity: safeInteger.min(0),
 });
 
 export const updateLineBody = z
   .object({
+    lifecycleVersion: version,
     pageVersion: version,
     lineVersion: nullableVersion,
     base: notaLineBaseValue.nullable(),
@@ -75,6 +99,7 @@ export const updateLineBody = z
 
 export const deleteLineBody = z
   .object({
+    lifecycleVersion: version,
     pageVersion: version,
     lineVersion: version,
     base: notaLineValue,

@@ -47,6 +47,8 @@ export function emptyCoreState(): DemoState {
     adjustments: [],
     priceChanges: [],
     notaTransactions: [],
+    notaPostings: [],
+    revenuePostings: [],
     labelTemplate: cloneCore(CORE_LABEL_TEMPLATE_DEFAULT),
     invoiceTemplate: cloneCore(CORE_INVOICE_TEMPLATE_DEFAULT),
     sourceLabel: 'CH Core',
@@ -62,6 +64,22 @@ export function blankCoreLine(pageId: string, position: number): NotaLine {
     unit: 'pcs',
     pcsPrice: 0,
     lsnPrice: 0,
+  };
+}
+
+export function mapCorePostingLine(
+  line: CoreBootstrap['notaPostings'][number]['snapshot']['lines'][number],
+): NotaLine {
+  const quantityPcs = integerFromDecimal(line.quantityPcs, 'quantityPcs');
+  return {
+    id: line.id,
+    ...(line.skuId ? { skuId: line.skuId } : {}),
+    description: line.skuNameSnapshot,
+    kind: line.kindSnapshot,
+    quantity: line.unitKind === 'lsn' ? quantityPcs / 12 : quantityPcs,
+    unit: line.unitKind,
+    pcsPrice: integerFromDecimal(line.pcsPriceRupiah, 'pcsPriceRupiah'),
+    lsnPrice: integerFromDecimal(line.lsnPriceRupiah, 'lsnPriceRupiah'),
   };
 }
 
@@ -111,6 +129,25 @@ export function mapCoreBootstrapToDemoState(
     requireRelation(
       line.skuId === null || skuIds.has(line.skuId),
       `Nota line ${line.id} references a missing SKU`,
+    );
+  }
+  const postingIds = new Set(bootstrap.notaPostings.map((row) => row.id));
+  for (const posting of bootstrap.notaPostings) {
+    requireRelation(
+      notaIds.has(posting.notaId),
+      `Nota posting ${posting.id} references a missing Nota`,
+    );
+    for (const line of posting.snapshot.lines) {
+      requireRelation(
+        line.skuId === null || skuIds.has(line.skuId),
+        `Nota posting ${posting.id} references a missing SKU`,
+      );
+    }
+  }
+  for (const posting of bootstrap.revenuePostings) {
+    requireRelation(
+      notaIds.has(posting.notaId) && postingIds.has(posting.notaPostingId),
+      `Revenue posting ${posting.id} references a missing posting`,
     );
   }
   const identifiers = new Map<string, string[]>();
@@ -253,6 +290,13 @@ export function mapCoreBootstrapToDemoState(
       (maximum, page) => Math.max(maximum, page.pagePosition),
       -1,
     );
+    const latestPosting = [...bootstrap.notaPostings]
+      .filter((posting) =>
+        posting.notaId === row.id &&
+        ['complete', 'recomplete', 'restore'].includes(posting.postingKind))
+      .sort((left, right) =>
+        BigInt(left.lifecycleVersion) < BigInt(right.lifecycleVersion) ? 1 : -1)
+      .at(0);
     return {
       id: row.id,
       baseNumber: row.notaNumber,
@@ -261,17 +305,51 @@ export function mapCoreBootstrapToDemoState(
       transactionDate: row.header.transactionDate ?? row.businessDate,
       payment: row.header.payment ?? 'unclassified',
       status: row.status,
-      ...(row.header.completionDestination
-        ? { completionDestination: row.header.completionDestination }
+      ...(row.completionDestination
+        ? { completionDestination: row.completionDestination }
         : {}),
       ...(row.completedAt ? { completedAt: row.completedAt } : {}),
       nextNoteIndex: safeIntegerIncrement(maxPage, 'nextNoteIndex'),
       pages,
-      postedLines: [],
-      postedStockEffects: {},
-      postedTrackedLineIds: {},
+      postedLines: latestPosting?.snapshot.lines.map(mapCorePostingLine) ?? [],
+      postedStockEffects: Object.fromEntries(
+        Object.entries(latestPosting?.snapshot.stockEffects ?? {}).map(
+          ([skuId, quantity]) => [
+            skuId,
+            -integerFromDecimal(quantity, 'stockEffect'),
+          ],
+        ),
+      ),
+      postedTrackedLineIds: latestPosting?.snapshot.trackedLineIds ?? {},
     };
   });
+  state.notaPostings = bootstrap.notaPostings.map((row) => ({
+    id: row.id,
+    notaId: row.notaId,
+    postingKind: row.postingKind,
+    amountRupiah: integerFromDecimal(row.amountRupiah, 'amountRupiah'),
+    lines: row.snapshot.lines.map(mapCorePostingLine),
+    stockEffects: Object.fromEntries(
+      Object.entries(row.snapshot.stockEffects).map(([skuId, quantity]) => [
+        skuId,
+        -integerFromDecimal(quantity, 'stockEffect'),
+      ]),
+    ),
+    trackedLineIds: row.snapshot.trackedLineIds,
+    lifecycleVersion: row.lifecycleVersion,
+    ...(row.reversesPostingId
+      ? { reversesPostingId: row.reversesPostingId }
+      : {}),
+    postedAt: row.postedAt,
+  }));
+  state.revenuePostings = bootstrap.revenuePostings.map((row) => ({
+    id: row.id,
+    notaId: row.notaId,
+    notaPostingId: row.notaPostingId,
+    amountRupiah: integerFromDecimal(row.amountRupiah, 'amountRupiah'),
+    postingKind: row.postingKind,
+    postedAt: row.postedAt,
+  }));
 
   const activeTemplates = bootstrap.templates.filter(
     (template) => !template.archivedAt,

@@ -33,8 +33,95 @@ describe('readBootstrapCollections', () => {
       notas: [],
       notaPages: [],
       notaLines: [],
+      notaPostings: [],
+      revenuePostings: [],
       templates: [],
     });
     expect(maximumConcurrentQueries).toBe(1);
+  });
+
+  it('normalizes driver DATE values and preserves completion destination', async () => {
+    const idHex = '11111111111141118111111111111111';
+    const deviceHex = '22222222222242228222222222222222';
+    const postingHex = '33333333333343338333333333333333';
+    const revenueHex = '44444444444444448444444444444444';
+    const timestamp = new Date('2026-07-30T01:02:03.000Z');
+    const connection = {
+      beginTransaction: async () => undefined,
+      commit: async () => undefined,
+      rollback: async () => undefined,
+      release: () => undefined,
+      query: async <T>(sql: string): Promise<T> => {
+        if (sql.includes('FROM notas')) {
+          return [{
+            id_hex: idHex,
+            nota_number: 'CHU-20260730-0001',
+            business_date: new Date('2026-07-30T00:00:00.000Z'),
+            status: 'completed',
+            completion_destination: 'finished',
+            header_json: '{}',
+            field_versions: '{}',
+            structure_version: 1n,
+            lifecycle_version: 2n,
+            subtotal_rupiah: 1000n,
+            total_rupiah: 1000n,
+            created_by_device_id_hex: deviceHex,
+            completed_at: timestamp,
+            cancelled_at: null,
+            created_at: timestamp,
+            updated_at: timestamp,
+          }] as T;
+        }
+        if (sql.includes('FROM nota_postings')) {
+          return [{
+            id_hex: postingHex,
+            nota_id_hex: idHex,
+            posting_kind: 'complete',
+            amount_rupiah: 1000n,
+            snapshot_json: JSON.stringify({
+              lines: [],
+              stockEffects: {},
+              trackedLineIds: {},
+            }),
+            lifecycle_version: 2n,
+            reverses_posting_id_hex: null,
+            posted_at: timestamp,
+          }] as T;
+        }
+        if (sql.includes('FROM revenue_postings')) {
+          return [{
+            id_hex: revenueHex,
+            nota_id_hex: idHex,
+            nota_posting_id_hex: postingHex,
+            amount_rupiah: 1000n,
+            posting_kind: 'complete',
+            posted_at: timestamp,
+          }] as T;
+        }
+        return [] as T;
+      },
+    } satisfies ProtocolConnection;
+
+    const collections = await readBootstrapCollections(connection);
+
+    expect(collections.notas).toEqual([
+      expect.objectContaining({
+        businessDate: '2026-07-30',
+        completionDestination: 'finished',
+      }),
+    ]);
+    expect(collections.notaPostings).toEqual([
+      expect.objectContaining({
+        notaId: '11111111-1111-4111-8111-111111111111',
+        amountRupiah: 1000n,
+        snapshot: { lines: [], stockEffects: {}, trackedLineIds: {} },
+      }),
+    ]);
+    expect(collections.revenuePostings).toEqual([
+      expect.objectContaining({
+        notaPostingId: '33333333-3333-4333-8333-333333333333',
+        amountRupiah: 1000n,
+      }),
+    ]);
   });
 });

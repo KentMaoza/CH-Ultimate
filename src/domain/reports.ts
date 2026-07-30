@@ -16,6 +16,46 @@ export function buildRevenueReport(
   let today = 0; let month = 0; let year = 0;
   const bySku = new Map<string, { skuId: string; name: string; units: number; revenue: number }>();
   const byDay = new Map<string, number>();
+  if (state.revenuePostings && state.notaPostings) {
+    for (const posting of state.revenuePostings) {
+      const posted = dateParts(new Date(posting.postedAt));
+      if ((range.from && posted.key < range.from) || (range.to && posted.key > range.to)) continue;
+      if (posted.year === now.year) year += posting.amountRupiah;
+      if (posted.year === now.year && posted.month === now.month) month += posting.amountRupiah;
+      if (posted.key === now.key) today += posting.amountRupiah;
+      byDay.set(posted.key, (byDay.get(posted.key) ?? 0) + posting.amountRupiah);
+    }
+    const netByNota = new Map<string, number>();
+    for (const posting of state.revenuePostings) {
+      netByNota.set(
+        posting.notaId,
+        (netByNota.get(posting.notaId) ?? 0) + posting.amountRupiah,
+      );
+    }
+    for (const [notaId, netRevenue] of netByNota) {
+      if (netRevenue <= 0) continue;
+      const posting = [...state.notaPostings]
+        .filter((item) =>
+          item.notaId === notaId &&
+          ['complete', 'recomplete', 'restore'].includes(item.postingKind))
+        .sort((left, right) =>
+          BigInt(left.lifecycleVersion) < BigInt(right.lifecycleVersion) ? 1 : -1)
+        .at(0);
+      if (!posting) continue;
+      const posted = dateParts(new Date(posting.postedAt));
+      if ((range.from && posted.key < range.from) || (range.to && posted.key > range.to)) continue;
+      for (const line of posting.lines) {
+        if (!line.skuId) continue;
+        const sku = state.skus.find((item) => item.id === line.skuId);
+        if (!sku) continue;
+        const entry = bySku.get(sku.id) ?? { skuId: sku.id, name: sku.name, units: 0, revenue: 0 };
+        entry.units += linePieces(line);
+        entry.revenue += lineTotal(line);
+        bySku.set(sku.id, entry);
+      }
+    }
+    return { today, month, year, bySku: [...bySku.values()].sort((a, b) => b.revenue - a.revenue), byDay: [...byDay].sort(([a], [b]) => a.localeCompare(b)).map(([date, revenue]) => ({ date, revenue })) };
+  }
   for (const transaction of state.notaTransactions.filter((item) => item.status === 'completed' && item.completedAt)) {
     const completed = dateParts(new Date(transaction.completedAt!));
     if ((range.from && completed.key < range.from) || (range.to && completed.key > range.to)) continue;

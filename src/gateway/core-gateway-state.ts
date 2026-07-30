@@ -132,16 +132,18 @@ export class CoreGatewayState {
     id: string,
     patch: Partial<NotaTransaction>,
   ): {
+    lifecycleVersion: string;
     fields: Record<
       string,
       { version: string; base: unknown; mine: unknown }
     >;
   } {
     const versions = this.notaFieldVersions.get(id);
+    const lifecycleVersion = this.notaLifecycleVersions.get(id);
     const canonical = this.canonicalState.notaTransactions.find(
       (nota) => nota.id === id,
     );
-    if (!versions || !canonical) {
+    if (!versions || !lifecycleVersion || !canonical) {
       throw new Error('Versi Nota belum tersedia. Sinkronkan ulang lalu coba lagi.');
     }
     const allowed = new Set([
@@ -164,7 +166,7 @@ export class CoreGatewayState {
         mine,
       };
     }
-    return { fields };
+    return { lifecycleVersion, fields };
   }
 
   requireNotaLineWriteContext(
@@ -173,12 +175,14 @@ export class CoreGatewayState {
     lineId: string,
     patch: Partial<NotaLine>,
   ): {
+    lifecycleVersion: string;
     pageVersion: string;
     lineVersion: string;
     base: Record<string, unknown>;
     mine: Record<string, unknown>;
   } {
     const pageVersion = this.notaPageVersions.get(pageId);
+    const lifecycleVersion = this.notaLifecycleVersions.get(notaId);
     const lineVersion = this.notaLineVersions.get(lineId);
     const canonicalPage = this.canonicalState.notaTransactions
       .find((nota) => nota.id === notaId)
@@ -188,10 +192,17 @@ export class CoreGatewayState {
       .find((nota) => nota.id === notaId)
       ?.pages.find((page) => page.id === pageId)
       ?.lines.find((line) => line.id === lineId);
-    if (!pageVersion || !lineVersion || !canonical || !projected) {
+    if (
+      !lifecycleVersion ||
+      !pageVersion ||
+      !lineVersion ||
+      !canonical ||
+      !projected
+    ) {
       throw new Error('Versi baris Nota belum tersedia. Sinkronkan ulang lalu coba lagi.');
     }
     return {
+      lifecycleVersion,
       pageVersion,
       lineVersion,
       base: notaLineMaterial(canonical, canonicalPage!.lines.indexOf(canonical)),
@@ -207,6 +218,7 @@ export class CoreGatewayState {
     pageId: string,
     lineId: string,
   ): {
+    lifecycleVersion: string;
     pageVersion: string;
     lineVersion: string;
     base: Record<string, unknown>;
@@ -218,24 +230,33 @@ export class CoreGatewayState {
       {},
     );
     return {
+      lifecycleVersion: context.lifecycleVersion,
       pageVersion: context.pageVersion,
       lineVersion: context.lineVersion,
       base: context.base,
     };
   }
 
-  requireNotaStructureContext(id: string): { structureVersion: string } {
+  requireNotaStructureContext(id: string): {
+    lifecycleVersion: string;
+    structureVersion: string;
+  } {
     const structureVersion = this.notaStructureVersions.get(id);
-    if (!structureVersion) {
+    const lifecycleVersion = this.notaLifecycleVersions.get(id);
+    if (!structureVersion || !lifecycleVersion) {
       throw new Error('Versi struktur Nota belum tersedia.');
     }
-    return { structureVersion };
+    return { lifecycleVersion, structureVersion };
   }
 
   requireNotaPageLifecycleContext(
     id: string,
     pageId: string,
-  ): { structureVersion: string; pageVersion: string } {
+  ): {
+    lifecycleVersion: string;
+    structureVersion: string;
+    pageVersion: string;
+  } {
     const pageVersion = this.notaPageLifecycleVersions.get(pageId);
     if (!pageVersion) throw new Error('Versi halaman Nota belum tersedia.');
     return { ...this.requireNotaStructureContext(id), pageVersion };
@@ -319,24 +340,7 @@ export class CoreGatewayState {
         !Array.isArray(change.payload)
           ? change.payload
           : undefined;
-      const version = payload?.rowVersion;
-      if (typeof version !== 'string') continue;
-      if (change.entityType === 'sku') {
-        this.skuVersions.set(change.entityId, version);
-      } else if (
-        change.entityType === 'stock_balance' ||
-        change.entityType === 'balance'
-      ) {
-        const skuId = payload?.skuId;
-        if (typeof skuId === 'string') {
-          this.balanceVersions.set(skuId, version);
-        }
-      } else if (change.entityType === 'template') {
-        const kind = payload?.templateKind;
-        if (kind === 'label' || kind === 'invoice') {
-          this.templateVersions.set(kind, version);
-        }
-      } else if (change.entityType === 'nota') {
+      if (change.entityType === 'nota') {
         const structureVersion = payload?.structureVersion;
         const lifecycleVersion = payload?.lifecycleVersion;
         const fieldVersions = payload?.fieldVersions;
@@ -359,6 +363,25 @@ export class CoreGatewayState {
                   typeof entry[1] === 'string'),
             ),
           );
+        }
+        continue;
+      }
+      const version = payload?.rowVersion;
+      if (typeof version !== 'string') continue;
+      if (change.entityType === 'sku') {
+        this.skuVersions.set(change.entityId, version);
+      } else if (
+        change.entityType === 'stock_balance' ||
+        change.entityType === 'balance'
+      ) {
+        const skuId = payload?.skuId;
+        if (typeof skuId === 'string') {
+          this.balanceVersions.set(skuId, version);
+        }
+      } else if (change.entityType === 'template') {
+        const kind = payload?.templateKind;
+        if (kind === 'label' || kind === 'invoice') {
+          this.templateVersions.set(kind, version);
         }
       } else if (change.entityType === 'nota_page') {
         this.notaPageVersions.set(change.entityId, version);
@@ -506,7 +529,10 @@ export class CoreGatewayState {
       }
     }
     if (
-      /^\/v1\/notas(?:\/|$)/.test(path) &&
+      (
+        /^\/v1\/notas(?:\/|$)/.test(path) ||
+        /^\/v1\/conflicts\/[^/]+\/resolve$/.test(path)
+      ) &&
       entity !== undefined &&
       entity !== null &&
       typeof entity === 'object' &&
@@ -514,16 +540,54 @@ export class CoreGatewayState {
     ) {
       const parsed = notaTransactionSchema.safeParse(entity);
       if (parsed.success) {
-        const current = this.canonicalState.notaTransactions.some(
+        const prior = this.canonicalState.notaTransactions.find(
           (nota) => nota.id === parsed.data.id,
         );
         this.canonicalState = {
           ...this.canonicalState,
-          notaTransactions: current
+          notaTransactions: prior
             ? this.canonicalState.notaTransactions.map((nota) =>
                 nota.id === parsed.data.id ? parsed.data : nota)
             : [...this.canonicalState.notaTransactions, parsed.data],
         };
+        const versionState = acknowledgement.versionState;
+        if (versionState) {
+          if (versionState.notaId !== parsed.data.id) {
+            throw new Error('Versi respons Nota CH Core tidak cocok.');
+          }
+          this.notaFieldVersions.set(
+            parsed.data.id,
+            { ...versionState.fieldVersions },
+          );
+          this.notaStructureVersions.set(
+            parsed.data.id,
+            versionState.structureVersion,
+          );
+          this.notaLifecycleVersions.set(
+            parsed.data.id,
+            versionState.lifecycleVersion,
+          );
+          for (const page of prior?.pages ?? []) {
+            this.notaPageVersions.delete(page.id);
+            this.notaPageLifecycleVersions.delete(page.id);
+            for (const line of page.lines) this.notaLineVersions.delete(line.id);
+          }
+          for (const [pageId, rowVersion] of Object.entries(
+            versionState.pageVersions,
+          )) {
+            this.notaPageVersions.set(pageId, rowVersion);
+          }
+          for (const [pageId, lifecycleVersion] of Object.entries(
+            versionState.pageLifecycleVersions,
+          )) {
+            this.notaPageLifecycleVersions.set(pageId, lifecycleVersion);
+          }
+          for (const [lineId, rowVersion] of Object.entries(
+            versionState.lineVersions,
+          )) {
+            this.notaLineVersions.set(lineId, rowVersion);
+          }
+        }
         if (
           version &&
           /^\/v1\/notas\/[^/]+\/(complete|reopen|cancel|restore)$/.test(path)

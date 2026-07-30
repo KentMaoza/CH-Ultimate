@@ -155,6 +155,7 @@ describe('Core operations gateway mutation coordination', () => {
     const mutationResponse = deferred<{ status: number; body: unknown }>();
     transport.enqueue(async (request) => {
       expect(request.body).toEqual({
+        lifecycleVersion: '1',
         fields: {
           customerName: {
             version: '1',
@@ -171,7 +172,7 @@ describe('Core operations gateway mutation coordination', () => {
       requestStarted.resolve();
       return mutationResponse.promise;
     });
-    transport.enqueue(emptyPoll());
+    transport.enqueue(emptyPoll('12'));
 
     const first = gateway.updateNotaTransaction(NOTA_ID, {
       customerName: 'Amina',
@@ -306,6 +307,7 @@ describe('Core operations gateway mutation coordination', () => {
       method: 'PATCH',
       path: CORE_API_PATHS.notaLine(NOTA_ID, PAGE_ID, LINE_ID),
       body: {
+        lifecycleVersion: '1',
         pageVersion: '1',
         lineVersion: '1',
         base: {
@@ -353,6 +355,90 @@ describe('Core operations gateway mutation coordination', () => {
     });
   });
 
+  it('replaces peer-polled Nota, page, and line versions without requiring rowVersion on Nota', () => {
+    const state = new CoreGatewayState();
+    const bootstrap = parseCoreBootstrap(populatedBootstrap('1'));
+    state.commitCanonical(mapCoreBootstrapToDemoState(bootstrap), '1');
+    state.replaceRowVersions(bootstrap);
+
+    state.recordChangeVersions([
+      {
+        revision: '2',
+        entityType: 'nota',
+        entityId: NOTA_ID,
+        operation: 'upsert',
+        payload: asCoreJson({
+          ...populatedBootstrap().notas[0],
+          fieldVersions: {
+            customerName: '7',
+            customerPlace: '8',
+            payment: '9',
+          },
+          structureVersion: '10',
+          lifecycleVersion: '11',
+        }),
+        createdAt: '2026-07-30T00:00:00.000Z',
+      },
+      {
+        revision: '3',
+        entityType: 'nota_page',
+        entityId: PAGE_ID,
+        operation: 'upsert',
+        payload: asCoreJson({
+          ...populatedBootstrap().notaPages[0],
+          rowVersion: '12',
+          lifecycleVersion: '13',
+        }),
+        createdAt: '2026-07-30T00:00:01.000Z',
+      },
+      {
+        revision: '4',
+        entityType: 'nota_line',
+        entityId: LINE_ID,
+        operation: 'upsert',
+        payload: asCoreJson({
+          ...populatedBootstrap().notaLines[0],
+          rowVersion: '14',
+        }),
+        createdAt: '2026-07-30T00:00:02.000Z',
+      },
+    ]);
+
+    expect(state.requireNotaLifecycleContext(NOTA_ID)).toEqual({
+      lifecycleVersion: '11',
+    });
+    expect(state.requireNotaStructureContext(NOTA_ID)).toEqual({
+      lifecycleVersion: '11',
+      structureVersion: '10',
+    });
+    expect(state.requireNotaPageLifecycleContext(NOTA_ID, PAGE_ID)).toEqual({
+      lifecycleVersion: '11',
+      structureVersion: '10',
+      pageVersion: '13',
+    });
+    expect(
+      state.requireNotaLineWriteContext(NOTA_ID, PAGE_ID, LINE_ID, {
+        quantity: 2,
+      }),
+    ).toMatchObject({
+      lifecycleVersion: '11',
+      pageVersion: '12',
+      lineVersion: '14',
+    });
+    expect(
+      state.requireNotaHeaderWriteContext(NOTA_ID, { customerName: 'Baru' }),
+    ).toEqual({
+      lifecycleVersion: '11',
+      fields: {
+        customerName: {
+          version: '7',
+          base: 'Amelia',
+          mine: 'Baru',
+        },
+      },
+    });
+  });
+
   it('stores a typed conflict and resolves it through the dedicated endpoint', async () => {
     const { gateway, transport } = readyGateway();
     await gateway.initialize();
@@ -378,7 +464,32 @@ describe('Core operations gateway mutation coordination', () => {
       conflictCount: 1,
     });
 
-    transport.enqueue({ status: 200, body: { serverRevision: '2' } });
+    const canonical = {
+      ...gateway.getSnapshot().notaTransactions[0]!,
+      customerName: 'Amelia Baru',
+    };
+    transport.enqueue({
+      status: 200,
+      body: {
+        serverRevision: '12',
+        entityVersion: '6',
+        entity: canonical,
+        versionState: {
+          notaId: NOTA_ID,
+          fieldVersions: {
+            customerName: '7',
+            customerPlace: '8',
+            transactionDate: '9',
+            payment: '10',
+          },
+          structureVersion: '11',
+          lifecycleVersion: '6',
+          pageVersions: { [PAGE_ID]: '12' },
+          pageLifecycleVersions: { [PAGE_ID]: '13' },
+          lineVersions: { [LINE_ID]: '14' },
+        },
+      },
+    });
     transport.enqueue(emptyPoll());
     await gateway.resolveConflict(conflict.id, 'server');
 
@@ -386,6 +497,30 @@ describe('Core operations gateway mutation coordination', () => {
       method: 'POST',
       path: CORE_API_PATHS.resolveConflict(conflict.id),
       body: { choice: 'server' },
+    });
+    expect(gateway.getSyncSnapshot().conflictCount).toBe(0);
+    expect(
+      gateway.getSnapshot().notaTransactions[0]?.customerName,
+    ).toBe('Amelia Baru');
+    transport.enqueue({
+      status: 200,
+      body: {
+        serverRevision: '13',
+        entityVersion: '8',
+        entity: { ...canonical, customerName: 'Saya' },
+      },
+    });
+    transport.enqueue(emptyPoll('13'));
+    await gateway.updateNotaTransaction(NOTA_ID, { customerName: 'Saya' });
+    expect(transport.requests.at(-2)?.body).toEqual({
+      lifecycleVersion: '6',
+      fields: {
+        customerName: {
+          version: '7',
+          base: 'Amelia Baru',
+          mine: 'Saya',
+        },
+      },
     });
   });
 

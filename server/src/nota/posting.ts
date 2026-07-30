@@ -67,3 +67,13 @@ export function restorePosting(snapshot: PostingSnapshot): PostingEffects {
     movementEffects: snapshot.stockEffects,
   };
 }
+
+export function shouldReversePostingOnCancel(status: string): boolean {
+  return status === 'completed' || status === 'reopened';
+}
+
+export function shouldReapplyPostingOnRestore(
+  cancelledFromStatus: string,
+): boolean {
+  return cancelledFromStatus === 'completed' || cancelledFromStatus === 'reopened';
+}

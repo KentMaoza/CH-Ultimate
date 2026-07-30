@@ -135,3 +135,75 @@ The builds retain the existing Vite CJS-deprecation, large-chunk, and Gradle
 - `/Users/hamlet/Documents/CH Nota` was not accessed or modified.
 - Task 10 offline creation/outbox policy and Task 11 deployment were not
   started.
+
+## Fix round 1
+
+The first review round closed all seven critical and six important findings.
+
+- MariaDB `DATE` values now normalize to exact `YYYY-MM-DD` strings for
+  bootstrap and ordered Nota changes, including driver-returned `Date`
+  objects. Completion destination is a first-class Nota column in every
+  server/client projection.
+- Peer changes install Nota field, structure, lifecycle, page, page-lifecycle,
+  and line versions even though a Nota row has no generic `rowVersion`.
+- Every edit carries the Nota lifecycle version. Lifecycle-versus-edit and
+  concurrent lifecycle races create durable typed conflict material before
+  generic editability rejection.
+- Conflict intent stores the full command. `mine` can reapply header, line,
+  delete-line, add-page, page lifecycle, and Nota lifecycle commands against
+  current versions; `server` discards the intent. Resolution acknowledgements
+  return the real change revision, canonical entity, and complete version
+  state, and repeated resolution returns the current real revision.
+- Cancelling a reopened Nota reverses its active prior posting. Restoring it
+  reapplies that posting, preserving additive history.
+- Posting snapshots now contain the exact posted line fields, identifier/name
+  snapshots, tracked-line decisions, and stock effects. Linked line edits
+  snapshot the locked SKU primary identifier, so later SKU rename/archive
+  cannot rewrite historical postings.
+- Posting and revenue rows are available in consistent bootstrap and ordered
+  changes. Core omzet reports use immutable revenue rows and posted-line
+  snapshots rather than mutable Nota pages.
+- Header validation is field-specific. Line multiplication and aggregate Nota
+  totals reject values outside the renderer's safe integer range before a
+  database bind.
+- The former 1,739-line MariaDB repository is now a 42-line facade. Row/date
+  mapping, shared queries/writes, page, header, line, conflict, lifecycle, and
+  posting persistence are separate modules; every production module is below
+  500 lines.
+
+### Expanded guarded MariaDB evidence
+
+The exact `/chu_test` source now also covers:
+
+- cancellation and restoration while the Nota is reopened;
+- immutable pre-rename and post-rename SKU identifier snapshots;
+- ordered `nota_posting` and `revenue_posting` changes;
+- durable multi-field `mine`, `server`, and repeated resolution;
+- authoritative version-state acknowledgement;
+- concurrent daily number allocation; and
+- one successful posting under concurrent completion.
+
+The source compiles, but these four integration tests were not executed because
+`CH_CORE_TEST_DATABASE_URL` is absent. The integration command failed closed
+before touching any database that was not explicitly named `chu_test`.
+
+### Fix-round verification
+
+| Gate | Result |
+| --- | --- |
+| `npm run verify` | PASS — 54 files, 408 tests |
+| `npm run test:mobile` | PASS — 9 files, 81 tests |
+| `npm run mobile:build` | PASS — 587 modules |
+| `npm run package` | PASS — Electron arm64 package |
+| `npm run server:test` | PASS — 36 files; 244 passed, 1 intentional workbook skip |
+| server source/test typecheck | PASS |
+| `npm run android:sync` | PASS |
+| Android `test` with Android Studio JDK 21 and local SDK | PASS |
+| Android `lint` with Android Studio JDK 21 and local SDK | PASS |
+| `git diff --check` | PASS |
+| `npm run server:test:integration` | BLOCKED — exact isolated `chu_test` URL absent |
+| `npm run test:e2e` | BLOCKED — all eight legacy demo tests time out at fail-closed CH Core startup before a screen assertion; provisioning/pairing belongs to Task 11 |
+
+The E2E startup guard was not weakened to restore the old silent demo fallback.
+No NAS, DSM, MariaDB package, certificate, reverse proxy, or deployment setting
+was accessed or changed during this fix round.

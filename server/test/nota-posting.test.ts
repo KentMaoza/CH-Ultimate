@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   completionPosting,
+  shouldReapplyPostingOnRestore,
+  shouldReversePostingOnCancel,
   reversalPosting,
   restorePosting,
 } from '../src/nota/posting.js';
@@ -69,5 +71,12 @@ describe('Nota posting effects', () => {
       snapshotEffects: snapshot.stockEffects,
       movementEffects: snapshot.stockEffects,
     });
+  });
+
+  it('reverses an active prior posting when cancelling reopened Nota and reapplies on restore', () => {
+    expect(shouldReversePostingOnCancel('reopened')).toBe(true);
+    expect(shouldReapplyPostingOnRestore('reopened')).toBe(true);
+    expect(shouldReversePostingOnCancel('draft')).toBe(false);
+    expect(shouldReapplyPostingOnRestore('draft')).toBe(false);
   });
 });

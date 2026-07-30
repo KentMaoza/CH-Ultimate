@@ -124,6 +124,7 @@ export function populatedBootstrap(
         notaNumber: 'CHU-20260729-0001',
         businessDate: '2026-07-29',
         status: 'draft',
+        completionDestination: null,
         header: {
           customerName: 'Amelia',
           customerPlace: 'Saibah',

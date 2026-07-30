@@ -12,6 +12,8 @@ import {
   applyNotaChange,
   applyNotaLineChange,
   applyNotaPageChange,
+  applyNotaPostingChange,
+  applyRevenuePostingChange,
   applyTemplateChange,
   CoreChangeRequiresBootstrapError,
 } from './core-nota-change-application';
@@ -208,6 +210,12 @@ export function applyCoreChange(
   }
   if (change.entityType === 'nota_line') {
     return applyNotaLineChange(state, change);
+  }
+  if (change.entityType === 'nota_posting') {
+    return applyNotaPostingChange(state, change);
+  }
+  if (change.entityType === 'revenue_posting') {
+    return applyRevenuePostingChange(state, change);
   }
   if (change.entityType === 'template') {
     return applyTemplateChange(state, change);

@@ -244,4 +244,120 @@ describe('Core gateway mapping safety', () => {
       ['A', 'B', 'AA'],
     );
   });
+
+  it('maps authoritative completion destination outside mutable header fields', () => {
+    const nota = {
+      ...populatedBootstrap().notas[0]!,
+      status: 'completed',
+      completionDestination: 'finished',
+      header: {
+        ...populatedBootstrap().notas[0]!.header as Record<string, unknown>,
+        completionDestination: 'archive',
+      },
+    };
+
+    const state = mapCoreBootstrapToDemoState(
+      parseCoreBootstrap(populatedBootstrap('2', { notas: [nota] })),
+    );
+
+    expect(state.notaTransactions[0]?.completionDestination).toBe('finished');
+  });
+
+  it('hydrates immutable posting and revenue rows into the Core snapshot', () => {
+    const postingId = '88888888-8888-4888-8888-888888888888';
+    const revenueId = '99999999-9999-4999-8999-999999999999';
+    const bootstrap = parseCoreBootstrap(populatedBootstrap('4', {
+      notaPostings: [{
+        id: postingId,
+        notaId: NOTA_ID,
+        postingKind: 'complete',
+        amountRupiah: '25000',
+        snapshot: {
+          lines: [{
+            id: LINE_ID,
+            pageId: PAGE_ID,
+            skuId: SKU_ID,
+            skuIdentifierSnapshot: 'SKU-CORE',
+            skuNameSnapshot: 'Produk Core saat posting',
+            kindSnapshot: 'Barang',
+            quantityPcs: '1',
+            unitKind: 'pcs',
+            unitPriceRupiah: '25000',
+            pcsPriceRupiah: '25000',
+            lsnPriceRupiah: '300000',
+            lineTotalRupiah: '25000',
+            linePosition: 0,
+          }],
+          stockEffects: { [SKU_ID]: '-1' },
+          trackedLineIds: { [LINE_ID]: SKU_ID },
+        },
+        lifecycleVersion: '2',
+        reversesPostingId: null,
+        postedAt: '2026-07-30T01:00:00.000Z',
+      }],
+      revenuePostings: [{
+        id: revenueId,
+        notaId: NOTA_ID,
+        notaPostingId: postingId,
+        amountRupiah: '25000',
+        postingKind: 'complete',
+        postedAt: '2026-07-30T01:00:00.000Z',
+      }],
+    }));
+
+    const state = mapCoreBootstrapToDemoState(bootstrap);
+
+    expect(state.notaTransactions[0]).toMatchObject({
+      postedLines: [{
+        id: LINE_ID,
+        skuId: SKU_ID,
+        description: 'Produk Core saat posting',
+      }],
+      postedStockEffects: { [SKU_ID]: 1 },
+      postedTrackedLineIds: { [LINE_ID]: SKU_ID },
+    });
+    expect(state.revenuePostings).toEqual([
+      expect.objectContaining({ id: revenueId, amountRupiah: 25000 }),
+    ]);
+  });
+
+  it('applies ordered posting and revenue changes without a bootstrap', () => {
+    const postingId = '88888888-8888-4888-8888-888888888888';
+    const revenueId = '99999999-9999-4999-8999-999999999999';
+    const withPosting = applyCoreChange(
+      mappedState(),
+      change('nota_posting', postingId, 'upsert', {
+        id: postingId,
+        notaId: NOTA_ID,
+        postingKind: 'complete',
+        amountRupiah: '25000',
+        snapshot: {
+          lines: [],
+          stockEffects: {},
+          trackedLineIds: {},
+        },
+        lifecycleVersion: '2',
+        reversesPostingId: null,
+        postedAt: '2026-07-30T01:00:00.000Z',
+      }),
+    );
+    const withRevenue = applyCoreChange(
+      withPosting,
+      change('revenue_posting', revenueId, 'upsert', {
+        id: revenueId,
+        notaId: NOTA_ID,
+        notaPostingId: postingId,
+        amountRupiah: '25000',
+        postingKind: 'complete',
+        postedAt: '2026-07-30T01:00:00.000Z',
+      }),
+    );
+
+    expect(withRevenue.notaPostings).toEqual([
+      expect.objectContaining({ id: postingId }),
+    ]);
+    expect(withRevenue.revenuePostings).toEqual([
+      expect.objectContaining({ id: revenueId, amountRupiah: 25000 }),
+    ]);
+  });
 });

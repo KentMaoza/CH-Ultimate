@@ -176,6 +176,7 @@ describe('Core gateway concurrency and durability', () => {
     await Promise.all([first, second]);
     expect(transport.requests[1]).toMatchObject({
       body: {
+        lifecycleVersion: '1',
         fields: {
           customerName: {
             version: '1',

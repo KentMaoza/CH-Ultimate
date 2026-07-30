@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   decideLineMutation,
+  lifecycleEditConflict,
   mergeHeaderFields,
   parseNotaStoredJson,
   versionConflict,
@@ -106,5 +107,21 @@ describe('Nota version merges and conflicts', () => {
         mine: { edit: 'line' },
         server: { page: 'B' },
       });
+  });
+
+  it.each(['header', 'line', 'delete-line', 'add-page', 'cancel-page'])(
+    'returns typed lifecycle conflict material before rejecting %s edits',
+    (action) => {
+      expect(lifecycleEditConflict('completed', '8', '7', action)).toEqual({
+        base: { lifecycleVersion: '7' },
+        mine: { action },
+        server: { status: 'completed', lifecycleVersion: '8' },
+      });
+    },
+  );
+
+  it('permits current draft and reopened edits only', () => {
+    expect(lifecycleEditConflict('draft', '3', '3', 'header')).toBeNull();
+    expect(lifecycleEditConflict('reopened', '4', '4', 'line')).toBeNull();
   });
 });

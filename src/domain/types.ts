@@ -77,6 +77,28 @@ export interface NotaTransaction {
   cancelledFromStatus?: 'draft' | 'completed' | 'reopened';
 }
 
+export interface NotaPosting {
+  id: string;
+  notaId: string;
+  postingKind: string;
+  amountRupiah: number;
+  lines: NotaLine[];
+  stockEffects: Record<string, number>;
+  trackedLineIds: Record<string, string>;
+  lifecycleVersion: string;
+  reversesPostingId?: string;
+  postedAt: string;
+}
+
+export interface RevenuePosting {
+  id: string;
+  notaId: string;
+  notaPostingId: string;
+  amountRupiah: number;
+  postingKind: string;
+  postedAt: string;
+}
+
 export interface LabelTemplate {
   medium: 'thermal' | 'a4';
   widthMm: number;
@@ -124,6 +146,8 @@ export interface DemoState {
   adjustments: StockAdjustment[];
   priceChanges: SkuPriceChange[];
   notaTransactions: NotaTransaction[];
+  notaPostings?: NotaPosting[];
+  revenuePostings?: RevenuePosting[];
   labelTemplate: LabelTemplate;
   invoiceTemplate: InvoiceTemplate;
   sourceLabel: string;

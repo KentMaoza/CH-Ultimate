@@ -44,6 +44,64 @@ test('revenue date range uses the WITA completion date', () => {
   expect(report.byDay).toEqual([{ date: '2026-07-21', revenue: 50000 }]);
 });
 
+test('Core revenue uses immutable posting rows instead of mutable Nota pages', () => {
+  const state = createInitialState();
+  const completed = createDraftNotaTransaction(1);
+  completed.id = '11111111-1111-4111-8111-111111111111';
+  completed.status = 'completed';
+  completed.completedAt = '2026-07-21T02:00:00.000Z';
+  completed.pages[0]!.lines = [{
+    id: 'mutable',
+    description: 'Nilai yang berubah',
+    kind: '',
+    quantity: 1,
+    unit: 'pcs',
+    pcsPrice: 999_999,
+    lsnPrice: 0,
+  }];
+  const postedLine = {
+    id: '22222222-2222-4222-8222-222222222222',
+    skuId: 'sku-1',
+    description: 'Beras saat posting',
+    kind: 'Pangan',
+    quantity: 2,
+    unit: 'pcs' as const,
+    pcsPrice: 21_000,
+    lsnPrice: 252_000,
+  };
+  const report = buildRevenueReport({
+    ...state,
+    notaTransactions: [completed],
+    notaPostings: [{
+      id: '33333333-3333-4333-8333-333333333333',
+      notaId: completed.id,
+      postingKind: 'complete',
+      amountRupiah: 42_000,
+      lines: [postedLine],
+      stockEffects: { 'sku-1': -2 },
+      trackedLineIds: { [postedLine.id]: 'sku-1' },
+      lifecycleVersion: '2',
+      postedAt: completed.completedAt,
+    }],
+    revenuePostings: [{
+      id: '44444444-4444-4444-8444-444444444444',
+      notaId: completed.id,
+      notaPostingId: '33333333-3333-4333-8333-333333333333',
+      amountRupiah: 42_000,
+      postingKind: 'complete',
+      postedAt: completed.completedAt,
+    }],
+  }, new Date('2026-07-21T12:00:00.000Z'));
+
+  expect(report.today).toBe(42_000);
+  expect(report.bySku).toEqual([{
+    skuId: 'sku-1',
+    name: 'Beras Hitam Premium 1 kg',
+    units: 2,
+    revenue: 42_000,
+  }]);
+});
+
 test('empty-stock report includes only tracked zero and negative balances', () => {
   const items = buildEmptyStockItems(createInitialState());
   expect(items.map((item) => item.sku.skuNumber)).toEqual(['ACC-204-SLV', 'SNK-044']);

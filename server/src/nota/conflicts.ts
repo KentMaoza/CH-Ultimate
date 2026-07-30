@@ -94,3 +94,28 @@ export function versionConflict<TBase, TMine, TServer>(
     ? { kind: 'apply' }
     : { kind: 'conflict', base, mine, server };
 }
+
+export function lifecycleEditConflict(
+  status: string,
+  currentVersion: string,
+  requestedVersion: string,
+  action: string,
+):
+  | null
+  | {
+      base: { lifecycleVersion: string };
+      mine: { action: string };
+      server: { status: string; lifecycleVersion: string };
+    } {
+  if (
+    currentVersion === requestedVersion &&
+    ['draft', 'reopened'].includes(status)
+  ) {
+    return null;
+  }
+  return {
+    base: { lifecycleVersion: requestedVersion },
+    mine: { action },
+    server: { status, lifecycleVersion: currentVersion },
+  };
+}

@@ -25,11 +25,14 @@ export {
   coreJsonValueSchema,
   coreNotaLineRowSchema,
   coreNotaPageRowSchema,
+  coreNotaPostingLineSchema,
+  coreNotaPostingRowSchema,
   coreNotaRowSchema,
   corePriceHistoryRowSchema,
   coreSkuIdentifierRowSchema,
   coreSkuRowSchema,
   coreStockMovementRowSchema,
+  coreRevenuePostingRowSchema,
   coreTemplateRowSchema,
 } from './core-api-schemas';
 export type { CoreJsonValue } from './core-api-schemas';
@@ -140,6 +143,15 @@ export interface CoreMutationAcknowledgement {
   entity?: CoreJsonValue;
   entityVersion?: string;
   entityId?: string;
+  versionState?: {
+    notaId: string;
+    fieldVersions: Record<string, string>;
+    structureVersion: string;
+    lifecycleVersion: string;
+    pageVersions: Record<string, string>;
+    pageLifecycleVersions: Record<string, string>;
+    lineVersions: Record<string, string>;
+  };
 }
 
 export function parseCoreMutationAcknowledgement(

@@ -88,22 +88,23 @@ describe('Nota HTTP boundary', () => {
     {
       method: 'POST',
       url: `/v1/notas/${NOTA_ID}/pages`,
-      payload: { structureVersion: '1' },
+      payload: { lifecycleVersion: '1', structureVersion: '1' },
     },
     {
       method: 'POST',
       url: `/v1/notas/${NOTA_ID}/pages/${PAGE_ID}/cancel`,
-      payload: { structureVersion: '1', pageVersion: '1' },
+      payload: { lifecycleVersion: '1', structureVersion: '1', pageVersion: '1' },
     },
     {
       method: 'POST',
       url: `/v1/notas/${NOTA_ID}/pages/${PAGE_ID}/restore`,
-      payload: { structureVersion: '1', pageVersion: '1' },
+      payload: { lifecycleVersion: '1', structureVersion: '1', pageVersion: '1' },
     },
     {
       method: 'PATCH',
       url: `/v1/notas/${NOTA_ID}/header`,
       payload: {
+        lifecycleVersion: '1',
         fields: {
           customerName: { version: '1', base: '', mine: 'Amelia' },
         },
@@ -113,6 +114,7 @@ describe('Nota HTTP boundary', () => {
       method: 'PATCH',
       url: `/v1/notas/${NOTA_ID}/pages/${PAGE_ID}/lines/${LINE_ID}`,
       payload: {
+        lifecycleVersion: '1',
         pageVersion: '1',
         lineVersion: null,
         base: null,
@@ -132,6 +134,7 @@ describe('Nota HTTP boundary', () => {
       method: 'DELETE',
       url: `/v1/notas/${NOTA_ID}/pages/${PAGE_ID}/lines/${LINE_ID}`,
       payload: {
+        lifecycleVersion: '1',
         pageVersion: '1',
         lineVersion: '1',
         base: {
@@ -194,12 +197,16 @@ describe('Nota HTTP boundary', () => {
       {
         method: 'PATCH',
         url: `/v1/notas/${NOTA_ID}/header`,
-        payload: { fields: { customerName: { mine: 'A' } } },
+        payload: {
+          lifecycleVersion: '1',
+          fields: { customerName: { mine: 'A' } },
+        },
       },
       {
         method: 'PATCH',
         url: `/v1/notas/${NOTA_ID}/pages/${PAGE_ID}/lines/${LINE_ID}`,
         payload: {
+          lifecycleVersion: '1',
           pageVersion: '1',
           lineVersion: null,
           base: null,
@@ -212,6 +219,50 @@ describe('Nota HTTP boundary', () => {
             unit: 'pcs',
             pcsPrice: 1,
             lsnPrice: 12,
+          },
+        },
+      },
+      {
+        method: 'PATCH',
+        url: `/v1/notas/${NOTA_ID}/header`,
+        payload: {
+          lifecycleVersion: '1',
+          fields: {
+            payment: { version: '1', base: 'cash', mine: 'poison' },
+          },
+        },
+      },
+      {
+        method: 'PATCH',
+        url: `/v1/notas/${NOTA_ID}/header`,
+        payload: {
+          lifecycleVersion: '1',
+          fields: {
+            transactionDate: {
+              version: '1',
+              base: '2026-07-30',
+              mine: '30/07/2026',
+            },
+          },
+        },
+      },
+      {
+        method: 'PATCH',
+        url: `/v1/notas/${NOTA_ID}/pages/${PAGE_ID}/lines/${LINE_ID}`,
+        payload: {
+          lifecycleVersion: '1',
+          pageVersion: '1',
+          lineVersion: null,
+          base: null,
+          mine: {
+            linePosition: 0,
+            skuId: null,
+            description: 'Overflow',
+            kind: '',
+            quantity: Number.MAX_SAFE_INTEGER,
+            unit: 'lsn',
+            pcsPrice: 1,
+            lsnPrice: Number.MAX_SAFE_INTEGER,
           },
         },
       },

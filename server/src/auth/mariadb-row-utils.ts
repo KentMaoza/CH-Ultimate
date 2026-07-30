@@ -28,6 +28,24 @@ export function nullableDatabaseDate(value: unknown): Date | null {
   return value === null || value === undefined ? null : databaseDate(value);
 }
 
+export function databaseDateOnly(value: unknown): string {
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) {
+      throw new Error('Database returned an invalid date');
+    }
+    return value.toISOString().slice(0, 10);
+  }
+  const text = String(value);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    throw new Error('Database returned an invalid date');
+  }
+  const parsed = new Date(`${text}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== text) {
+    throw new Error('Database returned an invalid date');
+  }
+  return text;
+}
+
 export function isDuplicateEntry(error: unknown): boolean {
   return (
     typeof error === 'object' &&

@@ -59,7 +59,10 @@ export function mergeQueuedMutation(
     ...item,
     body:
       currentFields && nextFields
-        ? asCoreJson({ fields: { ...currentFields, ...nextFields } })
+        ? asCoreJson({
+            ...currentBody,
+            fields: { ...currentFields, ...nextFields },
+          })
         : currentMine && nextMine && currentBody
           ? asCoreJson({ ...currentBody, mine: { ...currentMine, ...nextMine } })
           : currentPatch && nextPatch

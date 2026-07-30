@@ -7,13 +7,16 @@ import type {
 import {
   coreNotaLineRowSchema,
   coreNotaPageRowSchema,
+  coreNotaPostingRowSchema,
   coreNotaRowSchema,
+  coreRevenuePostingRowSchema,
   coreTemplateRowSchema,
   type CoreChange,
 } from './core-api-types';
 import {
   blankCoreLine,
   integerFromDecimal,
+  mapCorePostingLine,
   safeIntegerProduct,
 } from './core-bootstrap-mapping';
 
@@ -44,8 +47,8 @@ function notaFromRow(
     transactionDate: row.header.transactionDate ?? row.businessDate,
     payment: row.header.payment ?? 'unclassified',
     status: row.status,
-    ...(row.header.completionDestination
-      ? { completionDestination: row.header.completionDestination }
+    ...(row.completionDestination
+      ? { completionDestination: row.completionDestination }
       : {}),
     ...(row.completedAt ? { completedAt: row.completedAt } : {}),
     nextNoteIndex: current?.nextNoteIndex ?? 0,
@@ -211,6 +214,102 @@ export function applyNotaLineChange(
         }),
       };
     }),
+  };
+}
+
+export function applyNotaPostingChange(
+  state: DemoState,
+  change: CoreChange,
+): DemoState {
+  if (change.operation !== 'upsert') {
+    throw new CoreChangeRequiresBootstrapError('Unknown Nota posting operation');
+  }
+  const row = coreNotaPostingRowSchema.parse(change.payload);
+  requireIdentity(change, row.id);
+  if (
+    !state.notaTransactions.some((nota) => nota.id === row.notaId) ||
+    row.snapshot.lines.some(
+      (line) => line.skuId && !state.skus.some((sku) => sku.id === line.skuId),
+    )
+  ) {
+    throw new CoreChangeRequiresBootstrapError(
+      'Nota posting does not match its related entities',
+    );
+  }
+  const posting = {
+    id: row.id,
+    notaId: row.notaId,
+    postingKind: row.postingKind,
+    amountRupiah: integerFromDecimal(row.amountRupiah, 'amountRupiah'),
+    lines: row.snapshot.lines.map(mapCorePostingLine),
+    stockEffects: Object.fromEntries(
+      Object.entries(row.snapshot.stockEffects).map(([skuId, quantity]) => [
+        skuId,
+        -integerFromDecimal(quantity, 'stockEffect'),
+      ]),
+    ),
+    trackedLineIds: row.snapshot.trackedLineIds,
+    lifecycleVersion: row.lifecycleVersion,
+    ...(row.reversesPostingId
+      ? { reversesPostingId: row.reversesPostingId }
+      : {}),
+    postedAt: row.postedAt,
+  };
+  const positive = ['complete', 'recomplete', 'restore'].includes(
+    row.postingKind,
+  );
+  return {
+    ...state,
+    notaPostings: [
+      ...(state.notaPostings ?? []).filter((item) => item.id !== row.id),
+      posting,
+    ],
+    notaTransactions: positive
+      ? state.notaTransactions.map((nota) =>
+          nota.id === row.notaId
+            ? {
+                ...nota,
+                postedLines: posting.lines,
+                postedStockEffects: posting.stockEffects,
+                postedTrackedLineIds: posting.trackedLineIds,
+              }
+            : nota)
+      : state.notaTransactions,
+  };
+}
+
+export function applyRevenuePostingChange(
+  state: DemoState,
+  change: CoreChange,
+): DemoState {
+  if (change.operation !== 'upsert') {
+    throw new CoreChangeRequiresBootstrapError('Unknown revenue posting operation');
+  }
+  const row = coreRevenuePostingRowSchema.parse(change.payload);
+  requireIdentity(change, row.id);
+  if (
+    !state.notaTransactions.some((nota) => nota.id === row.notaId) ||
+    !(state.notaPostings ?? []).some(
+      (posting) => posting.id === row.notaPostingId,
+    )
+  ) {
+    throw new CoreChangeRequiresBootstrapError(
+      'Revenue posting does not match its Nota posting',
+    );
+  }
+  return {
+    ...state,
+    revenuePostings: [
+      ...(state.revenuePostings ?? []).filter((item) => item.id !== row.id),
+      {
+        id: row.id,
+        notaId: row.notaId,
+        notaPostingId: row.notaPostingId,
+        amountRupiah: integerFromDecimal(row.amountRupiah, 'amountRupiah'),
+        postingKind: row.postingKind,
+        postedAt: row.postedAt,
+      },
+    ],
   };
 }
 

@@ -194,3 +194,90 @@ No live CH Core TLS connection or physical-device Keystore flow can be claimed
 until Task 11 supplies the real private CA and reserved endpoint. The build,
 JVM boundary, TypeScript bridge, browser demo boundary, and fail-closed missing
 configuration behavior are verified locally. No NAS was accessed.
+
+---
+
+## Fix Round 1: Reject HTTPS redirects
+
+The native HTTPS client now disables automatic redirect following immediately
+after opening each connection. It also rejects every HTTP status from 300
+through 399 before selecting or reading a response stream. Consequently, a
+CH Core response cannot cause `HttpsURLConnection` to issue a second request
+whose route or origin bypassed the native allowlist.
+
+Only these implementation artifacts changed:
+
+- `android/app/src/main/java/com/tokoch/chucompanion/CoreApiClient.java`
+- `android/app/src/test/java/com/tokoch/chucompanion/CoreApiRedirectPolicyTest.java`
+
+### Focused RED
+
+Command against commit `8d871b5` after adding the regression test:
+
+```sh
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' \
+ANDROID_HOME='/Users/hamlet/Library/Android/sdk' \
+./gradlew testDebugUnitTest \
+  --tests com.tokoch.chucompanion.CoreApiRedirectPolicyTest
+```
+
+Expected result:
+
+```text
+CoreApiRedirectPolicyTest.java:21: error: cannot find symbol
+CoreApiClient.disableRedirects(connection);
+CoreApiRedirectPolicyTest.java:28: error: cannot find symbol
+CoreApiClient.requireNonRedirectStatus(redirectStatus)
+4 errors
+BUILD FAILED
+```
+
+This proved the current client had neither the per-connection redirect disable
+step nor the explicit 3xx rejection policy.
+
+### Focused GREEN
+
+The same focused command after the minimal implementation:
+
+```text
+CoreApiRedirectPolicyTest: 1 test, 0 failures, 0 errors
+BUILD SUCCESSFUL in 1s
+135 actionable tasks: 5 executed, 130 up-to-date
+```
+
+The test starts with a fake `HttpsURLConnection` whose instance redirect
+setting is enabled, proves the client disables it, rejects every status in the
+inclusive 300–399 range, and continues to accept adjacent non-redirect
+statuses 299 and 400.
+
+### Amended-code verification
+
+Environment:
+
+```text
+JAVA_HOME=/Applications/Android Studio.app/Contents/jbr/Contents/Home
+ANDROID_HOME=/Users/hamlet/Library/Android/sdk
+```
+
+| Command | Result |
+| --- | --- |
+| `npm run android:test` | PASS — 6 app tests in debug and 6 in release; `BUILD SUCCESSFUL in 8s`; 270 tasks |
+| `npm run android:lint` | PASS — 0 errors; `BUILD SUCCESSFUL in 4s`; 316 tasks |
+| `git diff --check` | PASS — no output |
+
+No TypeScript, mobile renderer, manifest, resource, dependency, or deployment
+configuration changed, so the unrelated mobile build/typecheck/sync gates were
+not rerun.
+
+### Fix self-review
+
+- Redirect following is disabled before TLS socket configuration, headers,
+  request bodies, or response-code access.
+- Every 3xx status is rejected before either `getInputStream()` or
+  `getErrorStream()` can consume a redirect response.
+- The existing endpoint, private-CA, hostname-verification, request allowlist,
+  authentication, timeout, body-size, and JSON boundaries are unchanged.
+- The regression uses only a local fake connection; it adds no endpoint,
+  certificate, network access, or production credential.
+- Task 11 remains responsible for the real endpoint/private CA and live TLS
+  verification. No NAS was accessed.

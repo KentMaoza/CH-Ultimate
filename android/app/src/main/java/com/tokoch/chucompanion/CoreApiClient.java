@@ -39,6 +39,7 @@ final class CoreApiClient {
         try {
             URL url = config.endpoint.resolve(path).toURL();
             connection = (HttpsURLConnection) url.openConnection();
+            disableRedirects(connection);
             connection.setSSLSocketFactory(createSslContext().getSocketFactory());
             connection.setConnectTimeout(TIMEOUT_MS);
             connection.setReadTimeout(TIMEOUT_MS);
@@ -76,6 +77,7 @@ final class CoreApiClient {
                 }
             }
             int status = connection.getResponseCode();
+            requireNonRedirectStatus(status);
             InputStream stream =
                 status >= 400
                     ? connection.getErrorStream()
@@ -94,6 +96,18 @@ final class CoreApiClient {
             );
         } finally {
             if (connection != null) connection.disconnect();
+        }
+    }
+
+    static void disableRedirects(HttpsURLConnection connection) {
+        connection.setInstanceFollowRedirects(false);
+    }
+
+    static void requireNonRedirectStatus(int status) {
+        if (status >= 300 && status <= 399) {
+            throw new CoreSecurityException(
+                "Respons CH Core tidak valid."
+            );
         }
     }
 

@@ -165,7 +165,7 @@ GREEN focused evidence:
 
 ## Review fix round 2/5
 
-Four Important findings were addressed, pending scoped re-review:
+Four Important findings were addressed and the scoped re-review approved them:
 
 1. Demo/browser Nota completion now says it is stored only in the local demo
    session. Only Core-backed completion claims shared-device availability or
@@ -189,6 +189,11 @@ GREEN focused evidence:
 
 - UI: 3 files / 24 tests.
 - Deployment artifacts: 1 file / 15 tests.
+
+Final scoped re-review found zero Critical or Important findings across
+`f2d268e..3b01276`. It independently reran UI 24/24, deployment artifacts
+15/15, root TypeScript, all shell syntax checks, and the full Task 11 diff
+check. The worktree remained clean.
 
 ## Final local verification
 

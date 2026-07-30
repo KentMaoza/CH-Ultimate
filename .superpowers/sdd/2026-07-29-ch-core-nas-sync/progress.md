@@ -189,3 +189,9 @@ Task 11 fix round 2 gate: UI RED 2/24 then GREEN 3 files / 24 tests;
 deployment RED 2/15 then GREEN 1 file / 15 tests. No NAS, DSM, SMB, router,
 Tailscale, certificate, physical client, MariaDB instance, CH Nota, or
 replacement workbook access/change/deployment occurred.
+Task 11 complete: commits `f2d268e..3b01276`; final scoped re-review approved
+with 0 Critical/Important findings.
+Task 11 approval gate: reviewer reran UI 24/24, deployment artifacts 15/15,
+root typecheck, all shell syntax checks, and the full Task 11 diff check.
+Docker/Compose, exact isolated `/chu_test`, NAS, certificate, and physical
+client gates remain environmental and no deployment occurred.

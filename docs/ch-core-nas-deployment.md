@@ -68,6 +68,18 @@ CA certificate. The leaf SHA-256 fingerprint is
 `22:CC:AC:8A:62:DE:C8:22:80:74:56:12:D5:55:18:67:53:BF:E7:BF:EE:17:F8:B9:D5:47:8E:B3:2B:DD:2E:1C`
 and it is valid from 2026-07-31 through 2027-09-01.
 
+The leaf was then imported into DSM and assigned only to reverse-proxy service
+`*:8443`; the DSM default and QuickConnect certificate assignments were left
+unchanged. Reverse proxy `CH Core LAN` maps HTTPS `*:8443` to HTTP
+`127.0.0.1:18080`. The DSM firewall is enabled with two ordered,
+port-specific rules: allow TCP 8443 from
+`192.168.1.0/255.255.255.0`, then deny TCP 8443 from all other sources.
+No catch-all deny rule was added. After applying the rules, LAN HTTPS returned
+`{"status":"ok"}` with the private CA and the expected leaf fingerprint.
+DSM 5001 and SMB 445 remained reachable; raw CH Core 18080 and MariaDB 3306
+remained unreachable. The administrator Mac's Tailscale client was stopped,
+so a separate live Tailscale-path denial probe remains outstanding.
+
 ## Blocking checklist
 
 - [ ] Create the router reservation `90:09:D0:9F:7C:1F -> 192.168.1.14`
@@ -83,8 +95,8 @@ and it is valid from 2026-07-31 through 2027-09-01.
   ready health plus raw-port isolation.
 - [x] Generate a private CA off-NAS and a leaf certificate containing the
   required IP SAN `192.168.1.14`.
-- [ ] Enable and validate the DSM firewall rules described below.
-- [ ] Configure and validate the DSM reverse proxy described below.
+- [x] Enable and validate the scoped DSM firewall rules described below.
+- [x] Configure and validate the DSM reverse proxy described below.
 - [ ] Pass reboot, resource, load, LAN-isolation, and seven-client gates.
 
 RAID1 is availability, not an independent backup. Production remains blocked

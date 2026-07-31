@@ -68,9 +68,10 @@ copied-data runtime is not yet an approved production endpoint.
 
 Current LAN evidence: the Mac is `192.168.1.18`; the NAS is
 `192.168.1.14`, MAC `90:09:D0:9F:7C:1F`. SMB 445 and DSM HTTPS 5001 are
-reachable. CH Core 8443 is not configured. The deployed raw API listens only
-on NAS loopback: the Mac cannot reach `192.168.1.14:18080`; MariaDB TCP is
-also unreachable and remains disabled (`port=0`).
+reachable. CH Core HTTPS is available at `192.168.1.14:8443` through the DSM
+reverse proxy. The deployed raw API listens only on NAS loopback: the Mac
+cannot reach `192.168.1.14:18080`; MariaDB TCP is also unreachable and remains
+disabled (`port=0`).
 
 | Requirement | Status | Current evidence or missing action |
 | --- | --- | --- |
@@ -85,23 +86,27 @@ also unreachable and remains disabled (`port=0`).
 | Copied-data CH Core runtime | PASS | Project `ch-ultimate-core-d5bb4b6` has one running container; `/health/live` returned `{"status":"ok"}` and `/health/ready` returned `{"status":"ready"}` through NAS loopback |
 | Runtime isolation | PASS | Container uses host networking but binds `127.0.0.1:18080`; the Mac cannot connect to raw 18080 or MariaDB 3306; all Linux capabilities are dropped and the root filesystem is read-only |
 | Post-start resource sample | READY | Load average `0.51 / 0.71 / 0.86`, `344328 kB` memory available, and `639496 kB` swap used; the one-hour and seven-client soak gates remain open |
-| Private CA and IP-SAN leaf | PREPARED | Encrypted CA key is held off-NAS on the administrator Mac; the validated leaf contains `IP:192.168.1.14`, expires 2027-09-01, and has SHA-256 fingerprint `22:CC:AC:8A:62:DE:C8:22:80:74:56:12:D5:55:18:67:53:BF:E7:BF:EE:17:F8:B9:D5:47:8E:B3:2B:DD:2E:1C`. DSM import and assignment remain pending |
-| DSM firewall and reverse proxy | BLOCKED | Firewall is disabled and reverse-proxy list is empty |
-| Production CH Core deployment | BLOCKED | The copied-data runtime is not a production endpoint until TLS, firewall, stable addressing, backup/restore, SMART, UPS, restart, load, and physical-client gates pass |
+| Private CA and IP-SAN leaf | PASS | Encrypted CA key remains off-NAS on the administrator Mac. DSM serves the leaf assigned to `*:8443`; it contains `IP:192.168.1.14`, expires 2027-09-01, and the live SHA-256 fingerprint matches `22:CC:AC:8A:62:DE:C8:22:80:74:56:12:D5:55:18:67:53:BF:E7:BF:EE:17:F8:B9:D5:47:8E:B3:2B:DD:2E:1C` |
+| DSM firewall and reverse proxy | PASS | `CH Core LAN` maps HTTPS `*:8443` to `127.0.0.1:18080`. Ordered firewall rules allow TCP 8443 from `192.168.1.0/255.255.255.0` and deny that port from all other sources. LAN CA-validated health passed; DSM 5001 and SMB 445 remained reachable |
+| Production CH Core deployment | BLOCKED | The copied-data runtime is not a production endpoint until stable addressing, backup/restore, SMART, UPS, restart, load, isolation-path, and physical-client gates pass |
 
 ## Physical acceptance after guarded deployment
 
-The copied-data runtime exists. Only the loopback health and raw-port
-isolation checks have direct evidence; every other item below remains
-`BLOCKED`:
+The copied-data runtime and LAN HTTPS endpoint exist. Loopback health,
+CA-validated LAN health, certificate fingerprint, scoped firewall state, and
+raw-port isolation have direct evidence. The remaining items below are still
+open unless explicitly marked `PASS`:
 
 - Business Wi-Fi works with Internet disconnected.
 - Guest Wi-Fi, mobile data, WAN, QuickConnect, and Tailscale cannot reach
-  CH Core 8443.
+  CH Core 8443. The firewall rule is configured to deny every non-business-LAN
+  source, but these separate paths have not all been probed; the administrator
+  Mac's Tailscale client was stopped during verification.
 - `PASS`: raw 18080 is unreachable from the Mac and MariaDB has no TCP
   listener.
-- Correct certificates work; untrusted, wrong-IP, and expired certificates
-  fail closed.
+- `PASS`: the correct private CA, IP SAN, and live fingerprint work; a client
+  without the private CA failed closed. Dedicated wrong-IP and
+  expired-certificate client tests remain open.
 - Foreground changes propagate within three seconds.
 - Replay never duplicates Nota, stock, or omzet.
 - Concurrent stock deltas survive and Nota merge/conflict rules hold.

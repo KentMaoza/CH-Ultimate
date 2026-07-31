@@ -194,8 +194,9 @@ Only after all blocking prerequisites are ready:
    Confirm host networking, no published ports, the read-only
    `/run/mysqld` socket bind, the explicit nonzero numeric runtime user,
    read-only root, dropped capabilities, 256 MiB memory, 160 MiB Node heap,
-   0.75 CPU, four DB connections, and bounded logs before starting it. The
-   `ch-core-ops` profile must not run by default.
+   768 soft CPU shares, four DB connections, and bounded logs before starting
+   it. The DS223j kernel does not support Docker's NanoCPUs/CFS hard quota, so
+   do not add a `cpus` limit. The `ch-core-ops` profile must not run by default.
 6. Verify `/health/live` and `/health/ready` locally, then verify HTTPS through
    8443 from the business LAN.
 

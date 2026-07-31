@@ -23,7 +23,7 @@ services:
     cap_drop:
       - ALL
     mem_limit: 256m
-    cpus: 0.75
+    cpu_shares: 768
     pids_limit: 128
     tmpfs:
       - /tmp:size=16m,mode=1777,noexec,nosuid,nodev
@@ -63,7 +63,7 @@ services:
     cap_drop:
       - ALL
     mem_limit: 128m
-    cpus: 0.25
+    cpu_shares: 256
     pids_limit: 64
     tmpfs:
       - /tmp:size=8m,mode=1777,noexec,nosuid,nodev

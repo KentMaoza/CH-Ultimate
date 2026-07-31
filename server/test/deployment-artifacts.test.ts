@@ -110,7 +110,8 @@ describe('local CH Core deployment artifacts', () => {
     expect(compose).toContain('target: /var/lib/ch-core/private');
     expect(compose).toContain('read_only: true');
     expect(compose).toContain('mem_limit: 256m');
-    expect(compose).toContain('cpus: 0.75');
+    expect(compose).toContain('cpu_shares: 768');
+    expect(compose).not.toContain('cpus:');
     expect(compose).toContain('cap_drop:');
     expect(compose).toContain('- ALL');
     expect(compose).not.toContain('privileged: true');
@@ -187,7 +188,7 @@ describe('local CH Core deployment artifacts', () => {
     expect(compose.match(/read_only: true/g)).toHaveLength(3);
     expect(compose.match(/no-new-privileges:true/g)).toHaveLength(2);
     expect(compose.match(/mem_limit:/g)).toHaveLength(2);
-    expect(compose.match(/cpus:/g)).toHaveLength(2);
+    expect(compose.match(/cpu_shares:/g)).toHaveLength(2);
   });
 
   it('ships placeholder-only separate backup and scratch credentials', async () => {

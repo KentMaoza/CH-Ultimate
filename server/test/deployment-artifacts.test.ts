@@ -181,6 +181,8 @@ describe('local CH Core deployment artifacts', () => {
     expect(dockerfile).toContain('FROM node:24-');
     expect(dockerfile).toContain('NODE_OPTIONS=--max-old-space-size=160');
     expect(dockerfile).toContain('HEALTHCHECK');
+    expect(dockerfile).not.toContain('COPY --chmod');
+    expect(dockerfile).toContain('RUN chmod 0555');
     expect(dockerfile).not.toMatch(/\bcurl\b/);
     expect(compose.match(/read_only: true/g)).toHaveLength(3);
     expect(compose.match(/no-new-privileges:true/g)).toHaveLength(2);

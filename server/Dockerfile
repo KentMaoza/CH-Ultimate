@@ -21,7 +21,8 @@ COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/server/package.json ./package.json
 COPY --from=build --chown=node:node /app/server/dist ./dist
 COPY --from=build --chown=node:node /app/server/migrations ./migrations
-COPY --chmod=0555 server/scripts/container-entrypoint.sh /usr/local/bin/ch-core-container-entrypoint
+COPY server/scripts/container-entrypoint.sh /usr/local/bin/ch-core-container-entrypoint
+RUN chmod 0555 /usr/local/bin/ch-core-container-entrypoint
 
 USER node
 ENTRYPOINT ["/usr/local/bin/ch-core-container-entrypoint"]
@@ -44,8 +45,9 @@ RUN apt-get update \
     && command -v mariadb-dump >/dev/null \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --chmod=0555 server/scripts/container-entrypoint.sh /usr/local/bin/ch-core-container-entrypoint
-COPY --chmod=0555 server/scripts /opt/ch-core-ops
+COPY server/scripts/container-entrypoint.sh /usr/local/bin/ch-core-container-entrypoint
+COPY server/scripts /opt/ch-core-ops
+RUN chmod 0555 /usr/local/bin/ch-core-container-entrypoint /opt/ch-core-ops/*.sh
 
 USER node
 ENTRYPOINT ["/usr/local/bin/ch-core-container-entrypoint"]

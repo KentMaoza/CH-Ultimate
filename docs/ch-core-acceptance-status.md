@@ -2,13 +2,18 @@
 
 Updated 2026-07-31 WITA. This is an evidence ledger, not a production
 deployment receipt. A copied-data CH Core runtime is deployed on the NAS, but
-the catalogue workbook has not been imported and no client is enrolled.
+CH Core is not deployed as a production endpoint. The catalogue workbook has
+not been imported and no client is enrolled.
 
 Status meanings:
 
 - `PASS`: the named requirement has direct current evidence.
 - `READY`: the implementation or reproducible artifact exists, but the
   required target environment has not accepted it.
+- `PREPARED`: a validated prerequisite exists but is not yet applied to its
+  target environment.
+- `PILOT RISK ACCEPTED`: the owner accepted a named copied-data pilot risk
+  without satisfying the corresponding production gate.
 - `BLOCKED`: a required environment, credential, hardware item, or owner
   decision is absent.
 
@@ -70,7 +75,7 @@ also unreachable and remains disabled (`port=0`).
 | Requirement | Status | Current evidence or missing action |
 | --- | --- | --- |
 | Authenticated DSM preflight | PASS | DS223j, DSM 7.4.1-90080, healthy RAID1/Btrfs, and supported Container Manager were confirmed before deployment |
-| Reserved LAN endpoint | BLOCKED | Owner declined a router reservation; no stable static-address or local-DNS alternative is approved, so the IP-SAN endpoint cannot be finalized |
+| Reserved LAN endpoint | PILOT RISK ACCEPTED | Owner accepted using DHCP address `192.168.1.14` for the copied-data pilot. This does not pass the production stable-endpoint gate; an address change requires a new IP-SAN leaf, reverse-proxy update, and client reconfiguration |
 | Extended SMART tests | BLOCKED | Drive 2 extended test was started and last observed at 10%; Drive 1 is pending and neither drive has a retained completion result |
 | Independent encrypted backup | BLOCKED | Owner declined using the connected Seagate disk; no independent backup destination or job exists |
 | Backup integrity and clean restore | BLOCKED | No job, integrity receipt, isolated restore schema, or business-invariant comparison exists |
@@ -80,7 +85,7 @@ also unreachable and remains disabled (`port=0`).
 | Copied-data CH Core runtime | PASS | Project `ch-ultimate-core-d5bb4b6` has one running container; `/health/live` returned `{"status":"ok"}` and `/health/ready` returned `{"status":"ready"}` through NAS loopback |
 | Runtime isolation | PASS | Container uses host networking but binds `127.0.0.1:18080`; the Mac cannot connect to raw 18080 or MariaDB 3306; all Linux capabilities are dropped and the root filesystem is read-only |
 | Post-start resource sample | READY | Load average `0.51 / 0.71 / 0.86`, `344328 kB` memory available, and `639496 kB` swap used; the one-hour and seven-client soak gates remain open |
-| Private CA and IP-SAN leaf | BLOCKED | Off-NAS CA custody and `IP:192.168.1.14` leaf are not yet established |
+| Private CA and IP-SAN leaf | PREPARED | Encrypted CA key is held off-NAS on the administrator Mac; the validated leaf contains `IP:192.168.1.14`, expires 2027-09-01, and has SHA-256 fingerprint `22:CC:AC:8A:62:DE:C8:22:80:74:56:12:D5:55:18:67:53:BF:E7:BF:EE:17:F8:B9:D5:47:8E:B3:2B:DD:2E:1C`. DSM import and assignment remain pending |
 | DSM firewall and reverse proxy | BLOCKED | Firewall is disabled and reverse-proxy list is empty |
 | Production CH Core deployment | BLOCKED | The copied-data runtime is not a production endpoint until TLS, firewall, stable addressing, backup/restore, SMART, UPS, restart, load, and physical-client gates pass |
 
@@ -116,7 +121,9 @@ LAN computer; MariaDB and private files remain on the NAS.
 ## Current owner decisions and unresolved gates
 
 1. The three workbook price selections are approved.
-2. A router reservation was declined; a stable LAN endpoint remains unresolved.
+2. A router reservation was declined. DHCP address `192.168.1.14` is accepted
+   for the copied-data pilot only; the stable production endpoint remains
+   unresolved.
 3. Use of the connected Seagate disk for backup was declined; an independent
    production backup and restore drill remain unresolved.
 4. External UPS hardware is reported connected; DSM signaling and safe

@@ -54,6 +54,20 @@ available memory, and `639496 kB` swap used. The failed original project
 `ch-ultimate-core` remains retained pending separate deletion approval. The
 disabled one-time DSM staging/probe task was deleted after verification.
 
+On 2026-07-31 the owner explicitly accepted using the current DHCP address
+`192.168.1.14` for the copied-data pilot without a router reservation. This
+does not satisfy the stable-endpoint production gate. If DHCP changes the NAS
+address, the IP-SAN leaf certificate, DSM reverse proxy, and every client
+endpoint/trust configuration must be replaced before clients can reconnect.
+
+The off-NAS private CA and the `IP:192.168.1.14` leaf were generated and
+validated on the administrator Mac. The encrypted CA signing key remains
+outside the repository and NAS; its passphrase is stored in the Mac login
+Keychain. DSM staging contains only the leaf key, leaf certificate, and public
+CA certificate. The leaf SHA-256 fingerprint is
+`22:CC:AC:8A:62:DE:C8:22:80:74:56:12:D5:55:18:67:53:BF:E7:BF:EE:17:F8:B9:D5:47:8E:B3:2B:DD:2E:1C`
+and it is valid from 2026-07-31 through 2027-09-01.
+
 ## Blocking checklist
 
 - [ ] Create the router reservation `90:09:D0:9F:7C:1F -> 192.168.1.14`
@@ -67,7 +81,7 @@ disabled one-time DSM staging/probe task was deleted after verification.
   least-privilege connection with TCP disabled.
 - [x] Build and start the copied-data CH Core runtime; verify loopback live and
   ready health plus raw-port isolation.
-- [ ] Generate a private CA off-NAS and a leaf certificate containing the
+- [x] Generate a private CA off-NAS and a leaf certificate containing the
   required IP SAN `192.168.1.14`.
 - [ ] Enable and validate the DSM firewall rules described below.
 - [ ] Configure and validate the DSM reverse proxy described below.

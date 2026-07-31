@@ -13,6 +13,14 @@ describe('GitHub pilot release workflow', () => {
     expect(workflow).not.toMatch(/^\s+push:/m);
     expect(workflow).toContain("node-version: '24'");
     expect(workflow).toContain("java-version: '21'");
+    expect(workflow).not.toContain('actions/checkout@v4');
+    expect(workflow).not.toContain('actions/setup-node@v4');
+    expect(workflow).not.toContain('actions/setup-java@v4');
+    expect(workflow).not.toContain('android-actions/setup-android@v3');
+    expect(workflow).toContain('actions/checkout@v7');
+    expect(workflow).toContain('actions/setup-node@v7');
+    expect(workflow).toContain('actions/setup-java@v5');
+    expect(workflow).toContain('android-actions/setup-android@v4');
     expect(workflow).toContain('windows-installer:');
     expect(workflow).toContain('runs-on: windows-latest');
     expect(workflow).toContain('npm run make:windows');

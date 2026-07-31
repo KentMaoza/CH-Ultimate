@@ -1,8 +1,8 @@
 # CH Core acceptance status
 
 Updated 2026-07-31 WITA. This is an evidence ledger, not a production
-deployment receipt. CH Core is not deployed and the catalogue workbook has
-not been imported.
+deployment receipt. A copied-data CH Core runtime is deployed on the NAS, but
+the catalogue workbook has not been imported and no client is enrolled.
 
 Status meanings:
 
@@ -25,8 +25,8 @@ Status meanings:
 | Android JVM and lint gates | PASS | Debug/release unit tests and lint pass with Android Studio JDK 21 |
 | Electron package | PASS | Reproducible darwin-arm64 package succeeds |
 | Source hygiene | PASS | `git diff --check`, shell syntax, and tracked-secret/private-artifact scans pass |
-| Exact MariaDB integration | BLOCKED | The NAS `chu` schema and app login exist, but CH Core migrations and integration tests have not yet run against that copied-data pilot; `server:test:integration` still fails closed unless explicitly pointed to isolated `/chu_test` |
-| Docker/Compose and ARM64 image | BLOCKED | No Docker, Compose, Podman, OrbStack, or equivalent runtime is installed on this Mac |
+| Exact MariaDB integration | BLOCKED | The NAS runtime connects through `/run/mysqld/mysqld10.sock`, migrations completed, and `/health/ready` returns `{"status":"ready"}`; the isolated `/chu_test` integration suite and transaction/restart acceptance remain outstanding |
+| Docker/Compose and ARM64 image | PASS | Container Manager built the ARM64 image on the DS223j and started one container from project `ch-ultimate-core-d5bb4b6`; the runtime remained up during the post-start checks |
 
 ## Client release artifacts
 
@@ -56,15 +56,16 @@ three selected price differences:
 | 1088 | `PR060522 Pigeon Baby Cologne Rejuv 200ml CH058` | Rp40,440 | Rp25,800 |
 | 1180 | `PR050339 Pigeon 2 Way Baby Bibs - Check CH058` | Rp187,320 | Rp183,320 |
 
-The price-review gate is complete. No import has been committed because CH
-Core is not deployed.
+The price-review gate is complete. No import has been committed because the
+copied-data runtime is not yet an approved production endpoint.
 
 ## NAS preflight and deployment gates
 
 Current LAN evidence: the Mac is `192.168.1.18`; the NAS is
 `192.168.1.14`, MAC `90:09:D0:9F:7C:1F`. SMB 445 and DSM HTTPS 5001 are
-reachable. CH Core 8443 and raw API 18080 remain closed/filtered, and MariaDB
-TCP is disabled (`port=0`), which is correct before deployment.
+reachable. CH Core 8443 is not configured. The deployed raw API listens only
+on NAS loopback: the Mac cannot reach `192.168.1.14:18080`; MariaDB TCP is
+also unreachable and remains disabled (`port=0`).
 
 | Requirement | Status | Current evidence or missing action |
 | --- | --- | --- |
@@ -76,18 +77,24 @@ TCP is disabled (`port=0`), which is correct before deployment.
 | UPS safe shutdown | BLOCKED | Owner reports external UPS hardware is connected, but DSM recognition, data signaling, shutdown, and restart have not been verified |
 | MariaDB 10 socket service | PASS | Package installed; `chu` and least-privilege `chu_app` created; socket login verified at `/run/mysqld/mysqld10.sock`; TCP disabled with `port=0` |
 | Restricted service identity and private share | PASS | `ch_core_service` has UID/GID `1027:100`, no DSM login or unrelated share access, and direct read/write only to hidden `CH_Core_Private` |
+| Copied-data CH Core runtime | PASS | Project `ch-ultimate-core-d5bb4b6` has one running container; `/health/live` returned `{"status":"ok"}` and `/health/ready` returned `{"status":"ready"}` through NAS loopback |
+| Runtime isolation | PASS | Container uses host networking but binds `127.0.0.1:18080`; the Mac cannot connect to raw 18080 or MariaDB 3306; all Linux capabilities are dropped and the root filesystem is read-only |
+| Post-start resource sample | READY | Load average `0.51 / 0.71 / 0.86`, `344328 kB` memory available, and `639496 kB` swap used; the one-hour and seven-client soak gates remain open |
 | Private CA and IP-SAN leaf | BLOCKED | Off-NAS CA custody and `IP:192.168.1.14` leaf are not yet established |
 | DSM firewall and reverse proxy | BLOCKED | Firewall is disabled and reverse-proxy list is empty |
-| CH Core deployment | BLOCKED | All preceding hard gates must pass first |
+| Production CH Core deployment | BLOCKED | The copied-data runtime is not a production endpoint until TLS, firewall, stable addressing, backup/restore, SMART, UPS, restart, load, and physical-client gates pass |
 
 ## Physical acceptance after guarded deployment
 
-Every item below remains `BLOCKED` until a copied-data pilot exists:
+The copied-data runtime exists. Only the loopback health and raw-port
+isolation checks have direct evidence; every other item below remains
+`BLOCKED`:
 
 - Business Wi-Fi works with Internet disconnected.
 - Guest Wi-Fi, mobile data, WAN, QuickConnect, and Tailscale cannot reach
   CH Core 8443.
-- Raw 18080 remains unreachable and MariaDB has no TCP listener.
+- `PASS`: raw 18080 is unreachable from the Mac and MariaDB has no TCP
+  listener.
 - Correct certificates work; untrusted, wrong-IP, and expired certificates
   fail closed.
 - Foreground changes propagate within three seconds.

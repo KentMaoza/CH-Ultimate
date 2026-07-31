@@ -1,11 +1,12 @@
 # CH Core NAS deployment runbook
 
-## Stop gate: deployment is blocked
+## Stop gate: production rollout is blocked
 
-This document is preparation, not a deployment receipt. CH Core has not been
-deployed to the NAS. Do not install MariaDB, create containers, change DSM
-networking, or enroll production clients until every item in the blocking
-checklist is completed and recorded.
+This document is a preparation runbook plus a copied-data pilot receipt. The
+CH Core runtime is deployed on the NAS, but it is not a production endpoint.
+Do not import the catalogue, configure client access, or enroll production
+clients until every remaining item in the blocking checklist is completed and
+recorded.
 
 ## Authenticated read-only preflight (2026-07-30)
 
@@ -38,6 +39,21 @@ production gates remain open. MariaDB 10 was subsequently installed. The
 `/run/mysqld/mysqld10.sock`; MariaDB reports TCP port `0`. The restricted
 `ch_core_service` identity and private `CH_Core_Private` share also exist.
 
+The copied-data runtime was then built and started in Container Manager project
+`ch-ultimate-core-d5bb4b6`. The image build uses commit `d5bb4b6`; Compose was
+updated from commit `0969723` after the DS223j rejected Docker NanoCPUs/CFS
+hard quotas. The replacement uses soft CPU shares instead. One container is
+running with all capabilities dropped, a read-only root, host networking, and
+`127.0.0.1:18080`. NAS-loopback checks returned `{"status":"ok"}` from
+`/health/live` and `{"status":"ready"}` from `/health/ready`. A Mac LAN probe
+could not reach raw port 18080 or MariaDB 3306.
+
+DSM also warned that this kernel cannot enforce the configured PID limit. The
+post-start sample showed load average `0.51 / 0.71 / 0.86`, `344328 kB`
+available memory, and `639496 kB` swap used. The failed original project
+`ch-ultimate-core` remains retained pending separate deletion approval. The
+disabled one-time DSM staging/probe task was deleted after verification.
+
 ## Blocking checklist
 
 - [ ] Create the router reservation `90:09:D0:9F:7C:1F -> 192.168.1.14`
@@ -49,6 +65,8 @@ production gates remain open. MariaDB 10 was subsequently installed. The
   shutdown and restart.
 - [x] Install the supported MariaDB 10 package and verify a socket-only
   least-privilege connection with TCP disabled.
+- [x] Build and start the copied-data CH Core runtime; verify loopback live and
+  ready health plus raw-port isolation.
 - [ ] Generate a private CA off-NAS and a leaf certificate containing the
   required IP SAN `192.168.1.14`.
 - [ ] Enable and validate the DSM firewall rules described below.

@@ -37,7 +37,7 @@ Status meanings:
 
 | Requirement | Status | Current evidence |
 | --- | --- | --- |
-| Private GitHub pilot workflow | PASS | GitHub Actions run `30625635440` passed source, Windows, Android, and publication jobs on merged commit `fe479f6be82704c7ac7257ba46de45017a362db0` |
+| Private GitHub pilot workflow | PASS | `.github/workflows/pilot-release.yml` run `30625635440` passed source, Windows, Android, and publication jobs on merged commit `fe479f6be82704c7ac7257ba46de45017a362db0` |
 | Windows x64 application package | READY | Electron cross-package succeeds and a reproducible Windows x64 ZIP is created |
 | Windows Squirrel installer | PASS | GitHub built and published `CH-Ultimate-0.1.0-Setup.exe`; a fresh authenticated download matched its published SHA-256 and was identified as a Windows PE32 GUI executable |
 | Two Windows laptop installations | BLOCKED | Windows package is not tested on either physical laptop |

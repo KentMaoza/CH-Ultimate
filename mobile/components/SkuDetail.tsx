@@ -3,9 +3,10 @@ import { formatRupiah, formatWita } from '../format';
 import { BackIcon, ScanIcon } from './Icons';
 import { ProductImage } from './ProductImage';
 
-export function SkuDetail({ sku, changes, onBack, onScanAgain }: {
+export function SkuDetail({ sku, changes, coreBacked = false, onBack, onScanAgain }: {
   sku: Sku;
   changes: SkuPriceChange[];
+  coreBacked?: boolean;
   onBack: () => void;
   onScanAgain: () => void;
 }) {
@@ -26,7 +27,7 @@ export function SkuDetail({ sku, changes, onBack, onScanAgain }: {
         const direction = change.after > change.before ? 'naik' : change.after < change.before ? 'turun' : 'tetap';
         const priceDescription = `Harga ${direction}. Harga lama ${formatRupiah(change.before)}. Harga baru ${formatRupiah(change.after)}.`;
         return <div key={change.id}><span aria-label={priceDescription} role="group"><s aria-hidden="true">{formatRupiah(change.before)}</s><b aria-hidden="true">→</b><strong aria-hidden="true">{formatRupiah(change.after)}</strong></span><time>{formatWita(change.createdAt)}</time></div>;
-      })}</div> : <p>Belum ada perubahan harga pada sesi ini.</p>}
+      })}</div> : <p>{coreBacked ? 'Belum ada perubahan harga tersinkronisasi.' : 'Belum ada perubahan harga pada sesi ini.'}</p>}
     </section>
     <button className="secondary-action" onClick={onScanAgain}><ScanIcon />Scan kode lain</button>
   </article>;

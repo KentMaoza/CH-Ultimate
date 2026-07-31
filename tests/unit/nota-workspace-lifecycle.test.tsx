@@ -374,6 +374,32 @@ class DelayedCompleteGateway extends MockOperationsGateway {
   release() { this.releaseComplete?.(); }
 }
 
+class FlushOrderGateway extends MockOperationsGateway {
+  readonly calls: string[] = [];
+
+  override async flushNota(transactionId: string) {
+    this.calls.push(`flush:${transactionId}`);
+  }
+
+  override async completeNotaTransaction(transactionId: string, destination?: 'archive' | 'finished') {
+    this.calls.push(`complete:${transactionId}`);
+    return super.completeNotaTransaction(transactionId, destination);
+  }
+}
+
+test('desktop completion flushes rapid Nota saves before the lifecycle mutation', async () => {
+  const gateway = new FlushOrderGateway();
+  const transactionId = gateway.getSnapshot().notaTransactions[0]!.id;
+  openNota(gateway);
+  fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
+  fireEvent.click(within(screen.getByRole('dialog', { name: /Selesaikan nota/i })).getByRole('button', { name: '1. Barang dikirim sekarang' }));
+
+  await waitFor(() => expect(gateway.calls).toEqual([
+    `flush:${transactionId}`,
+    `complete:${transactionId}`,
+  ]));
+});
+
 test('delayed mutations disable mutation controls until the gateway settles', async () => {
   const gateway = new DelayedAddGateway();
   openNota(gateway);

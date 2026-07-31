@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 import { App } from '../../src/renderer/App';
 
 function openSettings() {
@@ -17,7 +18,7 @@ function createPassword(password = 'rahasia') {
 }
 
 test('hides every revenue metric until a password is configured and unlocked', () => {
-  render(<App />);
+  render(<App gateway={new MockOperationsGateway()} />);
   openRevenue();
 
   expect(screen.getByText('Password omzet belum diatur')).toBeInTheDocument();
@@ -33,7 +34,7 @@ test('hides every revenue metric until a password is configured and unlocked', (
 });
 
 test('rejects a wrong password and keeps a successful unlock for the current session', () => {
-  render(<App />);
+  render(<App gateway={new MockOperationsGateway()} />);
   createPassword();
   expect(screen.getByRole('status')).toHaveTextContent('Password omzet disimpan');
 
@@ -54,7 +55,7 @@ test('rejects a wrong password and keeps a successful unlock for the current ses
 });
 
 test('requires the current password before changing it and relocks revenue after success', () => {
-  render(<App />);
+  render(<App gateway={new MockOperationsGateway()} />);
   createPassword();
   openRevenue();
   fireEvent.change(screen.getByLabelText('Password Laporan Omzet'), { target: { value: 'rahasia' } });

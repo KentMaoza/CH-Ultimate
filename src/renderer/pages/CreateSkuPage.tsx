@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useOperations } from '../operations-context';
 import { formatTitleCaseInput } from '../format';
 
-export function CreateSkuPage() {
+export function CreateSkuPage({ coreBacked = false }: { coreBacked?: boolean }) {
   const { gateway } = useOperations();
   const [message, setMessage] = useState('');
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -15,13 +15,13 @@ export function CreateSkuPage() {
         tracked: form.get('tracked') === 'on', note: String(form.get('note') ?? ''), imageUrl: String(form.get('image') ?? ''),
       });
       event.currentTarget.reset();
-      setMessage(`${sku.skuNumber} ditambahkan ke sesi demo.`);
+      setMessage(coreBacked ? `${sku.skuNumber} disimpan ke CH Core.` : `${sku.skuNumber} ditambahkan ke sesi demo.`);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'SKU gagal dibuat.'); }
   }
   return (
     <div className="feature-page form-layout">
       <form className="editor-card" onSubmit={(event) => void submit(event)}>
-        <div className="section-heading"><span>DATA UTAMA</span><h2>SKU baru</h2><p>Semua nilai hanya tersedia selama aplikasi tetap terbuka.</p></div>
+        <div className="section-heading"><span>DATA UTAMA</span><h2>SKU baru</h2><p>{coreBacked ? 'SKU akan disimpan ke CH Core dan disinkronkan ke perangkat lain.' : 'Semua nilai hanya tersedia selama aplikasi tetap terbuka.'}</p></div>
         {message && <div className="notice" role="status">{message}</div>}
         <div className="form-grid">
           <label><span>Nomor SKU</span><input required name="skuNumber" /></label>

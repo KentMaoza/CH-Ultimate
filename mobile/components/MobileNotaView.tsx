@@ -36,7 +36,7 @@ function availableSlot(transaction: NotaTransaction, preferredPageId?: string) {
   return null;
 }
 
-export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: OperationsGateway; scanner: BarcodeScannerPort; transactionId?: string }) {
+export function MobileNotaView({ coreBacked = false, gateway, scanner, transactionId }: { coreBacked?: boolean; gateway: OperationsGateway; scanner: BarcodeScannerPort; transactionId?: string }) {
   const snapshot = useSyncExternalStore(gateway.subscribe, gateway.getSnapshot, gateway.getSnapshot);
   const transaction = workingTransaction(snapshot.notaTransactions, transactionId);
   const [selectedPageId, setSelectedPageId] = useState('');
@@ -240,29 +240,23 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
     if (!transaction) return;
     completionStarted.current = true;
     setBusy(true);
-    let saved = false;
     try {
       await gateway.completeNotaTransaction(transaction.id, 'archive');
       const completed = gateway.getSnapshot().notaTransactions.find((item) => item.id === transaction.id);
       if (completed?.status !== 'completed') throw new Error('Nota tidak dapat disimpan.');
-      saved = true;
       setCompletionOpen(false);
-      const transfer = await gateway.transferNotaToDesktop(transaction.id);
-      if (!transfer.sent) {
-        setNoticeKind('alert');
-        setNotice(`Nota tersimpan di Arsip. Pengiriman ke desktop gagal: ${transfer.reason ?? 'Alasan tidak tersedia.'}`);
-        return;
-      }
       setNoticeKind('status');
-      setNotice('Nota tersimpan di Arsip dan berhasil dikirim ke desktop.');
+      setNotice(
+        !coreBacked
+          ? 'Nota tersimpan di Arsip sesi demo lokal.'
+          : gateway.getSyncSnapshot().phase === 'offline'
+          ? 'Menunggu sinkronisasi — stok dan omzet pusat belum berubah.'
+          : 'Nota tersimpan di Arsip dan tersedia di semua perangkat.',
+      );
     } catch (error) {
       setNoticeKind('alert');
-      if (saved) {
-        setNotice(`Nota tersimpan di Arsip. Pengiriman ke desktop gagal: ${error instanceof Error ? error.message : 'Alasan tidak tersedia.'}`);
-      } else {
-        completionStarted.current = false;
-        setNotice(error instanceof Error ? error.message : 'Nota tidak dapat disimpan.');
-      }
+      completionStarted.current = false;
+      setNotice(error instanceof Error ? error.message : 'Nota tidak dapat disimpan.');
     } finally {
       setBusy(false);
     }
@@ -279,7 +273,7 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
 
   return <section className="mobile-nota-view" aria-busy={busy || undefined}>
     <header className="mobile-header mobile-nota-header">
-      <div><span className="eyebrow">FRONTEND DEMO · SESSION ONLY</span><h1 data-page-heading tabIndex={-1}>Nota Barang</h1></div>
+      <div><span className="eyebrow">{coreBacked ? 'CH CORE · NOTA TERSINKRONISASI' : 'FRONTEND DEMO · SESSION ONLY'}</span><h1 data-page-heading tabIndex={-1}>Nota Barang</h1></div>
       <strong>{formatRupiah(transactionTotal)}</strong>
     </header>
     {notice && <p className={`mobile-nota-notice mobile-nota-notice--${noticeKind}`} role={noticeKind}>{notice}</p>}
@@ -376,6 +370,6 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
       </section>
       <footer className="mobile-nota-finish"><div><span>Total transaksi</span><strong>{formatRupiah(transactionTotal)}</strong></div><button className="primary-action" disabled={busy} onClick={() => setCompletionOpen(true)}>Selesaikan nota</button></footer>
     </> : !notice && <p className="mobile-nota-empty">Menyiapkan nota baru…</p>}
-    {completionOpen && <div className="mobile-nota-dialog-backdrop"><section role="dialog" aria-modal="true" aria-label="Selesaikan nota mobile?" className="mobile-nota-dialog"><h2>Selesaikan nota mobile?</h2><p>Nota disimpan ke Arsip lalu dicoba dikirim ke desktop.</p><button className="primary-action" disabled={busy} onClick={() => void complete()}>Simpan ke Arsip dan kirim ke desktop</button><button disabled={busy} onClick={() => setCompletionOpen(false)}>Batal</button></section></div>}
+    {completionOpen && <div className="mobile-nota-dialog-backdrop"><section role="dialog" aria-modal="true" aria-label="Selesaikan nota mobile?" className="mobile-nota-dialog"><h2>Selesaikan nota mobile?</h2><p>{coreBacked ? 'Nota disimpan ke Arsip dan tersedia di semua perangkat setelah sinkronisasi.' : 'Nota disimpan ke Arsip pada sesi demo lokal ini.'}</p><button className="primary-action" disabled={busy} onClick={() => void complete()}>Simpan ke Arsip</button><button disabled={busy} onClick={() => setCompletionOpen(false)}>Batal</button></section></div>}
   </section>;
 }

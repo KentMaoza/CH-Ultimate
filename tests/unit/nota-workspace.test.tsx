@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { App } from '../../src/renderer/App';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 
-function openNota(gateway?: MockOperationsGateway) {
+function openNota(gateway = new MockOperationsGateway()) {
   render(<App gateway={gateway} />);
   fireEvent.click(screen.getByRole('button', { name: 'Nota' }));
 }

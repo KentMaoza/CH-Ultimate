@@ -1,7 +1,6 @@
 export type PaymentKind = 'unclassified' | 'cash' | 'transfer' | 'credit';
 export type NotaTransactionStatus = 'draft' | 'completed' | 'reopened' | 'cancelled';
 export type NotaCompletionDestination = 'archive' | 'finished';
-export type NotaDesktopTransferStatus = 'failed' | 'sent';
 export type NotaPageStatus = 'active' | 'cancelled';
 export type Unit = 'pcs' | 'lsn';
 
@@ -15,6 +14,9 @@ export interface Sku {
   tracked: boolean;
   note: string;
   imageUrl: string;
+  imageHash?: string;
+  sourceImageUrl?: string | null;
+  sourceCreatedAt?: string;
   createdAt: string;
   archived: boolean;
 }
@@ -67,15 +69,34 @@ export interface NotaTransaction {
   status: NotaTransactionStatus;
   completionDestination?: NotaCompletionDestination;
   completedAt?: string;
-  desktopTransferStatus?: NotaDesktopTransferStatus;
-  desktopTransferError?: string;
-  desktopTransferAttemptedAt?: string;
   nextNoteIndex: number;
   pages: Nota[];
   postedLines: NotaLine[];
   postedStockEffects: Record<string, number>;
   postedTrackedLineIds: Record<string, string>;
   cancelledFromStatus?: 'draft' | 'completed' | 'reopened';
+}
+
+export interface NotaPosting {
+  id: string;
+  notaId: string;
+  postingKind: string;
+  amountRupiah: number;
+  lines: NotaLine[];
+  stockEffects: Record<string, number>;
+  trackedLineIds: Record<string, string>;
+  lifecycleVersion: string;
+  reversesPostingId?: string;
+  postedAt: string;
+}
+
+export interface RevenuePosting {
+  id: string;
+  notaId: string;
+  notaPostingId: string;
+  amountRupiah: number;
+  postingKind: string;
+  postedAt: string;
 }
 
 export interface LabelTemplate {
@@ -125,6 +146,8 @@ export interface DemoState {
   adjustments: StockAdjustment[];
   priceChanges: SkuPriceChange[];
   notaTransactions: NotaTransaction[];
+  notaPostings?: NotaPosting[];
+  revenuePostings?: RevenuePosting[];
   labelTemplate: LabelTemplate;
   invoiceTemplate: InvoiceTemplate;
   sourceLabel: string;

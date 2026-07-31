@@ -4,7 +4,7 @@ import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 import type { Sku } from '../../src/domain/types';
 
 test('shows revenue cards and tracked empty-stock report preview', () => {
-  render(<App />);
+  render(<App gateway={new MockOperationsGateway()} />);
   fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
   fireEvent.change(screen.getByLabelText('Password omzet baru'), { target: { value: 'demo' } });
   fireEvent.change(screen.getByLabelText('Konfirmasi password omzet'), { target: { value: 'demo' } });
@@ -25,10 +25,13 @@ test('shows revenue cards and tracked empty-stock report preview', () => {
   fireEvent.click(screen.getByLabelText('Pilih ACC-204-SLV'));
   expect(screen.getByTestId('empty-report-preview')).toHaveTextContent('ACC-204-SLV');
   expect(screen.getByTestId('empty-report-preview')).toHaveTextContent('Jumlah: 0');
+  expect(screen.getByTestId('empty-report-preview')).toHaveTextContent(
+    'Demo preview',
+  );
 });
 
 test('settings identifies the session data source and can reset it', async () => {
-  render(<App />);
+  render(<App gateway={new MockOperationsGateway()} />);
   fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
   expect(screen.getByText('Fixture sintetis')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Reset data demo' }));

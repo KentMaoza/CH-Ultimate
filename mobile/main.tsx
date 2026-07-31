@@ -1,17 +1,125 @@
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
+import { StrictMode, type ReactNode } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
 import { Capacitor } from '@capacitor/core';
 import { createMobileDemoState } from '../src/domain/mobile-demo-state';
 import { MockOperationsGateway } from '../src/gateway/operations-gateway';
 import { MobileApp } from './MobileApp';
-import { createMobilePorts } from './bootstrap';
+import { createMobileRuntime } from './bootstrap';
+import { CoreConnectionScreen } from './components/CoreConnectionScreen';
+import {
+  bootstrapMobileGateway,
+  type MobileBootstrapResult,
+} from './core-api-bootstrap';
+import {
+  type MobileCoreBridge,
+} from './core-api-native';
+import type { MobilePorts } from './bootstrap';
 import './styles.css';
 
-const gateway = new MockOperationsGateway(createMobileDemoState);
-const ports = createMobilePorts(Capacitor.isNativePlatform());
+interface MobileRendererOptions {
+  native: boolean;
+  bridge?: MobileCoreBridge;
+  ports: MobilePorts;
+}
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <MobileApp gateway={gateway} notifications={ports.notifications} scanner={ports.scanner} share={ports.share} />
-  </StrictMode>,
+function disposeGateway(result: MobileBootstrapResult | undefined) {
+  if (result?.kind === 'gateway' && result.source === 'core') {
+    result.gateway.dispose();
+  }
+}
+
+export function mountMobileRenderer(
+  root: Root,
+  options: MobileRendererOptions,
+): () => void {
+  let current: MobileBootstrapResult | undefined;
+  let generation = 0;
+  const render = (content: ReactNode) =>
+    root.render(<StrictMode>{content}</StrictMode>);
+
+  const retry = async (): Promise<void> => {
+    const activeGeneration = ++generation;
+    disposeGateway(current);
+    current = undefined;
+    if (options.native) {
+      render(
+        <CoreConnectionScreen
+          status={{
+            production: true,
+            configuration: 'ready',
+            credential: 'pending',
+            message: 'Menghubungkan ke CH Core.',
+          }}
+          onRetry={retry}
+        />,
+      );
+    }
+
+    let next: MobileBootstrapResult;
+    try {
+      next = await bootstrapMobileGateway({
+        native: options.native,
+        bridge: options.bridge,
+        demoFactory: () =>
+          new MockOperationsGateway(createMobileDemoState),
+      });
+    } catch {
+      if (activeGeneration !== generation) return;
+      render(
+        <CoreConnectionScreen
+          status={{
+            production: options.native,
+            configuration: 'invalid',
+            credential: 'unpaired',
+            message: 'CH Core tidak dapat dimulai. Coba lagi.',
+          }}
+          bridge={options.bridge}
+          onRetry={retry}
+        />,
+      );
+      return;
+    }
+    if (activeGeneration !== generation) {
+      disposeGateway(next);
+      return;
+    }
+    current = next;
+    if (next.kind === 'connection') {
+      render(
+        <CoreConnectionScreen
+          status={next.status}
+          bridge={options.bridge}
+          onRetry={retry}
+        />,
+      );
+      return;
+    }
+    render(
+      <MobileApp
+        coreBacked={next.source === 'core'}
+        gateway={next.gateway}
+        notifications={options.ports.notifications}
+        scanner={options.ports.scanner}
+        share={options.ports.share}
+      />,
+    );
+  };
+
+  void retry();
+  return () => {
+    generation += 1;
+    disposeGateway(current);
+    root.unmount();
+  };
+}
+
+const native = Capacitor.isNativePlatform();
+const runtime = createMobileRuntime(native);
+mountMobileRenderer(
+  createRoot(document.getElementById('root')!),
+  {
+    native,
+    bridge: runtime.bridge,
+    ports: runtime.ports,
+  },
 );

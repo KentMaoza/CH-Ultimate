@@ -13,16 +13,18 @@ import { ShareRecommendationsView } from './components/ShareRecommendationsView'
 import { MobileNotaView } from './components/MobileNotaView';
 import { MobileArchiveView } from './components/MobileArchiveView';
 import { MoreView } from './components/MoreView';
+import { OperationsSyncStatus } from './components/OperationsSyncStatus';
 import { formatRupiah } from './format';
 
 type MainView = 'home' | 'skus' | 'nota' | 'archive' | 'more' | 'prices' | 'recommendations';
 type PriceMode = 'all' | 'unread';
 
-export function MobileApp({ gateway, scanner, notifications, share }: {
+export function MobileApp({ gateway, scanner, notifications, share, coreBacked = false }: {
   gateway: OperationsGateway;
   scanner: BarcodeScannerPort;
   notifications: LocalNotificationPort;
   share: RecommendationPdfSharePort;
+  coreBacked?: boolean;
 }) {
   const snapshot = useSyncExternalStore(gateway.subscribe, gateway.getSnapshot, gateway.getSnapshot);
   const [view, setView] = useState<MainView>('home');
@@ -168,6 +170,7 @@ export function MobileApp({ gateway, scanner, notifications, share }: {
   }
 
   async function simulatePriceChange() {
+    if (coreBacked) return;
     const sku = snapshot.skus.find((candidate) => !candidate.archived);
     if (!sku) return;
     const nextPrice = sku.referencePrice + 1_000;
@@ -182,9 +185,18 @@ export function MobileApp({ gateway, scanner, notifications, share }: {
     }
   }
 
-  return <div className="mobile-app">
+  return <div className={`mobile-app${coreBacked ? ' mobile-app--core' : ''}`}>
+    {coreBacked ? (
+      <OperationsSyncStatus gateway={gateway} />
+    ) : (
+      <div
+        className="mobile-sync-status mobile-sync-status--demo"
+      >
+        <span>Demo lokal</span>
+      </div>
+    )}
     <main className="mobile-content" ref={mainContentRef}>
-      {selectedSku ? <SkuDetail changes={snapshot.priceChanges} onBack={closeSkuDetail} onScanAgain={openManualScan} sku={selectedSku} /> : scanOpen ? <ScanSurface error={scanError} initialCode={scanCode} key={scanCode} onManualLookup={manualLookup} onRetry={() => void beginScan()} /> : view === 'home' ? <DashboardView
+      {selectedSku ? <SkuDetail changes={snapshot.priceChanges} coreBacked={coreBacked} onBack={closeSkuDetail} onScanAgain={openManualScan} sku={selectedSku} /> : scanOpen ? <ScanSurface error={scanError} initialCode={scanCode} key={scanCode} onManualLookup={manualLookup} onRetry={() => void beginScan()} /> : view === 'home' ? <DashboardView
         snapshot={snapshot}
         unreadCount={unreadCount}
         onOpenPrices={() => navigate('prices')}
@@ -193,18 +205,20 @@ export function MobileApp({ gateway, scanner, notifications, share }: {
         onOpenRecommendations={() => navigate('recommendations')}
         onScan={() => void beginScan()}
         onSearch={() => navigate('skus', true)}
+        coreBacked={coreBacked}
       /> : null}
       {view === 'skus' && !scanOpen && !selectedSku ? <SkuCatalog focusSearch={focusSearch} onOpenSku={openSku} skus={snapshot.skus} /> : null}
-      {view === 'prices' && !scanOpen && !selectedSku ? <PriceFeedView changes={visiblePriceChanges} onOpenSku={openSku} onSimulate={() => void simulatePriceChange()} skus={snapshot.skus} status={simulationStatus} unreadOnly={priceMode === 'unread'} /> : null}
+      {view === 'prices' && !scanOpen && !selectedSku ? <PriceFeedView changes={visiblePriceChanges} coreBacked={coreBacked} onOpenSku={openSku} onSimulate={coreBacked ? undefined : () => void simulatePriceChange()} skus={snapshot.skus} status={simulationStatus} unreadOnly={priceMode === 'unread'} /> : null}
       {view === 'recommendations' && !scanOpen && !selectedSku ? <ShareRecommendationsView
         onBack={() => navigate('home')}
         onOpenSku={openSku}
         onSharePdf={share.sharePdf}
         snapshot={snapshot}
+        coreBacked={coreBacked}
       /> : null}
-      {view === 'nota' && !scanOpen && !selectedSku ? <MobileNotaView gateway={gateway} scanner={scanner} transactionId={editingNotaId ?? undefined} /> : null}
-      {view === 'archive' && !scanOpen && !selectedSku ? <MobileArchiveView gateway={gateway} onEdit={editArchivedNota} /> : null}
-      {view === 'more' && !scanOpen && !selectedSku ? <MoreView onOpenPrices={() => navigate('prices')} onOpenRecommendations={() => navigate('recommendations')} /> : null}
+      {view === 'nota' && !scanOpen && !selectedSku ? <MobileNotaView coreBacked={coreBacked} gateway={gateway} scanner={scanner} transactionId={editingNotaId ?? undefined} /> : null}
+      {view === 'archive' && !scanOpen && !selectedSku ? <MobileArchiveView coreBacked={coreBacked} gateway={gateway} onEdit={editArchivedNota} /> : null}
+      {view === 'more' && !scanOpen && !selectedSku ? <MoreView coreBacked={coreBacked} onOpenPrices={() => navigate('prices')} onOpenRecommendations={() => navigate('recommendations')} /> : null}
     </main>
     <nav aria-label="Navigasi utama" className="bottom-nav">
       <button aria-current={view === 'home' ? 'page' : undefined} onClick={() => navigate('home')}><HomeIcon />Beranda</button>

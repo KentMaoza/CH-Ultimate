@@ -6,12 +6,15 @@
   "author": "Toko CH",
   "main": ".vite/build/main.js",
   "private": true,
+  "workspaces": [
+    "server"
+  ],
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",
     "make:windows": "electron-forge make --platform=win32 --arch=x64",
     "test": "vitest run",
-    "test:mobile": "vitest run tests/unit/mobile-demo-state.test.ts tests/unit/mobile-app.test.tsx tests/unit/mobile-nota-ui.test.tsx tests/unit/mobile-archive-ui.test.tsx tests/unit/mobile-native-adapters.test.ts tests/unit/mobile-bootstrap.test.ts tests/unit/mobile-config.test.ts",
+    "test:mobile": "vitest run tests/unit/mobile-demo-state.test.ts tests/unit/mobile-app.test.tsx tests/unit/mobile-nota-ui.test.tsx tests/unit/mobile-archive-ui.test.tsx tests/unit/mobile-native-adapters.test.ts tests/unit/mobile-bootstrap.test.ts tests/unit/mobile-config.test.ts tests/unit/mobile-core-api-adapter.test.ts tests/unit/mobile-core-connection-ui.test.tsx",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
@@ -21,7 +24,11 @@
     "android:sync": "npm run mobile:build && cap sync android",
     "android:test": "cd android && ./gradlew test",
     "android:lint": "cd android && ./gradlew lint",
-    "android:release": "npm run android:sync && cd android && ./gradlew assembleRelease && cd .. && node scripts/copy-android-release.mjs"
+    "android:release": "npm run android:sync && cd android && ./gradlew assembleRelease && cd .. && node scripts/copy-android-release.mjs",
+    "server:test": "npm --workspace @ch-ultimate/core run test",
+    "server:test:integration": "npm --workspace @ch-ultimate/core run test:integration",
+    "server:typecheck": "npm --workspace @ch-ultimate/core run typecheck",
+    "server:build": "npm --workspace @ch-ultimate/core run build"
   },
   "dependencies": {
     "@capacitor/android": "8.4.2",

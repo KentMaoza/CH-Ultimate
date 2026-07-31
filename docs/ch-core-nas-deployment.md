@@ -33,7 +33,10 @@ snapshot above: external UPS hardware is reported connected, but DSM signaling
 and safe shutdown are unverified. Drive 2's extended SMART test was started
 and last observed at 10%; Drive 1 remains pending. The owner declined both the
 router reservation and use of the connected Seagate disk for backup, so those
-production gates remain open.
+production gates remain open. MariaDB 10 was subsequently installed. The
+`chu` database and least-privilege `chu_app` account were verified through
+`/run/mysqld/mysqld10.sock`; MariaDB reports TCP port `0`. The restricted
+`ch_core_service` identity and private `CH_Core_Private` share also exist.
 
 ## Blocking checklist
 
@@ -44,8 +47,8 @@ production gates remain open.
   complete a clean scratch restore drill.
 - [ ] Verify DSM recognizes the connected UPS data link, then test safe
   shutdown and restart.
-- [ ] Confirm the supported MariaDB 10 package and make a documented
-  host-loopback-only connection decision.
+- [x] Install the supported MariaDB 10 package and verify a socket-only
+  least-privilege connection with TCP disabled.
 - [ ] Generate a private CA off-NAS and a leaf certificate containing the
   required IP SAN `192.168.1.14`.
 - [ ] Enable and validate the DSM firewall rules described below.
@@ -66,13 +69,14 @@ DSM reverse proxy
         |
 127.0.0.1:18080 (CH Core, host-network container)
         |
-127.0.0.1:3306 (Synology MariaDB 10)
+/run/mysqld/mysqld10.sock (Synology MariaDB 10; TCP disabled)
 ```
 
-The Compose project uses host networking so its non-root process can reach
-host-loopback MariaDB. CH Core itself is forced to `127.0.0.1:18080`; Compose
-publishes no port. `/var/lib/ch-core/private` is its only persistent writable
-application path. The container root filesystem remains read-only.
+The Compose project mounts `/run/mysqld` read-only so its non-root process can
+reach MariaDB without a database network listener. Host networking is retained
+only so DSM can proxy to CH Core at `127.0.0.1:18080`; Compose publishes no
+port. `/var/lib/ch-core/private` is its only persistent writable application
+path. The container root filesystem remains read-only.
 
 Do not expose port 18080 or MariaDB to any client network.
 
@@ -167,7 +171,7 @@ After the router reservation and certificate exist:
    445. QuickConnect and Tailscale are administration paths only.
 5. Add DSM reverse proxy HTTPS `192.168.1.14:8443` to HTTP
    `127.0.0.1:18080`, using the IP-SAN leaf certificate.
-6. Confirm 18080 and 3306 remain unreachable from business clients.
+6. Confirm 18080 remains unreachable and MariaDB has no TCP listener.
 
 There must be no router port forwarding, UPnP rule, QuickConnect dependency,
 Tailscale Serve/Funnel, public DNS exposure, or SSH dependency. DSM and
@@ -180,18 +184,18 @@ Only after all blocking prerequisites are ready:
 
 1. Verify MariaDB 10 is supported on the installed DSM release, then install
    it from Package Center.
-2. Bind MariaDB to host loopback only. Create the `chu` database and a
-   dedicated least-privilege `chu_app` account; do not reuse a DSM
-   administrator.
+2. Keep MariaDB TCP disabled. Create the `chu` database and a dedicated
+   least-privilege `chu_app` account; do not reuse a DSM administrator.
 3. Create the dedicated service identity and exact ACLs described above.
    Record its numeric UID/GID receipt and complete both mount-write preflights.
 4. Copy the versioned deployment artifact through a bounded staging location.
    Create `.env` from `.env.example`; use unique secrets and never commit it.
 5. In Container Manager, create the project from `server/compose.yaml`.
-   Confirm host networking, no published ports, the explicit nonzero numeric
-   runtime user, read-only root, dropped capabilities, 256 MiB memory, 160 MiB
-   Node heap, 0.75 CPU, four DB connections, and bounded logs before starting
-   it. The `ch-core-ops` profile must not run by default.
+   Confirm host networking, no published ports, the read-only
+   `/run/mysqld` socket bind, the explicit nonzero numeric runtime user,
+   read-only root, dropped capabilities, 256 MiB memory, 160 MiB Node heap,
+   0.75 CPU, four DB connections, and bounded logs before starting it. The
+   `ch-core-ops` profile must not run by default.
 6. Verify `/health/live` and `/health/ready` locally, then verify HTTPS through
    8443 from the business LAN.
 

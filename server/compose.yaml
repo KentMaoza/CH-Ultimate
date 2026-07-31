@@ -6,6 +6,7 @@ services:
       target: runtime
     environment:
       CH_CORE_DATABASE_URL: "${CH_CORE_DATABASE_URL:?set CH_CORE_DATABASE_URL}"
+      CH_CORE_DATABASE_SOCKET: "/run/mysqld/mysqld10.sock"
       CH_CORE_OWNER_BOOTSTRAP_SECRET: "${CH_CORE_OWNER_BOOTSTRAP_SECRET:-}"
       CH_CORE_RUNTIME_UID: ${CH_CORE_RUNTIME_UID:?set a nonzero numeric CH_CORE_RUNTIME_UID}
       CH_CORE_RUNTIME_GID: ${CH_CORE_RUNTIME_GID:?set a nonzero numeric CH_CORE_RUNTIME_GID}
@@ -30,6 +31,10 @@ services:
       - type: bind
         source: ${CH_CORE_PRIVATE_STORAGE_HOST_PATH:?set CH_CORE_PRIVATE_STORAGE_HOST_PATH}
         target: /var/lib/ch-core/private
+      - type: bind
+        source: /run/mysqld
+        target: /run/mysqld
+        read_only: true
     logging:
       driver: json-file
       options:

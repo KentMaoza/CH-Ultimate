@@ -18,8 +18,8 @@ is read-only offline.
 
 The local application/server implementation and deployment artifacts exist,
 but CH Core is not deployed to the NAS. Production physical gates still
-include router reservation, SMART tests, independent backup and clean restore,
-UPS, MariaDB configuration, private-CA leaf certificate, DSM firewall/reverse
+include a stable LAN endpoint, SMART tests, independent backup and clean
+restore, UPS, private-CA leaf certificate, DSM firewall/reverse
 proxy, Windows installation, signed Android release/physical phones, reboot,
 LAN isolation, and the seven-client resource/load soak.
 
@@ -110,8 +110,8 @@ daemon. A successful local build is not a NAS deployment receipt.
 
 ## Server package
 
-`server/compose.yaml` uses host networking so the container can reach the
-Synology MariaDB package on host loopback without publishing its raw API.
+`server/compose.yaml` uses host networking for DSM reverse-proxy access and
+binds the Synology MariaDB Unix socket read-only without enabling MariaDB TCP.
 CH Core binds to `127.0.0.1:18080`; DSM reverse proxy will eventually expose
 LAN HTTPS 8443 after the security gates pass. The container is non-root,
 read-only, resource-bounded, and has one persistent writable private-file

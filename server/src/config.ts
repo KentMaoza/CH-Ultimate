@@ -24,6 +24,18 @@ const environmentSchema = z.object({
   CH_CORE_HOST: z.string().min(1).default('0.0.0.0'),
   CH_CORE_PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
   CH_CORE_DATABASE_URL: databaseUrl,
+  CH_CORE_DATABASE_SOCKET: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z
+      .string()
+      .refine(
+        (value) =>
+          isAbsolute(value) &&
+          resolve(value) !== '/' &&
+          !/[\u0000-\u001f\u007f]/.test(value),
+      )
+      .optional(),
+  ),
   CH_CORE_DB_POOL_MAX: z.coerce.number().int().min(1).max(4).default(4),
   CH_CORE_PRIVATE_STORAGE_ROOT: z
     .string()
@@ -50,6 +62,7 @@ export interface ServerConfig {
   host: string;
   port: number;
   databaseUrl: string;
+  databaseSocket?: string;
   dbPoolMax: number;
   privateStorageRoot: string;
   initialCatalogueSha256: string;
@@ -68,6 +81,11 @@ export function loadServerConfig(
     host: result.data.CH_CORE_HOST,
     port: result.data.CH_CORE_PORT,
     databaseUrl: result.data.CH_CORE_DATABASE_URL,
+    ...(result.data.CH_CORE_DATABASE_SOCKET === undefined
+      ? {}
+      : {
+          databaseSocket: result.data.CH_CORE_DATABASE_SOCKET,
+        }),
     dbPoolMax: result.data.CH_CORE_DB_POOL_MAX,
     privateStorageRoot: result.data.CH_CORE_PRIVATE_STORAGE_ROOT,
     initialCatalogueSha256:

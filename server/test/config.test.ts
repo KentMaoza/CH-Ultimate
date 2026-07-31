@@ -24,6 +24,39 @@ describe('loadServerConfig', () => {
     });
   });
 
+  it('accepts an optional absolute MariaDB socket path', () => {
+    const config = loadServerConfig({
+      CH_CORE_DATABASE_URL:
+        'mariadb://chu_app:secret@localhost/chu_test',
+      CH_CORE_DATABASE_SOCKET: '/run/mysqld/mysqld10.sock',
+    });
+
+    expect(config.databaseSocket).toBe('/run/mysqld/mysqld10.sock');
+  });
+
+  it('treats an empty optional MariaDB socket path as disabled', () => {
+    const config = loadServerConfig({
+      CH_CORE_DATABASE_URL:
+        'mariadb://chu_app:secret@localhost/chu_test',
+      CH_CORE_DATABASE_SOCKET: '',
+    });
+
+    expect(config).not.toHaveProperty('databaseSocket');
+  });
+
+  it.each(['relative/mysqld.sock', '/', '/run/mysqld\nunsafe.sock'])(
+    'rejects unsafe MariaDB socket path %s',
+    (databaseSocket) => {
+      expect(() =>
+        loadServerConfig({
+          CH_CORE_DATABASE_URL:
+            'mariadb://chu_app:secret@localhost/chu_test',
+          CH_CORE_DATABASE_SOCKET: databaseSocket,
+        }),
+      ).toThrow('Invalid CH Core server configuration');
+    },
+  );
+
   it.each([
     {},
     { CH_CORE_DATABASE_URL: 'https://example.test/chu_test' },

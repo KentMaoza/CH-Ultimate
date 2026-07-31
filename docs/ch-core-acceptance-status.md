@@ -18,14 +18,14 @@ Status meanings:
 | --- | --- | --- |
 | Desktop application and gateway | PASS | `npm run verify`: 56 files / 453 tests |
 | Mobile application | PASS | `npm run test:mobile`: 9 files / 88 tests |
-| CH Core unit and artifact tests | PASS | `npm run server:test`: 43 files / 295 tests plus one intentional workbook skip |
+| CH Core unit and artifact tests | PASS | `npm run server:test`: 44 files / 303 tests plus one intentional workbook skip |
 | Approved workbook parser | PASS | Exact SHA-256 and 3,144 / 2,786 / 358 / 3 / Rp276,267,011 / 4,115 PCS acceptance: 1/1 |
 | Desktop mock isolation | PASS | Packaged startup fails closed; explicit unpackaged test marker only; Playwright 8/8 |
 | Mobile production bundle | PASS | 589-module Vite build and Capacitor Android sync |
 | Android JVM and lint gates | PASS | Debug/release unit tests and lint pass with Android Studio JDK 21 |
 | Electron package | PASS | Reproducible darwin-arm64 package succeeds |
 | Source hygiene | PASS | `git diff --check`, shell syntax, and tracked-secret/private-artifact scans pass |
-| Exact MariaDB integration | BLOCKED | No local MariaDB server; `server:test:integration` accepts only an isolated `/chu_test` URL and fails closed otherwise |
+| Exact MariaDB integration | BLOCKED | The NAS `chu` schema and app login exist, but CH Core migrations and integration tests have not yet run against that copied-data pilot; `server:test:integration` still fails closed unless explicitly pointed to isolated `/chu_test` |
 | Docker/Compose and ARM64 image | BLOCKED | No Docker, Compose, Podman, OrbStack, or equivalent runtime is installed on this Mac |
 
 ## Client release artifacts
@@ -63,8 +63,8 @@ Core is not deployed.
 
 Current LAN evidence: the Mac is `192.168.1.18`; the NAS is
 `192.168.1.14`, MAC `90:09:D0:9F:7C:1F`. SMB 445 and DSM HTTPS 5001 are
-reachable. CH Core 8443, raw API 18080, and MariaDB 3306 remain
-closed/filtered, which is correct before deployment.
+reachable. CH Core 8443 and raw API 18080 remain closed/filtered, and MariaDB
+TCP is disabled (`port=0`), which is correct before deployment.
 
 | Requirement | Status | Current evidence or missing action |
 | --- | --- | --- |
@@ -74,7 +74,8 @@ closed/filtered, which is correct before deployment.
 | Independent encrypted backup | BLOCKED | Owner declined using the connected Seagate disk; no independent backup destination or job exists |
 | Backup integrity and clean restore | BLOCKED | No job, integrity receipt, isolated restore schema, or business-invariant comparison exists |
 | UPS safe shutdown | BLOCKED | Owner reports external UPS hardware is connected, but DSM recognition, data signaling, shutdown, and restart have not been verified |
-| MariaDB 10 loopback service | BLOCKED | Package is absent and must not be installed before the preceding safety decisions |
+| MariaDB 10 socket service | PASS | Package installed; `chu` and least-privilege `chu_app` created; socket login verified at `/run/mysqld/mysqld10.sock`; TCP disabled with `port=0` |
+| Restricted service identity and private share | PASS | `ch_core_service` has UID/GID `1027:100`, no DSM login or unrelated share access, and direct read/write only to hidden `CH_Core_Private` |
 | Private CA and IP-SAN leaf | BLOCKED | Off-NAS CA custody and `IP:192.168.1.14` leaf are not yet established |
 | DSM firewall and reverse proxy | BLOCKED | Firewall is disabled and reverse-proxy list is empty |
 | CH Core deployment | BLOCKED | All preceding hard gates must pass first |
@@ -86,7 +87,7 @@ Every item below remains `BLOCKED` until a copied-data pilot exists:
 - Business Wi-Fi works with Internet disconnected.
 - Guest Wi-Fi, mobile data, WAN, QuickConnect, and Tailscale cannot reach
   CH Core 8443.
-- Raw 18080 and MariaDB 3306 remain unreachable from clients.
+- Raw 18080 remains unreachable and MariaDB has no TCP listener.
 - Correct certificates work; untrusted, wrong-IP, and expired certificates
   fail closed.
 - Foreground changes propagate within three seconds.

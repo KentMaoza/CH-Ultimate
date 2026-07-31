@@ -94,13 +94,18 @@ async function createScriptHarness(
 }
 
 describe('local CH Core deployment artifacts', () => {
-  it('keeps the raw API and host MariaDB on shared loopback without a published port', async () => {
+  it('keeps the raw API on loopback and MariaDB on a local socket without published ports', async () => {
     const compose = await text('compose.yaml');
 
     expect(compose).toContain('network_mode: host');
     expect(compose).not.toMatch(/^\s+ports:/m);
     expect(compose).toContain('CH_CORE_HOST: "127.0.0.1"');
     expect(compose).toContain('CH_CORE_PORT: "18080"');
+    expect(compose).toContain(
+      'CH_CORE_DATABASE_SOCKET: "/run/mysqld/mysqld10.sock"',
+    );
+    expect(compose).toContain('source: /run/mysqld');
+    expect(compose).toContain('target: /run/mysqld');
     expect(compose).toContain('CH_CORE_DB_POOL_MAX: "4"');
     expect(compose).toContain('target: /var/lib/ch-core/private');
     expect(compose).toContain('read_only: true');
@@ -166,7 +171,7 @@ describe('local CH Core deployment artifacts', () => {
     expect(compose).toContain('- ops');
     expect(compose).toContain('target: /backup');
     expect(compose).not.toMatch(/ch-core-ops:[\s\S]*?ports:/);
-    expect(compose.match(/type: bind/g)).toHaveLength(2);
+    expect(compose.match(/type: bind/g)).toHaveLength(3);
   });
 
   it('keeps both services bounded and runs Node 24 as non-root', async () => {
@@ -177,7 +182,7 @@ describe('local CH Core deployment artifacts', () => {
     expect(dockerfile).toContain('NODE_OPTIONS=--max-old-space-size=160');
     expect(dockerfile).toContain('HEALTHCHECK');
     expect(dockerfile).not.toMatch(/\bcurl\b/);
-    expect(compose.match(/read_only: true/g)).toHaveLength(2);
+    expect(compose.match(/read_only: true/g)).toHaveLength(3);
     expect(compose.match(/no-new-privileges:true/g)).toHaveLength(2);
     expect(compose.match(/mem_limit:/g)).toHaveLength(2);
     expect(compose.match(/cpus:/g)).toHaveLength(2);

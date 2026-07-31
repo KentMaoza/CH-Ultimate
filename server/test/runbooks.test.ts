@@ -159,7 +159,8 @@ describe('CH Core guarded deployment documentation', () => {
     expect(readme).toContain('2,786');
     expect(readme).toContain('npm run server:test');
     expect(readme).toContain('npm run android:lint');
-    expect(readme).toMatch(/not deployed|belum di-deploy/i);
+    expect(readme).toMatch(/copied-data.+deployed.+NAS/is);
+    expect(readme).toMatch(/not.+production|bukan.+production/i);
   });
 
   it('tracks every local, client-release, and physical acceptance gate without overstating completion', async () => {
@@ -170,12 +171,15 @@ describe('CH Core guarded deployment documentation', () => {
 
     expect(readme).toContain('CH Core acceptance status');
     for (const requiredEvidence of [
-      '453',
+      '459',
       '303',
       '88',
       'Playwright 8/8',
       'Windows x64 ZIP',
       'Squirrel installer',
+      'pilot-release.yml',
+      'CH-Ultimate-0.1.0-Setup.exe',
+      'CHU-Companion-Mobile-0.1.0-pilot-debug.apk',
       'Android release signing',
       'chu_test',
       'Docker/Compose',
@@ -189,7 +193,8 @@ describe('CH Core guarded deployment documentation', () => {
     }
     expect(acceptance).toMatch(/Windows.+not tested.+physical/is);
     expect(acceptance).toMatch(/Android.+not installed.+physical/is);
-    expect(acceptance).toMatch(/CH Core.+not deployed/is);
+    expect(acceptance).toMatch(/copied-data.+deployed.+NAS/is);
+    expect(acceptance).toMatch(/not.+production|bukan.+production/i);
     expect(acceptance).toMatch(/approval.+price/is);
   });
 });

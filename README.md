@@ -16,12 +16,12 @@ is read-only offline.
 
 ## Current boundary
 
-The local application/server implementation and deployment artifacts exist,
-but CH Core is not deployed to the NAS. Production physical gates still
-include a stable LAN endpoint, SMART tests, independent backup and clean
-restore, UPS, private-CA leaf certificate, DSM firewall/reverse
-proxy, Windows installation, signed Android release/physical phones, reboot,
-LAN isolation, and the seven-client resource/load soak.
+A copied-data CH Core runtime is deployed on the NAS and is available through
+LAN HTTPS. It is not a production endpoint: the catalogue has not been
+imported and no Windows or Android client has been enrolled. Production gates
+still include stable addressing, completed SMART tests, an independent backup
+and clean restore, UPS signaling, reboot/isolation checks, physical client
+pilots, and the seven-client resource/load soak.
 
 QuickConnect and Tailscale are for DSM/SMB administration only. The CH Core
 API must remain reachable only from the business LAN at
@@ -49,6 +49,22 @@ only in an unpackaged process with the dedicated test flag and locked renderer
 URL marker. Packaged apps ignore that flag. Browser/mobile development demo
 mode remains visibly marked as demo/session-only and cannot be mistaken for
 the Core-backed runtime.
+
+## Private pilot distribution
+
+`.github/workflows/pilot-release.yml` defines a gated private GitHub
+prerelease. It builds these two installable pilot files only after the source
+gates pass:
+
+- `CH-Ultimate-0.1.0-Setup.exe` for Windows x64
+- `CHU-Companion-Mobile-0.1.0-pilot-debug.apk` for Android
+
+Publication is manual. Until a GitHub Actions run and downloaded checksums are
+recorded in the acceptance ledger, the workflow is only a ready build path,
+not evidence that the installers exist or work on physical devices. The
+Android file is a debug-signed copied-data pilot; permanent Android release
+signing remains a separate production gate. See the
+[pilot installation notes](docs/releases/pilot-0.1.0.md).
 
 ## Approved initial catalogue
 
@@ -90,6 +106,7 @@ npm run mobile:build
 npm run package
 npm run test:e2e
 npm run server:test
+npm run server:typecheck
 npm run server:test:integration
 npm run android:sync
 npm run android:test
@@ -112,8 +129,8 @@ daemon. A successful local build is not a NAS deployment receipt.
 
 `server/compose.yaml` uses host networking for DSM reverse-proxy access and
 binds the Synology MariaDB Unix socket read-only without enabling MariaDB TCP.
-CH Core binds to `127.0.0.1:18080`; DSM reverse proxy will eventually expose
-LAN HTTPS 8443 after the security gates pass. The container is non-root,
+CH Core binds to `127.0.0.1:18080`; DSM reverse proxy currently exposes it as
+LAN HTTPS 8443. The container is non-root,
 read-only, resource-bounded, and has one persistent writable private-file
 mount.
 
@@ -127,7 +144,8 @@ Copy `server/.env.example` to an untracked `.env` only in an approved
 deployment staging area. Backup and scratch restore use separate
 least-privilege database URLs. Dumps are completed directory bundles rather
 than replaceable single files. Never commit credentials, database dumps,
-private keys, certificates, or live configuration.
+private keys, leaf certificates/private material, or live configuration. The
+public client-trust CA certificate is intentionally tracked for the pilot.
 
 ## Main business behavior
 

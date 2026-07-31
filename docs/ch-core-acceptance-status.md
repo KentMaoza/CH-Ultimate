@@ -21,7 +21,7 @@ Status meanings:
 
 | Requirement | Status | Current evidence |
 | --- | --- | --- |
-| Desktop application and gateway | PASS | `npm run verify`: 56 files / 453 tests |
+| Desktop application and gateway | PASS | `npm run verify`: 59 files / 459 tests |
 | Mobile application | PASS | `npm run test:mobile`: 9 files / 88 tests |
 | CH Core unit and artifact tests | PASS | `npm run server:test`: 44 files / 303 tests plus one intentional workbook skip |
 | Approved workbook parser | PASS | Exact SHA-256 and 3,144 / 2,786 / 358 / 3 / Rp276,267,011 / 4,115 PCS acceptance: 1/1 |
@@ -37,17 +37,19 @@ Status meanings:
 
 | Requirement | Status | Current evidence |
 | --- | --- | --- |
+| Private GitHub pilot workflow | READY | `.github/workflows/pilot-release.yml` and its 2/2 static contract tests define gated Windows/Android builds and manual prerelease publication; no remote run or release exists yet |
 | Windows x64 application package | READY | Electron cross-package succeeds and a reproducible Windows x64 ZIP is created |
-| Windows Squirrel installer | BLOCKED | Non-Windows build requires Mono and Wine; the installer must preferably be built and then tested on real Windows |
+| Windows Squirrel installer | READY | A `windows-latest` job will build `CH-Ultimate-0.1.0-Setup.exe` only after source gates pass; the job and installer have not yet run on GitHub or a physical laptop |
 | Two Windows laptop installations | BLOCKED | Windows package is not tested on either physical laptop |
 | Android debug/release code checks | PASS | Gradle unit tests and lint pass |
+| Android pilot debug APK | READY | JDK 21 tests/lint and the fixed endpoint/public-CA resource contract pass; the workflow will build `CHU-Companion-Mobile-0.1.0-pilot-debug.apk`, but no remote artifact or physical installation exists yet |
 | Android release signing | BLOCKED | Owner deferred creation of the permanent signing identity; release builds continue to fail closed without the four private signing variables |
 | Signed Android APK | BLOCKED | No release key or signed APK exists; development/debug builds are not treated as production releases |
-| Physical Android installation | BLOCKED | Signed APK is not installed or tested on a physical phone |
+| Physical Android installation | BLOCKED | Android is not installed on a physical phone; the pilot APK has not yet been built or tested there |
 
-The Windows ZIP is useful only for target-machine validation. It does not
-satisfy the installer gate. Likewise, a debug or unsigned Android build does
-not satisfy release signing.
+The workflow and Windows ZIP are useful only for target-machine validation;
+they do not satisfy physical installation. Likewise, the debug Android pilot
+does not satisfy permanent release signing.
 
 ## Workbook owner review
 
@@ -134,4 +136,7 @@ LAN computer; MariaDB and private files remain on the NAS.
 4. External UPS hardware is reported connected; DSM signaling and safe
    shutdown remain unverified.
 5. Android release-signing identity creation is deferred. Development/debug
-   builds may continue, but no production Android release may be claimed.
+    builds may continue, but no production Android release may be claimed.
+6. Private GitHub Releases will distribute the Windows installer and Android
+   debug APK for the copied-data pilot. This does not relax physical-client or
+   production acceptance gates.

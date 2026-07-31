@@ -229,11 +229,11 @@ publish-prerelease:
 
 `source-gates` runs `npm ci`, `npm run verify`, `npm run test:mobile`, `npm run mobile:build`, `npm run server:test`, `npm run server:typecheck`, Playwright's Electron E2E under Xvfb, a tracked-private-key scan, and `git diff --check`.
 
-`windows-installer` runs `npm ci` and `npm run make:windows`, locates exactly one `*Setup.exe`, renames it to `CH-Ultimate-0.1.0-Setup.exe`, and uploads it with `actions/upload-artifact@v4`.
+`windows-installer` runs `npm ci` and `npm run make:windows`, locates exactly one `*Setup.exe`, renames it to `CH-Ultimate-0.1.0-Setup.exe`, and records its checksum.
 
-`android-apk` installs Node 24, Temurin JDK 21, and Android tooling; runs `npm ci`, `npm run android:sync`, `npm run android:test`, and `npm run android:lint`; runs `./gradlew assembleDebug`; renames the APK and uploads it.
+`android-apk` installs Node 24, Temurin JDK 21, and Android tooling; runs `npm ci`, `npm run android:sync`, `npm run android:test`, and `npm run android:lint`; runs `./gradlew assembleDebug`; renames the APK and records its checksum.
 
-`publish-prerelease` downloads both artifacts, rejects missing or duplicate files, creates `SHA256SUMS.txt`, and uses authenticated `gh release create pilot-v0.1.0 ... --prerelease --notes-file docs/releases/pilot-0.1.0.md`.
+The account's Actions artifact-storage quota is unavailable, so validation jobs do not use `upload-artifact`. `publish-prerelease` is the only write-enabled job: after both platform jobs pass, it rebuilds both payloads from the same commit on `windows-latest`, rejects missing or duplicate files, creates `SHA256SUMS.txt`, and uses authenticated `gh release create pilot-v0.1.0 ... --prerelease --notes-file docs/releases/pilot-0.1.0.md`.
 
 - [ ] **Step 4: Write exact pilot installation notes**
 

@@ -69,11 +69,7 @@ jobs:
           }
           New-Item -ItemType Directory -Path release -Force | Out-Null
           Copy-Item $setups[0].FullName release/CH-Ultimate-0.1.0-Setup.exe
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-installer
-          path: release/CH-Ultimate-0.1.0-Setup.exe
-          if-no-files-found: error
+          Get-FileHash -Algorithm SHA256 release/CH-Ultimate-0.1.0-Setup.exe
 
   android-apk:
     needs: source-gates
@@ -107,58 +103,68 @@ jobs:
           fi
           mkdir -p release
           cp "${apks[0]}" release/CHU-Companion-Mobile-0.1.0-pilot-debug.apk
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android-apk
-          path: release/CHU-Companion-Mobile-0.1.0-pilot-debug.apk
-          if-no-files-found: error
+          sha256sum release/CHU-Companion-Mobile-0.1.0-pilot-debug.apk
 
   publish-prerelease:
     needs: [windows-installer, android-apk]
     if: github.event_name == 'workflow_dispatch' && inputs.publish
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/setup-node@v4
         with:
-          name: windows-installer
-          path: release
-      - uses: actions/download-artifact@v4
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-java@v4
         with:
-          name: android-apk
-          path: release
-      - name: Verify release payload and create checksums
-        shell: bash
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - name: Rebuild Windows release payload
+        run: npm run make:windows
+      - run: npm run android:sync
+      - name: Rebuild Android release payload
+        working-directory: android
+        shell: pwsh
+        run: .\gradlew.bat assembleDebug
+      - name: Collect exact release payload and create checksums
+        shell: pwsh
         run: |
-          expected=(
-            release/CH-Ultimate-0.1.0-Setup.exe
-            release/CHU-Companion-Mobile-0.1.0-pilot-debug.apk
+          $setups = @(Get-ChildItem -Path out/make -Recurse -Filter '*Setup.exe')
+          $apks = @(Get-ChildItem -Path android/app/build/outputs/apk/debug -Recurse -Filter '*-debug.apk')
+          if ($setups.Count -ne 1) {
+            throw "Expected exactly one Setup.exe, found $($setups.Count)."
+          }
+          if ($apks.Count -ne 1) {
+            throw "Expected exactly one debug APK, found $($apks.Count)."
+          }
+          New-Item -ItemType Directory -Path release -Force | Out-Null
+          Copy-Item $setups[0].FullName release/CH-Ultimate-0.1.0-Setup.exe
+          Copy-Item $apks[0].FullName release/CHU-Companion-Mobile-0.1.0-pilot-debug.apk
+          $names = @(
+            'CH-Ultimate-0.1.0-Setup.exe',
+            'CHU-Companion-Mobile-0.1.0-pilot-debug.apk'
           )
-          for file in "${expected[@]}"; do
-            test -f "$file" || { echo "Missing $file" >&2; exit 1; }
-          done
-          if [ "$(find release -maxdepth 1 -type f | wc -l | tr -d ' ')" -ne 2 ]; then
-            echo 'Unexpected release payload.' >&2
-            exit 1
-          fi
-          (
-            cd release
-            sha256sum \
-              CH-Ultimate-0.1.0-Setup.exe \
-              CHU-Companion-Mobile-0.1.0-pilot-debug.apk \
-              > SHA256SUMS.txt
-          )
+          $lines = foreach ($name in $names) {
+            $hash = (Get-FileHash -Algorithm SHA256 (Join-Path release $name)).Hash.ToLowerInvariant()
+            "$hash  $name"
+          }
+          $checksumPath = Join-Path (Resolve-Path release) 'SHA256SUMS.txt'
+          [System.IO.File]::WriteAllLines($checksumPath, $lines, [System.Text.Encoding]::ASCII)
       - name: Publish private prerelease
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: pwsh
         run: |
-          gh release create pilot-v0.1.0 \
-            release/CH-Ultimate-0.1.0-Setup.exe \
-            release/CHU-Companion-Mobile-0.1.0-pilot-debug.apk \
-            release/SHA256SUMS.txt \
-            --prerelease \
-            --target "$GITHUB_SHA" \
-            --title 'CH Ultimate pilot v0.1.0' \
+          gh release create pilot-v0.1.0 `
+            release/CH-Ultimate-0.1.0-Setup.exe `
+            release/CHU-Companion-Mobile-0.1.0-pilot-debug.apk `
+            release/SHA256SUMS.txt `
+            --prerelease `
+            --target "$env:GITHUB_SHA" `
+            --title 'CH Ultimate pilot v0.1.0' `
             --notes-file docs/releases/pilot-0.1.0.md

@@ -32,6 +32,15 @@ describe('GitHub pilot release workflow', () => {
       "github.event_name == 'workflow_dispatch' && inputs.publish",
     );
     expect(workflow).toContain('--prerelease');
+    expect(workflow).not.toContain('actions/upload-artifact');
+    expect(workflow).not.toContain('actions/download-artifact');
+    const publisher = workflow.slice(
+      workflow.indexOf('publish-prerelease:'),
+    );
+    expect(publisher).toContain('runs-on: windows-latest');
+    expect(publisher).toContain('npm run make:windows');
+    expect(publisher).toContain('npm run android:sync');
+    expect(publisher).toContain('.\\gradlew.bat assembleDebug');
   });
 
   it('does not introduce production credentials or TLS bypasses', async () => {

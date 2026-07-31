@@ -94,13 +94,14 @@ The workflow has four bounded jobs:
    private-key scans, `npm run verify`, mobile tests/build, server tests and
    typecheck, Electron E2E, and patch hygiene.
 2. `windows-installer` depends on `source-gates`, builds the Windows x64
-   Squirrel installer on a Windows runner, records its checksum, and uploads a
-   workflow artifact.
+   Squirrel installer on a Windows runner and records its checksum.
 3. `android-apk` depends on `source-gates`, uses JDK 21, runs Android sync,
-   unit tests, and lint, builds the debug APK, records its checksum, and uploads
-   a workflow artifact.
-4. `publish-prerelease` depends on both platform jobs and publishes the assets
-   only for an explicitly requested manual prerelease run.
+   unit tests, and lint, builds the debug APK, and records its checksum.
+4. `publish-prerelease` depends on both platform jobs. Because the account's
+   Actions artifact-storage quota cannot be used, this one write-enabled
+   Windows job rebuilds both payloads from the same commit, creates their
+   checksum file, and attaches them directly to the private GitHub prerelease.
+   It runs only for an explicitly requested manual publish.
 
 The exact `/chu_test` MariaDB integration suite remains a separate guarded gate
 because GitHub has no approved MariaDB fixture or production credential. It is

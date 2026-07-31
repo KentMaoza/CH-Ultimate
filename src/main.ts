@@ -11,6 +11,7 @@ import { pathToFileURL } from 'node:url';
 import { createCoreCredentialStore } from './electron/core-credential-store';
 import { createCoreDesktopService } from './electron/core-desktop-service';
 import { registerCoreIpcHandlers } from './electron/core-ipc';
+import { ensurePackagedCoreDeployment } from './electron/core-packaged-deployment';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -37,8 +38,14 @@ async function createWindow(): Promise<void> {
     safeStorage,
     userDataPath,
   });
+  const configPath = app.isPackaged
+    ? await ensurePackagedCoreDeployment({
+        resourcesPath: process.resourcesPath,
+        userDataPath,
+      })
+    : path.join(userDataPath, 'ch-core-config.json');
   const service = await createCoreDesktopService({
-    configPath: path.join(userDataPath, 'ch-core-config.json'),
+    configPath,
     production: app.isPackaged,
     store,
     platform: process.platform,

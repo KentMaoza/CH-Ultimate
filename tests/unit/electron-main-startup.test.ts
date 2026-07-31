@@ -7,6 +7,7 @@ afterEach(() => {
   vi.doUnmock('../../src/electron/core-credential-store');
   vi.doUnmock('../../src/electron/core-desktop-service');
   vi.doUnmock('../../src/electron/core-ipc');
+  vi.doUnmock('../../src/electron/core-packaged-deployment');
   vi.unstubAllGlobals();
   delete process.env.CH_ULTIMATE_E2E_TEST_MOCK;
   vi.resetModules();
@@ -63,6 +64,10 @@ describe('Electron CH Core startup', () => {
       callOrder.push('service');
       return service;
     });
+    const ensurePackagedCoreDeployment = vi.fn(async () => {
+      callOrder.push('deployment');
+      return '/private/ch-ultimate-user-data/ch-core-config.json';
+    });
     const registerCoreIpcHandlers = vi.fn(() => {
       callOrder.push('register');
       return unregister;
@@ -84,6 +89,9 @@ describe('Electron CH Core startup', () => {
     vi.doMock('../../src/electron/core-ipc', () => ({
       registerCoreIpcHandlers,
     }));
+    vi.doMock('../../src/electron/core-packaged-deployment', () => ({
+      ensurePackagedCoreDeployment,
+    }));
     vi.stubGlobal('MAIN_WINDOW_VITE_DEV_SERVER_URL', undefined);
     vi.stubGlobal('MAIN_WINDOW_VITE_NAME', 'main_window');
 
@@ -95,7 +103,13 @@ describe('Electron CH Core startup', () => {
       expect(registerCoreIpcHandlers).toHaveBeenCalledTimes(1),
     );
 
-    expect(callOrder).toEqual(['window', 'store', 'service', 'register']);
+    expect(callOrder).toEqual([
+      'window',
+      'store',
+      'deployment',
+      'service',
+      'register',
+    ]);
     expect(BrowserWindow).toHaveBeenCalledWith(
       expect.objectContaining({
         webPreferences: {
@@ -108,6 +122,10 @@ describe('Electron CH Core startup', () => {
     );
     expect(createCoreCredentialStore).toHaveBeenCalledWith({
       safeStorage,
+      userDataPath: '/private/ch-ultimate-user-data',
+    });
+    expect(ensurePackagedCoreDeployment).toHaveBeenCalledWith({
+      resourcesPath: process.resourcesPath,
       userDataPath: '/private/ch-ultimate-user-data',
     });
     expect(createCoreDesktopService).toHaveBeenCalledWith({

@@ -7,7 +7,10 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     name: 'CH Ultimate',
-    extraResource: ['resources/ch-core-config.example.json'],
+    extraResource: [
+      'resources/ch-core-deployment.json',
+      'resources/ch-core-ca.pem',
+    ],
   },
   makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin', 'win32'])],
   plugins: [

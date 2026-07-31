@@ -32,6 +32,8 @@ jobs:
       - run: npm run mobile:build
       - run: npm run server:test
       - run: npm run server:typecheck
+      - name: Build Electron before end-to-end tests
+        run: npm run package
       - name: Install virtual display
         run: |
           sudo apt-get update

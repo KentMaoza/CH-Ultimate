@@ -20,6 +20,10 @@ describe('GitHub pilot release workflow', () => {
     expect(workflow).toContain('npm run android:test');
     expect(workflow).toContain('npm run android:lint');
     expect(workflow).toContain('./gradlew assembleDebug');
+    expect(workflow.indexOf('npm run package')).toBeGreaterThan(-1);
+    expect(workflow.indexOf('npm run package')).toBeLessThan(
+      workflow.indexOf('npm run test:e2e'),
+    );
     expect(workflow.match(/needs: source-gates/g)).toHaveLength(2);
     expect(workflow).toContain('needs: [windows-installer, android-apk]');
     expect(workflow).toContain('contents: write');

@@ -36,8 +36,8 @@ Status meanings:
 | Windows Squirrel installer | BLOCKED | Non-Windows build requires Mono and Wine; the installer must preferably be built and then tested on real Windows |
 | Two Windows laptop installations | BLOCKED | Windows package is not tested on either physical laptop |
 | Android debug/release code checks | PASS | Gradle unit tests and lint pass |
-| Android release signing | BLOCKED | Release build correctly refuses to run without `CHU_COMPANION_STORE_FILE`, store password, key alias, and key password |
-| Signed Android APK | BLOCKED | No owner-approved signing credential is available; no unsigned artifact is treated as a release |
+| Android release signing | BLOCKED | Owner deferred creation of the permanent signing identity; release builds continue to fail closed without the four private signing variables |
+| Signed Android APK | BLOCKED | No release key or signed APK exists; development/debug builds are not treated as production releases |
 | Physical Android installation | BLOCKED | Signed APK is not installed or tested on a physical phone |
 
 The Windows ZIP is useful only for target-machine validation. It does not
@@ -47,8 +47,8 @@ not satisfy release signing.
 ## Workbook owner review
 
 The fixed selection rule uses a positive `Harga Jual Referensi`; otherwise it
-uses `Modal Referensi`. Before the transactional first import, owner approval
-of the three selected price differences remains required:
+uses `Modal Referensi`. On 2026-07-31, owner approval was recorded for the
+three selected price differences:
 
 | Excel row | Primary SKU | Modal | Jual selected |
 | --- | --- | ---: | ---: |
@@ -56,8 +56,8 @@ of the three selected price differences remains required:
 | 1088 | `PR060522 Pigeon Baby Cologne Rejuv 200ml CH058` | Rp40,440 | Rp25,800 |
 | 1180 | `PR050339 Pigeon 2 Way Baby Bibs - Check CH058` | Rp187,320 | Rp183,320 |
 
-No import is committed until the owner approves those prices or supplies
-corrections.
+The price-review gate is complete. No import has been committed because CH
+Core is not deployed.
 
 ## NAS preflight and deployment gates
 
@@ -68,12 +68,12 @@ closed/filtered, which is correct before deployment.
 
 | Requirement | Status | Current evidence or missing action |
 | --- | --- | --- |
-| Authenticated DSM preflight | PASS | DS223j, DSM 7.4.1-90080, healthy RAID1/Btrfs, Container Manager present; no changes made |
-| Reserved LAN endpoint | BLOCKED | Owner/router confirmation of `90:09:D0:9F:7C:1F -> 192.168.1.14` is absent |
-| Extended SMART tests | BLOCKED | Both drives report healthy, but no explicit SMART self-test results exist |
-| Independent encrypted backup | BLOCKED | Hyper Backup is absent; connected Seagate 1TB is not approved or configured as a backup |
+| Authenticated DSM preflight | PASS | DS223j, DSM 7.4.1-90080, healthy RAID1/Btrfs, and supported Container Manager were confirmed before deployment |
+| Reserved LAN endpoint | BLOCKED | Owner declined a router reservation; no stable static-address or local-DNS alternative is approved, so the IP-SAN endpoint cannot be finalized |
+| Extended SMART tests | BLOCKED | Drive 2 extended test was started and last observed at 10%; Drive 1 is pending and neither drive has a retained completion result |
+| Independent encrypted backup | BLOCKED | Owner declined using the connected Seagate disk; no independent backup destination or job exists |
 | Backup integrity and clean restore | BLOCKED | No job, integrity receipt, isolated restore schema, or business-invariant comparison exists |
-| UPS safe shutdown | BLOCKED | No compatible UPS is connected; DSM UPS support is disabled |
+| UPS safe shutdown | BLOCKED | Owner reports external UPS hardware is connected, but DSM recognition, data signaling, shutdown, and restart have not been verified |
 | MariaDB 10 loopback service | BLOCKED | Package is absent and must not be installed before the preceding safety decisions |
 | Private CA and IP-SAN leaf | BLOCKED | Off-NAS CA custody and `IP:192.168.1.14` leaf are not yet established |
 | DSM firewall and reverse proxy | BLOCKED | Firewall is disabled and reverse-proxy list is empty |
@@ -105,14 +105,13 @@ Every item below remains `BLOCKED` until a copied-data pilot exists:
 If the DS223j fails the resource gate, only the Node service moves to a small
 LAN computer; MariaDB and private files remain on the NAS.
 
-## Owner decisions required before the next mutation
+## Current owner decisions and unresolved gates
 
-1. Approve or correct the three workbook prices above.
-2. Confirm the router reservation is complete.
-3. Confirm whether the connected Seagate 1TB disk may be dedicated to an
-   encrypted backup, including whether existing contents may be erased or
-   repurposed.
-4. Connect and identify a compatible UPS.
-5. Provide or authorize creation and custody of the Android release-signing
-   credential.
-
+1. The three workbook price selections are approved.
+2. A router reservation was declined; a stable LAN endpoint remains unresolved.
+3. Use of the connected Seagate disk for backup was declined; an independent
+   production backup and restore drill remain unresolved.
+4. External UPS hardware is reported connected; DSM signaling and safe
+   shutdown remain unverified.
+5. Android release-signing identity creation is deferred. Development/debug
+   builds may continue, but no production Android release may be claimed.

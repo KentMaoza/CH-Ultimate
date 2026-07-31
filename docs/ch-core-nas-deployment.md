@@ -28,6 +28,13 @@ No setting or package was changed during this preflight.
 The connected USB Seagate Ultra Slim disk is not assumed to be a configured,
 independent backup.
 
+Subsequent owner updates on 2026-07-31 do not change the historical preflight
+snapshot above: external UPS hardware is reported connected, but DSM signaling
+and safe shutdown are unverified. Drive 2's extended SMART test was started
+and last observed at 10%; Drive 1 remains pending. The owner declined both the
+router reservation and use of the connected Seagate disk for backup, so those
+production gates remain open.
+
 ## Blocking checklist
 
 - [ ] Create the router reservation `90:09:D0:9F:7C:1F -> 192.168.1.14`
@@ -35,7 +42,8 @@ independent backup.
 - [ ] Run explicit extended SMART tests on both disks and retain results.
 - [ ] Configure an independent encrypted backup, run its integrity check, and
   complete a clean scratch restore drill.
-- [ ] Install and test a compatible UPS, including DSM safe shutdown.
+- [ ] Verify DSM recognizes the connected UPS data link, then test safe
+  shutdown and restart.
 - [ ] Confirm the supported MariaDB 10 package and make a documented
   host-loopback-only connection decision.
 - [ ] Generate a private CA off-NAS and a leaf certificate containing the

@@ -154,7 +154,8 @@ jobs:
             "$hash  $name"
           }
           $checksumPath = Join-Path (Resolve-Path release) 'SHA256SUMS.txt'
-          [System.IO.File]::WriteAllLines($checksumPath, $lines, [System.Text.Encoding]::ASCII)
+          $portableManifest = ($lines -join "`n") + "`n"
+          [System.IO.File]::WriteAllText($checksumPath, $portableManifest, [System.Text.Encoding]::ASCII)
       - name: Publish private prerelease
         env:
           GH_TOKEN: ${{ github.token }}

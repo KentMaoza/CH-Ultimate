@@ -49,6 +49,9 @@ describe('GitHub pilot release workflow', () => {
     expect(publisher).toContain('npm run make:windows');
     expect(publisher).toContain('npm run android:sync');
     expect(publisher).toContain('.\\gradlew.bat assembleDebug');
+    expect(publisher).toContain('$portableManifest = ($lines -join "`n") + "`n"');
+    expect(publisher).toContain('[System.IO.File]::WriteAllText');
+    expect(publisher).not.toContain('[System.IO.File]::WriteAllLines');
   });
 
   it('does not introduce production credentials or TLS bypasses', async () => {

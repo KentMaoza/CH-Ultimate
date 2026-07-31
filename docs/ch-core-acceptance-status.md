@@ -37,12 +37,12 @@ Status meanings:
 
 | Requirement | Status | Current evidence |
 | --- | --- | --- |
-| Private GitHub pilot workflow | READY | `.github/workflows/pilot-release.yml` and its 2/2 static contract tests define gated Windows/Android builds and manual prerelease publication; no remote run or release exists yet |
+| Private GitHub pilot workflow | PASS | GitHub Actions run `30625635440` passed source, Windows, Android, and publication jobs on merged commit `fe479f6be82704c7ac7257ba46de45017a362db0` |
 | Windows x64 application package | READY | Electron cross-package succeeds and a reproducible Windows x64 ZIP is created |
-| Windows Squirrel installer | READY | A `windows-latest` job will build `CH-Ultimate-0.1.0-Setup.exe` only after source gates pass; the job and installer have not yet run on GitHub or a physical laptop |
+| Windows Squirrel installer | PASS | GitHub built and published `CH-Ultimate-0.1.0-Setup.exe`; a fresh authenticated download matched its published SHA-256 and was identified as a Windows PE32 GUI executable |
 | Two Windows laptop installations | BLOCKED | Windows package is not tested on either physical laptop |
 | Android debug/release code checks | PASS | Gradle unit tests and lint pass |
-| Android pilot debug APK | READY | JDK 21 tests/lint and the fixed endpoint/public-CA resource contract pass; the workflow will build `CHU-Companion-Mobile-0.1.0-pilot-debug.apk`, but no remote artifact or physical installation exists yet |
+| Android pilot debug APK | PASS | GitHub built and published `CHU-Companion-Mobile-0.1.0-pilot-debug.apk`; a fresh authenticated download matched its SHA-256 and passed `apksigner` v2 verification with exactly one Android Debug signer |
 | Android release signing | BLOCKED | Owner deferred creation of the permanent signing identity; release builds continue to fail closed without the four private signing variables |
 | Signed Android APK | BLOCKED | No release key or signed APK exists; development/debug builds are not treated as production releases |
 | Physical Android installation | BLOCKED | Android is not installed on a physical phone; the pilot APK has not yet been built or tested there |
@@ -50,6 +50,29 @@ Status meanings:
 The workflow and Windows ZIP are useful only for target-machine validation;
 they do not satisfy physical installation. Likewise, the debug Android pilot
 does not satisfy permanent release signing.
+
+### Private pilot release receipt
+
+Private prerelease `pilot-v0.1.0` was published from commit
+`fe479f6be82704c7ac7257ba46de45017a362db0` by successful GitHub Actions run
+`30625635440`:
+
+- Release: `https://github.com/KentMaoza/CH-Ultimate/releases/tag/pilot-v0.1.0`
+- Windows installer: `CH-Ultimate-0.1.0-Setup.exe`, 149,194,240 bytes,
+  SHA-256 `fe6c89c5adb2eaa018cd3f5e27494c7847749462eb9414785e720dca982e68ed`
+- Android pilot APK: `CHU-Companion-Mobile-0.1.0-pilot-debug.apk`, 46,568,612
+  bytes, SHA-256
+  `7af5ebcc190266e916ff9e01bf25fd2aa735ff023d40232e32800afdeb3ebe41`
+- Android signer certificate SHA-256:
+  `6fadcb41eae42b1d90218fca8a72af3f1e3a50817a241372394fec44995a0b28`
+- `SHA256SUMS.txt` was downloaded from the release and verified both files
+  with the standard macOS `shasum -a 256 -c` command. Its line endings were
+  corrected to portable LF, and the workflow was updated to preserve that
+  format for future releases.
+
+The release contains exactly these two installers and the checksum manifest.
+It remains a copied-data pilot: neither installer has passed installation or
+runtime acceptance on a physical Windows laptop or Android phone.
 
 ## Workbook owner review
 

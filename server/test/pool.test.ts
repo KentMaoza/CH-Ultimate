@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { createPoolMock } = vi.hoisted(() => ({
-  createPoolMock: vi.fn(() => ({ end: vi.fn() })),
+  createPoolMock: vi.fn((_options: unknown) => ({ end: vi.fn() })),
 }));
 
 vi.mock('mariadb', () => ({

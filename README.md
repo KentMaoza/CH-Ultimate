@@ -56,15 +56,15 @@ the Core-backed runtime.
 prerelease. It builds these two installable pilot files only after the source
 gates pass:
 
-- `CH-Ultimate-0.1.0-Setup.exe` for Windows x64
-- `CHU-Companion-Mobile-0.1.0-pilot-debug.apk` for Android
+- `CH-Ultimate-0.1.1-Setup.exe` for Windows x64
+- `CHU-Companion-Mobile-0.1.1-pilot-debug.apk` for Android
 
 Publication is manual. Until a GitHub Actions run and downloaded checksums are
 recorded in the acceptance ledger, the workflow is only a ready build path,
 not evidence that the installers exist or work on physical devices. The
 Android file is a debug-signed copied-data pilot; permanent Android release
 signing remains a separate production gate. See the
-[pilot installation notes](docs/releases/pilot-0.1.0.md).
+[pilot installation notes](docs/releases/pilot-0.1.1.md).
 
 ## Approved initial catalogue
 

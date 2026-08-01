@@ -78,7 +78,7 @@ function AppLayout({
     <div className={`app-shell${collapsed ? ' rail-collapsed' : ''}`}>
       <aside className="app-rail">
         <div className="brand-row">
-          <div className="brand-mark">CHU</div>
+          <img className="brand-mark" src="/brand/ch-ultimate-mark.svg" alt="CH Ultimate" />
           {!collapsed && <div><strong>CH Ultimate</strong><span>OPERATIONAL</span></div>}
         </div>
         <button className="rail-collapse" aria-label={collapsed ? 'Besarkan navigasi' : 'Kecilkan navigasi'} onClick={() => setCollapsed((value) => !value)}>

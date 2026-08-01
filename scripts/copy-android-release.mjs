@@ -2,7 +2,7 @@ import { copyFile, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const source = resolve('android/app/build/outputs/apk/release/app-release.apk');
-const destination = resolve('out/android/CHU-Companion-Mobile-0.1.0-release.apk');
+const destination = resolve('out/android/CHU-Companion-Mobile-0.1.1-release.apk');
 
 try {
   await mkdir(resolve('out/android'), { recursive: true });

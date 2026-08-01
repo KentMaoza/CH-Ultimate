@@ -9,7 +9,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .brand-row { display: flex; align-items: center; gap: 11px; min-height: 44px; padding: 0 6px 25px; white-space: nowrap; overflow: hidden; }
 .brand-row strong { display: block; font-size: 15px; }
 .brand-row span { display: block; margin-top: 3px; font-size: 9px; letter-spacing: .16em; }
-.brand-mark { display: grid; flex: 0 0 42px; width: 42px; height: 42px; place-items: center; border: 2px solid #fff; font-weight: 800; letter-spacing: -.04em; }
+.brand-mark { display: block; flex: 0 0 42px; width: 42px; height: 42px; object-fit: contain; }
 .rail-collapse { position: absolute; top: 78px; right: -13px; z-index: 2; width: 26px; height: 32px; border: 2px solid #111; color: #111; background: #fff; cursor: pointer; }
 .app-rail nav { display: grid; gap: 4px; }
 .app-rail nav button { display: flex; min-height: 42px; align-items: center; gap: 10px; width: 100%; padding: 10px 11px; border: 0; color: #fff; background: transparent; cursor: pointer; text-align: left; white-space: nowrap; }

@@ -7,6 +7,7 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     name: 'CH Ultimate',
+    icon: 'assets/brand/ch-ultimate-icon',
     extraResource: [
       'resources/ch-core-deployment.json',
       'resources/ch-core-ca.pem',

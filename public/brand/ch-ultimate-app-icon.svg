@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title">
+  <title id="title">CH Ultimate app icon</title>
+  <rect x="32" y="32" width="960" height="960" rx="216" fill="#F7F1E5"/>
+  <g transform="translate(118 116) scale(.77)">
+    <g fill="#1D1D1D">
+      <path d="M100 100h460v150H300v170H100ZM310 292h258v148H310ZM620 238h160v372H650V390h-30ZM780 470h144v334H764V648h-96V516h112ZM100 470h164v176H100ZM100 690h420v154H100ZM548 710h158v188H548Z"/>
+    </g>
+    <rect x="362" y="468" width="210" height="210" fill="#C39C34"/>
+  </g>
+</svg>

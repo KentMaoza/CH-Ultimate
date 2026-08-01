@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 const workflowPath = '.github/workflows/pilot-release.yml';
+const pilotVersion = '0.1.1';
 
 describe('GitHub pilot release workflow', () => {
   it('gates both platform builds and manual prerelease publication', async () => {
@@ -52,6 +53,12 @@ describe('GitHub pilot release workflow', () => {
     expect(publisher).toContain('$portableManifest = ($lines -join "`n") + "`n"');
     expect(publisher).toContain('[System.IO.File]::WriteAllText');
     expect(publisher).not.toContain('[System.IO.File]::WriteAllLines');
+    expect(workflow).toContain(`CH-Ultimate-${pilotVersion}-Setup.exe`);
+    expect(workflow).toContain(
+      `CHU-Companion-Mobile-${pilotVersion}-pilot-debug.apk`,
+    );
+    expect(workflow).toContain(`pilot-v${pilotVersion}`);
+    expect(workflow).toContain(`docs/releases/pilot-${pilotVersion}.md`);
   });
 
   it('does not introduce production credentials or TLS bypasses', async () => {

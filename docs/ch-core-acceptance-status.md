@@ -104,13 +104,20 @@ MariaDB TCP remains disabled. The planned target is
 `https://192.168.50.14:8443` and is governed by
 `docs/ch-core-business-lan.md`, not by this pre-cutover health result.
 
+The network-only cutover preflight requires a new completed logical dump
+bundle, verified checksum/integrity, an off-NAS copy on the protected
+administrator Mac, and its recorded SHA-256 hash. Private-file manifest and
+evidence are captured and copied off-NAS where feasible. This bounded cutover
+receipt does not satisfy the independent encrypted backup or clean scratch
+restore production gates.
+
 | Requirement | Status | Current evidence or missing action |
 | --- | --- | --- |
 | Authenticated DSM preflight | PASS | DS223j, DSM 7.4.1-90080, healthy RAID1/Btrfs, and supported Container Manager were confirmed before deployment |
 | Reserved LAN endpoint | PILOT RISK ACCEPTED | Current DHCP `192.168.1.14/24` remains pre-cutover evidence only. The target manual `.50.14` endpoint is unresolved until EW and NAS reboot evidence proves it belongs only to MAC `90:09:D0:9F:7C:1F` |
 | Extended SMART tests | BLOCKED | Drive 2 extended test was started and last observed at 10%; Drive 1 is pending and neither drive has a retained completion result |
-| Independent encrypted backup | BLOCKED | Owner declined using the connected Seagate disk; no independent backup destination or job exists |
-| Backup integrity and clean restore | BLOCKED | No job, integrity receipt, isolated restore schema, or business-invariant comparison exists |
+| Independent encrypted backup | BLOCKED | Separate production gate; the one-time off-NAS cutover bundle does not provide an independent encrypted backup destination or job |
+| Backup integrity and clean restore | BLOCKED | Separate production gate; checksum verification of the cutover bundle does not complete an isolated clean restore or business-invariant comparison |
 | UPS safe shutdown | BLOCKED | Owner reports external UPS hardware is connected, but DSM recognition, data signaling, shutdown, and restart have not been verified |
 | MariaDB 10 socket service | PASS | Package installed; `chu` and least-privilege `chu_app` created; socket login verified at `/run/mysqld/mysqld10.sock`; TCP disabled with `port=0` |
 | Restricted service identity and private share | PASS | `ch_core_service` has UID/GID `1027:100`, no DSM login or unrelated share access, and direct read/write only to hidden `CH_Core_Private` |

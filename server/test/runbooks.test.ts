@@ -260,6 +260,24 @@ describe('CH Core guarded deployment documentation', () => {
     expect(businessLan).toContain(
       'This runbook does not make CH Core a production endpoint.',
     );
+    expect(businessLan).toMatch(
+      /Create a new completed logical dump bundle.+verify its checksum and integrity/is,
+    );
+    expect(businessLan).toMatch(
+      /Copy the completed bundle off the NAS to the protected administrator Mac\s+and record its SHA-256 hash\./,
+    );
+    expect(businessLan).toMatch(
+      /Where feasible, capture the private-file manifest and evidence,\s+copy them\s+off the NAS.+record their hashes/is,
+    );
+    expect(businessLan).toMatch(
+      /Independent encrypted backup and clean scratch restore remain BLOCKED as\s+separate production-readiness gates; they are not prerequisites for this\s+network-only cutover\./,
+    );
+    expect(businessLan).toMatch(
+      /Passing this cutover must not be called\s+production-ready\./,
+    );
+    expect(businessLan).not.toMatch(
+      /complete the\s+clean scratch restore described in/,
+    );
     expect(businessLan).toMatch(/one NAS\s+MAC at \.50\.14/i);
 
     expect(businessLan).toMatch(/does not.+perform.+cutover/is);
@@ -268,5 +286,11 @@ describe('CH Core guarded deployment documentation', () => {
     expect(acceptance).toMatch(/DHCP `192\.168\.1\.14\/24`/);
     expect(acceptance).toMatch(/firewall UI.+disabled/is);
     expect(acceptance).toMatch(/one NAS MAC.+\.50\.14.+EW.+NAS reboots/is);
+    expect(acceptance).toMatch(
+      /\| Independent encrypted backup \| BLOCKED \|[^\n]*separate production gate/i,
+    );
+    expect(acceptance).toMatch(
+      /\| Backup integrity and clean restore \| BLOCKED \|[^\n]*separate production gate/i,
+    );
   });
 });

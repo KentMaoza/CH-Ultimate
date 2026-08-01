@@ -44,14 +44,25 @@ Complete and retain a timestamped receipt before the maintenance window:
    Container Manager state; export EW configuration. The DSM Firewall UI
    currently appears disabled, so prior firewall PASS evidence is historical
    only and must be re-established during cutover.
-4. Create an off-NAS encrypted backup, verify its integrity, and complete the
-   clean scratch restore described in `docs/ch-core-backup-restore.md`. RAID1
-   and an attached-but-unverified disk do not qualify.
-5. On the protected administrator Mac, generate and validate a new leaf with
+4. Using the opt-in operations container from
+   `docs/ch-core-backup-restore.md`, create a new completed logical dump bundle
+   and verify its checksum and integrity before changing the network.
+5. Copy the completed bundle off the NAS to the protected administrator Mac
+   and record its SHA-256 hash. The receipt must also name the bundle, NAS
+   source, off-NAS destination, timestamp, and operator.
+6. Where feasible, capture the private-file manifest and evidence, copy them
+   off the NAS to the protected administrator Mac, and record their hashes.
+   Record any unavailable evidence as an open production gate; do not imply
+   that the dump bundle contains private files.
+7. Independent encrypted backup and clean scratch restore remain BLOCKED as
+   separate production-readiness gates; they are not prerequisites for this
+   network-only cutover. Passing this cutover must not be called
+   production-ready.
+8. On the protected administrator Mac, generate and validate a new leaf with
    SAN `IP:192.168.50.14` from the unchanged private CA. Keep the CA signing
    key off NAS and out of this repository. Stage only the new leaf key, leaf,
    and public CA in DSM; do not assign it yet.
-6. Record the current client list and pause business writes. Verify no client
+9. Record the current client list and pause business writes. Verify no client
    is using a direct raw API port or MariaDB TCP.
 
 ## Exact 30-minute cutover order
@@ -61,7 +72,7 @@ result. If any numbered check fails, stop and use the rollback boundary below.
 
 | Window | Action and required observation |
 | --- | --- |
-| T-30 to T-25 | Announce the maintenance window, pause writes, capture the preflight receipt, and verify the off-NAS backup and restore evidence. |
+| T-30 to T-25 | Announce the maintenance window and pause writes. Confirm the preflight receipt for the verified completed logical dump, its off-NAS copy/hash, and the private-file manifest evidence captured where feasible. |
 | T-25 to T-20 | Export EW and DSM state; confirm old DHCP `.1.14`, MAC `90:09:D0:9F:7C:1F`, current CA-validated health, and the old IP leaf. |
 | T-20 to T-15 | Configure EW Router mode: WAN DHCP, LAN `192.168.50.1/24`, pool `192.168.50.100-192.168.50.199`, `CH-Business`, WPA2/WPA3, and disabled UPnP/port-forward/WAN-admin/guest-LAN access. Do not connect its WAN until reviewed. |
 | T-15 to T-10 | Connect a FiberHome LAN port to EW WAN. Keep the NAS connected only to EW LAN. Confirm an EW client receives a DHCP address in the configured pool. |
@@ -97,12 +108,13 @@ MAC at .50.14 across EW and NAS reboots: `192.168.50.14` must resolve only to
 `90:09:D0:9F:7C:1F`, with no duplicate ARP/DHCP ownership. Re-run CA-validated
 health and all isolation probes after the NAS restart.
 
-The physical acceptance gate remains blocked until the independent backup and
-clean restore, SMART, UPS, restart, load, and device gates pass. Then run one
-Windows laptop and one Android phone for 24 hours before the one-hour
-seven-client soak. The seven-client gate requires no restart or sustained
-swap, p95 reads below 500 ms, p95 writes below one second, no duplicate Nota,
-stock, or omzet postings, and no lost acknowledged transaction across restart.
+The physical acceptance gate remains blocked until the independent encrypted
+backup and clean scratch restore, SMART, UPS, restart, load, and device gates
+pass. Then run one Windows laptop and one Android phone for 24 hours before the
+one-hour seven-client soak. The seven-client gate requires no restart or
+sustained swap, p95 reads below 500 ms, p95 writes below one second, no
+duplicate Nota, stock, or omzet postings, and no lost acknowledged transaction
+across restart.
 
 ## Rollback boundary
 

@@ -21,7 +21,7 @@ Status meanings:
 
 | Requirement | Status | Current evidence |
 | --- | --- | --- |
-| Desktop application and gateway | PASS | `npm run verify`: 59 files / 459 tests |
+| Desktop application and gateway | PASS | `npm run verify`: 60 files / 462 tests |
 | Mobile application | PASS | `npm run test:mobile`: 9 files / 88 tests |
 | CH Core unit and artifact tests | PASS | `npm run server:test`: 44 files / 303 tests plus one intentional workbook skip |
 | Approved workbook parser | PASS | Exact SHA-256 and 3,144 / 2,786 / 358 / 3 / Rp276,267,011 / 4,115 PCS acceptance: 1/1 |
@@ -37,15 +37,15 @@ Status meanings:
 
 | Requirement | Status | Current evidence |
 | --- | --- | --- |
-| Private GitHub pilot workflow | PASS | `.github/workflows/pilot-release.yml` run `30625635440` passed source, Windows, Android, and publication jobs on merged commit `fe479f6be82704c7ac7257ba46de45017a362db0` |
+| Private GitHub pilot workflow | PASS | `.github/workflows/pilot-release.yml` run `30690226319` passed source, Windows, Android, and publication jobs on merged commit `f8cc18d12f247f645f137a5fcb54143587831fdf` |
 | Windows x64 application package | READY | Electron cross-package succeeds and a reproducible Windows x64 ZIP is created |
-| Windows Squirrel installer | PASS | GitHub built and published `CH-Ultimate-0.1.0-Setup.exe`; a fresh authenticated download matched its published SHA-256 and was identified as a Windows PE32 GUI executable |
+| Windows Squirrel installer | PASS | GitHub built and published `CH-Ultimate-0.1.1-Setup.exe`; a fresh authenticated download matched its published SHA-256 and was identified as a Windows PE32 GUI executable |
 | Two Windows laptop installations | BLOCKED | Windows package is not tested on either physical laptop |
 | Android debug/release code checks | PASS | Gradle unit tests and lint pass |
-| Android pilot debug APK | PASS | GitHub built and published `CHU-Companion-Mobile-0.1.0-pilot-debug.apk`; a fresh authenticated download matched its SHA-256 and passed `apksigner` v2 verification with exactly one Android Debug signer |
+| Android pilot debug APK | PASS | GitHub built and published `CHU-Companion-Mobile-0.1.1-pilot-debug.apk`; a fresh authenticated download matched its SHA-256 and passed `apksigner` v2 verification with exactly one Android Debug signer |
 | Android release signing | BLOCKED | Owner deferred creation of the permanent signing identity; release builds continue to fail closed without the four private signing variables |
 | Signed Android APK | BLOCKED | No release key or signed APK exists; development/debug builds are not treated as production releases |
-| Physical Android installation | BLOCKED | Android is not installed on a physical phone; the pilot APK has not yet been built or tested there |
+| Physical Android installation | BLOCKED | The published pilot APK is not installed or tested on a physical phone |
 
 The workflow and Windows ZIP are useful only for target-machine validation;
 they do not satisfy physical installation. Likewise, the debug Android pilot
@@ -53,22 +53,20 @@ does not satisfy permanent release signing.
 
 ### Private pilot release receipt
 
-Private prerelease `pilot-v0.1.0` was published from commit
-`fe479f6be82704c7ac7257ba46de45017a362db0` by successful GitHub Actions run
-`30625635440`:
+Private prerelease `pilot-v0.1.1` was published from commit
+`f8cc18d12f247f645f137a5fcb54143587831fdf` by successful GitHub Actions run
+`30690226319`:
 
-- Release: `https://github.com/KentMaoza/CH-Ultimate/releases/tag/pilot-v0.1.0`
-- Windows installer: `CH-Ultimate-0.1.0-Setup.exe`, 149,194,240 bytes,
-  SHA-256 `fe6c89c5adb2eaa018cd3f5e27494c7847749462eb9414785e720dca982e68ed`
-- Android pilot APK: `CHU-Companion-Mobile-0.1.0-pilot-debug.apk`, 46,568,612
+- Release: `https://github.com/KentMaoza/CH-Ultimate/releases/tag/pilot-v0.1.1`
+- Windows installer: `CH-Ultimate-0.1.1-Setup.exe`, 149,241,344 bytes,
+  SHA-256 `8bc9ec1014295e9f1dbf2f5df87b842675c09a298ace5d2df384e07cd1907cec`
+- Android pilot APK: `CHU-Companion-Mobile-0.1.1-pilot-debug.apk`, 46,610,231
   bytes, SHA-256
-  `7af5ebcc190266e916ff9e01bf25fd2aa735ff023d40232e32800afdeb3ebe41`
+  `4c784f6ab13f35797e400e8cd29ed23008f1ec8aed20634c18dc44188ffd04bd`
 - Android signer certificate SHA-256:
-  `6fadcb41eae42b1d90218fca8a72af3f1e3a50817a241372394fec44995a0b28`
+  `30498d7c313a0ccab1710a3828aa30df87bf96c30114a87fe5f4e05cc27e3103`
 - `SHA256SUMS.txt` was downloaded from the release and verified both files
-  with the standard macOS `shasum -a 256 -c` command. Its line endings were
-  corrected to portable LF, and the workflow was updated to preserve that
-  format for future releases.
+  with the standard macOS `shasum -a 256 -c` command.
 
 The release contains exactly these two installers and the checksum manifest.
 It remains a copied-data pilot: neither installer has passed installation or

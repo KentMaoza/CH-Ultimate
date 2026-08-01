@@ -171,15 +171,15 @@ describe('CH Core guarded deployment documentation', () => {
 
     expect(readme).toContain('CH Core acceptance status');
     for (const requiredEvidence of [
-      '459',
+      '462',
       '303',
       '88',
       'Playwright 8/8',
       'Windows x64 ZIP',
       'Squirrel installer',
       'pilot-release.yml',
-      'CH-Ultimate-0.1.0-Setup.exe',
-      'CHU-Companion-Mobile-0.1.0-pilot-debug.apk',
+      'CH-Ultimate-0.1.1-Setup.exe',
+      'CHU-Companion-Mobile-0.1.1-pilot-debug.apk',
       'Android release signing',
       'chu_test',
       'Docker/Compose',

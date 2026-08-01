@@ -16,7 +16,7 @@ release. Download only the file for the device:
 
 Before installing or pairing, connect the laptop or phone to the
 `CH-Business` Wi-Fi. These clients connect only to CH Core at
-`https://192.168.50.14:8443/v1`; they do not use the Internet, QuickConnect,
+`https://192.168.50.14:8443`; they do not use the Internet, QuickConnect,
 or Tailscale.
 
 ## Windows installation

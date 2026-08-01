@@ -29,6 +29,13 @@ describe('pilot deployment assets', () => {
     expect(new X509Certificate(androidCa).fingerprint256).toBe(caFingerprint);
   });
 
+  it('states the exact public client origin without an API path in the v0.1.2 notes', async () => {
+    const releaseNotes = await readFile('docs/releases/pilot-0.1.2.md', 'utf8');
+
+    expect(releaseNotes).toContain(endpoint);
+    expect(releaseNotes).not.toContain(`${endpoint}/v1`);
+  });
+
   it('keeps the published client version synchronized with the Android and desktop surfaces', async () => {
     const [packageManifest, packageLock, androidBuild, settingsPage, releaseCopy] =
       await Promise.all([

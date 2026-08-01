@@ -6,24 +6,25 @@ import {
 } from '../../src/electron/core-api-main';
 
 const VALID_CONFIG = {
-  endpoint: 'https://192.168.1.14:8443',
+  endpoint: 'https://192.168.50.14:8443',
   caFile: '/private/ch-core-ca.pem',
 };
 
 describe('CH Core endpoint configuration', () => {
-  it('accepts only a fixed HTTPS host in the approved business LAN', () => {
+  it('accepts only the exact fixed HTTPS business LAN origin', () => {
     expect(parseCoreEndpointConfig(VALID_CONFIG)).toEqual(VALID_CONFIG);
 
     for (const endpoint of [
-      'http://192.168.1.14:8443',
+      'http://192.168.50.14:8443',
       'https://core.local:8443',
-      'https://192.168.1.14',
-      'https://user:pass@192.168.1.14:8443',
-      'https://192.168.1.14:8443/v1',
-      'https://192.168.1.14:8443?mode=test',
-      'https://192.168.1.14:8443#core',
-      'https://192.168.1.0:8443',
-      'https://192.168.1.255:8443',
+      'https://192.168.50.14',
+      'https://user:pass@192.168.50.14:8443',
+      'https://192.168.50.14:8443/v1',
+      'https://192.168.50.14:8443?mode=test',
+      'https://192.168.50.14:8443#core',
+      'https://192.168.1.14:8443',
+      'https://192.168.50.13:8443',
+      'https://192.168.50.15:8443',
       'https://192.168.2.14:8443',
       'https://8.8.8.8:8443',
       'https://127.0.0.1:8443',
@@ -120,8 +121,8 @@ describe('CH Core operation allowlist', () => {
   it('rejects origin, traversal, control characters, and unknown routes before networking', async () => {
     const { api, credentials, send } = createHarness();
     const paths = [
-      'https://192.168.1.14:8443/v1/bootstrap',
-      '//192.168.1.14:8443/v1/bootstrap',
+      'https://192.168.50.14:8443/v1/bootstrap',
+      '//192.168.50.14:8443/v1/bootstrap',
       '/v1/../bootstrap',
       '/v1/%2e%2e/bootstrap',
       '/v1/bootstrap\nX-Test: yes',

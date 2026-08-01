@@ -36,7 +36,7 @@ public class CoreApiRedirectPolicyTest {
         extends HttpsURLConnection {
 
         FakeHttpsURLConnection() throws Exception {
-            super(new URL("https://192.168.1.14:8443/v1/bootstrap"));
+            super(new URL("https://192.168.50.14:8443/v1/bootstrap"));
         }
 
         @Override

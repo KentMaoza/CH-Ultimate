@@ -197,4 +197,59 @@ describe('CH Core guarded deployment documentation', () => {
     expect(acceptance).toMatch(/not.+production|bukan.+production/i);
     expect(acceptance).toMatch(/approval.+price/is);
   });
+
+  it('locks the business-LAN cutover, rollback, and acceptance boundaries', async () => {
+    const businessLan = await repositoryText('docs/ch-core-business-lan.md');
+    const deployment = await repositoryText(
+      'docs/ch-core-nas-deployment.md',
+    );
+    const acceptance = await repositoryText(
+      'docs/ch-core-acceptance-status.md',
+    );
+
+    for (const requiredTopology of [
+      '192.168.1.1/24',
+      'WAN DHCP',
+      '192.168.50.1/24',
+      '192.168.50.100-192.168.50.199',
+      '192.168.50.14/24',
+      '90:09:D0:9F:7C:1F',
+      'https://192.168.50.14:8443',
+      'IP:192.168.50.14',
+      '127.0.0.1:18080',
+    ]) {
+      expect(businessLan).toContain(requiredTopology);
+    }
+
+    const allowRule = 'allow tcp 8443 from 192.168.50.0/24';
+    const denyRule = 'deny tcp 8443 from every other source';
+    expect(businessLan.toLowerCase()).toContain(allowRule);
+    expect(businessLan.toLowerCase()).toContain(denyRule);
+    expect(businessLan.toLowerCase().indexOf(allowRule)).toBeLessThan(
+      businessLan.toLowerCase().indexOf(denyRule),
+    );
+
+    for (const requiredBoundary of [
+      'MariaDB TCP stays disabled',
+      'no UPnP',
+      'no port forward',
+      'QuickConnect',
+      'Tailscale',
+      'reboot EW then NAS',
+      'rollback',
+      'seven-client',
+    ]) {
+      expect(businessLan.toLowerCase()).toContain(
+        requiredBoundary.toLowerCase(),
+      );
+    }
+    expect(businessLan).toMatch(/one NAS\s+MAC at \.50\.14/i);
+
+    expect(businessLan).toMatch(/does not.+perform.+cutover/is);
+    expect(deployment).toMatch(/planned business-LAN cutover/is);
+    expect(acceptance).toMatch(/live cutover has not happened/is);
+    expect(acceptance).toMatch(/DHCP `192\.168\.1\.14\/24`/);
+    expect(acceptance).toMatch(/firewall UI.+disabled/is);
+    expect(acceptance).toMatch(/one NAS MAC.+\.50\.14.+EW.+NAS reboots/is);
+  });
 });

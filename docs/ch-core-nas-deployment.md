@@ -8,6 +8,21 @@ Do not import the catalogue, configure client access, or enroll production
 clients until every remaining item in the blocking checklist is completed and
 recorded.
 
+## Current live-readiness boundary (2026-08-01)
+
+The historical evidence below is retained as dated evidence; it is not a
+statement that every older PASS condition is still current. The NAS is still
+on DHCP `192.168.1.14/24`, Ethernet MAC `90:09:D0:9F:7C:1F`, at 1 Gbps full
+duplex. CA-validated `/health/live` is OK, and the DSM certificate list still
+contains the old `IP:192.168.1.14` leaf. The DSM Firewall UI currently appears
+disabled, so the earlier firewall validation must not be presented as current
+or used to authorize clients.
+
+The planned business-LAN cutover is documented in
+`docs/ch-core-business-lan.md`; it has not happened. It changes the target to
+`https://192.168.50.14:8443` only after the documented backup, certificate,
+router, firewall, isolation, and reboot evidence is recorded.
+
 ## Authenticated read-only preflight (2026-07-30)
 
 No setting or package was changed during this preflight.
@@ -95,7 +110,8 @@ so a separate live Tailscale-path denial probe remains outstanding.
   ready health plus raw-port isolation.
 - [x] Generate a private CA off-NAS and a leaf certificate containing the
   required IP SAN `192.168.1.14`.
-- [x] Enable and validate the scoped DSM firewall rules described below.
+- [ ] Re-establish and validate the scoped DSM firewall rules during the
+  business-LAN cutover; the currently visible DSM Firewall UI appears disabled.
 - [x] Configure and validate the DSM reverse proxy described below.
 - [ ] Pass reboot, resource, load, LAN-isolation, and seven-client gates.
 
@@ -274,6 +290,11 @@ runbook. There are no down migrations.
    all evidence, and restore only through the approved clean-restore process.
 
 ## Pilot and acceptance
+
+For the planned business-LAN cutover, follow
+`docs/ch-core-business-lan.md`. It is a separate maintenance-window procedure
+with a network-only rollback boundary; it does not turn this copied-data pilot
+into a production endpoint.
 
 Enroll one Windows laptop and one physical Android phone for a 24-hour
 copied-data pilot. Only then enroll the remaining clients.

@@ -212,8 +212,6 @@ describe('CH Core guarded deployment documentation', () => {
       'WAN DHCP',
       '192.168.50.1/24',
       '192.168.50.100-192.168.50.199',
-      '192.168.50.14/24',
-      '90:09:D0:9F:7C:1F',
       'https://192.168.50.14:8443',
       'IP:192.168.50.14',
       '127.0.0.1:18080',
@@ -233,8 +231,6 @@ describe('CH Core guarded deployment documentation', () => {
       'MariaDB TCP stays disabled',
       'no UPnP',
       'no port forward',
-      'QuickConnect',
-      'Tailscale',
       'reboot EW then NAS',
       'rollback',
       'seven-client',
@@ -243,6 +239,27 @@ describe('CH Core guarded deployment documentation', () => {
         requiredBoundary.toLowerCase(),
       );
     }
+    expect(businessLan).toContain(
+      '| NAS Ethernet | Manual `192.168.50.14/24`, gateway/DNS `192.168.50.1`, MAC `90:09:D0:9F:7C:1F` |',
+    );
+    expect(businessLan).toMatch(
+      /Do not create Internet exposure, QuickConnect, Tailscale,\s+public-DNS, or Tailscale Serve\/Funnel exposure for CH Core\./,
+    );
+    expect(businessLan).toMatch(
+      /From FiberHome\/IndiHome, guest Wi-Fi, mobile data, WAN, QuickConnect, and\s+Tailscale, TCP 8443 is unreachable\./,
+    );
+    expect(businessLan).toMatch(
+      /They must retain\s+the existing public CA and fail closed for the old IP, a wrong-IP leaf, an\s+untrusted leaf, redirects, paths, and other origins\./,
+    );
+    expect(businessLan).toContain(
+      'Rollback applies only to this network/certificate/firewall cutover.',
+    );
+    expect(businessLan).toMatch(
+      /Do not change the CH Core image, database schema, database data, CA signing\s+key, or client trust bundle as a network rollback shortcut\./,
+    );
+    expect(businessLan).toContain(
+      'This runbook does not make CH Core a production endpoint.',
+    );
     expect(businessLan).toMatch(/one NAS\s+MAC at \.50\.14/i);
 
     expect(businessLan).toMatch(/does not.+perform.+cutover/is);

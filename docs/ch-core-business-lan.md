@@ -6,6 +6,7 @@ This is a planned 30-minute cutover procedure, not a completion receipt. It
 does not perform the cutover. The live cutover has not happened. Stop before
 changing cabling, router, DSM, certificate, or firewall configuration unless
 the preflight receipt and maintenance-window approval are present.
+This runbook does not make CH Core a production endpoint.
 
 The only public client origin after a successful cutover is
 `https://192.168.50.14:8443`. CH Core remains LAN-only. The internal API stays
@@ -25,8 +26,8 @@ at `127.0.0.1:18080`, and MariaDB TCP stays disabled.
 
 Set EW to Router mode with a `CH-Business` SSID, WPA2/WPA3, no guest-LAN
 access, no CH-LAN IPv6 during the pilot, no UPnP, no port forward, and no WAN
-administration. Do not create Internet, QuickConnect, Tailscale, public-DNS,
-or Tailscale Serve/Funnel exposure for CH Core.
+administration. Do not create Internet exposure, QuickConnect, Tailscale,
+public-DNS, or Tailscale Serve/Funnel exposure for CH Core.
 
 ## Preflight evidence and staging
 

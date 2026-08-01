@@ -130,14 +130,18 @@ remaining items below are still open unless explicitly marked `PASS`:
 
 - Business Wi-Fi works with Internet disconnected.
 - Guest Wi-Fi, mobile data, WAN, QuickConnect, and Tailscale cannot reach
-  CH Core 8443. The firewall rule is configured to deny every non-business-LAN
-  source, but these separate paths have not all been probed; the administrator
-  Mac's Tailscale client was stopped during verification.
+  CH Core 8443. Historical old-endpoint evidence recorded a firewall rule for
+  `192.168.1.14:8443`, but the current firewall UI appears disabled and that
+  record is not proof for the target. The `.50.14` firewall enablement,
+  allow-then-deny order, and all isolation probes remain open; the
+  administrator Mac's Tailscale client was stopped during the historical probe.
 - `PASS`: raw 18080 is unreachable from the Mac and MariaDB has no TCP
   listener.
-- `PASS`: the correct private CA, IP SAN, and live fingerprint work; a client
-  without the private CA failed closed. Dedicated wrong-IP and
-  expired-certificate client tests remain open.
+- Historical old-endpoint evidence only: the correct private CA and
+  `IP:192.168.1.14` leaf/fingerprint worked, while a client without that CA
+  failed closed. This is not a PASS for the target. The `IP:192.168.50.14`
+  leaf must still be staged, assigned, and CA-validated; wrong-IP and
+  expired-certificate client checks remain open.
 - Foreground changes propagate within three seconds.
 - Replay never duplicates Nota, stock, or omzet.
 - Concurrent stock deltas survive and Nota merge/conflict rules hold.

@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 const workflowPath = '.github/workflows/pilot-release.yml';
-const pilotVersion = '0.1.1';
+const pilotVersion = '0.1.2';
 
 describe('GitHub pilot release workflow', () => {
   it('gates both platform builds and manual prerelease publication', async () => {

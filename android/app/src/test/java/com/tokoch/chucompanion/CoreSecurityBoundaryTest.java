@@ -15,20 +15,23 @@ public class CoreSecurityBoundaryTest {
 
     @Test
     public void endpointPolicyAcceptsOnlyFixedHttpsBusinessLanOrigin() {
-        URI endpoint = CoreEndpointPolicy.requireApproved("https://192.168.1.14:8443");
+        URI endpoint = CoreEndpointPolicy.requireApproved("https://192.168.50.14:8443");
 
         assertEquals("https", endpoint.getScheme());
-        assertEquals("192.168.1.14", endpoint.getHost());
+        assertEquals("192.168.50.14", endpoint.getHost());
         assertEquals(8443, endpoint.getPort());
 
         for (String rejected : new String[] {
-            "http://192.168.1.14:8443",
-            "https://192.168.1.14",
+            "http://192.168.50.14:8443",
+            "https://192.168.50.14",
             "https://core.local:8443",
+            "https://192.168.1.14:8443",
+            "https://192.168.50.13:8443",
+            "https://192.168.50.15:8443",
             "https://192.168.2.14:8443",
             "https://127.0.0.1:8443",
-            "https://192.168.1.14:8443/v1",
-            "https://user:pass@192.168.1.14:8443"
+            "https://192.168.50.14:8443/v1",
+            "https://user:pass@192.168.50.14:8443"
         }) {
             assertThrows(
                 CoreSecurityException.class,
@@ -66,8 +69,8 @@ public class CoreSecurityBoundaryTest {
         );
 
         for (String path : new String[] {
-            "https://192.168.1.14:8443/v1/bootstrap",
-            "//192.168.1.14:8443/v1/bootstrap",
+            "https://192.168.50.14:8443/v1/bootstrap",
+            "//192.168.50.14:8443/v1/bootstrap",
             "/v1/../bootstrap",
             "/v1/%2e%2e/bootstrap",
             "/v1/not-a-route",

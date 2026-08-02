@@ -66,7 +66,7 @@ describe('Android CH Core adapter', () => {
       credential: 'paired',
       deviceId: '11111111-1111-4111-8111-111111111111',
       deviceToken: 'native-secret',
-      endpoint: 'https://192.168.1.14:8443',
+      endpoint: 'https://192.168.50.14:8443',
     } as never);
 
     const result = await createNativeCoreApiBridge(plugin).credentialStatus();
@@ -78,7 +78,7 @@ describe('Android CH Core adapter', () => {
       deviceId: '11111111-1111-4111-8111-111111111111',
     });
     expect(JSON.stringify(result)).not.toContain('native-secret');
-    expect(JSON.stringify(result)).not.toContain('192.168.1.14');
+    expect(JSON.stringify(result)).not.toContain('192.168.50.14');
   });
 
   it('surfaces only the stable native installation UUID', async () => {

@@ -197,4 +197,108 @@ describe('CH Core guarded deployment documentation', () => {
     expect(acceptance).toMatch(/not.+production|bukan.+production/i);
     expect(acceptance).toMatch(/approval.+price/is);
   });
+
+  it('locks the business-LAN cutover, rollback, and acceptance boundaries', async () => {
+    const businessLan = await repositoryText('docs/ch-core-business-lan.md');
+    const deployment = await repositoryText(
+      'docs/ch-core-nas-deployment.md',
+    );
+    const acceptance = await repositoryText(
+      'docs/ch-core-acceptance-status.md',
+    );
+
+    for (const requiredTopology of [
+      '192.168.1.1/24',
+      'WAN DHCP',
+      '192.168.50.1/24',
+      '192.168.50.100-192.168.50.199',
+      'https://192.168.50.14:8443',
+      'IP:192.168.50.14',
+      '127.0.0.1:18080',
+    ]) {
+      expect(businessLan).toContain(requiredTopology);
+    }
+
+    const allowRule = 'allow tcp 8443 from 192.168.50.0/24';
+    const denyRule = 'deny tcp 8443 from every other source';
+    expect(businessLan.toLowerCase()).toContain(allowRule);
+    expect(businessLan.toLowerCase()).toContain(denyRule);
+    expect(businessLan.toLowerCase().indexOf(allowRule)).toBeLessThan(
+      businessLan.toLowerCase().indexOf(denyRule),
+    );
+
+    for (const requiredBoundary of [
+      'MariaDB TCP stays disabled',
+      'no UPnP',
+      'no port forward',
+      'reboot EW then NAS',
+      'rollback',
+      'seven-client',
+    ]) {
+      expect(businessLan.toLowerCase()).toContain(
+        requiredBoundary.toLowerCase(),
+      );
+    }
+    expect(businessLan).toContain(
+      '| NAS Ethernet | Manual `192.168.50.14/24`, gateway/DNS `192.168.50.1`, MAC `90:09:D0:9F:7C:1F` |',
+    );
+    expect(businessLan).toMatch(
+      /Do not create Internet exposure, QuickConnect, Tailscale,\s+public-DNS, or Tailscale Serve\/Funnel exposure for CH Core\./,
+    );
+    expect(businessLan).toMatch(
+      /From FiberHome\/IndiHome, guest Wi-Fi, mobile data, WAN, QuickConnect, and\s+Tailscale, TCP 8443 is unreachable\./,
+    );
+    expect(businessLan).toMatch(
+      /They must retain\s+the existing public CA and fail closed for the old IP, a wrong-IP leaf, an\s+untrusted leaf, redirects, paths, and other origins\./,
+    );
+    expect(businessLan).toContain(
+      'Rollback applies only to this network/certificate/firewall cutover.',
+    );
+    expect(businessLan).toMatch(
+      /Do not change the CH Core image, database schema, database data, CA signing\s+key, or client trust bundle as a network rollback shortcut\./,
+    );
+    expect(businessLan).toContain(
+      'This runbook does not make CH Core a production endpoint.',
+    );
+    expect(businessLan).toMatch(
+      /Create a new completed logical dump bundle.+verify its checksum and integrity/is,
+    );
+    expect(businessLan).toMatch(
+      /Copy the completed bundle off the NAS to the protected administrator Mac\s+and record its SHA-256 hash\./,
+    );
+    expect(businessLan).toMatch(
+      /Where feasible, capture the private-file manifest and evidence,\s+copy them\s+off the NAS.+record their hashes/is,
+    );
+    expect(businessLan).toMatch(
+      /Independent encrypted backup and clean scratch restore remain BLOCKED as\s+separate production-readiness gates; they are not prerequisites for this\s+network-only cutover\./,
+    );
+    expect(businessLan).toMatch(
+      /Passing this cutover must not be called\s+production-ready\./,
+    );
+    expect(businessLan).not.toMatch(
+      /complete the\s+clean scratch restore described in/,
+    );
+    expect(businessLan).toMatch(/one NAS\s+MAC at \.50\.14/i);
+
+    expect(businessLan).toMatch(/document itself does not perform.+cutover/is);
+    expect(businessLan).toMatch(/partial live receipt.+2026-08-02/is);
+    expect(deployment).toMatch(/business-LAN partial live receipt/is);
+    expect(acceptance).toMatch(/current live-readiness evidence on 2026-08-02/i);
+    expect(acceptance).toContain('Mac is `192.168.50.174`');
+    expect(acceptance).toMatch(/NAS\s+resolves to `192\.168\.50\.14`/);
+    expect(acceptance).toContain(
+      '22:08:62:71:10:7F:61:65:E6:34:B3:70:12:20:C3:16:BC:E1:B8:87:5A:20:E8:AA:21:26:59:DB:04:90:E5:88',
+    );
+    expect(acceptance).toMatch(/`IP:192\.168\.50\.14`.+2027-09-02/is);
+    expect(acceptance).toMatch(/raw 18080.+MariaDB 3306.+unreachable/is);
+    expect(acceptance).not.toMatch(/live cutover has not happened/is);
+    expect(acceptance).toMatch(/firewall.+isolation.+remain open/is);
+    expect(acceptance).toMatch(/one NAS MAC.+\.50\.14.+EW.+NAS reboots/is);
+    expect(acceptance).toMatch(
+      /\| Independent encrypted backup \| BLOCKED \|[^\n]*separate production gate/i,
+    );
+    expect(acceptance).toMatch(
+      /\| Backup integrity and clean restore \| BLOCKED \|[^\n]*separate production gate/i,
+    );
+  });
 });

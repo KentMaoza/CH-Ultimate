@@ -33,13 +33,7 @@ const INVALID_REQUEST = 'Permintaan CH Core tidak valid.';
 const UUID =
   '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}';
 const SHA256 = '[0-9a-f]{64}';
-
-function isApprovedLanHost(hostname: string): boolean {
-  const match = /^192\.168\.1\.(\d{1,3})$/.exec(hostname);
-  if (!match) return false;
-  const host = Number(match[1]);
-  return host >= 1 && host <= 254;
-}
+const APPROVED_ENDPOINT = 'https://192.168.50.14:8443';
 
 const operationRules: ReadonlyArray<{
   methods: ReadonlyArray<CoreApiRequest['method']>;
@@ -121,17 +115,17 @@ export function parseCoreEndpointConfig(input: unknown): CoreEndpointConfig {
   }
   try {
     const url = new URL(endpoint);
-    const hostname = url.hostname.replace(/^\[|\]$/g, '');
     if (
       url.protocol !== 'https:' ||
-      !isApprovedLanHost(hostname) ||
+      url.hostname !== '192.168.50.14' ||
       url.port !== '8443' ||
       url.username !== '' ||
       url.password !== '' ||
       url.pathname !== '/' ||
       url.search !== '' ||
       url.hash !== '' ||
-      url.origin !== endpoint
+      url.origin !== endpoint ||
+      endpoint !== APPROVED_ENDPOINT
     ) {
       throw new Error(INVALID_CONFIG);
     }

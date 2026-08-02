@@ -29,7 +29,7 @@ const recoveryCredential = Buffer.alloc(32, 2).toString('base64url');
 describe('CH Core desktop service configuration', () => {
   it('fails closed when the config or private CA exceeds its bounded read limit', async () => {
     const validConfig = JSON.stringify({
-      endpoint: 'https://192.168.1.14:8443',
+      endpoint: 'https://192.168.50.14:8443',
       caFile,
     });
     const oversizedConfig = Buffer.from(
@@ -98,7 +98,7 @@ describe('CH Core desktop service configuration', () => {
       if (filePath === configPath) {
         return Buffer.from(
           JSON.stringify({
-            endpoint: 'https://192.168.1.14:8443',
+            endpoint: 'https://192.168.50.14:8443',
             caFile,
           }),
         );
@@ -131,7 +131,7 @@ describe('CH Core desktop service configuration', () => {
       filePath === configPath
         ? Buffer.from(
             JSON.stringify({
-              endpoint: 'https://192.168.1.14:8443',
+              endpoint: 'https://192.168.50.14:8443',
               caFile,
             }),
           )

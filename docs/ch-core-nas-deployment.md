@@ -8,6 +8,22 @@ Do not import the catalogue, configure client access, or enroll production
 clients until every remaining item in the blocking checklist is completed and
 recorded.
 
+## Current live-readiness boundary (2026-08-02)
+
+The historical evidence below is retained as dated evidence; it is not a
+statement that every older PASS condition is still current. A business-LAN
+partial live receipt now records the Mac at `192.168.50.174`, the NAS at
+`192.168.50.14` with Ethernet MAC `90:09:D0:9F:7C:1F`, and CA-validated live
+and ready health at `https://192.168.50.14:8443`.
+
+The served leaf has SAN `IP:192.168.50.14`, SHA-256 fingerprint
+`22:08:62:71:10:7F:61:65:E6:34:B3:70:12:20:C3:16:BC:E1:B8:87:5A:20:E8:AA:21:26:59:DB:04:90:E5:88`,
+and expires 2027-09-02. Raw API port 18080 and MariaDB port 3306 were
+unreachable from the Mac. The firewall rule order, external isolation paths,
+EW/NAS reboot persistence, backup/restore, and physical-client gates remain
+open. See `docs/ch-core-business-lan.md`; this partial receipt is not a
+production-readiness claim.
+
 ## Authenticated read-only preflight (2026-07-30)
 
 No setting or package was changed during this preflight.
@@ -82,8 +98,8 @@ so a separate live Tailscale-path denial probe remains outstanding.
 
 ## Blocking checklist
 
-- [ ] Create the router reservation `90:09:D0:9F:7C:1F -> 192.168.1.14`
-  without changing WAN forwarding, UPnP, or the subnet.
+- [ ] Prove manual `192.168.50.14` ownership by
+  `90:09:D0:9F:7C:1F` across EW and NAS reboots.
 - [ ] Run explicit extended SMART tests on both disks and retain results.
 - [ ] Configure an independent encrypted backup, run its integrity check, and
   complete a clean scratch restore drill.
@@ -93,9 +109,10 @@ so a separate live Tailscale-path denial probe remains outstanding.
   least-privilege connection with TCP disabled.
 - [x] Build and start the copied-data CH Core runtime; verify loopback live and
   ready health plus raw-port isolation.
-- [x] Generate a private CA off-NAS and a leaf certificate containing the
-  required IP SAN `192.168.1.14`.
-- [x] Enable and validate the scoped DSM firewall rules described below.
+- [x] Retain the private CA off-NAS and validate the current leaf containing
+  required IP SAN `192.168.50.14`.
+- [ ] Re-establish and validate the scoped DSM firewall rules during the
+  business-LAN cutover; the currently visible DSM Firewall UI appears disabled.
 - [x] Configure and validate the DSM reverse proxy described below.
 - [ ] Pass reboot, resource, load, LAN-isolation, and seven-client gates.
 
@@ -107,7 +124,7 @@ until the backup/restore runbook passes.
 ```text
 Windows / Android
         |
-business LAN HTTPS 192.168.1.14:8443
+business LAN HTTPS 192.168.50.14:8443
         |
 DSM reverse proxy
         |
@@ -274,6 +291,11 @@ runbook. There are no down migrations.
    all evidence, and restore only through the approved clean-restore process.
 
 ## Pilot and acceptance
+
+For the business-LAN partial live receipt and remaining cutover gates, follow
+`docs/ch-core-business-lan.md`. It retains the maintenance-window procedure
+and network-only rollback boundary; it does not turn this copied-data pilot
+into a production endpoint.
 
 Enroll one Windows laptop and one physical Android phone for a 24-hour
 copied-data pilot. Only then enroll the remaining clients.

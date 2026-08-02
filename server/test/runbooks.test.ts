@@ -280,11 +280,19 @@ describe('CH Core guarded deployment documentation', () => {
     );
     expect(businessLan).toMatch(/one NAS\s+MAC at \.50\.14/i);
 
-    expect(businessLan).toMatch(/does not.+perform.+cutover/is);
-    expect(deployment).toMatch(/planned business-LAN cutover/is);
-    expect(acceptance).toMatch(/live cutover has not happened/is);
-    expect(acceptance).toMatch(/DHCP `192\.168\.1\.14\/24`/);
-    expect(acceptance).toMatch(/firewall UI.+disabled/is);
+    expect(businessLan).toMatch(/document itself does not perform.+cutover/is);
+    expect(businessLan).toMatch(/partial live receipt.+2026-08-02/is);
+    expect(deployment).toMatch(/business-LAN partial live receipt/is);
+    expect(acceptance).toMatch(/current live-readiness evidence on 2026-08-02/i);
+    expect(acceptance).toContain('Mac is `192.168.50.174`');
+    expect(acceptance).toMatch(/NAS\s+resolves to `192\.168\.50\.14`/);
+    expect(acceptance).toContain(
+      '22:08:62:71:10:7F:61:65:E6:34:B3:70:12:20:C3:16:BC:E1:B8:87:5A:20:E8:AA:21:26:59:DB:04:90:E5:88',
+    );
+    expect(acceptance).toMatch(/`IP:192\.168\.50\.14`.+2027-09-02/is);
+    expect(acceptance).toMatch(/raw 18080.+MariaDB 3306.+unreachable/is);
+    expect(acceptance).not.toMatch(/live cutover has not happened/is);
+    expect(acceptance).toMatch(/firewall.+isolation.+remain open/is);
     expect(acceptance).toMatch(/one NAS MAC.+\.50\.14.+EW.+NAS reboots/is);
     expect(acceptance).toMatch(
       /\| Independent encrypted backup \| BLOCKED \|[^\n]*separate production gate/i,

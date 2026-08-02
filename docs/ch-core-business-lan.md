@@ -2,15 +2,35 @@
 
 ## Scope and stop condition
 
-This is a planned 30-minute cutover procedure, not a completion receipt. It
-does not perform the cutover. The live cutover has not happened. Stop before
-changing cabling, router, DSM, certificate, or firewall configuration unless
-the preflight receipt and maintenance-window approval are present.
+This document itself does not perform the cutover. It preserves the planned
+30-minute procedure and rollback boundary. The address, certificate, and
+service portions now have the partial live receipt below; do not rerun or
+change cabling, router, DSM, certificate, or firewall configuration from this
+document without a new preflight receipt and maintenance-window approval.
 This runbook does not make CH Core a production endpoint.
 
 The only public client origin after a successful cutover is
 `https://192.168.50.14:8443`. CH Core remains LAN-only. The internal API stays
 at `127.0.0.1:18080`, and MariaDB TCP stays disabled.
+
+## Partial live receipt — 2026-08-02
+
+From the administrator Mac on the CH LAN, fresh read-only checks recorded:
+
+- Mac `192.168.50.174`, gateway `192.168.50.1`, and NAS
+  `192.168.50.14` at Ethernet MAC `90:09:D0:9F:7C:1F`;
+- CA-validated `/health/live` returned `{"status":"ok"}` and
+  `/health/ready` returned `{"status":"ready"}`;
+- the served leaf has SAN `IP:192.168.50.14`, SHA-256 fingerprint
+  `22:08:62:71:10:7F:61:65:E6:34:B3:70:12:20:C3:16:BC:E1:B8:87:5A:20:E8:AA:21:26:59:DB:04:90:E5:88`,
+  and expires 2027-09-02; and
+- raw API port 18080 and MariaDB port 3306 were unreachable from the Mac.
+
+This receipt proves only the current CH-LAN path. EW/NAS reboot persistence,
+the DSM firewall rule order, FiberHome/guest/mobile/WAN/QuickConnect/Tailscale
+isolation, physical-client pairing, backup/restore, SMART, UPS, and soak gates
+remain open. It authorizes building a copied-data v0.1.2 pilot client; it does
+not authorize a production-readiness claim.
 
 ## Target topology
 
@@ -29,13 +49,13 @@ access, no CH-LAN IPv6 during the pilot, no UPnP, no port forward, and no WAN
 administration. Do not create Internet exposure, QuickConnect, Tailscale,
 public-DNS, or Tailscale Serve/Funnel exposure for CH Core.
 
-## Preflight evidence and staging
+## Historical preflight evidence and staging
 
 Complete and retain a timestamped receipt before the maintenance window:
 
-1. Record NAS Ethernet state: DHCP `192.168.1.14/24`, MAC
-   `90:09:D0:9F:7C:1F`, and 1 Gbps full duplex. This is current pre-cutover
-   evidence, not proof of the target address.
+1. Record the former NAS Ethernet state: DHCP `192.168.1.14/24`, MAC
+   `90:09:D0:9F:7C:1F`, and 1 Gbps full duplex. This is historical pre-cutover
+   evidence, not proof of the current target address.
 2. From the administrator Mac, CA-validate `https://192.168.1.14:8443/health/live`
    and record the returned `{"status":"ok"}` plus the current leaf
    fingerprint/expiry. Confirm the DSM certificate list still contains the old

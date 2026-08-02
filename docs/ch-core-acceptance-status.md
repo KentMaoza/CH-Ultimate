@@ -24,9 +24,9 @@ evidence. The business-LAN partial live receipt does not amend those receipts.
 
 | Requirement | Status | Current evidence |
 | --- | --- | --- |
-| Desktop application and gateway | PASS | `npm run verify`: 60 files / 462 tests |
+| Desktop application and gateway | PASS | `npm run verify`: 60 files / 465 tests |
 | Mobile application | PASS | `npm run test:mobile`: 9 files / 88 tests |
-| CH Core unit and artifact tests | PASS | `npm run server:test`: 44 files / 303 tests plus one intentional workbook skip |
+| CH Core unit and artifact tests | PASS | `npm run server:test`: 44 files / 304 tests plus one intentional workbook skip |
 | Approved workbook parser | PASS | Exact SHA-256 and 3,144 / 2,786 / 358 / 3 / Rp276,267,011 / 4,115 PCS acceptance: 1/1 |
 | Desktop mock isolation | PASS | Packaged startup fails closed; explicit unpackaged test marker only; Playwright 8/8 |
 | Mobile production bundle | PASS | 589-module Vite build and Capacitor Android sync |
@@ -40,12 +40,12 @@ evidence. The business-LAN partial live receipt does not amend those receipts.
 
 | Requirement | Status | Current evidence |
 | --- | --- | --- |
-| Private GitHub pilot workflow | PASS | `.github/workflows/pilot-release.yml` run `30690226319` passed source, Windows, Android, and publication jobs on merged commit `f8cc18d12f247f645f137a5fcb54143587831fdf` |
+| Private GitHub pilot workflow | PASS | `.github/workflows/pilot-release.yml` run `30749115155` passed source, Windows, Android, and publication jobs on merged commit `69f308c6971496d1e38a172c0f7d98a699cc894a` |
 | Windows x64 application package | READY | Electron cross-package succeeds and a reproducible Windows x64 ZIP is created |
-| Windows Squirrel installer | PASS | GitHub built and published `CH-Ultimate-0.1.1-Setup.exe`; a fresh authenticated download matched its published SHA-256 and was identified as a Windows PE32 GUI executable |
+| Windows Squirrel installer | PASS | GitHub built and published `CH-Ultimate-0.1.2-Setup.exe`; a fresh authenticated download matched its published SHA-256 and was identified as a Windows PE32 GUI executable |
 | Two Windows laptop installations | BLOCKED | Windows package is not tested on either physical laptop |
 | Android debug/release code checks | PASS | Gradle unit tests and lint pass |
-| Android pilot debug APK | PASS | GitHub built and published `CHU-Companion-Mobile-0.1.1-pilot-debug.apk`; a fresh authenticated download matched its SHA-256 and passed `apksigner` v2 verification with exactly one Android Debug signer |
+| Android pilot debug APK | PASS | GitHub built and published `CHU-Companion-Mobile-0.1.2-pilot-debug.apk`; a fresh authenticated download matched its SHA-256, embeds `https://192.168.50.14:8443`, and passed `apksigner` v2 verification with exactly one Android Debug signer |
 | Android release signing | BLOCKED | Owner deferred creation of the permanent signing identity; release builds continue to fail closed without the four private signing variables |
 | Signed Android APK | BLOCKED | No release key or signed APK exists; development/debug builds are not treated as production releases |
 | Physical Android installation | BLOCKED | The published pilot APK is not installed or tested on a physical phone |
@@ -54,7 +54,32 @@ The workflow and Windows ZIP are useful only for target-machine validation;
 they do not satisfy physical installation. Likewise, the debug Android pilot
 does not satisfy permanent release signing.
 
-### Private pilot release receipt
+### Private pilot release receipt v0.1.2
+
+Private prerelease `pilot-v0.1.2` was published from merge commit
+`69f308c6971496d1e38a172c0f7d98a699cc894a` by successful GitHub Actions run
+`30749115155`:
+
+- Release: `https://github.com/KentMaoza/CH-Ultimate/releases/tag/pilot-v0.1.2`
+- Windows installer: `CH-Ultimate-0.1.2-Setup.exe`, 149,240,832 bytes,
+  SHA-256 `e86517fd0a32313270ea64cd4595c298274e2d6d822243061aa38367698fbf0a`
+- Android pilot APK: `CHU-Companion-Mobile-0.1.2-pilot-debug.apk`, 46,610,239
+  bytes, SHA-256
+  `4d384782ab9d92fa4b1b251cb5f0fac315aa323538522da8bcc32086c6b365f2`
+- Android signer certificate SHA-256:
+  `e3e57a4770bb374e6b12e5e6d1ff31e27bfef31e2bef30a7def382247f40dce5`
+- Checksum manifest: `SHA256SUMS.txt`, SHA-256
+  `f46a28e8f6f163df7d2ac62ab21668e16840be8cbd7c17e85d6284ba534eb2ef`
+- Fresh authenticated downloads passed `shasum -a 256 -c`; the APK passed
+  independent package/version, signer, and embedded endpoint inspection for
+  `com.tokoch.chucompanion`, version `0.1.2` (`3`), and
+  `https://192.168.50.14:8443`.
+
+The release contains exactly these two installers and the checksum manifest.
+It remains a copied-data pilot: neither installer has passed installation or
+runtime acceptance on a physical Windows laptop or Android phone.
+
+### Historical private pilot release receipt v0.1.1
 
 Private prerelease `pilot-v0.1.1` was published from commit
 `f8cc18d12f247f645f137a5fcb54143587831fdf` by successful GitHub Actions run

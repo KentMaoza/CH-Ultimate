@@ -1,9 +1,9 @@
 # CH Core acceptance status
 
 Updated 2026-08-03 WITA. This is an evidence ledger, not a production
-deployment receipt. A copied-data CH Core runtime is deployed on the NAS, but
-CH Core is not deployed as a production endpoint. The catalogue workbook has
-not been imported and no client is enrolled.
+deployment receipt. A v0.1.3-compatible copied-data CH Core runtime is
+deployed on the NAS, but CH Core is not deployed as a production endpoint.
+The catalogue workbook has not been imported and no client is enrolled.
 
 Status meanings:
 
@@ -34,36 +34,35 @@ evidence. The business-LAN partial live receipt does not amend those receipts.
 | Electron package | PASS | Reproducible darwin-arm64 package succeeds |
 | Source hygiene | PASS | `git diff --check`, shell syntax, and tracked-secret/private-artifact scans pass |
 | Exact MariaDB integration | BLOCKED | The NAS runtime connects through `/run/mysqld/mysqld10.sock`, migrations completed, and `/health/ready` returns `{"status":"ready"}`; the isolated `/chu_test` integration suite and transaction/restart acceptance remain outstanding |
-| Docker/Compose and ARM64 image | PASS | Container Manager built the ARM64 image on the DS223j and started one container from project `ch-ultimate-core-d5bb4b6`; the runtime remained up during the post-start checks |
+| Docker/Compose and ARM64 image | PASS | Container Manager built the merged ARM64 image on the DS223j and started one healthy container from project `ch-ultimate-core-4482af7`; the prior `ch-ultimate-core-d5bb4b6` project is stopped and retained for rollback |
 
 ## Client release artifacts
 
-### Owner-pairing release candidate v0.1.3
+### Owner-pairing release v0.1.3
 
-The source now contains the owner-only pairing-status API, secure Electron
-owner transport, and Windows Settings controls for generating, inspecting, and
-explicitly approving one-use pairing requests. The v0.1.3 release contract and
-operator guide are prepared. This is implementation evidence only:
+The merged source and private pilot release contain the owner-only
+pairing-status API, secure Electron owner transport, and Windows Settings
+controls for generating, inspecting, and explicitly approving one-use pairing
+requests. Physical-device acceptance remains separate:
 
 | Requirement | Status | Current evidence or missing action |
 | --- | --- | --- |
 | Owner-pairing implementation | READY | Full local desktop, mobile, server, package, Electron E2E, Android JVM, Android lint, and debug-APK gates pass; physical devices have not accepted it |
-| Compatible NAS Core upgrade | BLOCKED | The copied-data NAS runtime still needs the reviewed v0.1.3-compatible server image before new clients are published |
-| v0.1.3 GitHub artifacts | PREPARED | Exact workflow names are `CH-Ultimate-0.1.3-Setup.exe` and `CHU-Companion-Mobile-0.1.3-pilot-debug.apk`; the local APK is version `0.1.3` (`4`) with one v2 debug signer, but no GitHub release receipt exists yet |
+| Compatible NAS Core upgrade | PASS | NAS project `ch-ultimate-core-4482af7` runs the server from merged commit `4482af7ce1a4f20acfed49f31f037348c5586d8f`; the container is healthy and CA-validated live/ready checks pass |
+| v0.1.3 GitHub artifacts | PASS | Private prerelease `pilot-v0.1.3` was published by successful workflow run `30790902144` from merged commit `4482af7ce1a4f20acfed49f31f037348c5586d8f`; fresh downloads and independent verification are recorded below |
 | Physical owner/client pairing | BLOCKED | No physical Windows owner bootstrap, device-name/platform confirmation, explicit approval, client completion, or synchronized edit has been recorded |
 
-Do not describe the server upgrade, v0.1.3 publication, physical pairing,
-synchronization, or production acceptance as complete until their independent
-evidence is added here.
+Do not describe physical pairing, synchronization, or production acceptance
+as complete until their independent evidence is added here.
 
 | Requirement | Status | Current evidence |
 | --- | --- | --- |
-| Private GitHub pilot workflow | PASS | `.github/workflows/pilot-release.yml` run `30749115155` passed source, Windows, Android, and publication jobs on merged commit `69f308c6971496d1e38a172c0f7d98a699cc894a` |
+| Private GitHub pilot workflow | PASS | `.github/workflows/pilot-release.yml` run `30790902144` passed source, Windows, Android, and publication jobs on merged commit `4482af7ce1a4f20acfed49f31f037348c5586d8f` |
 | Windows x64 application package | READY | Electron cross-package succeeds and a reproducible Windows x64 ZIP is created |
-| Windows Squirrel installer | PASS | GitHub built and published `CH-Ultimate-0.1.2-Setup.exe`; a fresh authenticated download matched its published SHA-256 and was identified as a Windows PE32 GUI executable |
+| Windows Squirrel installer | PASS | GitHub built and published `CH-Ultimate-0.1.3-Setup.exe`; a fresh authenticated download matched its published SHA-256 and was identified as a Windows PE32 GUI executable |
 | Two Windows laptop installations | BLOCKED | Windows package is not tested on either physical laptop |
 | Android debug/release code checks | PASS | Gradle unit tests and lint pass |
-| Android pilot debug APK | PASS | GitHub built and published `CHU-Companion-Mobile-0.1.2-pilot-debug.apk`; a fresh authenticated download matched its SHA-256, embeds `https://192.168.50.14:8443`, and passed `apksigner` v2 verification with exactly one Android Debug signer |
+| Android pilot debug APK | PASS | GitHub built and published `CHU-Companion-Mobile-0.1.3-pilot-debug.apk`; a fresh authenticated download matched its SHA-256, embeds `https://192.168.50.14:8443`, and passed `apksigner` v2 verification with exactly one Android Debug signer |
 | Android release signing | BLOCKED | Owner deferred creation of the permanent signing identity; release builds continue to fail closed without the four private signing variables |
 | Signed Android APK | BLOCKED | No release key or signed APK exists; development/debug builds are not treated as production releases |
 | Physical Android installation | BLOCKED | The published pilot APK is not installed or tested on a physical phone |
@@ -71,6 +70,40 @@ evidence is added here.
 The workflow and Windows ZIP are useful only for target-machine validation;
 they do not satisfy physical installation. Likewise, the debug Android pilot
 does not satisfy permanent release signing.
+
+### Private pilot release receipt v0.1.3
+
+Private prerelease `pilot-v0.1.3` was published from merge commit
+`4482af7ce1a4f20acfed49f31f037348c5586d8f` by successful GitHub Actions run
+`30790902144`:
+
+- Release: `https://github.com/KentMaoza/CH-Ultimate/releases/tag/pilot-v0.1.3`
+- Windows installer: `CH-Ultimate-0.1.3-Setup.exe`, 149,243,392 bytes,
+  SHA-256 `4d76dad8707373f61dffdb8bb3619a7d733144666c25342fad32ea7e639abf15`
+- Android pilot APK: `CHU-Companion-Mobile-0.1.3-pilot-debug.apk`, 46,610,239
+  bytes, SHA-256
+  `6d3e42b90ebd7717050e25115a9a215de392007e7d1c858d09c562092c775f80`
+- Android signer certificate SHA-256:
+  `6b0a86ff0d56ba045b12d391f02ab3c4869c7f78d4d0afcc5fb81435250bdbcb`
+- Checksum manifest: `SHA256SUMS.txt`, 203 bytes, SHA-256
+  `36010781272ecde309994e26e1fb8189b0ffa25f9daf3e21a9ad93aea274a59b`
+- The lightweight tag resolves directly to the same merge commit.
+
+Fresh authenticated downloads contained exactly those three files.
+`shasum -a 256 -c` passed both payloads, and the Windows installer was
+identified as a PE32 GUI executable. Independent APK inspection confirmed
+`com.tokoch.chucompanion`, version `0.1.3` (`4`), the exact endpoint
+`https://192.168.50.14:8443`, disabled Android backup and cleartext traffic,
+and one v2 Android Debug signer. The Windows checkout converted the embedded
+public-CA PEM to CRLF, so its raw-file hash differs; after CR removal it has
+the repository hash
+`2856854bdfd40dcad3a69d1f5f8b9a14e50d6d553d6cafd36bff6a047ab13168`,
+and the decoded DER certificate matches exactly at SHA-256
+`397c7a745af599edd7f898ceff50d3f5117c7f7d1b6100ac8f9cab7de998763c`.
+
+The release remains a copied-data pilot. Neither installer has passed
+installation, owner bootstrap, pairing, or synchronized-edit acceptance on
+physical devices.
 
 ### Private pilot release receipt v0.1.2
 
@@ -155,6 +188,35 @@ evidence are captured and copied off-NAS where feasible. This bounded cutover
 receipt does not satisfy the independent encrypted backup or clean scratch
 restore production gates.
 
+### Compatible server upgrade receipt — 2026-08-03
+
+The merged server archive for commit
+`4482af7ce1a4f20acfed49f31f037348c5586d8f` was staged at
+`/volume1/homes/kentmaoza/CH_Ultimate_Pilot/4482af7/` with SHA-256
+`18f446375e5ca340c1342362b4d32f3efc0a631193eabcae20eb0238e129e8c8`.
+A root one-time preparation task verified that hash, rejected unsafe archive
+paths, created `/volume1/docker/ch-ultimate-4482af7/server`, and preserved the
+existing environment without printing it. The retained preparation receipt
+records no migration beyond `009_offline_operations.sql`.
+
+Container Manager stopped but retained project `ch-ultimate-core-d5bb4b6`
+for rollback, then built and started project `ch-ultimate-core-4482af7` from
+the prepared path. Container
+`96b42c6f60b16c40704735ea02d35e6c96e47b39ab1458f29ce62682f3781655`
+uses image `ch-ultimate-core-4482af7-ch-core:latest`; DSM reported it healthy,
+with a 256 MB memory limit, auto-restart, host networking, and all Linux
+capabilities dropped. The observed post-start sample was 3.15% container CPU
+and 96 MB RAM; soak acceptance remains open.
+
+From the administrator Mac, the bundled CA validated both `/health/live` as
+`{"status":"ok"}` and `/health/ready` as `{"status":"ready"}` over
+`https://192.168.50.14:8443`. Raw 18080 and MariaDB 3306 remained
+unreachable. The three new owner-only pairing routes returned authenticated
+boundary `401` responses without a token, while a deliberately unknown route
+returned `404`; this proves the deployed router contains the new endpoints
+without creating an unintended owner or pairing. Physical owner bootstrap is
+still required before an authenticated route test is possible.
+
 | Requirement | Status | Current evidence or missing action |
 | --- | --- | --- |
 | Authenticated DSM preflight | PASS | DS223j, DSM 7.4.1-90080, healthy RAID1/Btrfs, and supported Container Manager were confirmed before deployment |
@@ -165,9 +227,9 @@ restore production gates.
 | UPS safe shutdown | BLOCKED | Owner reports external UPS hardware is connected, but DSM recognition, data signaling, shutdown, and restart have not been verified |
 | MariaDB 10 socket service | PASS | Package installed; `chu` and least-privilege `chu_app` created; socket login verified at `/run/mysqld/mysqld10.sock`; TCP disabled with `port=0` |
 | Restricted service identity and private share | PASS | `ch_core_service` has UID/GID `1027:100`, no DSM login or unrelated share access, and direct read/write only to hidden `CH_Core_Private` |
-| Copied-data CH Core runtime | PASS | Project `ch-ultimate-core-d5bb4b6` has one running container; `/health/live` returned `{"status":"ok"}` and `/health/ready` returned `{"status":"ready"}` through NAS loopback |
+| Copied-data CH Core runtime | PASS | Project `ch-ultimate-core-4482af7` has one healthy running container from merged commit `4482af7ce1a4f20acfed49f31f037348c5586d8f`; `/health/live` returned `{"status":"ok"}` and `/health/ready` returned `{"status":"ready"}` through CA-validated LAN HTTPS |
 | Runtime isolation | PASS | Container uses host networking but binds `127.0.0.1:18080`; the Mac cannot connect to raw 18080 or MariaDB 3306; all Linux capabilities are dropped and the root filesystem is read-only |
-| Post-start resource sample | READY | Load average `0.51 / 0.71 / 0.86`, `344328 kB` memory available, and `639496 kB` swap used; the one-hour and seven-client soak gates remain open |
+| Post-start resource sample | READY | The new container was observed at 3.15% CPU and 96 MB RAM under its 256 MB limit; the one-hour and seven-client soak gates remain open |
 | Private CA and IP-SAN leaf | PASS | The encrypted CA key remains off-NAS on the administrator Mac. The current leaf has `IP:192.168.50.14`, expires 2027-09-02, and passed CA validation at the public endpoint with the recorded fingerprint |
 | DSM firewall and reverse proxy | PARTIAL | CA-validated 8443 health passed while raw 18080 remained unreachable, consistent with the reverse-proxy boundary. Authenticated DSM confirmation of the `.50.0/24` allow-then-deny order and every external isolation path remain open |
 | Production CH Core deployment | BLOCKED | The copied-data runtime is not a production endpoint until stable addressing, backup/restore, SMART, UPS, restart, load, isolation-path, and physical-client gates pass |

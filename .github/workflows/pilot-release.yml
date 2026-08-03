@@ -68,8 +68,8 @@ jobs:
             throw "Expected exactly one Setup.exe, found $($setups.Count)."
           }
           New-Item -ItemType Directory -Path release -Force | Out-Null
-          Copy-Item $setups[0].FullName release/CH-Ultimate-0.1.3-Setup.exe
-          Get-FileHash -Algorithm SHA256 release/CH-Ultimate-0.1.3-Setup.exe
+          Copy-Item $setups[0].FullName release/CH-Ultimate-0.1.4-Setup.exe
+          Get-FileHash -Algorithm SHA256 release/CH-Ultimate-0.1.4-Setup.exe
 
   android-apk:
     needs: source-gates
@@ -102,8 +102,8 @@ jobs:
             exit 1
           fi
           mkdir -p release
-          cp "${apks[0]}" release/CHU-Companion-Mobile-0.1.3-pilot-debug.apk
-          sha256sum release/CHU-Companion-Mobile-0.1.3-pilot-debug.apk
+          cp "${apks[0]}" release/CHU-Companion-Mobile-0.1.4-pilot-debug.apk
+          sha256sum release/CHU-Companion-Mobile-0.1.4-pilot-debug.apk
 
   publish-prerelease:
     needs: [windows-installer, android-apk]
@@ -143,11 +143,11 @@ jobs:
             throw "Expected exactly one debug APK, found $($apks.Count)."
           }
           New-Item -ItemType Directory -Path release -Force | Out-Null
-          Copy-Item $setups[0].FullName release/CH-Ultimate-0.1.3-Setup.exe
-          Copy-Item $apks[0].FullName release/CHU-Companion-Mobile-0.1.3-pilot-debug.apk
+          Copy-Item $setups[0].FullName release/CH-Ultimate-0.1.4-Setup.exe
+          Copy-Item $apks[0].FullName release/CHU-Companion-Mobile-0.1.4-pilot-debug.apk
           $names = @(
-            'CH-Ultimate-0.1.3-Setup.exe',
-            'CHU-Companion-Mobile-0.1.3-pilot-debug.apk'
+            'CH-Ultimate-0.1.4-Setup.exe',
+            'CHU-Companion-Mobile-0.1.4-pilot-debug.apk'
           )
           $lines = foreach ($name in $names) {
             $hash = (Get-FileHash -Algorithm SHA256 (Join-Path release $name)).Hash.ToLowerInvariant()
@@ -161,11 +161,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          gh release create pilot-v0.1.3 `
-            release/CH-Ultimate-0.1.3-Setup.exe `
-            release/CHU-Companion-Mobile-0.1.3-pilot-debug.apk `
+          gh release create pilot-v0.1.4 `
+            release/CH-Ultimate-0.1.4-Setup.exe `
+            release/CHU-Companion-Mobile-0.1.4-pilot-debug.apk `
             release/SHA256SUMS.txt `
             --prerelease `
             --target "$env:GITHUB_SHA" `
-            --title 'CH Ultimate pilot v0.1.3' `
-            --notes-file docs/releases/pilot-0.1.3.md
+            --title 'CH Ultimate pilot v0.1.4' `
+            --notes-file docs/releases/pilot-0.1.4.md

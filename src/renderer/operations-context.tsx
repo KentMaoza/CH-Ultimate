@@ -1,4 +1,4 @@
-import { createContext, useContext, useSyncExternalStore, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { OperationsGateway } from '../gateway/operations-gateway';
 
 const GatewayContext = createContext<OperationsGateway | null>(null);
@@ -11,6 +11,10 @@ export function OperationsProvider({ children, gateway }: { children: ReactNode;
 export function useOperations() {
   const gateway = useContext(GatewayContext);
   if (!gateway) throw new Error('OperationsProvider is missing.');
-  const state = useSyncExternalStore(gateway.subscribe, gateway.getSnapshot, gateway.getSnapshot);
+  const [state, setState] = useState(gateway.getSnapshot);
+  useEffect(() => {
+    setState(gateway.getSnapshot());
+    return gateway.subscribe(() => setState(gateway.getSnapshot()));
+  }, [gateway]);
   return { state, gateway };
 }

@@ -207,6 +207,30 @@ describe('CH Core guarded deployment documentation', () => {
     expect(acceptance).toMatch(/approval.+price/is);
   });
 
+  it('documents the explicit v0.1.3 owner-approved device-pairing pilot', async () => {
+    const release = await repositoryText('docs/releases/pilot-0.1.3.md');
+
+    for (const requiredStep of [
+      'bootstrap',
+      'Buat kode pemasangan',
+      'nama perangkat',
+      'platform',
+      'Setujui perangkat',
+      'Periksa persetujuan',
+      'satu perubahan kecil',
+    ]) {
+      expect(release.toLowerCase()).toContain(requiredStep.toLowerCase());
+    }
+    expect(release).toContain('CH-Ultimate-0.1.3-Setup.exe');
+    expect(release).toContain(
+      'CHU-Companion-Mobile-0.1.3-pilot-debug.apk',
+    );
+    expect(release).toMatch(/10 menit/i);
+    expect(release).toMatch(/v0\.1\.2.+uninstall.+v0\.1\.3/is);
+    expect(release).toMatch(/belum dipasangkan.+tidak ada.+offline/is);
+    expect(release).toMatch(/physical Windows\/Android installation.+remain/is);
+  });
+
   it('locks the business-LAN cutover, rollback, and acceptance boundaries', async () => {
     const businessLan = await repositoryText('docs/ch-core-business-lan.md');
     const deployment = await repositoryText(

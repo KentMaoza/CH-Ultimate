@@ -38,6 +38,24 @@ evidence. The business-LAN partial live receipt does not amend those receipts.
 
 ## Client release artifacts
 
+### Owner-pairing release candidate v0.1.3
+
+The source now contains the owner-only pairing-status API, secure Electron
+owner transport, and Windows Settings controls for generating, inspecting, and
+explicitly approving one-use pairing requests. The v0.1.3 release contract and
+operator guide are prepared. This is implementation evidence only:
+
+| Requirement | Status | Current evidence or missing action |
+| --- | --- | --- |
+| Owner-pairing implementation | READY | Focused server, Electron transport, IPC, and Windows UI tests pass locally; full release verification is pending |
+| Compatible NAS Core upgrade | BLOCKED | The copied-data NAS runtime still needs the reviewed v0.1.3-compatible server image before new clients are published |
+| v0.1.3 GitHub artifacts | PREPARED | Exact workflow names are `CH-Ultimate-0.1.3-Setup.exe` and `CHU-Companion-Mobile-0.1.3-pilot-debug.apk`; no v0.1.3 release receipt exists yet |
+| Physical owner/client pairing | BLOCKED | No physical Windows owner bootstrap, device-name/platform confirmation, explicit approval, client completion, or synchronized edit has been recorded |
+
+Do not describe the server upgrade, v0.1.3 publication, physical pairing,
+synchronization, or production acceptance as complete until their independent
+evidence is added here.
+
 | Requirement | Status | Current evidence |
 | --- | --- | --- |
 | Private GitHub pilot workflow | PASS | `.github/workflows/pilot-release.yml` run `30749115155` passed source, Windows, Android, and publication jobs on merged commit `69f308c6971496d1e38a172c0f7d98a699cc894a` |

@@ -26,6 +26,8 @@ export const CH_CORE_IPC_CHANNELS = {
 
 export const CORE_SAFE_STORAGE_UNAVAILABLE_MESSAGE =
   'Penyimpanan aman tidak tersedia. Perangkat tidak dapat dipasangkan.';
+export const CORE_OWNER_ACCESS_REQUIRED_MESSAGE =
+  'Hanya perangkat pemilik yang dapat mengatur pemasangan.';
 
 export interface CoreCredentialStatus {
   production: boolean;

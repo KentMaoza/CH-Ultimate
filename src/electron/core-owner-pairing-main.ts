@@ -5,6 +5,7 @@ import type {
   CoreApiResponse,
 } from '../gateway/core-api-transport';
 import type { CoreCredentialStore } from './core-credential-store';
+import { CORE_OWNER_ACCESS_REQUIRED_MESSAGE } from './core-bridge-contract';
 
 export interface OwnerPairing {
   pairingId: string;
@@ -81,6 +82,9 @@ function parseResponse<T>(
   status: number,
   schema: z.ZodType<T>,
 ): T {
+  if (response.status === 403) {
+    throw new Error(CORE_OWNER_ACCESS_REQUIRED_MESSAGE);
+  }
   if (response.status !== status) throw new Error(invalidResponse);
   const result = schema.safeParse(response.body);
   if (!result.success) throw new Error(invalidResponse);

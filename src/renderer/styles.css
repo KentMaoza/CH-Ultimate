@@ -248,6 +248,17 @@ td small { display: block; margin-top: 3px; color: #777; font-size: 9px; }
 .settings-card dl div { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #aaa; }
 .settings-card dt, .settings-card dd { margin: 0; font-size: 12px; }
 .settings-card hr { margin: 28px 0; border: 0; border-top: 1px solid #555; }
+.owner-pairing-card { grid-column: 1 / -1; }
+.owner-pairing-card > p { color: #555; font-size: 12px; line-height: 1.55; }
+.owner-pairing-code { display: grid; gap: 5px; margin: 18px 0; padding: 16px; border: 2px solid #111; background: #f3f3ee; }
+.owner-pairing-code small { font-size: 9px; font-weight: 900; letter-spacing: .12em; }
+.owner-pairing-code strong { font-size: 34px; letter-spacing: .16em; }
+.owner-pairing-code span { color: #555; font-size: 11px; }
+.owner-pairing-device { margin: 14px 0; border-top: 1px solid #111; }
+.owner-pairing-device div { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid #bbb; }
+.owner-pairing-device dt, .owner-pairing-device dd { margin: 0; font-size: 12px; }
+.owner-pairing-device dd { font-weight: 900; }
+.owner-pairing-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 @media (max-width: 1150px) { .report-grid, .empty-layout { grid-template-columns: 1fr; } .metric-grid { grid-template-columns: 1fr; } }
 .archive-nota { display: grid; grid-template-columns: minmax(380px, .46fr) minmax(0, 1fr); gap: 14px; align-items: start; }
 .archive-nota--preview-collapsed { grid-template-columns: 1fr; }

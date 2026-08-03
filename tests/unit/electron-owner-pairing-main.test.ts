@@ -157,4 +157,18 @@ describe('Electron owner pairing main boundary', () => {
       'Respons pemasangan CH Core tidak valid.',
     );
   });
+
+  it('maps a forbidden owner operation to fixed public copy', async () => {
+    const owner = createCoreOwnerPairingMain({
+      store: store(),
+      send: vi.fn().mockResolvedValue({
+        status: 403,
+        body: { code: 'FORBIDDEN', privateDetail: 'must not escape' },
+      }),
+    });
+
+    await expect(owner.createOwnerPairing()).rejects.toThrow(
+      'Hanya perangkat pemilik yang dapat mengatur pemasangan.',
+    );
+  });
 });

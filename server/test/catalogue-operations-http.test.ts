@@ -33,6 +33,7 @@ function harness() {
       throw new IdentityError('UNAUTHORIZED', 401, 'Unauthorized');
     }),
     createPairing: vi.fn(),
+    inspectPairing: vi.fn(),
     claimPairing: vi.fn(),
     approvePairing: vi.fn(),
     completePairing: vi.fn(),

@@ -40,6 +40,15 @@ function createProtocol() {
         code: '12345678',
         expiresAt: '2026-07-29T00:10:00.000Z',
       })),
+      inspectPairing: vi.fn(async () => ({
+        pairingId: '33333333-3333-4333-8333-333333333333',
+        state: 'pending' as const,
+        expiresAt: '2026-07-29T00:10:00.000Z',
+        requestedDevice: {
+          displayName: 'HP Gudang',
+          platform: 'android',
+        },
+      })),
       claimPairing: vi.fn(async () => ({
         pairingId: '33333333-3333-4333-8333-333333333333',
         status: 'pending' as const,
@@ -167,6 +176,48 @@ describe('CH Core protocol routes', () => {
       claimSecret: opaqueSecret(1),
       deviceToken: opaqueSecret(2),
     });
+    await app.close();
+  });
+
+  it('lets only the owner inspect a validated public pairing status', async () => {
+    const { app, protocol } = appWithProtocol();
+    const pairingId = '33333333-3333-4333-8333-333333333333';
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/v1/pairings/${pairingId}`,
+      headers: { authorization: 'Bearer owner-token' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      pairingId,
+      state: 'pending',
+      expiresAt: '2026-07-29T00:10:00.000Z',
+      requestedDevice: { displayName: 'HP Gudang', platform: 'android' },
+    });
+    expect(protocol.identity.inspectPairing).toHaveBeenCalledWith(
+      owner.id,
+      pairingId,
+    );
+
+    for (const request of [
+      { url: `/v1/pairings/${pairingId}` },
+      {
+        url: `/v1/pairings/${pairingId}`,
+        headers: { authorization: 'Bearer client-token' },
+      },
+      {
+        url: '/v1/pairings/not-a-uuid',
+        headers: { authorization: 'Bearer owner-token' },
+      },
+    ]) {
+      const rejected = await app.inject({ method: 'GET', ...request });
+      expect(rejected.statusCode).toBe(
+        request.url.endsWith('not-a-uuid') ? 400 : request.headers ? 403 : 401,
+      );
+    }
+    expect(protocol.identity.inspectPairing).toHaveBeenCalledTimes(1);
     await app.close();
   });
 

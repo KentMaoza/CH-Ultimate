@@ -9,6 +9,93 @@ import {
 } from './support/identity-harness.js';
 
 describe('pairing', () => {
+  it('shows the owner only the public lifecycle and claimed device identity', async () => {
+    const { service } = createIdentityHarness({
+      bootstrapSecret: 's'.repeat(32),
+    });
+    const owner = await bootstrapTestOwner(service);
+    const pairing = await service.createPairing(owner.device.id);
+
+    await expect(
+      service.inspectPairing(owner.device.id, pairing.pairingId),
+    ).resolves.toEqual({
+      pairingId: pairing.pairingId,
+      state: 'available',
+      expiresAt: pairing.expiresAt,
+    });
+
+    const claimSecret = opaqueSecret(35);
+    await service.claimPairing('198.51.100.35', {
+      code: pairing.code,
+      requestId: '35353535-3535-4535-8535-353535353535',
+      claimSecret,
+      installationId: clientInstallationId,
+      displayName: 'HP Gudang',
+      platform: 'android',
+    });
+    await expect(
+      service.inspectPairing(owner.device.id, pairing.pairingId),
+    ).resolves.toEqual({
+      pairingId: pairing.pairingId,
+      state: 'pending',
+      expiresAt: pairing.expiresAt,
+      requestedDevice: { displayName: 'HP Gudang', platform: 'android' },
+    });
+
+    await service.approvePairing(owner.device.id, pairing.pairingId);
+    await expect(
+      service.inspectPairing(owner.device.id, pairing.pairingId),
+    ).resolves.toEqual({
+      pairingId: pairing.pairingId,
+      state: 'approved',
+      expiresAt: pairing.expiresAt,
+      requestedDevice: { displayName: 'HP Gudang', platform: 'android' },
+    });
+
+    await service.completePairing({
+      pairingId: pairing.pairingId,
+      claimSecret,
+      deviceToken: opaqueSecret(36),
+    });
+    await expect(
+      service.inspectPairing(owner.device.id, pairing.pairingId),
+    ).resolves.toEqual({
+      pairingId: pairing.pairingId,
+      state: 'consumed',
+      expiresAt: pairing.expiresAt,
+      requestedDevice: { displayName: 'HP Gudang', platform: 'android' },
+    });
+  });
+
+  it('reports expiry and rejects non-owner, missing, or malformed inspection', async () => {
+    const { service, setNow } = createIdentityHarness({
+      bootstrapSecret: 's'.repeat(32),
+    });
+    const owner = await bootstrapTestOwner(service);
+    const pairing = await service.createPairing(owner.device.id);
+
+    setNow('2026-07-29T00:10:00.001Z');
+    await expect(
+      service.inspectPairing(owner.device.id, pairing.pairingId),
+    ).resolves.toEqual({
+      pairingId: pairing.pairingId,
+      state: 'expired',
+      expiresAt: pairing.expiresAt,
+    });
+    await expect(
+      service.inspectPairing('not-the-owner', pairing.pairingId),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', statusCode: 403 });
+    await expect(
+      service.inspectPairing(
+        owner.device.id,
+        '99999999-9999-4999-8999-999999999999',
+      ),
+    ).rejects.toMatchObject({ code: 'PAIRING_REJECTED', statusCode: 400 });
+    await expect(
+      service.inspectPairing(owner.device.id, 'not-a-uuid'),
+    ).rejects.toMatchObject({ code: 'PAIRING_REJECTED', statusCode: 400 });
+  });
+
   it('uses an eight-digit one-use code and gives no detail for expired or reused codes', async () => {
     const { service, setNow } = createIdentityHarness({
       bootstrapSecret: 's'.repeat(32),

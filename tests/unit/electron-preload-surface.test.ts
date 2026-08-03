@@ -7,7 +7,7 @@ import {
 import { registerCoreIpcHandlers } from '../../src/electron/core-ipc';
 
 describe('CH Core preload surface', () => {
-  it('publishes the seven-method bridge without exposing raw Electron IPC', async () => {
+  it('publishes the ten-method bridge without exposing raw Electron IPC', async () => {
     vi.resetModules();
     const exposeInMainWorld = vi.fn();
     const invoke = vi.fn().mockResolvedValue({ status: 'ok' });
@@ -22,10 +22,13 @@ describe('CH Core preload surface', () => {
     const [key, bridge] = exposeInMainWorld.mock.calls[0]!;
     expect(key).toBe('chCore');
     expect(Object.keys(bridge).sort()).toEqual([
+      'approveOwnerPairing',
       'claimPairing',
       'completePairing',
+      'createOwnerPairing',
       'credentialStatus',
       'enrollOwner',
+      'getOwnerPairing',
       'installationId',
       'request',
       'rotateToken',
@@ -40,15 +43,18 @@ describe('CH Core preload surface', () => {
     vi.doUnmock('electron');
   });
 
-  it('exposes exactly seven narrow methods without raw IPC', async () => {
+  it('exposes exactly ten narrow methods without raw IPC', async () => {
     const invoke = vi.fn().mockResolvedValue({ status: 'ok' });
     const bridge = createChCoreBridge(invoke);
 
     expect(Object.keys(bridge).sort()).toEqual([
+      'approveOwnerPairing',
       'claimPairing',
       'completePairing',
+      'createOwnerPairing',
       'credentialStatus',
       'enrollOwner',
+      'getOwnerPairing',
       'installationId',
       'request',
       'rotateToken',
@@ -70,6 +76,11 @@ describe('CH Core preload surface', () => {
       displayName: 'Mac Gudang',
     });
     await bridge.completePairing();
+    await bridge.createOwnerPairing();
+    await bridge.getOwnerPairing('33333333-3333-4333-8333-333333333333');
+    await bridge.approveOwnerPairing(
+      '33333333-3333-4333-8333-333333333333',
+    );
     await bridge.rotateToken();
 
     expect(invoke.mock.calls.map(([channel]) => channel)).toEqual([
@@ -79,6 +90,9 @@ describe('CH Core preload surface', () => {
       CH_CORE_IPC_CHANNELS.enrollOwner,
       CH_CORE_IPC_CHANNELS.claimPairing,
       CH_CORE_IPC_CHANNELS.completePairing,
+      CH_CORE_IPC_CHANNELS.createOwnerPairing,
+      CH_CORE_IPC_CHANNELS.getOwnerPairing,
+      CH_CORE_IPC_CHANNELS.approveOwnerPairing,
       CH_CORE_IPC_CHANNELS.rotateToken,
     ]);
   });
@@ -100,6 +114,9 @@ describe('CH Core main IPC registration', () => {
       enrollOwner: vi.fn(),
       claimPairing: vi.fn(),
       completePairing: vi.fn(),
+      createOwnerPairing: vi.fn(),
+      getOwnerPairing: vi.fn(),
+      approveOwnerPairing: vi.fn(),
       rotateToken: vi.fn(),
     };
 
@@ -138,6 +155,9 @@ describe('CH Core main IPC registration', () => {
       enrollOwner: vi.fn().mockResolvedValue({ status: 'paired' }),
       claimPairing: vi.fn().mockResolvedValue({ status: 'pending' }),
       completePairing: vi.fn().mockResolvedValue({ status: 'paired' }),
+      createOwnerPairing: vi.fn().mockResolvedValue({ code: '12345678' }),
+      getOwnerPairing: vi.fn().mockResolvedValue({ state: 'available' }),
+      approveOwnerPairing: vi.fn().mockResolvedValue({ status: 'approved' }),
       rotateToken: vi.fn().mockResolvedValue({ status: 'rotated' }),
     };
     const mainFrame = { url: rendererUrl };
@@ -172,6 +192,9 @@ describe('CH Core main IPC registration', () => {
       enrollOwner: vi.fn(),
       claimPairing: vi.fn(),
       completePairing: vi.fn(),
+      createOwnerPairing: vi.fn(),
+      getOwnerPairing: vi.fn(),
+      approveOwnerPairing: vi.fn(),
       rotateToken: vi.fn(),
     };
     const trustedSender = { mainFrame: { url: rendererUrl } };
@@ -220,6 +243,9 @@ describe('CH Core main IPC registration', () => {
       enrollOwner: vi.fn(),
       claimPairing: vi.fn(),
       completePairing: vi.fn(),
+      createOwnerPairing: vi.fn(),
+      getOwnerPairing: vi.fn(),
+      approveOwnerPairing: vi.fn(),
       rotateToken: vi.fn(),
     };
     const mainFrame = { url: 'https://penyerang.example/' };
@@ -251,6 +277,9 @@ describe('CH Core main IPC registration', () => {
       enrollOwner: vi.fn(),
       claimPairing: vi.fn(),
       completePairing: vi.fn(),
+      createOwnerPairing: vi.fn(),
+      getOwnerPairing: vi.fn(),
+      approveOwnerPairing: vi.fn(),
       rotateToken: vi.fn(),
     };
     const mainFrame = { url: rendererUrl };
@@ -277,7 +306,19 @@ describe('CH Core main IPC registration', () => {
         }),
       ),
     ).rejects.toThrow('Permintaan CH Core tidak valid.');
+    for (const channel of [
+      CH_CORE_IPC_CHANNELS.getOwnerPairing,
+      CH_CORE_IPC_CHANNELS.approveOwnerPairing,
+    ]) {
+      for (const invalid of ['', 'not-a-uuid', { pairingId: 'private' }]) {
+        await expect(
+          Promise.resolve().then(() => handlers.get(channel)!(event, invalid)),
+        ).rejects.toThrow('Permintaan CH Core tidak valid.');
+      }
+    }
     expect(service.enrollOwner).not.toHaveBeenCalled();
     expect(service.claimPairing).not.toHaveBeenCalled();
+    expect(service.getOwnerPairing).not.toHaveBeenCalled();
+    expect(service.approveOwnerPairing).not.toHaveBeenCalled();
   });
 });

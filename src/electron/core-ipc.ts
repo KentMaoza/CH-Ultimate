@@ -82,6 +82,18 @@ function requirePairingInput(
   return input as Parameters<ChCoreBridge['claimPairing']>[0];
 }
 
+function requirePairingId(input: unknown): string {
+  if (
+    typeof input !== 'string' ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      input,
+    )
+  ) {
+    return invalidRequest();
+  }
+  return input;
+}
+
 export function registerCoreIpcHandlers(
   ipcMain: IpcMainPort,
   service: ChCoreBridge,
@@ -133,6 +145,20 @@ export function registerCoreIpcHandlers(
   ipcMain.handle(
     CH_CORE_IPC_CHANNELS.completePairing,
     authorized(() => service.completePairing()),
+  );
+  ipcMain.handle(
+    CH_CORE_IPC_CHANNELS.createOwnerPairing,
+    authorized(() => service.createOwnerPairing()),
+  );
+  ipcMain.handle(
+    CH_CORE_IPC_CHANNELS.getOwnerPairing,
+    authorized((input) => service.getOwnerPairing(requirePairingId(input))),
+  );
+  ipcMain.handle(
+    CH_CORE_IPC_CHANNELS.approveOwnerPairing,
+    authorized((input) =>
+      service.approveOwnerPairing(requirePairingId(input)),
+    ),
   );
   ipcMain.handle(
     CH_CORE_IPC_CHANNELS.rotateToken,

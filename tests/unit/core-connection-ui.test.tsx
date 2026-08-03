@@ -70,6 +70,9 @@ describe('desktop connection screen', () => {
         ),
       ),
       completePairing: vi.fn(),
+      createOwnerPairing: vi.fn(),
+      getOwnerPairing: vi.fn(),
+      approveOwnerPairing: vi.fn(),
       rotateToken: vi.fn(),
     } as ChCoreBridge;
     const status: CoreCredentialStatus = {
@@ -110,6 +113,9 @@ describe('desktop connection screen', () => {
       enrollOwner: vi.fn(),
       claimPairing: vi.fn().mockRejectedValue(new Error(privateFailure)),
       completePairing: vi.fn(),
+      createOwnerPairing: vi.fn(),
+      getOwnerPairing: vi.fn(),
+      approveOwnerPairing: vi.fn(),
       rotateToken: vi.fn(),
     } as ChCoreBridge;
 

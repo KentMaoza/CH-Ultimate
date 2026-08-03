@@ -6,6 +6,10 @@ import type {
   OwnerEnrollmentInput,
   PairingClaimInput,
 } from './core-identity-main';
+import type {
+  OwnerPairing,
+  OwnerPairingStatus,
+} from './core-owner-pairing-main';
 
 export const CH_CORE_IPC_CHANNELS = {
   request: 'ch-core:request',
@@ -14,6 +18,9 @@ export const CH_CORE_IPC_CHANNELS = {
   enrollOwner: 'ch-core:enroll-owner',
   claimPairing: 'ch-core:claim-pairing',
   completePairing: 'ch-core:complete-pairing',
+  createOwnerPairing: 'ch-core:create-owner-pairing',
+  getOwnerPairing: 'ch-core:get-owner-pairing',
+  approveOwnerPairing: 'ch-core:approve-owner-pairing',
   rotateToken: 'ch-core:rotate-token',
 } as const;
 
@@ -40,6 +47,11 @@ export interface ChCoreBridge {
     input: PairingClaimInput,
   ): Promise<{ status: 'pending'; pairingId: string }>;
   completePairing(): Promise<{ status: 'paired'; deviceId: string }>;
+  createOwnerPairing(): Promise<OwnerPairing>;
+  getOwnerPairing(pairingId: string): Promise<OwnerPairingStatus>;
+  approveOwnerPairing(
+    pairingId: string,
+  ): Promise<{ status: 'approved' }>;
   rotateToken(): Promise<{ status: 'rotated' }>;
 }
 
@@ -67,6 +79,19 @@ export function createChCoreBridge(invoke: BridgeInvoke): ChCoreBridge {
       invoke(CH_CORE_IPC_CHANNELS.completePairing) as ReturnType<
         ChCoreBridge['completePairing']
       >,
+    createOwnerPairing: () =>
+      invoke(CH_CORE_IPC_CHANNELS.createOwnerPairing) as ReturnType<
+        ChCoreBridge['createOwnerPairing']
+      >,
+    getOwnerPairing: (pairingId) =>
+      invoke(CH_CORE_IPC_CHANNELS.getOwnerPairing, pairingId) as ReturnType<
+        ChCoreBridge['getOwnerPairing']
+      >,
+    approveOwnerPairing: (pairingId) =>
+      invoke(
+        CH_CORE_IPC_CHANNELS.approveOwnerPairing,
+        pairingId,
+      ) as ReturnType<ChCoreBridge['approveOwnerPairing']>,
     rotateToken: () =>
       invoke(CH_CORE_IPC_CHANNELS.rotateToken) as ReturnType<
         ChCoreBridge['rotateToken']

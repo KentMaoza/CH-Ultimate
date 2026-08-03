@@ -16,6 +16,7 @@ import {
   type CoreHttpsClientOptions,
 } from './core-https-client';
 import { createCoreIdentityMain } from './core-identity-main';
+import { createCoreOwnerPairingMain } from './core-owner-pairing-main';
 
 export interface CoreDesktopServiceOptions {
   configPath: string;
@@ -150,6 +151,9 @@ function unavailableService(
     enrollOwner: unavailable,
     claimPairing: unavailable,
     completePairing: unavailable,
+    createOwnerPairing: unavailable,
+    getOwnerPairing: unavailable,
+    approveOwnerPairing: unavailable,
     rotateToken: unavailable,
   };
 }
@@ -179,6 +183,10 @@ export async function createCoreDesktopService(
     send,
     platform: options.platform,
   });
+  const ownerPairing = createCoreOwnerPairingMain({
+    store: options.store,
+    send,
+  });
 
   return {
     request: api.request,
@@ -192,6 +200,9 @@ export async function createCoreDesktopService(
     enrollOwner: identity.enrollOwner,
     claimPairing: identity.claimPairing,
     completePairing: identity.completePairing,
+    createOwnerPairing: ownerPairing.createOwnerPairing,
+    getOwnerPairing: ownerPairing.getOwnerPairing,
+    approveOwnerPairing: ownerPairing.approveOwnerPairing,
     rotateToken: identity.rotateToken,
   };
 }

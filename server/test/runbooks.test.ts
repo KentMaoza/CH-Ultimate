@@ -171,8 +171,8 @@ describe('CH Core guarded deployment documentation', () => {
 
     expect(readme).toContain('CH Core acceptance status');
     for (const requiredEvidence of [
-      '465',
-      '304',
+      '487',
+      '308',
       '88',
       'Playwright 8/8',
       'Windows x64 ZIP',

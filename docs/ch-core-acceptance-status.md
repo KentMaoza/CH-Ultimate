@@ -1,6 +1,6 @@
 # CH Core acceptance status
 
-Updated 2026-08-02 WITA. This is an evidence ledger, not a production
+Updated 2026-08-03 WITA. This is an evidence ledger, not a production
 deployment receipt. A copied-data CH Core runtime is deployed on the NAS, but
 CH Core is not deployed as a production endpoint. The catalogue workbook has
 not been imported and no client is enrolled.
@@ -24,9 +24,9 @@ evidence. The business-LAN partial live receipt does not amend those receipts.
 
 | Requirement | Status | Current evidence |
 | --- | --- | --- |
-| Desktop application and gateway | PASS | `npm run verify`: 60 files / 465 tests |
+| Desktop application and gateway | PASS | `npm run verify`: 63 files / 487 tests |
 | Mobile application | PASS | `npm run test:mobile`: 9 files / 88 tests |
-| CH Core unit and artifact tests | PASS | `npm run server:test`: 44 files / 304 tests plus one intentional workbook skip |
+| CH Core unit and artifact tests | PASS | `npm run server:test`: 44 files / 308 tests plus one intentional workbook skip |
 | Approved workbook parser | PASS | Exact SHA-256 and 3,144 / 2,786 / 358 / 3 / Rp276,267,011 / 4,115 PCS acceptance: 1/1 |
 | Desktop mock isolation | PASS | Packaged startup fails closed; explicit unpackaged test marker only; Playwright 8/8 |
 | Mobile production bundle | PASS | 589-module Vite build and Capacitor Android sync |
@@ -47,9 +47,9 @@ operator guide are prepared. This is implementation evidence only:
 
 | Requirement | Status | Current evidence or missing action |
 | --- | --- | --- |
-| Owner-pairing implementation | READY | Focused server, Electron transport, IPC, and Windows UI tests pass locally; full release verification is pending |
+| Owner-pairing implementation | READY | Full local desktop, mobile, server, package, Electron E2E, Android JVM, Android lint, and debug-APK gates pass; physical devices have not accepted it |
 | Compatible NAS Core upgrade | BLOCKED | The copied-data NAS runtime still needs the reviewed v0.1.3-compatible server image before new clients are published |
-| v0.1.3 GitHub artifacts | PREPARED | Exact workflow names are `CH-Ultimate-0.1.3-Setup.exe` and `CHU-Companion-Mobile-0.1.3-pilot-debug.apk`; no v0.1.3 release receipt exists yet |
+| v0.1.3 GitHub artifacts | PREPARED | Exact workflow names are `CH-Ultimate-0.1.3-Setup.exe` and `CHU-Companion-Mobile-0.1.3-pilot-debug.apk`; the local APK is version `0.1.3` (`4`) with one v2 debug signer, but no GitHub release receipt exists yet |
 | Physical owner/client pairing | BLOCKED | No physical Windows owner bootstrap, device-name/platform confirmation, explicit approval, client completion, or synchronized edit has been recorded |
 
 Do not describe the server upgrade, v0.1.3 publication, physical pairing,

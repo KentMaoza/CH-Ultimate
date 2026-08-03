@@ -171,8 +171,8 @@ describe('CH Core guarded deployment documentation', () => {
 
     expect(readme).toContain('CH Core acceptance status');
     for (const requiredEvidence of [
-      '465',
-      '304',
+      '487',
+      '308',
       '88',
       'Playwright 8/8',
       'Windows x64 ZIP',
@@ -205,6 +205,30 @@ describe('CH Core guarded deployment documentation', () => {
     expect(acceptance).toMatch(/copied-data.+deployed.+NAS/is);
     expect(acceptance).toMatch(/not.+production|bukan.+production/i);
     expect(acceptance).toMatch(/approval.+price/is);
+  });
+
+  it('documents the explicit v0.1.3 owner-approved device-pairing pilot', async () => {
+    const release = await repositoryText('docs/releases/pilot-0.1.3.md');
+
+    for (const requiredStep of [
+      'bootstrap',
+      'Buat kode pemasangan',
+      'nama perangkat',
+      'platform',
+      'Setujui perangkat',
+      'Periksa persetujuan',
+      'satu perubahan kecil',
+    ]) {
+      expect(release.toLowerCase()).toContain(requiredStep.toLowerCase());
+    }
+    expect(release).toContain('CH-Ultimate-0.1.3-Setup.exe');
+    expect(release).toContain(
+      'CHU-Companion-Mobile-0.1.3-pilot-debug.apk',
+    );
+    expect(release).toMatch(/10 menit/i);
+    expect(release).toMatch(/v0\.1\.2.+uninstall.+v0\.1\.3/is);
+    expect(release).toMatch(/belum dipasangkan.+tidak ada.+offline/is);
+    expect(release).toMatch(/physical Windows\/Android installation.+remain/is);
   });
 
   it('locks the business-LAN cutover, rollback, and acceptance boundaries', async () => {

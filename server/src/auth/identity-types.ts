@@ -38,6 +38,23 @@ export interface PairingRecord {
   createdAt: Date;
 }
 
+export type PublicPairingState =
+  | 'available'
+  | 'pending'
+  | 'approved'
+  | 'consumed'
+  | 'expired';
+
+export interface PublicPairingStatus {
+  pairingId: string;
+  state: PublicPairingState;
+  expiresAt: string;
+  requestedDevice?: {
+    displayName: string;
+    platform: string;
+  };
+}
+
 export interface RecoveryRecord {
   credentialHash: Buffer;
   credentialVersion: bigint;

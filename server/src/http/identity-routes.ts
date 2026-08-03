@@ -35,6 +35,17 @@ export function registerIdentityRoutes(
     return reply.code(201).send(result);
   });
 
+  app.get<{ Params: { id: string } }>(
+    '/v1/pairings/:id',
+    async (request) => {
+      requireEmptyQuery(request.query);
+      const authenticated = await authenticateRequest(identity, request);
+      requireOwner(authenticated.device);
+      const { id } = parseRequest(uuidPath, request.params);
+      return identity.inspectPairing(authenticated.device.id, id);
+    },
+  );
+
   app.post('/v1/pairings/redeem', async (request, reply) => {
     requireEmptyQuery(request.query);
     const input = parseRequest(pairingRedeemBody, request.body);

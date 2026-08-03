@@ -6,6 +6,7 @@ import {
   type IdentityRuntime,
   type InstallationInput,
   type PairingRecord,
+  type PublicPairingStatus,
   publicDevice,
   requireInstallation,
   requireOwner,
@@ -69,6 +70,48 @@ export async function createPairing(
       503,
       'Pairing is unavailable',
     );
+  });
+}
+
+export async function inspectPairing(
+  runtime: IdentityRuntime,
+  ownerDeviceId: string,
+  pairingId: string,
+): Promise<PublicPairingStatus> {
+  if (!UUID_PATTERN.test(pairingId)) {
+    throw pairingRejected();
+  }
+  const now = runtime.now();
+  return runtime.store.transaction(async (session) => {
+    await requireOwner(session, ownerDeviceId);
+    const pairing = await session.findPairingById(pairingId);
+    if (!pairing) {
+      throw pairingRejected();
+    }
+    const state = pairing.consumedAt
+      ? 'consumed'
+      : pairing.approvedAt
+        ? 'approved'
+        : now.getTime() >= pairing.expiresAt.getTime()
+          ? 'expired'
+          : pairing.redeemedAt
+            ? 'pending'
+            : 'available';
+    const requestedDevice =
+      pairing.redeemedAt &&
+      pairing.requestedDisplayName &&
+      pairing.requestedPlatform
+        ? {
+            displayName: pairing.requestedDisplayName,
+            platform: pairing.requestedPlatform,
+          }
+        : undefined;
+    return {
+      pairingId: pairing.id,
+      state,
+      expiresAt: pairing.expiresAt.toISOString(),
+      ...(requestedDevice ? { requestedDevice } : {}),
+    };
   });
 }
 

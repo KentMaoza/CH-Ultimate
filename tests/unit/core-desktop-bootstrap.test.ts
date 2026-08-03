@@ -22,6 +22,9 @@ function bridge(
     enrollOwner: vi.fn(),
     claimPairing: vi.fn(),
     completePairing: vi.fn(),
+    createOwnerPairing: vi.fn(),
+    getOwnerPairing: vi.fn(),
+    approveOwnerPairing: vi.fn(),
     rotateToken: vi.fn(),
   };
 }

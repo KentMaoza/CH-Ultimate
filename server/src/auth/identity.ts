@@ -15,6 +15,7 @@ import type {
   IdentityRuntime,
   IdentityServiceOptions,
   OwnerBootstrapInput,
+  PublicPairingStatus,
   PublicDevice,
 } from './identity-types.js';
 import { bootstrapOwner } from './owner-recovery.js';
@@ -23,6 +24,7 @@ import {
   claimPairing,
   completePairing,
   createPairing,
+  inspectPairing,
 } from './pairing.js';
 
 export {
@@ -37,6 +39,8 @@ export {
   type IdentityStore,
   type OwnerBootstrapInput,
   type PairingRecord,
+  type PublicPairingState,
+  type PublicPairingStatus,
   type PublicDevice,
   type RecoveryRecord,
   type TokenKind,
@@ -67,6 +71,13 @@ export class IdentityService {
     ownerDeviceId: string,
   ): Promise<{ pairingId: string; code: string; expiresAt: string }> {
     return createPairing(this.runtime, ownerDeviceId);
+  }
+
+  inspectPairing(
+    ownerDeviceId: string,
+    pairingId: string,
+  ): Promise<PublicPairingStatus> {
+    return inspectPairing(this.runtime, ownerDeviceId, pairingId);
   }
 
   claimPairing(

@@ -6,6 +6,7 @@ export type ProtocolIdentityService = Pick<
   | 'bootstrapOwner'
   | 'authenticate'
   | 'createPairing'
+  | 'inspectPairing'
   | 'claimPairing'
   | 'approvePairing'
   | 'completePairing'

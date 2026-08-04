@@ -84,6 +84,7 @@ export interface OperationsGateway {
   getSyncSnapshot(): SyncSnapshot;
   getConflicts(): SyncConflict[];
   subscribeSync(listener: () => void): () => void;
+  isNotaLifecycleOnlineOnly(id: string): boolean;
   initialize(): Promise<void>;
   flushNota(id: string): Promise<void>;
   retryPending(): Promise<void>;

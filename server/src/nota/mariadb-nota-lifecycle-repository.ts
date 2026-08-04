@@ -38,6 +38,7 @@ import {
   emitNota,
   hexToUuid,
   mutationBody,
+  notaVersionState,
   nullableHexToUuid,
   postingLineSnapshot,
   readLines,
@@ -205,6 +206,7 @@ export class MariaDbNotaLifecycleRepository {
       emitted.revision,
       String(row.lifecycle_version),
       emitted.entity,
+      await notaVersionState(connection, row),
     );
   }
 
@@ -333,7 +335,12 @@ export class MariaDbNotaLifecycleRepository {
       { postingId, totalRupiah: posting.amountRupiah.toString() },
       now,
     );
-    return mutationBody(emitted.revision, nextLifecycle, emitted.entity);
+    return mutationBody(
+      emitted.revision,
+      nextLifecycle,
+      emitted.entity,
+      await notaVersionState(connection, updated),
+    );
   }
 
   private async latestSnapshot(

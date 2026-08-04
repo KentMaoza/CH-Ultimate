@@ -24,11 +24,13 @@ import {
   cloneCore,
   coreCacheEnvelope,
   type CoreCacheEnvelope,
+  type CoreNotaVersionState,
   type CoreOptimisticChange,
   type CoreOutboxItem,
 } from './core-cache';
 import {
   asCoreJson,
+  applyCoreOptimisticChange,
   previewOptimisticOutbox,
 } from './core-optimistic-state';
 import { applyCoreChange } from './core-change-application';
@@ -142,6 +144,84 @@ export class CoreGatewayState {
     );
   }
 
+  getNotaVersions(): Record<string, CoreNotaVersionState> {
+    return Object.fromEntries(
+      this.canonicalState.notaTransactions.flatMap((nota) => {
+        const fieldVersions = this.notaFieldVersions.get(nota.id);
+        const structureVersion = this.notaStructureVersions.get(nota.id);
+        const lifecycleVersion = this.notaLifecycleVersions.get(nota.id);
+        if (!fieldVersions || !structureVersion || !lifecycleVersion) return [];
+        const pageIds = new Set(nota.pages.map((page) => page.id));
+        const lineIds = new Set(
+          nota.pages.flatMap((page) => page.lines.map((line) => line.id)),
+        );
+        return [[
+          nota.id,
+          {
+            fieldVersions: { ...fieldVersions },
+            structureVersion,
+            lifecycleVersion,
+            pageVersions: Object.fromEntries(
+              [...this.notaPageVersions].filter(([id]) => pageIds.has(id)),
+            ),
+            pageLifecycleVersions: Object.fromEntries(
+              [...this.notaPageLifecycleVersions].filter(([id]) =>
+                pageIds.has(id),
+              ),
+            ),
+            lineVersions: Object.fromEntries(
+              [...this.notaLineVersions].filter(([id]) => lineIds.has(id)),
+            ),
+          } satisfies CoreNotaVersionState,
+        ] as const];
+      }),
+    );
+  }
+
+  replaceCachedNotaVersions(
+    versions: Record<string, CoreNotaVersionState>,
+  ): void {
+    this.notaFieldVersions = new Map();
+    this.notaStructureVersions = new Map();
+    this.notaLifecycleVersions = new Map();
+    this.notaPageVersions = new Map();
+    this.notaPageLifecycleVersions = new Map();
+    this.notaLineVersions = new Map();
+    for (const [notaId, version] of Object.entries(versions)) {
+      this.notaFieldVersions.set(notaId, { ...version.fieldVersions });
+      this.notaStructureVersions.set(notaId, version.structureVersion);
+      this.notaLifecycleVersions.set(notaId, version.lifecycleVersion);
+      for (const [pageId, rowVersion] of Object.entries(version.pageVersions)) {
+        this.notaPageVersions.set(pageId, rowVersion);
+      }
+      for (const [pageId, lifecycleVersion] of Object.entries(
+        version.pageLifecycleVersions,
+      )) {
+        this.notaPageLifecycleVersions.set(pageId, lifecycleVersion);
+      }
+      for (const [lineId, rowVersion] of Object.entries(version.lineVersions)) {
+        this.notaLineVersions.set(lineId, rowVersion);
+      }
+    }
+  }
+
+  hasNotaVersionKnowledge(id: string): boolean {
+    return (
+      this.notaFieldVersions.has(id) &&
+      this.notaStructureVersions.has(id) &&
+      this.notaLifecycleVersions.has(id)
+    );
+  }
+
+  hasDeferredNotaConflict(id: string): boolean {
+    return this.deferredCommands.some(
+      (command) =>
+        command.kind === 'nota-mutation' &&
+        command.payload.notaId === id &&
+        command.status === 'conflict',
+    );
+  }
+
   requireNotaHeaderWriteContext(
     id: string,
     patch: Partial<NotaTransaction>,
@@ -201,11 +281,12 @@ export class CoreGatewayState {
     const canonicalPage = this.canonicalState.notaTransactions
       .find((nota) => nota.id === notaId)
       ?.pages.find((page) => page.id === pageId);
-    const canonical = canonicalPage?.lines.find((line) => line.id === lineId);
-    const projected = this.state.notaTransactions
+    const projectedPage = this.state.notaTransactions
       .find((nota) => nota.id === notaId)
-      ?.pages.find((page) => page.id === pageId)
-      ?.lines.find((line) => line.id === lineId);
+      ?.pages.find((page) => page.id === pageId);
+    const projected = projectedPage?.lines.find((line) => line.id === lineId);
+    const canonical =
+      canonicalPage?.lines.find((line) => line.id === lineId) ?? projected;
     if (
       !lifecycleVersion ||
       !pageVersion ||
@@ -219,10 +300,13 @@ export class CoreGatewayState {
       lifecycleVersion,
       pageVersion,
       lineVersion,
-      base: notaLineMaterial(canonical, canonicalPage!.lines.indexOf(canonical)),
+      base: notaLineMaterial(
+        canonical,
+        (canonicalPage ?? projectedPage)!.lines.indexOf(canonical),
+      ),
       mine: notaLineMaterial(
         { ...projected, ...patch },
-        canonicalPage!.lines.indexOf(canonical),
+        projectedPage!.lines.indexOf(projected),
       ),
     };
   }
@@ -896,6 +980,7 @@ export class CoreGatewayState {
 
   restore(envelope: CoreCacheEnvelope): void {
     this.canonicalState = cloneCore(envelope.state);
+    this.replaceCachedNotaVersions(envelope.notaVersions ?? {});
     this.outbox = cloneCore(envelope.outbox);
     this.outboxVersion += 1;
     this.serverRevision = envelope.serverRevision;
@@ -945,7 +1030,7 @@ export class CoreGatewayState {
     revision = this.serverRevision,
     outbox = this.outbox,
   ): CoreCacheEnvelope {
-    return coreCacheEnvelope(state, revision, outbox);
+    return coreCacheEnvelope(state, revision, outbox, this.getNotaVersions());
   }
 
   publishSync(patch: Partial<SyncSnapshot>): void {
@@ -973,6 +1058,17 @@ export class CoreGatewayState {
       this.outbox,
     );
     for (const command of this.deferredCommands) {
+      if (
+        command.kind === 'nota-mutation' &&
+        command.status !== 'conflict' &&
+        command.status !== 'quarantined'
+      ) {
+        projected = applyCoreOptimisticChange(
+          projected,
+          command.payload.optimistic,
+        );
+        continue;
+      }
       if (command.kind !== 'stock-count' || command.status === 'conflict') {
         continue;
       }

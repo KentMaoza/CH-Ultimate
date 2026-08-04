@@ -2,11 +2,15 @@ import { useMemo, useState, type CSSProperties } from 'react';
 import { lineTotal } from '../../src/domain/nota';
 import type { OperationsGateway } from '../../src/gateway/operations-gateway';
 import { notaPageTheme } from '../../src/renderer/nota/nota-page-colors';
-import { useOperationsSnapshot } from '../../src/renderer/use-operations-snapshot';
+import {
+  useOperationsSnapshot,
+  useOperationsSyncSnapshot,
+} from '../../src/renderer/use-operations-snapshot';
 import { formatRupiah } from '../format';
 
 export function MobileArchiveView({ coreBacked = false, gateway, onEdit }: { coreBacked?: boolean; gateway: OperationsGateway; onEdit: (transactionId: string) => void }) {
   const snapshot = useOperationsSnapshot(gateway);
+  const sync = useOperationsSyncSnapshot(gateway);
   const archived = useMemo(() => snapshot.notaTransactions
     .filter((transaction) => transaction.status === 'completed' && (transaction.completionDestination ?? 'archive') === 'archive')
     .sort((a, b) => Date.parse(b.completedAt ?? '') - Date.parse(a.completedAt ?? '')), [snapshot.notaTransactions]);
@@ -52,7 +56,7 @@ export function MobileArchiveView({ coreBacked = false, gateway, onEdit }: { cor
             <b>{formatRupiah(total)}</b>
           </button>
           {expanded && <section className="mobile-archive-detail" id={detailId} aria-label={`Nota arsip ${transaction.baseNumber}`}>
-            <header><span>{transaction.baseNumber}</span><button className="secondary-action" disabled={editing} onClick={() => void editSelected()}>Edit nota</button></header>
+            <header><span>{transaction.baseNumber}</span><button className="secondary-action" disabled={editing || (sync.phase === 'offline' && gateway.isNotaLifecycleOnlineOnly(transaction.id))} onClick={() => void editSelected()}>Edit nota</button></header>
             {transaction.pages.filter((page) => page.status === 'active').map((page) => {
               const pageIndex = transaction.pages.findIndex((candidate) => candidate.id === page.id);
               const theme = notaPageTheme(pageIndex);

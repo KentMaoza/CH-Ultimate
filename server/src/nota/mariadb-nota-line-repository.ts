@@ -35,6 +35,7 @@ import {
   lineTotal,
   lineValue,
   mutationBody,
+  notaVersionState,
   noteSuffix,
   quantityPcs,
   readLine,
@@ -217,10 +218,12 @@ export class MariaDbNotaLineRepository {
       { notaId: id, pageId, rowVersion: String(updated.row_version) },
       now,
     );
+    const updatedNota = await requireNota(connection, id);
     return mutationBody(
       revision,
       String(updated.row_version),
-      await domainEntity(connection, await requireNota(connection, id)),
+      await domainEntity(connection, updatedNota),
+      await notaVersionState(connection, updatedNota),
     );
   };
 
@@ -304,10 +307,12 @@ export class MariaDbNotaLineRepository {
       { notaId: id, pageId },
       now,
     );
+    const updatedNota = await requireNota(connection, id);
     return mutationBody(
       revision,
       String(updated.row_version),
-      await domainEntity(connection, await requireNota(connection, id)),
+      await domainEntity(connection, updatedNota),
+      await notaVersionState(connection, updatedNota),
     );
   };
 

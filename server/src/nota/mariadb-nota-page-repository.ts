@@ -35,6 +35,7 @@ import {
   lineTotal,
   lineValue,
   mutationBody,
+  notaVersionState,
   noteSuffix,
   quantityPcs,
   readLine,
@@ -145,7 +146,12 @@ export class MariaDbNotaPageRepository {
       now,
     );
     return {
-      ...mutationBody(revision, '1', await domainEntity(connection, row)),
+      ...mutationBody(
+        revision,
+        '1',
+        await domainEntity(connection, row),
+        await notaVersionState(connection, row),
+      ),
       statusCode: 201,
     };
   };
@@ -195,7 +201,7 @@ export class MariaDbNotaPageRepository {
         (maximum, page) => Math.max(maximum, Number(page.page_position)),
         -1,
       ) + 1;
-    const pageId = this.dependencies.uuid();
+    const pageId = input.clientPageId ?? this.dependencies.uuid();
     const now = this.dependencies.now();
     await connection.query(
       `INSERT INTO nota_pages
@@ -206,7 +212,14 @@ export class MariaDbNotaPageRepository {
           'active', 1, 1, ?, ?)`,
       [pageId, id, position, now, now],
     );
-    await insertBlankLines(connection, this.dependencies, id, pageId, now);
+    await insertBlankLines(
+      connection,
+      this.dependencies,
+      id,
+      pageId,
+      now,
+      input.clientLineIds,
+    );
     await connection.query(
       `UPDATE notas SET structure_version = structure_version + 1,
                         updated_at = ?
@@ -250,22 +263,27 @@ export class MariaDbNotaPageRepository {
       { notaId: id, position },
       now,
     );
-    return mutationBody(revision, '1', {
-      id: pageId,
-      suffix: noteSuffix(position),
-      status: 'active',
-      lines: (await readLines(connection, id))
-        .filter((item) => hexToUuid(item.page_id_hex) === pageId)
-        .map((item) => ({
-          id: hexToUuid(item.id_hex),
-          description: '',
-          kind: '',
-          quantity: 0,
-          unit: 'pcs',
-          pcsPrice: 0,
-          lsnPrice: 0,
-        })),
-    });
+    return mutationBody(
+      revision,
+      '1',
+      {
+        id: pageId,
+        suffix: noteSuffix(position),
+        status: 'active',
+        lines: (await readLines(connection, id))
+          .filter((item) => hexToUuid(item.page_id_hex) === pageId)
+          .map((item) => ({
+            id: hexToUuid(item.id_hex),
+            description: '',
+            kind: '',
+            quantity: 0,
+            unit: 'pcs',
+            pcsPrice: 0,
+            lsnPrice: 0,
+          })),
+      },
+      await notaVersionState(connection, updatedNota),
+    );
   };
 
   cancelPage = (
@@ -395,7 +413,8 @@ export class MariaDbNotaPageRepository {
     return mutationBody(
       revision,
       String(updated.lifecycle_version),
-      await domainEntity(connection, await requireNota(connection, id)),
+      await domainEntity(connection, updatedNota),
+      await notaVersionState(connection, updatedNota),
     );
   }
 }

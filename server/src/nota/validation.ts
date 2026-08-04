@@ -21,8 +21,38 @@ export const notaLinePath = z
   .strict();
 
 export const addPageBody = z
-  .object({ lifecycleVersion: version, structureVersion: version })
-  .strict();
+  .object({
+    lifecycleVersion: version,
+    structureVersion: version,
+    clientPageId: z.string().uuid().optional(),
+    clientLineIds: z.array(z.string().uuid()).length(15).optional(),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    if ((input.clientPageId === undefined) !== (input.clientLineIds === undefined)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'clientPageId and clientLineIds must be supplied together',
+      });
+    }
+    if (input.clientLineIds && new Set(input.clientLineIds).size !== 15) {
+      context.addIssue({
+        code: 'custom',
+        path: ['clientLineIds'],
+        message: 'clientLineIds must be unique',
+      });
+    }
+    if (
+      input.clientPageId &&
+      input.clientLineIds?.includes(input.clientPageId)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['clientLineIds'],
+        message: 'client page and line IDs must be unique',
+      });
+    }
+  });
 export const pageLifecycleBody = z
   .object({
     lifecycleVersion: version,

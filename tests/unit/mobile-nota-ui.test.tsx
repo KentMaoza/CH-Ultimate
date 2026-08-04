@@ -40,6 +40,29 @@ class AsyncAddNotaPageGateway extends MockOperationsGateway {
   }
 }
 
+class SyncedOfflineLifecycleGateway extends MockOperationsGateway {
+  override getSyncSnapshot = () => ({
+    phase: 'offline' as const,
+    serverRevision: '7',
+    pendingCount: 0,
+    conflictCount: 0,
+  });
+  override isNotaLifecycleOnlineOnly = () => true;
+}
+
+test('mobile disables synced Nota completion offline', async () => {
+  renderNota(
+    undefined,
+    createMobileDemoState,
+    new SyncedOfflineLifecycleGateway(createMobileDemoState),
+    true,
+  );
+
+  expect(
+    await screen.findByRole('button', { name: 'Selesaikan nota' }),
+  ).toBeDisabled();
+});
+
 async function addManual(name: string) {
   fireEvent.click(screen.getByRole('button', { name: 'Tambah barang tanpa barcode' }));
   fireEvent.change(screen.getByLabelText('Nama barang manual'), { target: { value: name } });

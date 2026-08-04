@@ -54,6 +54,7 @@ export class MockOperationsGateway implements OperationsGateway {
   getSyncSnapshot = () => this.syncSnapshot;
   getConflicts = (): SyncConflict[] => [];
   subscribeSync = (listener: () => void) => { this.syncListeners.add(listener); return () => this.syncListeners.delete(listener); };
+  isNotaLifecycleOnlineOnly = (_id: string): boolean => false;
   async initialize(): Promise<void> {}
   async flushNota(_id: string): Promise<void> {}
   async retryPending(): Promise<void> {}

@@ -23,6 +23,7 @@ import { CoreMutationCoordinator } from './core-mutation-coordinator';
 import { CoreMutationQueue } from './core-mutation-queue';
 import { CoreDeferredOutbox } from './core-outbox';
 import {
+  asOfflineJson,
   CoreLocalOwnershipError,
   CoreLocalStore,
   type CoreDeferredCommand,
@@ -52,6 +53,7 @@ import {
   integerFromDecimal,
   mapCoreStockCheckRow,
 } from './core-bootstrap-mapping';
+import { applyCoreOptimisticChange } from './core-optimistic-state';
 
 export type {
   CoreCacheEnvelope,
@@ -158,6 +160,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   getConflicts = () => this.state.getConflicts();
   subscribeSync = (listener: () => void): (() => void) =>
     this.state.subscribeSync(listener);
+  isNotaLifecycleOnlineOnly = (id: string): boolean => !this.hasLocalNota(id);
   initialize = async (): Promise<void> => {
     let envelope: CoreLocalEnvelope;
     let legacyCacheRestored = false;
@@ -197,6 +200,10 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   flushNota = async (id: string): Promise<void> => {
     if (this.hasLocalNota(id)) return;
     this.requireNetworkAllowed();
+    if (this.isOffline()) return this.offlineBlocked();
+    await this.deferred.pump(true);
+    await this.refreshOfflineProjection();
+    await this.requireNotaDeferredReady(id);
     await this.mutations.flushNota(id);
   };
   retryPending = async (): Promise<void> => {
@@ -207,7 +214,10 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
       return;
     }
     await this.mutations.retryPending();
-    if (this.state.getSyncSnapshot().phase === 'online') {
+    if (
+      this.state.getSyncSnapshot().phase === 'online' ||
+      this.state.getSyncSnapshot().phase === 'conflict'
+    ) {
       await this.deferred.pump(true);
       await this.refreshOfflineProjection();
     }
@@ -233,13 +243,11 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   ): Promise<void> {
     const resolvedOffline = await this.deferred.resolveConflict(id, choice);
     if (resolvedOffline) {
-      if (choice === 'mine') {
-        if (this.isOffline()) {
-          await this.refreshOfflineProjection();
-          return;
-        }
-        await this.deferred.pump(true);
+      if (this.isOffline()) {
+        await this.refreshOfflineProjection();
+        return;
       }
+      await this.deferred.pump(true);
       await this.refreshOfflineProjection();
       if (
         this.state.getSyncSnapshot().phase === 'conflict' &&
@@ -451,7 +459,27 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     transactionId: string,
   ): Promise<Nota | undefined> => {
     if (!this.hasLocalNota(transactionId)) {
-      if (this.isOffline()) return this.offlineBlocked();
+      if (this.isOffline()) {
+        const transaction = this.requireEditableSyncedNota(transactionId);
+        const context = this.state.requireNotaStructureContext(transactionId);
+        const page = createOfflinePage(transaction.nextNoteIndex);
+        await this.deferred.deferNotaMutation({
+          notaId: transactionId,
+          targetKey: `nota:${transactionId}:page-add:${page.id}`,
+          method: 'POST',
+          path: CORE_API_PATHS.notaPages(transactionId),
+          body: asOfflineJson({
+            ...context,
+            clientPageId: page.id,
+            clientLineIds: page.lines.map((line) => line.id),
+          }),
+          dependsOn: [],
+          optimistic: { kind: 'nota-page-add', notaId: transactionId, page },
+        });
+        await this.refreshOfflineProjection();
+        return page;
+      }
+      this.requireNotaUnconflicted(transactionId);
       return this.mutations.addNotaPage(transactionId);
     }
     const transaction = await this.requireLocalNota(transactionId);
@@ -469,7 +497,33 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     pageId: string,
   ): Promise<void> => {
     if (!this.hasLocalNota(transactionId)) {
-      if (this.isOffline()) return this.offlineBlocked();
+      if (this.isOffline()) {
+        const transaction = this.requireEditableSyncedNota(transactionId);
+        if (transaction.pages.filter((page) => page.status === 'active').length < 2) {
+          throw new Error('Nota harus memiliki setidaknya satu halaman aktif.');
+        }
+        const context = this.state.requireNotaPageLifecycleContext(
+          transactionId,
+          pageId,
+        );
+        await this.deferred.deferNotaMutation({
+          notaId: transactionId,
+          targetKey: `nota:${transactionId}:page:${pageId}:cancel`,
+          method: 'POST',
+          path: `${CORE_API_PATHS.notaPage(transactionId, pageId)}/cancel`,
+          body: asOfflineJson(context),
+          dependsOn: await this.pageDependencies(transactionId, pageId),
+          optimistic: {
+            kind: 'nota-page-status',
+            notaId: transactionId,
+            pageId,
+            status: 'cancelled',
+          },
+        });
+        await this.refreshOfflineProjection();
+        return;
+      }
+      this.requireNotaUnconflicted(transactionId);
       await this.mutations.cancelNotaPage(transactionId, pageId);
       return;
     }
@@ -491,7 +545,30 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     pageId: string,
   ): Promise<void> => {
     if (!this.hasLocalNota(transactionId)) {
-      if (this.isOffline()) return this.offlineBlocked();
+      if (this.isOffline()) {
+        this.requireEditableSyncedNota(transactionId);
+        const context = this.state.requireNotaPageLifecycleContext(
+          transactionId,
+          pageId,
+        );
+        await this.deferred.deferNotaMutation({
+          notaId: transactionId,
+          targetKey: `nota:${transactionId}:page:${pageId}:restore`,
+          method: 'POST',
+          path: `${CORE_API_PATHS.notaPage(transactionId, pageId)}/restore`,
+          body: asOfflineJson(context),
+          dependsOn: await this.pageDependencies(transactionId, pageId),
+          optimistic: {
+            kind: 'nota-page-status',
+            notaId: transactionId,
+            pageId,
+            status: 'active',
+          },
+        });
+        await this.refreshOfflineProjection();
+        return;
+      }
+      this.requireNotaUnconflicted(transactionId);
       await this.mutations.restoreNotaPage(transactionId, pageId);
       return;
     }
@@ -510,7 +587,34 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     patch: Parameters<OperationsGateway['updateNotaTransaction']>[1],
   ): Promise<void> => {
     if (!this.hasLocalNota(id)) {
-      if (this.isOffline()) return this.offlineBlocked();
+      if (this.isOffline()) {
+        this.requireEditableSyncedNota(id);
+        for (const field of Object.keys(patch) as Array<keyof typeof patch>) {
+          const mine = patch[field];
+          if (mine === undefined) continue;
+          const fieldPatch = { [field]: mine } as typeof patch;
+          const context = this.state.requireNotaHeaderWriteContext(
+            id,
+            fieldPatch,
+          );
+          await this.deferred.deferNotaMutation({
+            notaId: id,
+            targetKey: `nota:${id}:header:${field}`,
+            method: 'PATCH',
+            path: CORE_API_PATHS.notaHeader(id),
+            body: asOfflineJson(context),
+            dependsOn: [],
+            optimistic: {
+              kind: 'nota-header',
+              notaId: id,
+              patch: fieldPatch,
+            },
+          });
+        }
+        await this.refreshOfflineProjection();
+        return;
+      }
+      this.requireNotaUnconflicted(id);
       await this.mutations.updateNotaTransaction(id, patch);
       return;
     }
@@ -526,7 +630,33 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     patch: Partial<NotaLine>,
   ): Promise<void> => {
     if (!this.hasLocalNota(transactionId)) {
-      if (this.isOffline()) return this.offlineBlocked();
+      if (this.isOffline()) {
+        this.requireEditableSyncedNota(transactionId);
+        const context = this.state.requireNotaLineWriteContext(
+          transactionId,
+          pageId,
+          lineId,
+          patch,
+        );
+        await this.deferred.deferNotaMutation({
+          notaId: transactionId,
+          targetKey: `nota:${transactionId}:line:${lineId}`,
+          method: 'PATCH',
+          path: CORE_API_PATHS.notaLine(transactionId, pageId, lineId),
+          body: asOfflineJson(context),
+          dependsOn: await this.pageDependencies(transactionId, pageId),
+          optimistic: {
+            kind: 'nota-line',
+            notaId: transactionId,
+            pageId,
+            lineId,
+            patch,
+          },
+        });
+        await this.refreshOfflineProjection();
+        return;
+      }
+      this.requireNotaUnconflicted(transactionId);
       await this.mutations.updateNotaLine(
         transactionId,
         pageId,
@@ -558,7 +688,32 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     lineId: string,
   ): Promise<void> => {
     if (!this.hasLocalNota(transactionId)) {
-      if (this.isOffline()) return this.offlineBlocked();
+      if (this.isOffline()) {
+        this.requireEditableSyncedNota(transactionId);
+        const context = this.state.requireNotaDeleteContext(
+          transactionId,
+          pageId,
+          lineId,
+        );
+        await this.deferred.deferNotaMutation({
+          notaId: transactionId,
+          targetKey: `nota:${transactionId}:line:${lineId}`,
+          method: 'DELETE',
+          path: CORE_API_PATHS.notaLine(transactionId, pageId, lineId),
+          body: asOfflineJson(context),
+          dependsOn: await this.pageDependencies(transactionId, pageId),
+          optimistic: {
+            kind: 'nota-line',
+            notaId: transactionId,
+            pageId,
+            lineId,
+            patch: { ...emptyOfflineLine(lineId), skuId: undefined },
+          },
+        });
+        await this.refreshOfflineProjection();
+        return;
+      }
+      this.requireNotaUnconflicted(transactionId);
       await this.mutations.deleteNotaLine(transactionId, pageId, lineId);
       return;
     }
@@ -586,7 +741,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     destination: NotaCompletionDestination = 'archive',
   ): Promise<void> => {
     if (!this.hasLocalNota(id)) {
-      if (this.isOffline()) return this.offlineBlocked();
+      await this.flushNota(id);
       await this.mutations.completeNotaTransaction(id, destination);
       return;
     }
@@ -600,24 +755,21 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
         'Menunggu sinkronisasi — stok dan omzet pusat belum berubah.',
     });
   };
-  reopenNotaTransaction = (id: string): Promise<void> =>
-    this.hasLocalNota(id)
-      ? this.rejectLocalNotaLifecycle(id)
-      : this.isOffline()
-        ? this.offlineBlocked()
-        : this.mutations.reopenNotaTransaction(id);
-  cancelNotaTransaction = (id: string): Promise<void> =>
-    this.hasLocalNota(id)
-      ? this.rejectLocalNotaLifecycle(id)
-      : this.isOffline()
-        ? this.offlineBlocked()
-        : this.mutations.cancelNotaTransaction(id);
-  restoreNotaTransaction = (id: string): Promise<void> =>
-    this.hasLocalNota(id)
-      ? this.rejectLocalNotaLifecycle(id)
-      : this.isOffline()
-        ? this.offlineBlocked()
-        : this.mutations.restoreNotaTransaction(id);
+  reopenNotaTransaction = async (id: string): Promise<void> => {
+    if (this.hasLocalNota(id)) return this.rejectLocalNotaLifecycle(id);
+    await this.flushNota(id);
+    await this.mutations.reopenNotaTransaction(id);
+  };
+  cancelNotaTransaction = async (id: string): Promise<void> => {
+    if (this.hasLocalNota(id)) return this.rejectLocalNotaLifecycle(id);
+    await this.flushNota(id);
+    await this.mutations.cancelNotaTransaction(id);
+  };
+  restoreNotaTransaction = async (id: string): Promise<void> => {
+    if (this.hasLocalNota(id)) return this.rejectLocalNotaLifecycle(id);
+    await this.flushNota(id);
+    await this.mutations.restoreNotaTransaction(id);
+  };
 
   private isOffline(): boolean {
     const phase = this.state.getSyncSnapshot().phase;
@@ -675,6 +827,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     restoreOutbox = false,
   ): void {
     this.state.replaceCachedBalanceVersions(envelope.balanceVersions);
+    this.state.replaceCachedNotaVersions(envelope.notaVersions);
     this.provisionalNotaIds = new Set(
       envelope.provisionalNotas.map((nota) => nota.id),
     );
@@ -684,6 +837,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
         state: envelope.state,
         serverRevision: envelope.serverRevision,
         outbox: envelope.outbox,
+        notaVersions: envelope.notaVersions,
       });
     } else {
       const canonicalChanged =
@@ -737,6 +891,66 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   private requireEditableLocalNota(transaction: NotaTransaction): void {
     if (transaction.status !== 'draft') {
       throw new Error('Nota offline yang selesai tidak dapat diubah.');
+    }
+  }
+
+  private requireEditableSyncedNota(id: string): NotaTransaction {
+    const transaction = this.state
+      .getSnapshot()
+      .notaTransactions.find((nota) => nota.id === id);
+    if (!transaction) {
+      throw new Error('Nota tidak ditemukan di snapshot lokal.');
+    }
+    if (!['draft', 'reopened'].includes(transaction.status)) {
+      throw new Error('Nota offline yang selesai tidak dapat diubah.');
+    }
+    if (!this.state.hasNotaVersionKnowledge(id)) {
+      throw new Error(
+        'Mode offline: data bersama hanya dapat dibaca. Versi Nota belum tersedia. Sinkronkan ulang lalu coba lagi.',
+      );
+    }
+    return transaction;
+  }
+
+  private async pageDependencies(
+    notaId: string,
+    pageId: string,
+  ): Promise<string[]> {
+    const envelope = await this.localStore.load();
+    return envelope.deferredOutbox.flatMap((command) =>
+      command.kind === 'nota-mutation' &&
+      command.payload.notaId === notaId &&
+      command.payload.optimistic.kind === 'nota-page-add' &&
+      command.payload.optimistic.page.id === pageId
+        ? [command.operationId]
+        : [],
+    );
+  }
+
+  private requireNotaUnconflicted(notaId: string): void {
+    const normalConflict = this.state.getOutbox().some(
+      (item) => item.notaId === notaId && item.conflict,
+    );
+    const conflicted = this.state.hasDeferredNotaConflict(notaId);
+    if (normalConflict || conflicted) {
+      throw new Error(
+        'Nota memiliki konflik. Pilih Versi saya atau Versi server sebelum melanjutkan.',
+      );
+    }
+  }
+
+  private async requireNotaDeferredReady(notaId: string): Promise<void> {
+    this.requireNotaUnconflicted(notaId);
+    const envelope = await this.localStore.load();
+    const pending = envelope.deferredOutbox.some(
+      (command) =>
+        command.kind === 'nota-mutation' &&
+        command.payload.notaId === notaId,
+    );
+    if (pending) {
+      throw new Error(
+        'Perubahan Nota belum tersinkronisasi. Coba lagi setelah koneksi stabil.',
+      );
     }
   }
 
@@ -798,6 +1012,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     const envelope = await this.localStore.update((current) => ({
       ...current,
       balanceVersions: this.state.getBalanceVersions(),
+      notaVersions: this.state.getNotaVersions(),
     }));
     if (envelope.quarantine.active) {
       const resumed = await this.deferred.resumeAfterReapproval(
@@ -1003,6 +1218,56 @@ function acknowledgeOfflineCommand(
       },
     };
   }
+  if (command.kind === 'nota-mutation') {
+    const parsed = notaTransactionSchema.safeParse(entity);
+    const nextState = parsed.success
+      ? {
+          ...envelope.state,
+          notaTransactions: envelope.state.notaTransactions.some(
+            (nota) => nota.id === parsed.data.id,
+          )
+            ? envelope.state.notaTransactions.map((nota) =>
+                nota.id === parsed.data.id ? parsed.data : nota,
+              )
+            : [...envelope.state.notaTransactions, parsed.data],
+        }
+      : applyCoreOptimisticChange(
+          envelope.state,
+          command.payload.optimistic,
+        );
+    const versionState = acknowledgement.versionState;
+    const acknowledged: CoreLocalEnvelope = {
+      ...envelope,
+      state: nextState,
+      notaVersions:
+        versionState && versionState.notaId === command.payload.notaId
+          ? {
+              ...envelope.notaVersions,
+              [versionState.notaId]: {
+                fieldVersions: { ...versionState.fieldVersions },
+                structureVersion: versionState.structureVersion,
+                lifecycleVersion: versionState.lifecycleVersion,
+                pageVersions: { ...versionState.pageVersions },
+                pageLifecycleVersions: {
+                  ...versionState.pageLifecycleVersions,
+                },
+                lineVersions: { ...versionState.lineVersions },
+              },
+            }
+          : envelope.notaVersions,
+    };
+    return {
+      ...acknowledged,
+      deferredOutbox: acknowledged.deferredOutbox.map((candidate) =>
+        candidate.kind === 'nota-mutation' &&
+        candidate.payload.notaId === command.payload.notaId &&
+        candidate.sequence > command.sequence &&
+        !candidate.firstSentAt
+          ? rebaseOfflineNotaMutation(candidate, acknowledged)
+          : candidate,
+      ),
+    };
+  }
   const balance = coreBalanceRowSchema.parse(entity);
   if (balance.skuId !== command.payload.skuId) {
     throw new Error('Respons stok offline CH Core tidak valid.');
@@ -1031,6 +1296,108 @@ function acknowledgeOfflineCommand(
         sku.id === current.id ? { ...sku, stock: quantity } : sku,
       ),
     },
+  };
+}
+
+function rebaseOfflineNotaMutation(
+  command: Extract<CoreDeferredCommand, { kind: 'nota-mutation' }>,
+  envelope: CoreLocalEnvelope,
+): Extract<CoreDeferredCommand, { kind: 'nota-mutation' }> {
+  const version = envelope.notaVersions[command.payload.notaId];
+  const nota = envelope.state.notaTransactions.find(
+    (candidate) => candidate.id === command.payload.notaId,
+  );
+  if (!version || !nota) return command;
+  const optimistic = command.payload.optimistic;
+  if (optimistic.kind === 'nota-header') {
+    const field = Object.keys(optimistic.patch)[0] as keyof NotaTransaction;
+    const fieldVersion = version.fieldVersions[String(field)];
+    if (!fieldVersion) return command;
+    return {
+      ...command,
+      payload: {
+        ...command.payload,
+        body: asOfflineJson({
+          lifecycleVersion: version.lifecycleVersion,
+          fields: {
+            [field]: {
+              version: fieldVersion,
+              base: nota[field],
+              mine: optimistic.patch[field],
+            },
+          },
+        }),
+      },
+    };
+  }
+  if (optimistic.kind === 'nota-line') {
+    const page = nota.pages.find((candidate) => candidate.id === optimistic.pageId);
+    const line = page?.lines.find((candidate) => candidate.id === optimistic.lineId);
+    const pageVersion = version.pageVersions[optimistic.pageId];
+    const lineVersion = version.lineVersions[optimistic.lineId];
+    if (!page || !line || !pageVersion || !lineVersion) return command;
+    const position = page.lines.indexOf(line);
+    return {
+      ...command,
+      payload: {
+        ...command.payload,
+        body: asOfflineJson({
+          lifecycleVersion: version.lifecycleVersion,
+          pageVersion,
+          lineVersion,
+          base: offlineNotaLineMaterial(line, position),
+          mine: offlineNotaLineMaterial(
+            { ...line, ...optimistic.patch },
+            position,
+          ),
+        }),
+      },
+    };
+  }
+  if (optimistic.kind === 'nota-page-status') {
+    const pageVersion =
+      version.pageLifecycleVersions[optimistic.pageId];
+    if (!pageVersion) return command;
+    return {
+      ...command,
+      payload: {
+        ...command.payload,
+        body: asOfflineJson({
+          lifecycleVersion: version.lifecycleVersion,
+          structureVersion: version.structureVersion,
+          pageVersion,
+        }),
+      },
+    };
+  }
+  if (optimistic.kind !== 'nota-page-add') return command;
+  return {
+    ...command,
+    payload: {
+      ...command.payload,
+      body: asOfflineJson({
+        lifecycleVersion: version.lifecycleVersion,
+        structureVersion: version.structureVersion,
+        clientPageId: optimistic.page.id,
+        clientLineIds: optimistic.page.lines.map((line) => line.id),
+      }),
+    },
+  };
+}
+
+function offlineNotaLineMaterial(
+  line: NotaLine,
+  linePosition: number,
+): Record<string, unknown> {
+  return {
+    linePosition,
+    skuId: line.skuId ?? null,
+    description: line.description,
+    kind: line.kind,
+    quantity: line.quantity,
+    unit: line.unit,
+    pcsPrice: line.pcsPrice,
+    lsnPrice: line.lsnPrice,
   };
 }
 

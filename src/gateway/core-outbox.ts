@@ -4,6 +4,7 @@ import { coreConflictSchema } from './core-cache';
 import type {
   CoreDeferredCommand,
   CoreLocalEnvelope,
+  OfflineNotaMutationPayload,
   OfflineSkuSnapshot,
   OfflineStockCountPayload,
   OfflineStockPayload,
@@ -150,6 +151,54 @@ export class CoreDeferredOutbox {
     }));
   }
 
+  async deferNotaMutation(payload: OfflineNotaMutationPayload): Promise<string> {
+    const operationId = this.dependencies.uuid();
+    let durableOperationId = operationId;
+    await this.store.update((envelope) => {
+      const existing = envelope.deferredOutbox.find(
+        (command) =>
+          command.kind === 'nota-mutation' &&
+          command.payload.targetKey === payload.targetKey &&
+          !command.firstSentAt &&
+          command.status !== 'conflict' &&
+          command.status !== 'quarantined',
+      );
+      if (existing?.kind === 'nota-mutation') {
+        durableOperationId = existing.operationId;
+        return {
+          ...envelope,
+          deferredOutbox: envelope.deferredOutbox.map((command) =>
+            command.operationId === existing.operationId
+              ? {
+                  ...existing,
+                  status: 'deferred',
+                  lastError: undefined,
+                  payload,
+                }
+              : command,
+          ),
+        };
+      }
+      return applyDeferredNotaVersionEffect({
+        ...envelope,
+        deferredOutbox: [
+          ...envelope.deferredOutbox,
+          {
+            kind: 'nota-mutation',
+            sequence: envelope.nextDeferredSequence,
+            operationId,
+            idempotencyKey: operationId,
+            createdAt: this.dependencies.now().toISOString(),
+            status: 'deferred',
+            payload,
+          },
+        ],
+        nextDeferredSequence: envelope.nextDeferredSequence + 1,
+      }, payload);
+    });
+    return durableOperationId;
+  }
+
   pump(onlineConfirmed: boolean): Promise<void> {
     if (!onlineConfirmed) return Promise.resolve();
     this.pumping ??= this.runPump().finally(() => {
@@ -165,18 +214,44 @@ export class CoreDeferredOutbox {
   }
 
   async resolveConflict(
-    operationId: string,
+    conflictId: string,
     choice: 'mine' | 'server',
   ): Promise<boolean> {
     const current = await this.store.load();
-    if (
-      !current.deferredOutbox.some(
-        (candidate) =>
+    const conflict = current.offlineConflicts.find(
+      (candidate) =>
+        candidate.conflict.id === conflictId ||
+        candidate.operationId === conflictId,
+    );
+    if (!conflict) return false;
+    const operationId = conflict.operationId;
+    const selected = current.deferredOutbox.find(
+      (candidate) =>
+        candidate.operationId === operationId &&
+        candidate.status === 'conflict',
+    );
+    if (!selected) return false;
+    if (selected.kind === 'nota-mutation') {
+      const resolutionKey = this.dependencies.uuid();
+      await this.store.update((envelope) => ({
+        ...envelope,
+        deferredOutbox: envelope.deferredOutbox.map((candidate) =>
           candidate.operationId === operationId &&
-          candidate.status === 'conflict',
-      )
-    ) {
-      return false;
+          candidate.kind === 'nota-mutation'
+            ? {
+                ...candidate,
+                status: 'deferred',
+                lastError: undefined,
+                resolution: {
+                  conflictId: conflict.conflict.id,
+                  choice,
+                  idempotencyKey: resolutionKey,
+                },
+              }
+            : candidate,
+        ),
+      }));
+      return true;
     }
     let found = false;
     await this.store.update((envelope) => {
@@ -235,17 +310,30 @@ export class CoreDeferredOutbox {
       }
       if (!candidate) return;
       const firstSentAt =
-        candidate.firstSentAt ?? this.dependencies.now().toISOString();
+        candidate.kind === 'nota-mutation' && candidate.resolution
+          ? candidate.resolution.firstSentAt ??
+            this.dependencies.now().toISOString()
+          : candidate.firstSentAt ?? this.dependencies.now().toISOString();
       const sending = await this.store.update((current) => ({
         ...current,
         deferredOutbox: current.deferredOutbox.map((command) =>
           command.operationId === candidate.operationId
-            ? {
-                ...command,
-                status: 'sending',
-                firstSentAt,
-                lastError: undefined,
-              }
+            ? command.kind === 'nota-mutation' && command.resolution
+              ? {
+                  ...command,
+                  status: 'sending',
+                  lastError: undefined,
+                  resolution: {
+                    ...command.resolution,
+                    firstSentAt,
+                  },
+                }
+              : {
+                  ...command,
+                  status: 'sending',
+                  firstSentAt,
+                  lastError: undefined,
+                }
             : command,
         ),
       }));
@@ -256,15 +344,34 @@ export class CoreDeferredOutbox {
       let response: CoreApiResponse;
       try {
         response = await this.transport.request({
-          method: 'POST',
+          method:
+            command.kind === 'nota-mutation' && command.resolution
+              ? 'POST'
+              : command.kind === 'nota-mutation'
+              ? command.payload.method
+              : 'POST',
           path:
-            command.kind === 'offline-nota'
+            command.kind === 'nota-mutation' && command.resolution
+              ? CORE_API_PATHS.resolveConflict(
+                  command.resolution.conflictId,
+                )
+              : command.kind === 'offline-nota'
               ? CORE_API_PATHS.offlineNotas
               : command.kind === 'stock-delta'
                 ? CORE_API_PATHS.offlineStockAdjustments
-                : CORE_API_PATHS.offlineStockChecks,
-          body: command.payload,
-          idempotencyKey: command.idempotencyKey,
+                : command.kind === 'stock-count'
+                  ? CORE_API_PATHS.offlineStockChecks
+                  : command.payload.path,
+          body:
+            command.kind === 'nota-mutation' && command.resolution
+              ? { choice: command.resolution.choice }
+              : command.kind === 'nota-mutation'
+                ? command.payload.body
+                : command.payload,
+          idempotencyKey:
+            command.kind === 'nota-mutation' && command.resolution
+              ? command.resolution.idempotencyKey
+              : command.idempotencyKey,
         });
       } catch (error) {
         await this.markError(command.operationId, error);
@@ -294,9 +401,22 @@ export class CoreDeferredOutbox {
           ) ?? current;
         return {
           ...acknowledged,
-          deferredOutbox: acknowledged.deferredOutbox.filter(
-            (item) => item.operationId !== command.operationId,
-          ),
+          deferredOutbox: acknowledged.deferredOutbox.filter((item) => {
+            if (item.operationId === command.operationId) return false;
+            return !(
+              command.kind === 'nota-mutation' &&
+              command.resolution?.choice === 'server' &&
+              command.payload.optimistic.kind === 'nota-page-add' &&
+              item.kind === 'nota-mutation' &&
+              item.payload.dependsOn.includes(command.operationId)
+            );
+          }),
+          offlineConflicts:
+            command.kind === 'nota-mutation' && command.resolution
+            ? acknowledged.offlineConflicts.filter(
+                (item) => item.operationId !== command.operationId,
+              )
+            : acknowledged.offlineConflicts,
         };
       });
     }
@@ -334,12 +454,15 @@ export class CoreDeferredOutbox {
                   : {
                       id: operationId,
                       entityType:
-                        command.kind === 'offline-nota'
+                        command.kind === 'offline-nota' ||
+                        command.kind === 'nota-mutation'
                           ? 'nota'
                           : 'stock_balance',
                       entityId:
                         command.kind === 'offline-nota'
                           ? command.payload.provisionalId
+                          : command.kind === 'nota-mutation'
+                            ? command.payload.notaId
                           : command.payload.skuId,
                       base: null,
                       mine: asOfflineJson(command.payload),
@@ -381,9 +504,13 @@ export class CoreDeferredOutbox {
 }
 
 function deferredEntityKey(command: CoreDeferredCommand): string {
-  return command.kind === 'offline-nota'
-    ? `nota:${command.payload.provisionalId}`
-    : `stock:${command.payload.skuId}`;
+  if (command.kind === 'offline-nota') {
+    return `nota:${command.payload.provisionalId}`;
+  }
+  if (command.kind === 'nota-mutation') {
+    return `nota:${command.payload.notaId}`;
+  }
+  return `stock:${command.payload.skuId}`;
 }
 
 function responseError(response: CoreApiResponse): Error {
@@ -398,4 +525,63 @@ function responseError(response: CoreApiResponse): Error {
       ? candidate
       : `HTTP_${response.status}`;
   return new Error(code);
+}
+
+function applyDeferredNotaVersionEffect(
+  envelope: CoreLocalEnvelope,
+  payload: OfflineNotaMutationPayload,
+): CoreLocalEnvelope {
+  const version = envelope.notaVersions[payload.notaId];
+  if (!version) return envelope;
+  if (payload.optimistic.kind === 'nota-page-add') {
+    const page = payload.optimistic.page;
+    return {
+      ...envelope,
+      notaVersions: {
+        ...envelope.notaVersions,
+        [payload.notaId]: {
+          ...version,
+          structureVersion: incrementVersion(version.structureVersion),
+          pageVersions: { ...version.pageVersions, [page.id]: '1' },
+          pageLifecycleVersions: {
+            ...version.pageLifecycleVersions,
+            [page.id]: '1',
+          },
+          lineVersions: {
+            ...version.lineVersions,
+            ...Object.fromEntries(page.lines.map((line) => [line.id, '1'])),
+          },
+        },
+      },
+    };
+  }
+  if (payload.optimistic.kind === 'nota-page-status') {
+    const pageId = payload.optimistic.pageId;
+    const pageVersion = version.pageVersions[pageId];
+    const pageLifecycleVersion = version.pageLifecycleVersions[pageId];
+    if (!pageVersion || !pageLifecycleVersion) return envelope;
+    return {
+      ...envelope,
+      notaVersions: {
+        ...envelope.notaVersions,
+        [payload.notaId]: {
+          ...version,
+          structureVersion: incrementVersion(version.structureVersion),
+          pageVersions: {
+            ...version.pageVersions,
+            [pageId]: incrementVersion(pageVersion),
+          },
+          pageLifecycleVersions: {
+            ...version.pageLifecycleVersions,
+            [pageId]: incrementVersion(pageLifecycleVersion),
+          },
+        },
+      },
+    };
+  }
+  return envelope;
+}
+
+function incrementVersion(version: string): string {
+  return (BigInt(version) + 1n).toString();
 }

@@ -22,7 +22,7 @@ export function previewOptimisticOutbox(
   let state = canonical;
   for (const item of outbox) {
     if (item.optimistic && item.optimisticActive) {
-      state = applyOptimistic(state, item.optimistic);
+      state = applyCoreOptimisticChange(state, item.optimistic);
     }
   }
   return state;
@@ -108,7 +108,7 @@ function patchRecord(
   return patch;
 }
 
-function applyOptimistic(
+export function applyCoreOptimisticChange(
   state: DemoState,
   change: CoreOptimisticChange,
 ): DemoState {
@@ -123,6 +123,43 @@ function applyOptimistic(
       ...state,
       notaTransactions: state.notaTransactions.map((nota) =>
         nota.id === change.notaId ? { ...nota, ...change.patch } : nota,
+      ),
+    };
+  }
+  if (change.kind === 'nota-page-add') {
+    return {
+      ...state,
+      notaTransactions: state.notaTransactions.map((nota) =>
+        nota.id === change.notaId
+          ? {
+              ...nota,
+              nextNoteIndex: Math.max(
+                nota.nextNoteIndex,
+                nota.pages.length + 1,
+              ),
+              pages: [
+                ...nota.pages.filter((page) => page.id !== change.page.id),
+                cloneCore(change.page),
+              ],
+            }
+          : nota,
+      ),
+    };
+  }
+  if (change.kind === 'nota-page-status') {
+    return {
+      ...state,
+      notaTransactions: state.notaTransactions.map((nota) =>
+        nota.id === change.notaId
+          ? {
+              ...nota,
+              pages: nota.pages.map((page) =>
+                page.id === change.pageId
+                  ? { ...page, status: change.status }
+                  : page,
+              ),
+            }
+          : nota,
       ),
     };
   }

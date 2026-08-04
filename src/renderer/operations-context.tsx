@@ -1,6 +1,9 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import type { OperationsGateway } from '../gateway/operations-gateway';
-import { useOperationsSnapshot } from './use-operations-snapshot';
+import {
+  useOperationsSnapshot,
+  useOperationsSyncSnapshot,
+} from './use-operations-snapshot';
 
 const GatewayContext = createContext<OperationsGateway | null>(null);
 
@@ -13,5 +16,6 @@ export function useOperations() {
   const gateway = useContext(GatewayContext);
   if (!gateway) throw new Error('OperationsProvider is missing.');
   const state = useOperationsSnapshot(gateway);
-  return { state, gateway };
+  const sync = useOperationsSyncSnapshot(gateway);
+  return { state, sync, gateway };
 }

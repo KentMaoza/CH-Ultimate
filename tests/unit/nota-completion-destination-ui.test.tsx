@@ -3,10 +3,28 @@ import type { NotaCompletionDestination } from '../../src/domain/types';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 import { App } from '../../src/renderer/App';
 
-function openNota(gateway: MockOperationsGateway) {
-  render(<App gateway={gateway} />);
+function openNota(gateway: MockOperationsGateway, coreBacked = false) {
+  render(<App gateway={gateway} coreBacked={coreBacked} />);
   fireEvent.click(screen.getByRole('button', { name: 'Nota' }));
 }
+
+class SyncedOfflineLifecycleGateway extends MockOperationsGateway {
+  override getSyncSnapshot = () => ({
+    phase: 'offline' as const,
+    serverRevision: '7',
+    pendingCount: 0,
+    conflictCount: 0,
+  });
+  override isNotaLifecycleOnlineOnly = () => true;
+}
+
+test('desktop disables synced Nota transaction lifecycle controls offline', () => {
+  const gateway = new SyncedOfflineLifecycleGateway();
+  openNota(gateway, true);
+
+  expect(screen.getByRole('button', { name: 'Selesaikan nota' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Batalkan transaksi' })).toBeDisabled();
+});
 
 async function chooseCompletion(destination: NotaCompletionDestination) {
   fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));

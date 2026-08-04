@@ -13,3 +13,15 @@ export function useOperationsSnapshot(gateway: OperationsGateway) {
 
   return snapshot;
 }
+
+export function useOperationsSyncSnapshot(gateway: OperationsGateway) {
+  const [snapshot, setSnapshot] = useState(() => gateway.getSyncSnapshot());
+
+  useEffect(() => {
+    const publish = () => setSnapshot(gateway.getSyncSnapshot());
+    publish();
+    return gateway.subscribeSync(publish);
+  }, [gateway]);
+
+  return snapshot;
+}

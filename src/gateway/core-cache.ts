@@ -17,6 +17,7 @@ import {
   demoStateSchema,
   invoiceTemplateSchema,
   labelTemplateSchema,
+  notaPageSchema,
   notaLineSchema,
   notaTransactionSchema,
   timestampSchema,
@@ -52,6 +53,17 @@ export type CoreOptimisticChange =
       lineId: string;
       patch: Partial<NotaLine>;
     }
+  | {
+      kind: 'nota-page-add';
+      notaId: string;
+      page: NotaTransaction['pages'][number];
+    }
+  | {
+      kind: 'nota-page-status';
+      notaId: string;
+      pageId: string;
+      status: NotaTransaction['pages'][number]['status'];
+    }
   | { kind: 'label-template'; template: LabelTemplate }
   | { kind: 'invoice-template'; template: InvoiceTemplate };
 
@@ -70,11 +82,21 @@ export interface CoreOutboxItem {
   conflict?: CoreConflict;
 }
 
+export interface CoreNotaVersionState {
+  fieldVersions: Record<string, string>;
+  structureVersion: string;
+  lifecycleVersion: string;
+  pageVersions: Record<string, string>;
+  pageLifecycleVersions: Record<string, string>;
+  lineVersions: Record<string, string>;
+}
+
 export interface CoreCacheEnvelope {
   cacheVersion: 1;
   state: DemoState;
   serverRevision: string;
   outbox: CoreOutboxItem[];
+  notaVersions?: Record<string, CoreNotaVersionState>;
 }
 
 export const coreConflictSchema = z
@@ -89,7 +111,7 @@ export const coreConflictSchema = z
   })
   .strict();
 
-const optimisticSchema: z.ZodType<CoreOptimisticChange> = z.discriminatedUnion(
+export const coreOptimisticChangeSchema: z.ZodType<CoreOptimisticChange> = z.discriminatedUnion(
   'kind',
   [
     z
@@ -106,6 +128,21 @@ const optimisticSchema: z.ZodType<CoreOptimisticChange> = z.discriminatedUnion(
         pageId: z.string(),
         lineId: z.string(),
         patch: notaLineSchema.partial(),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('nota-page-add'),
+        notaId: z.string(),
+        page: notaPageSchema,
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('nota-page-status'),
+        notaId: z.string(),
+        pageId: z.string(),
+        status: z.enum(['active', 'cancelled']),
       })
       .strict(),
     z
@@ -134,9 +171,21 @@ export const coreOutboxItemSchema: z.ZodType<CoreOutboxItem> = z
     notaId: z.string().optional(),
     coalesceKey: z.string().optional(),
     resolvesConflictId: z.string().uuid().optional(),
-    optimistic: optimisticSchema.optional(),
+    optimistic: coreOptimisticChangeSchema.optional(),
     optimisticActive: z.boolean().optional(),
     conflict: coreConflictSchema.optional(),
+  })
+  .strict();
+
+const canonicalVersion = z.string().regex(/^[1-9]\d*$/);
+export const coreNotaVersionStateSchema: z.ZodType<CoreNotaVersionState> = z
+  .object({
+    fieldVersions: z.record(z.string(), canonicalVersion),
+    structureVersion: canonicalVersion,
+    lifecycleVersion: canonicalVersion,
+    pageVersions: z.record(z.string().uuid(), canonicalVersion),
+    pageLifecycleVersions: z.record(z.string().uuid(), canonicalVersion),
+    lineVersions: z.record(z.string().uuid(), canonicalVersion),
   })
   .strict();
 
@@ -146,6 +195,9 @@ const cacheEnvelopeSchema: z.ZodType<CoreCacheEnvelope> = z
     state: demoStateSchema,
     serverRevision: z.string().regex(/^(0|[1-9]\d*)$/),
     outbox: z.array(coreOutboxItemSchema),
+    notaVersions: z
+      .record(z.string().uuid(), coreNotaVersionStateSchema)
+      .default({}),
   })
   .strict();
 
@@ -170,11 +222,13 @@ export function coreCacheEnvelope(
   state: DemoState,
   serverRevision: string,
   outbox: CoreOutboxItem[],
+  notaVersions: Record<string, CoreNotaVersionState> = {},
 ): CoreCacheEnvelope {
   return {
     cacheVersion: CORE_CACHE_VERSION,
     state: cloneCore(state),
     serverRevision,
     outbox: cloneCore(outbox),
+    notaVersions: cloneCore(notaVersions),
   };
 }

@@ -9,8 +9,8 @@ class ConflictGateway extends MockOperationsGateway {
   override getSyncSnapshot = () => ({
     phase: 'conflict' as const,
     serverRevision: '7',
-    pendingCount: 1,
-    conflictCount: 1,
+    pendingCount: 2,
+    conflictCount: 2,
   });
   override getConflicts = () => [
     {
@@ -21,6 +21,15 @@ class ConflictGateway extends MockOperationsGateway {
       base: 'Amelia',
       mine: 'Amina',
       server: 'Amelia Baru',
+    },
+    {
+      id: '99999999-9999-4999-8999-999999999999',
+      entityType: 'nota_line',
+      entityId: '44444444-4444-4444-8444-444444444444',
+      field: 'description',
+      base: 'Kopi',
+      mine: 'Kopi Susu',
+      server: 'Kopi Hitam',
     },
   ];
   override resolveConflict = vi.fn(async () => undefined);
@@ -36,8 +45,10 @@ it.each([
   expect(screen.getByText('Dasar: Amelia')).toBeInTheDocument();
   expect(screen.getByText('Saya: Amina')).toBeInTheDocument();
   expect(screen.getByText('Server: Amelia Baru')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Gunakan perubahan saya' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Gunakan versi server' }));
+  expect(screen.getByText('Saya: Kopi Susu')).toBeInTheDocument();
+  expect(screen.getAllByRole('region', { name: 'Detail konflik data' })).toHaveLength(2);
+  fireEvent.click(screen.getAllByRole('button', { name: 'Versi saya' })[0]!);
+  fireEvent.click(screen.getAllByRole('button', { name: 'Versi server' })[1]!);
 
   expect(gateway.resolveConflict).toHaveBeenNthCalledWith(
     1,
@@ -46,7 +57,7 @@ it.each([
   );
   expect(gateway.resolveConflict).toHaveBeenNthCalledWith(
     2,
-    '88888888-8888-4888-8888-888888888888',
+    '99999999-9999-4999-8999-999999999999',
     'server',
   );
 });

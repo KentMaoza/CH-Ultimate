@@ -4,9 +4,13 @@ import type { DemoState, NotaTransaction } from '../domain/types';
 import {
   cloneCore,
   coreConflictSchema,
+  coreNotaVersionStateSchema,
+  coreOptimisticChangeSchema,
   coreOutboxItemSchema,
   type CoreCacheEnvelope,
   type CoreGatewayStorage,
+  type CoreNotaVersionState,
+  type CoreOptimisticChange,
   type CoreOutboxItem,
 } from './core-cache';
 import { emptyCoreState } from './core-bootstrap-mapping';
@@ -15,7 +19,11 @@ import {
   notaTransactionSchema,
   timestampSchema,
 } from './core-domain-schemas';
-import type { CoreConflict, CoreJsonValue } from './core-api-types';
+import {
+  coreJsonValueSchema,
+  type CoreConflict,
+  type CoreJsonValue,
+} from './core-api-types';
 
 export const CORE_CACHE_VERSION = 4;
 
@@ -68,6 +76,23 @@ export interface OfflineStockCountPayload {
   note?: string;
 }
 
+export interface OfflineNotaMutationPayload {
+  notaId: string;
+  targetKey: string;
+  method: 'POST' | 'PATCH' | 'DELETE';
+  path: string;
+  body: CoreJsonValue;
+  dependsOn: string[];
+  optimistic: CoreOptimisticChange;
+}
+
+export interface OfflineNotaConflictResolution {
+  conflictId: string;
+  choice: 'mine' | 'server';
+  idempotencyKey: string;
+  firstSentAt?: string;
+}
+
 export type CoreDeferredCommand =
   | {
       kind: 'offline-nota';
@@ -101,6 +126,18 @@ export type CoreDeferredCommand =
       firstSentAt?: string;
       lastError?: string;
       payload: OfflineStockCountPayload;
+    }
+  | {
+      kind: 'nota-mutation';
+      sequence: number;
+      operationId: string;
+      idempotencyKey: string;
+      createdAt: string;
+      status: CoreDeferredStatus;
+      firstSentAt?: string;
+      lastError?: string;
+      resolution?: OfflineNotaConflictResolution;
+      payload: OfflineNotaMutationPayload;
     };
 
 export interface CoreOfflineConflict {
@@ -115,6 +152,7 @@ export interface CoreLocalEnvelope {
   state: DemoState;
   serverRevision: string;
   balanceVersions: Record<string, string>;
+  notaVersions: Record<string, CoreNotaVersionState>;
   outbox: CoreOutboxItem[];
   quarantinedOutbox: CoreOutboxItem[];
   deferredOutbox: CoreDeferredCommand[];
@@ -214,6 +252,32 @@ const deferredCommandSchema: z.ZodType<CoreDeferredCommand> =
           .strict(),
       })
       .strict(),
+    z
+      .object({
+        kind: z.literal('nota-mutation'),
+        ...commonDeferred,
+        payload: z
+          .object({
+            notaId: uuid,
+            targetKey: z.string().min(1).max(512),
+            method: z.enum(['POST', 'PATCH', 'DELETE']),
+            path: z.string().startsWith('/v1/'),
+            body: coreJsonValueSchema,
+            dependsOn: z.array(uuid),
+            optimistic: coreOptimisticChangeSchema,
+          })
+          .strict(),
+        resolution: z
+          .object({
+            conflictId: uuid,
+            choice: z.enum(['mine', 'server']),
+            idempotencyKey: uuid,
+            firstSentAt: timestampSchema.optional(),
+          })
+          .strict()
+          .optional(),
+      })
+      .strict(),
   ]);
 const legacyDeferredCommandSchema = z.discriminatedUnion('kind', [
   z
@@ -288,6 +352,7 @@ const localEnvelopeSchema: z.ZodType<CoreLocalEnvelope> = z
     state: demoStateSchema,
     serverRevision: decimalCursor,
     balanceVersions: z.record(uuid, z.string().regex(/^[1-9]\d*$/)),
+    notaVersions: z.record(uuid, coreNotaVersionStateSchema).default({}),
     outbox: z.array(coreOutboxItemSchema),
     quarantinedOutbox: z.array(coreOutboxItemSchema),
     deferredOutbox: z.array(deferredCommandSchema),
@@ -429,6 +494,7 @@ export function migrateCoreCache(
         sequence: index + 1,
       })),
       balanceVersions: {},
+      notaVersions: {},
       nextDeferredSequence: v3.data.deferredOutbox.length + 1,
     };
   }
@@ -450,6 +516,7 @@ export function migrateCoreCache(
       quarantinedOutbox: [],
       deferredOutbox: [],
       balanceVersions: {},
+      notaVersions: {},
       nextDeferredSequence: 1,
       quarantine: { active: false },
     };
@@ -462,6 +529,7 @@ export function migrateCoreCache(
     state: cloneCore(legacy.state),
     serverRevision: legacy.serverRevision,
     balanceVersions: {},
+    notaVersions: {},
     outbox: cloneCore(legacy.outbox),
     quarantinedOutbox: [],
     deferredOutbox: [],
@@ -482,6 +550,7 @@ export function emptyCoreLocalEnvelope(
     state: cloneCore(state),
     serverRevision: '0',
     balanceVersions: {},
+    notaVersions: {},
     outbox: [],
     quarantinedOutbox: [],
     deferredOutbox: [],
@@ -534,6 +603,7 @@ export class CoreLocalStore {
       state: cloneCore(envelope.state),
       serverRevision: envelope.serverRevision,
       outbox: cloneCore(envelope.outbox),
+      notaVersions: cloneCore(envelope.notaVersions),
     };
   }
 
@@ -544,6 +614,7 @@ export class CoreLocalStore {
         ...current,
         state: cloneCore(canonical.state),
         serverRevision: canonical.serverRevision,
+        notaVersions: cloneCore(canonical.notaVersions ?? current.notaVersions),
         outbox: current.quarantine.active
           ? []
           : cloneCore(canonical.outbox),

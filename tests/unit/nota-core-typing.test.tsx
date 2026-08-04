@@ -102,14 +102,17 @@ describe('Core-backed Nota typing', () => {
     const initial = gateway.getSnapshot().notaTransactions[0]!;
     const firstStarted = deferred<void>();
     const firstResponse = deferred<{ status: number; body: unknown }>();
+    const secondStarted = deferred<void>();
+    const secondResponse = deferred<{ status: number; body: unknown }>();
     transport.enqueue(() => {
       firstStarted.resolve();
       return firstResponse.promise;
     });
     transport.enqueue(emptyPoll('2'));
-    transport.enqueue(
-      acknowledgement({ ...initial, customerName: 'Ami' }, '3', '3', '1'),
-    );
+    transport.enqueue(() => {
+      secondStarted.resolve();
+      return secondResponse.promise;
+    });
     transport.enqueue(emptyPoll('3'));
 
     const customer = screen.getByLabelText('Pelanggan');
@@ -128,9 +131,18 @@ describe('Core-backed Nota typing', () => {
       firstResponse.resolve(
         acknowledgement({ ...initial, customerName: 'A' }, '2', '2', '1'),
       );
-      await Promise.resolve();
+      await secondStarted.promise;
     });
 
+    expect(customer).toHaveValue('Ami');
+    expect(customer).toHaveFocus();
+    expect(customer).not.toBeDisabled();
+    await act(async () => {
+      secondResponse.resolve(
+        acknowledgement({ ...initial, customerName: 'Ami' }, '3', '3', '1'),
+      );
+      await Promise.resolve();
+    });
     await waitFor(() => expect(storage.saves.at(-1)?.outbox).toEqual([]));
     expect(customer).toHaveValue('Ami');
     expect(customer).toHaveFocus();
@@ -142,19 +154,17 @@ describe('Core-backed Nota typing', () => {
     const initial = gateway.getSnapshot().notaTransactions[0]!;
     const firstStarted = deferred<void>();
     const firstResponse = deferred<{ status: number; body: unknown }>();
+    const secondStarted = deferred<void>();
+    const secondResponse = deferred<{ status: number; body: unknown }>();
     transport.enqueue(() => {
       firstStarted.resolve();
       return firstResponse.promise;
     });
     transport.enqueue(emptyPoll('2'));
-    transport.enqueue(
-      acknowledgement(
-        withLineDescription(initial, 'Produk Core Baru'),
-        '3',
-        '1',
-        '3',
-      ),
-    );
+    transport.enqueue(() => {
+      secondStarted.resolve();
+      return secondResponse.promise;
+    });
     transport.enqueue(emptyPoll('3'));
 
     const description = screen.getByLabelText('Nama barang baris 1');
@@ -177,9 +187,23 @@ describe('Core-backed Nota typing', () => {
           '2',
         ),
       );
-      await Promise.resolve();
+      await secondStarted.promise;
     });
 
+    expect(description).toHaveValue('Produk Core Baru');
+    expect(description).toHaveFocus();
+    expect(description).not.toBeDisabled();
+    await act(async () => {
+      secondResponse.resolve(
+        acknowledgement(
+          withLineDescription(initial, 'Produk Core Baru'),
+          '3',
+          '1',
+          '3',
+        ),
+      );
+      await Promise.resolve();
+    });
     await waitFor(() => expect(storage.saves.at(-1)?.outbox).toEqual([]));
     expect(description).toHaveValue('Produk Core Baru');
     expect(description).toHaveFocus();

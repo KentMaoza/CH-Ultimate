@@ -85,6 +85,58 @@ describe('Nota HTTP boundary', () => {
     await app.close();
   });
 
+  it('accepts client-selected page and exactly fifteen unique line UUIDs', async () => {
+    const { app, device, nota } = harness();
+    const clientLineIds = Array.from(
+      { length: 15 },
+      (_, index) =>
+        `70000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+    );
+    const payload = {
+      lifecycleVersion: '1',
+      structureVersion: '1',
+      clientPageId: PAGE_ID,
+      clientLineIds,
+    };
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/v1/notas/${NOTA_ID}/pages`,
+      headers,
+      payload,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(nota.addPage).toHaveBeenCalledWith(
+      { deviceId: device.id, idempotencyKey: KEY },
+      NOTA_ID,
+      payload,
+    );
+
+    const malformed = await app.inject({
+      method: 'POST',
+      url: `/v1/notas/${NOTA_ID}/pages`,
+      headers: { ...headers, 'idempotency-key': DEVICE_ID },
+      payload: { ...payload, clientLineIds: clientLineIds.slice(0, 14) },
+    });
+    expect(malformed.statusCode).toBe(400);
+
+    const colliding = await app.inject({
+      method: 'POST',
+      url: `/v1/notas/${NOTA_ID}/pages`,
+      headers: {
+        ...headers,
+        'idempotency-key': '99999999-9999-4999-8999-999999999999',
+      },
+      payload: {
+        ...payload,
+        clientLineIds: [PAGE_ID, ...clientLineIds.slice(1)],
+      },
+    });
+    expect(colliding.statusCode).toBe(400);
+    await app.close();
+  });
+
   it.each([
     {
       method: 'POST',

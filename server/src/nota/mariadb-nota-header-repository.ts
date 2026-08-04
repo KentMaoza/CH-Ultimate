@@ -35,6 +35,7 @@ import {
   lineTotal,
   lineValue,
   mutationBody,
+  notaVersionState,
   noteSuffix,
   quantityPcs,
   readLine,
@@ -117,6 +118,7 @@ export class MariaDbNotaHeaderRepository {
       emitted.revision,
       String(updated.lifecycle_version),
       emitted.entity,
+      await notaVersionState(connection, updated),
     );
   };
 

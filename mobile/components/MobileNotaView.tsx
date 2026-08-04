@@ -5,7 +5,10 @@ import type { NotaLine, NotaTransaction, Unit } from '../../src/domain/types';
 import type { OperationsGateway } from '../../src/gateway/operations-gateway';
 import { createNotaVoicePlayer, type NotaVoicePlayer } from '../../src/renderer/nota/nota-voice';
 import { notaPageTheme } from '../../src/renderer/nota/nota-page-colors';
-import { useOperationsSnapshot } from '../../src/renderer/use-operations-snapshot';
+import {
+  useOperationsSnapshot,
+  useOperationsSyncSnapshot,
+} from '../../src/renderer/use-operations-snapshot';
 import { formatRupiah } from '../format';
 import type { BarcodeScannerPort } from '../ports';
 import { ScanIcon } from './Icons';
@@ -39,6 +42,7 @@ function availableSlot(transaction: NotaTransaction, preferredPageId?: string) {
 
 export function MobileNotaView({ coreBacked = false, gateway, scanner, transactionId }: { coreBacked?: boolean; gateway: OperationsGateway; scanner: BarcodeScannerPort; transactionId?: string }) {
   const snapshot = useOperationsSnapshot(gateway);
+  const sync = useOperationsSyncSnapshot(gateway);
   const transaction = workingTransaction(snapshot.notaTransactions, transactionId);
   const [selectedPageId, setSelectedPageId] = useState('');
   const [manualOpen, setManualOpen] = useState(false);
@@ -54,6 +58,11 @@ export function MobileNotaView({ coreBacked = false, gateway, scanner, transacti
   const voicePlayer = useRef<NotaVoicePlayer | null>(null);
   const activePages = transaction?.pages.filter((page) => page.status === 'active') ?? [];
   const selectedPage = activePages.find((page) => page.id === selectedPageId) ?? activePages[0];
+  const lifecycleBlocked = Boolean(
+    transaction &&
+    sync.phase === 'offline' &&
+    gateway.isNotaLifecycleOnlineOnly(transaction.id),
+  );
 
   useEffect(() => {
     if (transaction || creating.current || completionStarted.current) return;
@@ -390,7 +399,7 @@ export function MobileNotaView({ coreBacked = false, gateway, scanner, transacti
           </article>;
         })}{!selectedPage.lines.some(populated) && <p className="mobile-nota-empty">Belum ada barang di Bagian {selectedPage.suffix}.</p>}</div>
       </section>
-      <footer className="mobile-nota-finish"><div><span>Total transaksi</span><strong>{formatRupiah(transactionTotal)}</strong></div><button className="primary-action" disabled={busy} onClick={() => setCompletionOpen(true)}>Selesaikan nota</button></footer>
+      <footer className="mobile-nota-finish"><div><span>Total transaksi</span><strong>{formatRupiah(transactionTotal)}</strong></div><button className="primary-action" disabled={busy || lifecycleBlocked} title={lifecycleBlocked ? 'Hubungkan CH Core untuk menyelesaikan transaksi.' : undefined} onClick={() => setCompletionOpen(true)}>Selesaikan nota</button></footer>
     </> : !notice && <p className="mobile-nota-empty">Menyiapkan nota baru…</p>}
     {completionOpen && <div className="mobile-nota-dialog-backdrop"><section role="dialog" aria-modal="true" aria-label="Selesaikan nota mobile?" className="mobile-nota-dialog"><h2>Selesaikan nota mobile?</h2><p>{coreBacked ? 'Nota disimpan ke Arsip dan tersedia di semua perangkat setelah sinkronisasi.' : 'Nota disimpan ke Arsip pada sesi demo lokal ini.'}</p><button className="primary-action" disabled={busy} onClick={() => void complete()}>Simpan ke Arsip</button><button disabled={busy} onClick={() => setCompletionOpen(false)}>Batal</button></section></div>}
   </section>;

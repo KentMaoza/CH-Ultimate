@@ -480,6 +480,7 @@ export async function insertBlankLines(
   notaId: string,
   pageId: string,
   now: Date,
+  clientLineIds?: string[],
 ): Promise<void> {
   for (let position = 0; position < 15; position += 1) {
     await connection.query(
@@ -492,7 +493,7 @@ export async function insertBlankLines(
          (UNHEX(REPLACE(?, '-', '')), UNHEX(REPLACE(?, '-', '')),
           UNHEX(REPLACE(?, '-', '')), ?, '', '', '', 0, 'pcs', 0, 0, 0,
           0, 1, ?, ?)`,
-      [dependencies.uuid(), notaId, pageId, position, now, now],
+      [clientLineIds?.[position] ?? dependencies.uuid(), notaId, pageId, position, now, now],
     );
   }
 }

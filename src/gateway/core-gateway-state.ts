@@ -8,6 +8,7 @@ import type {
 } from '../domain/types';
 import type {
   ImagePrefetchSnapshot,
+  SyncBlockedOperation,
   SyncConflict,
   SyncSnapshot,
 } from './operations-gateway-contract';
@@ -56,6 +57,7 @@ export class CoreGatewayState {
   private deferredCommands: CoreDeferredCommand[] = [];
   private deferredPendingCount = 0;
   private quarantinedCount = 0;
+  private blockedOperations: SyncBlockedOperation[] = [];
   private offlineConflicts: SyncConflict[] = [];
   private outboxVersion = 0;
   private serverRevision = '0';
@@ -75,6 +77,7 @@ export class CoreGatewayState {
     pendingCount: 0,
     conflictCount: 0,
     quarantinedCount: 0,
+    blockedCount: 0,
   };
   private listeners = new Set<() => void>();
   private syncListeners = new Set<() => void>();
@@ -99,6 +102,9 @@ export class CoreGatewayState {
     ),
     ...cloneCore(this.offlineConflicts),
   ];
+
+  getBlockedOperations = (): SyncBlockedOperation[] =>
+    cloneCore(this.blockedOperations);
 
   subscribeSync = (listener: () => void): (() => void) => {
     this.syncListeners.add(listener);
@@ -1020,6 +1026,7 @@ export class CoreGatewayState {
     deferredPendingCount: number,
     quarantinedCount: number,
     offlineConflicts: SyncConflict[],
+    blockedOperations: SyncBlockedOperation[],
   ): void {
     const projectionChanged =
       JSON.stringify(this.provisionalNotas) !==
@@ -1031,6 +1038,7 @@ export class CoreGatewayState {
     this.deferredPendingCount = deferredPendingCount;
     this.quarantinedCount = quarantinedCount;
     this.offlineConflicts = cloneCore(offlineConflicts);
+    this.blockedOperations = cloneCore(blockedOperations);
     if (projectionChanged) this.publishProjectedState();
     this.publishSync({});
   }
@@ -1053,6 +1061,7 @@ export class CoreGatewayState {
         this.outbox.filter((item) => item.conflict).length +
         this.offlineConflicts.length,
       quarantinedCount: this.quarantinedCount,
+      blockedCount: this.blockedOperations.length,
     };
     this.syncListeners.forEach((listener) => listener());
   }

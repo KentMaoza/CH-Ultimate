@@ -9,7 +9,7 @@ import type {
   OfflineStockCountPayload,
   OfflineStockPayload,
 } from './core-local-store';
-import { asOfflineJson, CoreLocalStore } from './core-local-store';
+import { CoreLocalStore } from './core-local-store';
 import type { NotaTransaction } from '../domain/types';
 
 interface DeferredOutboxDependencies {
@@ -288,6 +288,67 @@ export class CoreDeferredOutbox {
     return found;
   }
 
+  async retryBlocked(operationId: string): Promise<boolean> {
+    let found = false;
+    await this.store.update((envelope) => ({
+      ...envelope,
+      deferredOutbox: envelope.deferredOutbox.map((command) => {
+        if (
+          command.operationId !== operationId ||
+          command.status !== 'blocked'
+        ) {
+          return command;
+        }
+        found = true;
+        return { ...command, status: 'deferred', lastError: undefined };
+      }),
+    }));
+    return found;
+  }
+
+  async discardBlocked(operationId: string): Promise<boolean> {
+    let found = false;
+    await this.store.update((envelope) => {
+      const command = envelope.deferredOutbox.find(
+        (candidate) =>
+          candidate.operationId === operationId &&
+          candidate.status === 'blocked',
+      );
+      if (!command) return envelope;
+      found = true;
+      const discarded = new Set([operationId]);
+      if (
+        command.kind === 'nota-mutation' &&
+        command.payload.optimistic.kind === 'nota-page-add'
+      ) {
+        for (const candidate of envelope.deferredOutbox) {
+          if (
+            candidate.kind === 'nota-mutation' &&
+            candidate.payload.dependsOn.includes(operationId)
+          ) {
+            discarded.add(candidate.operationId);
+          }
+        }
+      }
+      return {
+        ...envelope,
+        deferredOutbox: envelope.deferredOutbox.filter(
+          (candidate) => !discarded.has(candidate.operationId),
+        ),
+        provisionalNotas:
+          command.kind === 'offline-nota'
+            ? envelope.provisionalNotas.filter(
+                (nota) => nota.id !== command.payload.provisionalId,
+              )
+            : envelope.provisionalNotas,
+        offlineConflicts: envelope.offlineConflicts.filter(
+          (candidate) => !discarded.has(candidate.operationId),
+        ),
+      };
+    });
+    return found;
+  }
+
   private async runPump(): Promise<void> {
     while (true) {
       const envelope = await this.store.load();
@@ -298,6 +359,7 @@ export class CoreDeferredOutbox {
         const entityKey = deferredEntityKey(command);
         if (
           command.status === 'conflict' ||
+          command.status === 'blocked' ||
           command.status === 'quarantined'
         ) {
           blockedEntities.add(entityKey);
@@ -383,11 +445,14 @@ export class CoreDeferredOutbox {
       }
       if (response.status < 200 || response.status >= 300) {
         const permanent = response.status >= 400 && response.status < 500;
+        const parsedConflict = permanent
+          ? parseServerConflict(response.body)
+          : undefined;
         await this.markError(
           command.operationId,
           responseError(response),
-          permanent,
-          response.body,
+          parsedConflict ? 'conflict' : permanent ? 'blocked' : 'error',
+          parsedConflict,
         );
         if (permanent) continue;
         return;
@@ -425,8 +490,8 @@ export class CoreDeferredOutbox {
   private async markError(
     operationId: string,
     error: unknown,
-    conflict = false,
-    responseBody?: unknown,
+    status: 'error' | 'blocked' | 'conflict' = 'error',
+    parsedConflict?: ReturnType<typeof parseServerConflict>,
   ): Promise<void> {
     await this.store.update((envelope) => {
       const command = envelope.deferredOutbox.find(
@@ -436,38 +501,12 @@ export class CoreDeferredOutbox {
         error instanceof Error
           ? error.message.slice(0, 128)
           : 'CH Core tidak tersedia.';
-      const serverConflict =
-        responseBody &&
-        typeof responseBody === 'object' &&
-        !Array.isArray(responseBody)
-          ? Reflect.get(responseBody, 'conflict')
-          : undefined;
-      const parsedConflict = coreConflictSchema.safeParse(serverConflict);
       const retainedConflict =
-        conflict && command
+        status === 'conflict' && parsedConflict && command
           ? {
               operationId,
               errorCode,
-              conflict:
-                parsedConflict.success
-                  ? parsedConflict.data
-                  : {
-                      id: operationId,
-                      entityType:
-                        command.kind === 'offline-nota' ||
-                        command.kind === 'nota-mutation'
-                          ? 'nota'
-                          : 'stock_balance',
-                      entityId:
-                        command.kind === 'offline-nota'
-                          ? command.payload.provisionalId
-                          : command.kind === 'nota-mutation'
-                            ? command.payload.notaId
-                          : command.payload.skuId,
-                      base: null,
-                      mine: asOfflineJson(command.payload),
-                      server: errorCode,
-                    },
+              conflict: parsedConflict,
             }
           : undefined;
       return {
@@ -476,7 +515,7 @@ export class CoreDeferredOutbox {
           candidate.operationId === operationId
             ? {
                 ...candidate,
-                status: conflict ? 'conflict' : 'error',
+                status,
                 lastError:
                   error instanceof Error
                     ? error.message.slice(0, 512)
@@ -525,6 +564,20 @@ function responseError(response: CoreApiResponse): Error {
       ? candidate
       : `HTTP_${response.status}`;
   return new Error(code);
+}
+
+function parseServerConflict(responseBody: unknown) {
+  if (
+    !responseBody ||
+    typeof responseBody !== 'object' ||
+    Array.isArray(responseBody)
+  ) {
+    return undefined;
+  }
+  const parsed = coreConflictSchema.safeParse(
+    Reflect.get(responseBody, 'conflict'),
+  );
+  return parsed.success ? parsed.data : undefined;
 }
 
 function applyDeferredNotaVersionEffect(

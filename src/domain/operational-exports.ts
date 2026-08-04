@@ -195,12 +195,102 @@ export async function createOperationalPdfBlob(plan: OperationalPdfPlan): Promis
   });
   const hasImageColumn = plan.dataset === 'sku-stock';
   const margin = 8;
-  const rowHeight = 7;
+  const minimumRowHeight = 7;
+  const lineHeight = 2.4;
+  const cellPadding = 1;
   const tableWidth = plan.widthMm - (margin * 2);
   const columnCount = plan.headers.length + (hasImageColumn ? 1 : 0);
   const columnWidth = tableWidth / columnCount;
-  const rowsPerPage = 21;
-  const pages = Math.max(1, Math.ceil(plan.rows.length / rowsPerPage));
+  const headers = hasImageColumn ? ['GAMBAR', ...plan.headers] : plan.headers;
+  document.setFont('helvetica', 'bold');
+  document.setFontSize(5.5);
+  const headerLines = headers.map((header) =>
+    document.splitTextToSize(header, columnWidth - (cellPadding * 2)) as string[],
+  );
+  const headerHeight = Math.max(
+    minimumRowHeight,
+    Math.max(...headerLines.map((lines) => lines.length)) * lineHeight +
+      (cellPadding * 2),
+  );
+  document.setFont('helvetica', 'normal');
+  document.setFontSize(5.25);
+  const rowLayouts = plan.rows.map((row) => {
+    const cells = row.cells.map((cell) =>
+      document.splitTextToSize(
+        pdfCell(cell),
+        columnWidth - (cellPadding * 2),
+      ) as string[],
+    );
+    const height = Math.max(
+      minimumRowHeight,
+      Math.max(1, ...cells.map((lines) => lines.length)) * lineHeight +
+        (cellPadding * 2),
+    );
+    return {
+      row,
+      cells,
+      height,
+      lineCount: Math.max(1, ...cells.map((lines) => lines.length)),
+    };
+  });
+  const tableTop = 19;
+  const contentBottom = plan.heightMm - margin;
+  const pageContentHeight = contentBottom - tableTop - headerHeight;
+  const maximumLinesPerPage = Math.max(
+    1,
+    Math.floor(
+      (pageContentHeight - (cellPadding * 2)) / lineHeight,
+    ),
+  );
+  type PdfRowLayout = {
+    row: OperationalExportRow;
+    cells: string[][];
+    height: number;
+    showImage: boolean;
+  };
+  const pageRows: PdfRowLayout[][] = [[]];
+  let nextY = tableTop + headerHeight;
+  const startPage = () => {
+    pageRows.push([]);
+    nextY = tableTop + headerHeight;
+  };
+  for (const layout of rowLayouts) {
+    const currentPage = pageRows.at(-1)!;
+    if (layout.lineCount <= maximumLinesPerPage) {
+      if (currentPage.length > 0 && nextY + layout.height > contentBottom) {
+        startPage();
+      }
+      pageRows.at(-1)!.push({ ...layout, showImage: true });
+      nextY += layout.height;
+      continue;
+    }
+    if (currentPage.length > 0) startPage();
+    for (
+      let offset = 0;
+      offset < layout.lineCount;
+      offset += maximumLinesPerPage
+    ) {
+      const cells = layout.cells.map((lines) =>
+        lines.slice(offset, offset + maximumLinesPerPage),
+      );
+      const height = Math.max(
+        minimumRowHeight,
+        Math.max(1, ...cells.map((lines) => lines.length)) * lineHeight +
+          (cellPadding * 2),
+      );
+      if (pageRows.at(-1)!.length > 0 && nextY + height > contentBottom) {
+        startPage();
+      }
+      pageRows.at(-1)!.push({
+        row: layout.row,
+        cells,
+        height,
+        showImage: offset === 0,
+      });
+      nextY += height;
+    }
+  }
+  const pages = pageRows.length;
 
   for (let pageIndex = 0; pageIndex < pages; pageIndex += 1) {
     if (pageIndex > 0) document.addPage([plan.widthMm, plan.heightMm], 'landscape');
@@ -214,43 +304,55 @@ export async function createOperationalPdfBlob(plan: OperationalPdfPlan): Promis
     document.text(`${plan.totalIncluded} dari ${plan.totalMatched} baris · ${plan.generatedDate}`, plan.widthMm - margin, 8, { align: 'right' });
     document.text(`Halaman ${pageIndex + 1}/${pages}`, plan.widthMm - margin, 14, { align: 'right' });
 
-    const headers = hasImageColumn ? ['GAMBAR', ...plan.headers] : plan.headers;
-    let y = 19;
+    let y = tableTop;
     document.setFillColor(25, 25, 25);
-    document.rect(margin, y, tableWidth, rowHeight, 'F');
+    document.rect(margin, y, tableWidth, headerHeight, 'F');
     document.setTextColor(255, 255, 255);
     document.setFont('helvetica', 'bold');
     document.setFontSize(5.5);
-    headers.forEach((header, index) => {
-      document.text(header.slice(0, 22), margin + (index * columnWidth) + 1, y + 4.5, { maxWidth: columnWidth - 2 });
+    headerLines.forEach((lines, index) => {
+      lines.forEach((line, lineIndex) => {
+        document.text(
+          line,
+          margin + (index * columnWidth) + cellPadding,
+          y + cellPadding + lineHeight + (lineIndex * lineHeight),
+        );
+      });
     });
-    y += rowHeight;
+    y += headerHeight;
 
-    const pageRows = plan.rows.slice(pageIndex * rowsPerPage, (pageIndex + 1) * rowsPerPage);
-    for (const row of pageRows) {
+    for (const { row, cells, height, showImage } of pageRows[pageIndex]!) {
       document.setDrawColor(205, 205, 205);
       document.setTextColor(20, 20, 20);
       document.setFont('helvetica', 'normal');
       document.setFontSize(5.25);
-      document.rect(margin, y, tableWidth, rowHeight);
+      document.rect(margin, y, tableWidth, height);
       let offset = 0;
       if (hasImageColumn) {
-        if (row.thumbnailDataUrl) {
-          try {
-            document.addImage(row.thumbnailDataUrl, 'JPEG', margin + 1, y + 0.75, 5.5, 5.5, undefined, 'FAST');
-          } catch {
-            document.text('CHU', margin + 1, y + 4.5);
+        if (showImage) {
+          const imageY = y + Math.max(0.75, (height - 5.5) / 2);
+          if (row.thumbnailDataUrl) {
+            try {
+              document.addImage(row.thumbnailDataUrl, 'JPEG', margin + 1, imageY, 5.5, 5.5, undefined, 'FAST');
+            } catch {
+              document.text('CHU', margin + 1, y + cellPadding + lineHeight);
+            }
+          } else {
+            document.text('CHU', margin + 1, y + cellPadding + lineHeight);
           }
-        } else {
-          document.text('CHU', margin + 1, y + 4.5);
         }
         offset = 1;
       }
-      row.cells.forEach((cell, index) => {
-        const value = pdfCell(cell).replace(/\s+/g, ' ');
-        document.text(value.slice(0, 48), margin + ((index + offset) * columnWidth) + 1, y + 4.5, { maxWidth: columnWidth - 2 });
+      cells.forEach((lines, index) => {
+        lines.forEach((line, lineIndex) => {
+          document.text(
+            line,
+            margin + ((index + offset) * columnWidth) + cellPadding,
+            y + cellPadding + lineHeight + (lineIndex * lineHeight),
+          );
+        });
       });
-      y += rowHeight;
+      y += height;
     }
   }
 

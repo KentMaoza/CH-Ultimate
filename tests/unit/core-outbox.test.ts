@@ -35,6 +35,20 @@ function localNota(customerName = '') {
   };
 }
 
+function stockConflictBody(skuId: string) {
+  return {
+    code: 'CONFLICT',
+    conflict: {
+      id: OPERATION_ID,
+      entityType: 'stock_balance',
+      entityId: skuId,
+      base: { quantityPcs: 1 },
+      mine: { quantityPcs: 3 },
+      server: { quantityPcs: 2 },
+    },
+  };
+}
+
 function legacyV2Envelope() {
   return {
     cacheVersion: 2 as const,
@@ -501,7 +515,7 @@ describe('Core deferred outbox', () => {
       delta: -1,
       reason: 'Rusak',
     });
-    transport.enqueue({ status: 409, body: { code: 'SKU_NOT_ACTIVE' } });
+    transport.enqueue({ status: 409, body: stockConflictBody(firstSkuId) });
     transport.enqueue({ status: 200, body: {} });
 
     await outbox.pump(true);
@@ -696,7 +710,7 @@ describe('Core deferred outbox', () => {
       delta: -1,
       reason: 'Rusak',
     });
-    transport.enqueue({ status: 409, body: { code: 'SKU_NOT_ACTIVE' } });
+    transport.enqueue({ status: 409, body: stockConflictBody(firstSkuId) });
     transport.enqueue({ status: 401, body: { code: 'UNAUTHORIZED' } });
 
     await outbox.pump(true);
@@ -734,7 +748,7 @@ describe('Core deferred outbox', () => {
     });
   });
 
-  it('retains a permanent rejection as an actionable offline conflict', async () => {
+  it('retains a validated server conflict as an actionable offline conflict', async () => {
     const storage = new MemoryStorage();
     const store = new CoreLocalStore(storage, () => INSTALLATION_ID);
     const transport = new ScriptedTransport();
@@ -752,7 +766,17 @@ describe('Core deferred outbox', () => {
     });
     transport.enqueue({
       status: 409,
-      body: { code: 'SKU_MISSING' },
+      body: {
+        code: 'CONFLICT',
+        conflict: {
+          id: OPERATION_ID,
+          entityType: 'stock_balance',
+          entityId: '11111111-1111-4111-8111-111111111111',
+          base: { quantityPcs: 1 },
+          mine: { quantityPcs: 3 },
+          server: { quantityPcs: 2 },
+        },
+      },
     });
 
     await outbox.pump(true);
@@ -760,17 +784,17 @@ describe('Core deferred outbox', () => {
     const envelope = await store.load();
     expect(envelope.deferredOutbox[0]).toMatchObject({
       status: 'conflict',
-      lastError: 'SKU_MISSING',
+      lastError: 'CONFLICT',
     });
     expect(envelope.offlineConflicts).toEqual([
       expect.objectContaining({
         operationId: OPERATION_ID,
-        errorCode: 'SKU_MISSING',
+        errorCode: 'CONFLICT',
         conflict: expect.objectContaining({
           id: OPERATION_ID,
           entityType: 'stock_balance',
           entityId: '11111111-1111-4111-8111-111111111111',
-          server: 'SKU_MISSING',
+          server: { quantityPcs: 2 },
         }),
       }),
     ]);
@@ -780,5 +804,75 @@ describe('Core deferred outbox', () => {
       deferredOutbox: [{ status: 'error' }],
       offlineConflicts: [],
     });
+  });
+
+  it('blocks an ordinary Nota 400 without conflict metadata while unrelated work continues', async () => {
+    const otherOperationId = '50505050-5050-4050-8050-505050505050';
+    const operationIds = [OPERATION_ID, otherOperationId];
+    const storage = new MemoryStorage();
+    const store = new CoreLocalStore(storage, () => INSTALLATION_ID);
+    const transport = new ScriptedTransport();
+    const outbox = new CoreDeferredOutbox(store, transport, {
+      now: () => new Date('2026-07-30T02:00:00.000Z'),
+      uuid: () => operationIds.shift()!,
+    });
+    await outbox.deferNota(localNota('Tidak valid'));
+    await outbox.deferStock({
+      skuId: '11111111-1111-4111-8111-111111111111',
+      skuIdentifier: 'SKU-1',
+      skuName: 'Produk',
+      referencePrice: 5_000,
+      delta: 2,
+      reason: 'Koreksi',
+    });
+    transport.enqueue({
+      status: 400,
+      body: { code: 'INVALID_NOTA' },
+    });
+    transport.enqueue({ status: 200, body: {} });
+
+    await outbox.pump(true);
+
+    expect(transport.requests.map((request) => request.path)).toEqual([
+      '/v1/offline/notas',
+      '/v1/offline/stock-adjustments',
+    ]);
+    expect((await store.load()).deferredOutbox).toEqual([
+      expect.objectContaining({
+        operationId: OPERATION_ID,
+        status: 'blocked',
+        lastError: 'INVALID_NOTA',
+      }),
+    ]);
+    expect((await store.load()).offlineConflicts).toEqual([]);
+    expect(
+      transport.requests.some((request) =>
+        request.path.startsWith('/v1/conflicts/'),
+      ),
+    ).toBe(false);
+
+    await expect(outbox.retryBlocked(OPERATION_ID)).resolves.toBe(true);
+    transport.enqueue({
+      status: 404,
+      body: {
+        code: 'NOTA_NOT_FOUND',
+        conflict: { id: 'not-a-valid-conflict' },
+      },
+    });
+    await outbox.pump(true);
+    expect((await store.load()).deferredOutbox[0]).toMatchObject({
+      status: 'blocked',
+      lastError: 'NOTA_NOT_FOUND',
+    });
+    expect(
+      transport.requests.some((request) =>
+        request.path.startsWith('/v1/conflicts/'),
+      ),
+    ).toBe(false);
+    expect(transport.requests).toHaveLength(3);
+
+    await expect(outbox.discardBlocked(OPERATION_ID)).resolves.toBe(true);
+    expect((await store.load()).deferredOutbox).toEqual([]);
+    expect((await store.load()).provisionalNotas).toEqual([]);
   });
 });

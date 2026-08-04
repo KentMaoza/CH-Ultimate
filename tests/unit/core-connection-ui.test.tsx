@@ -205,6 +205,46 @@ describe('desktop operations synchronization status', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows an ordinary blocked operation with explicit retry and confirmed discard actions', () => {
+    const retryBlockedOperation = vi.fn().mockResolvedValue(undefined);
+    const discardBlockedOperation = vi.fn().mockResolvedValue(undefined);
+    const gateway = Object.assign(new MockOperationsGateway(), {
+      getSyncSnapshot: () => ({
+        phase: 'online' as const,
+        serverRevision: '7',
+        pendingCount: 1,
+        conflictCount: 0,
+        blockedCount: 1,
+        message: '1 perubahan ditolak CH Core.',
+      }),
+      getBlockedOperations: () => [{
+        id: '20202020-2020-4020-8020-202020202020',
+        kind: 'Nota' as const,
+        errorCode: 'INVALID_NOTA',
+      }],
+      retryBlockedOperation,
+      discardBlockedOperation,
+    });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<OperationsSyncStatus gateway={gateway} />);
+
+    expect(screen.getByText('Nota ditolak: INVALID_NOTA')).toBeInTheDocument();
+    expect(screen.queryByText('Versi saya')).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Coba lagi perubahan Nota' }),
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Buang perubahan Nota' }),
+    );
+    expect(retryBlockedOperation).toHaveBeenCalledWith(
+      '20202020-2020-4020-8020-202020202020',
+    );
+    expect(discardBlockedOperation).toHaveBeenCalledWith(
+      '20202020-2020-4020-8020-202020202020',
+    );
+  });
+
   it('shows image progress with explicit pause and retry controls', () => {
     const gateway = new MockOperationsGateway();
     gateway.getSyncSnapshot = () => ({

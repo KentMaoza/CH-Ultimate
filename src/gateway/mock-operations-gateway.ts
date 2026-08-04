@@ -11,7 +11,7 @@ import {
   restoreNotaTransaction,
 } from '../domain/nota';
 import type { DemoState, InvoiceTemplate, LabelTemplate, Nota, NotaCompletionDestination, NotaLine, NotaTransaction, Sku, WorkbookImportResult } from '../domain/types';
-import type { CreateSkuInput, OperationsGateway, OperationsGatewayCapabilities, SyncConflict, SyncSnapshot } from './operations-gateway-contract';
+import type { CreateSkuInput, OperationsGateway, OperationsGatewayCapabilities, SyncBlockedOperation, SyncConflict, SyncSnapshot } from './operations-gateway-contract';
 
 let sequence = 100;
 
@@ -54,11 +54,14 @@ export class MockOperationsGateway implements OperationsGateway {
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
   getSyncSnapshot = () => this.syncSnapshot;
   getConflicts = (): SyncConflict[] => [];
+  getBlockedOperations = (): SyncBlockedOperation[] => [];
   subscribeSync = (listener: () => void) => { this.syncListeners.add(listener); return () => this.syncListeners.delete(listener); };
   isNotaLifecycleOnlineOnly = (_id: string): boolean => false;
   async initialize(): Promise<void> {}
   async flushNota(_id: string): Promise<void> {}
   async retryPending(): Promise<void> {}
+  async retryBlockedOperation(_id: string): Promise<void> {}
+  async discardBlockedOperation(_id: string): Promise<void> {}
   async resolveConflict(_id: string, _choice: 'mine' | 'server'): Promise<void> {}
   private publish(next: DemoState) { this.state = next; this.listeners.forEach((listener) => listener()); }
 

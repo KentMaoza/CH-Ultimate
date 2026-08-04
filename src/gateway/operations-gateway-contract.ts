@@ -15,10 +15,17 @@ export interface SyncSnapshot {
   serverRevision: string;
   pendingCount: number;
   conflictCount: number;
+  blockedCount?: number;
   quarantinedCount?: number;
   lastSyncedAt?: string;
   message?: string;
   imagePrefetch?: ImagePrefetchSnapshot;
+}
+
+export interface SyncBlockedOperation {
+  id: string;
+  kind: 'Nota' | 'Stok';
+  errorCode: string;
 }
 
 export interface SyncConflict {
@@ -93,11 +100,14 @@ export interface OperationsGateway {
   subscribe(listener: () => void): () => void;
   getSyncSnapshot(): SyncSnapshot;
   getConflicts(): SyncConflict[];
+  getBlockedOperations(): SyncBlockedOperation[];
   subscribeSync(listener: () => void): () => void;
   isNotaLifecycleOnlineOnly(id: string): boolean;
   initialize(): Promise<void>;
   flushNota(id: string): Promise<void>;
   retryPending(): Promise<void>;
+  retryBlockedOperation(id: string): Promise<void>;
+  discardBlockedOperation(id: string): Promise<void>;
   resolveConflict(id: string, choice: 'mine' | 'server'): Promise<void>;
   createSku(input: CreateSkuInput): Promise<Sku>;
   updateSku(id: string, patch: Partial<Sku>): Promise<void>;

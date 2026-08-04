@@ -40,6 +40,7 @@ export type CoreDeferredStatus =
   | 'deferred'
   | 'sending'
   | 'error'
+  | 'blocked'
   | 'quarantined'
   | 'conflict';
 
@@ -172,6 +173,7 @@ const deferredStatus = z.enum([
   'deferred',
   'sending',
   'error',
+  'blocked',
   'quarantined',
   'conflict',
 ]);
@@ -648,7 +650,7 @@ export class CoreLocalStore {
         outbox: [],
         quarantinedOutbox: [...combined.values()],
         deferredOutbox: envelope.deferredOutbox.map((command) =>
-          command.status === 'conflict'
+          command.status === 'conflict' || command.status === 'blocked'
             ? command
             : {
                 ...command,

@@ -123,6 +123,8 @@ export class MariaDbCatalogueRepository implements CatalogueRepository {
            UNION ALL
            SELECT 1 FROM stock_movements
            UNION ALL
+           SELECT 1 FROM stock_checks
+           UNION ALL
            SELECT 1 FROM price_history
            WHERE source <> 'catalogue_import'
            LIMIT 1

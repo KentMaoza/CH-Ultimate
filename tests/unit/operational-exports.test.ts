@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import { describe, expect, it } from 'vitest';
+import { inflateSync } from 'node:zlib';
 
 import { createInitialState } from '../../src/domain/operations';
 import {
@@ -24,6 +25,43 @@ function largeState(): DemoState {
     createdAt: '2026-08-04T00:00:00.000Z',
   }));
   return { ...state, skus };
+}
+
+async function pdfStreams(blob: Blob): Promise<string> {
+  const bytes = Buffer.from(await blob.arrayBuffer());
+  const raw = bytes.toString('latin1');
+  const content = [raw];
+  let cursor = 0;
+  while (true) {
+    const marker = raw.indexOf('stream\n', cursor);
+    if (marker < 0) break;
+    const start = marker + 'stream\n'.length;
+    const end = raw.indexOf('\nendstream', start);
+    if (end < 0) break;
+    const dictionaryStart = raw.lastIndexOf('<<', marker);
+    const dictionary = raw.slice(dictionaryStart, marker);
+    if (dictionary.includes('/FlateDecode')) {
+      try {
+        content.push(inflateSync(bytes.subarray(start, end)).toString('latin1'));
+      } catch {
+        // Ignore image streams or unsupported filters; text streams remain readable.
+      }
+    }
+    cursor = end + '\nendstream'.length;
+  }
+  return content.join('\n');
+}
+
+async function pdfPageCount(blob: Blob): Promise<number> {
+  const raw = Buffer.from(await blob.arrayBuffer()).toString('latin1');
+  return raw.match(/\/Type \/Page\b/g)?.length ?? 0;
+}
+
+function pdfTextBaseline(content: string, token: string): number {
+  const tokenIndex = content.indexOf(token);
+  const before = content.slice(Math.max(0, tokenIndex - 240), tokenIndex);
+  const positions = [...before.matchAll(/[-\d.]+\s+(-?[\d.]+)\s+Td/g)];
+  return Number(positions.at(-1)?.[1]);
 }
 
 describe('operational export selectors', () => {
@@ -98,4 +136,91 @@ it('creates a readable operational PDF blob with included-versus-matched metadat
   ));
   expect(blob.type).toBe('application/pdf');
   expect(await blob.slice(0, 5).text()).toBe('%PDF-');
+});
+
+it('preserves long image references, hashes, and stock-check notes in PDF continuation lines', async () => {
+  const state = createInitialState();
+  state.skus[0] = {
+    ...state.skus[0]!,
+    sourceImageUrl:
+      `https://example.test/${'reference-segment-'.repeat(110)}REFERENCE-END`,
+    imageHash: `${'a'.repeat(56)}deadbeef`,
+  };
+  state.stockChecks = [{
+    id: 'check-long',
+    skuId: state.skus[0]!.id,
+    observedQuantityPcs: 12,
+    countedQuantityPcs: 12,
+    serverQuantityBeforePcs: 12,
+    appliedDeltaPcs: 0,
+    forcedOffline: false,
+    countedAt: '2026-08-04T01:00:00.000Z',
+    appliedAt: '2026-08-04T01:00:01.000Z',
+    deviceId: 'device-1',
+    deviceDisplayName: 'Perangkat Gudang',
+    note: `${'catatan-panjang '.repeat(24)}NOTE-END`,
+  }];
+  const filters = { query: '', from: '', to: '', status: 'active' as const };
+
+  const skuBlob = await createOperationalPdfBlob(
+    buildOperationalPdfPlan(state, 'sku-stock', filters, '2026-08-04'),
+  );
+  const skuText = await pdfStreams(skuBlob);
+  const checkText = await pdfStreams(await createOperationalPdfBlob(
+    buildOperationalPdfPlan(state, 'stock-checks', filters, '2026-08-04'),
+  ));
+
+  expect(skuText).toContain('CHU');
+  expect(skuText).toContain('REFERENCE-END');
+  expect(skuText).toContain('deadbeef');
+  expect(checkText).toContain('NOTE-END');
+  expect(await pdfPageCount(skuBlob)).toBeGreaterThan(1);
+  expect(pdfTextBaseline(skuText, 'REFERENCE-END')).toBeGreaterThan(
+    8 * 72 / 25.4,
+  );
+});
+
+it('uses deterministic wrapped row heights to paginate long operational values', async () => {
+  const base = createInitialState();
+  const checks = Array.from({ length: 24 }, (_, index) => ({
+    id: `check-${String(index).padStart(2, '0')}`,
+    skuId: base.skus[0]!.id,
+    observedQuantityPcs: 12,
+    countedQuantityPcs: 12,
+    serverQuantityBeforePcs: 12,
+    appliedDeltaPcs: 0,
+    forcedOffline: false,
+    countedAt: `2026-08-04T01:${String(index).padStart(2, '0')}:00.000Z`,
+    appliedAt: `2026-08-04T01:${String(index).padStart(2, '0')}:01.000Z`,
+    deviceId: `device-${index}`,
+    deviceDisplayName: 'Perangkat Gudang',
+    note: '',
+  }));
+  const filters = { query: '', from: '', to: '', status: 'active' as const };
+  const shortPlan = buildOperationalPdfPlan(
+    { ...base, stockChecks: checks },
+    'stock-checks',
+    filters,
+    '2026-08-04',
+  );
+  const longPlan = buildOperationalPdfPlan(
+    {
+      ...base,
+      stockChecks: checks.map((check) => ({
+        ...check,
+        note: `${'detail hitung stok '.repeat(28)}ROW-END-${check.id}`,
+      })),
+    },
+    'stock-checks',
+    filters,
+    '2026-08-04',
+  );
+
+  const shortPages = await pdfPageCount(await createOperationalPdfBlob(shortPlan));
+  const longBlob = await createOperationalPdfBlob(longPlan);
+  const longPages = await pdfPageCount(longBlob);
+
+  expect(shortPages).toBe(1);
+  expect(longPages).toBeGreaterThan(shortPages);
+  expect(await pdfStreams(longBlob)).toContain('ROW-END-check-00');
 });

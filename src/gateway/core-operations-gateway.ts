@@ -36,6 +36,7 @@ import type {
   CreateSkuInput,
   OperationsGateway,
   OperationsGatewayCapabilities,
+  SyncBlockedOperation,
   SyncSnapshot,
 } from './operations-gateway-contract';
 import {
@@ -182,6 +183,8 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     this.state.subscribe(listener);
   getSyncSnapshot = (): SyncSnapshot => this.state.getSyncSnapshot();
   getConflicts = () => this.state.getConflicts();
+  getBlockedOperations = (): SyncBlockedOperation[] =>
+    this.state.getBlockedOperations();
   subscribeSync = (listener: () => void): (() => void) =>
     this.state.subscribeSync(listener);
   isNotaLifecycleOnlineOnly = (id: string): boolean => !this.hasLocalNota(id);
@@ -248,6 +251,17 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
       await this.deferred.pump(true);
       await this.refreshOfflineProjection();
     }
+  };
+  retryBlockedOperation = async (id: string): Promise<void> => {
+    this.requireNetworkAllowed();
+    if (this.isOffline()) return this.offlineBlocked();
+    if (!(await this.deferred.retryBlocked(id))) return;
+    await this.deferred.pump(true);
+    await this.refreshOfflineProjection();
+  };
+  discardBlockedOperation = async (id: string): Promise<void> => {
+    if (!(await this.deferred.discardBlocked(id))) return;
+    await this.refreshOfflineProjection();
   };
   resolveConflict = (
     id: string,
@@ -933,6 +947,19 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
         (command) => command.status === 'quarantined',
       ).length + envelope.quarantinedOutbox.length,
       envelope.offlineConflicts.map((item) => item.conflict),
+      envelope.deferredOutbox.flatMap((command) =>
+        command.status === 'blocked'
+          ? [{
+              id: command.operationId,
+              kind:
+                command.kind === 'offline-nota' ||
+                command.kind === 'nota-mutation'
+                  ? 'Nota' as const
+                  : 'Stok' as const,
+              errorCode: command.lastError ?? 'HTTP_ERROR',
+            }]
+          : [],
+      ),
     );
     const phase = this.state.getSyncSnapshot().phase;
     if (
@@ -943,6 +970,15 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
         phase: 'conflict',
         message: 'Perubahan offline memerlukan penyelesaian konflik.',
       });
+    } else if (envelope.deferredOutbox.some((command) => command.status === 'blocked')) {
+      const count = envelope.deferredOutbox.filter(
+        (command) => command.status === 'blocked',
+      ).length;
+      this.state.publishSync({
+        message: `${count} perubahan ditolak CH Core. Coba lagi atau buang perubahan setelah diperiksa.`,
+      });
+    } else if (this.state.getSyncSnapshot().message?.includes('perubahan ditolak CH Core')) {
+      this.state.publishSync({ message: undefined });
     }
   }
 

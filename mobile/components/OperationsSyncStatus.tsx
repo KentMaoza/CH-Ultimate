@@ -27,6 +27,7 @@ export function OperationsSyncStatus(
     gateway.getSyncSnapshot(),
   );
   const conflicts = gateway.getConflicts();
+  const blockedOperations = gateway.getBlockedOperations();
 
   useEffect(() => {
     setSnapshot(gateway.getSyncSnapshot());
@@ -59,6 +60,29 @@ export function OperationsSyncStatus(
       {snapshot.phase === 'offline' && (
         <button onClick={() => void gateway.retryPending()}>Coba lagi</button>
       )}
+      {blockedOperations.map((operation) => (
+        <section key={operation.id} aria-label="Perubahan ditolak CH Core">
+          <p>{`${operation.kind} ditolak: ${operation.errorCode}`}</p>
+          <button
+            onClick={() => void gateway.retryBlockedOperation(operation.id)}
+          >
+            {`Coba lagi perubahan ${operation.kind}`}
+          </button>
+          <button
+            onClick={() => {
+              if (
+                window.confirm(
+                  `Buang perubahan ${operation.kind} yang ditolak CH Core? Tindakan ini tidak dapat dibatalkan.`,
+                )
+              ) {
+                void gateway.discardBlockedOperation(operation.id);
+              }
+            }}
+          >
+            {`Buang perubahan ${operation.kind}`}
+          </button>
+        </section>
+      ))}
       {snapshot.phase === 'conflict' && conflicts.map((conflict) => (
         <section key={conflict.id} aria-label="Detail konflik data">
           <p>Dasar: {displayConflictValue(conflict.base)}</p>

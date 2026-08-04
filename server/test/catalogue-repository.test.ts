@@ -73,6 +73,7 @@ type QueryResult = unknown;
 function commitHarness(options: {
   lockedStatus?: 'staged' | 'committed';
   liveTransactions?: boolean;
+  stockCheckActivity?: boolean;
   existingCatalogue?: boolean;
   failOn?: RegExp;
 } = {}) {
@@ -123,7 +124,11 @@ function commitHarness(options: {
       if (compact.includes('AS has_live_transactions')) {
         return [
           {
-            has_live_transactions: options.liveTransactions ? 1 : 0,
+            has_live_transactions:
+              options.liveTransactions ||
+              (options.stockCheckActivity && compact.includes('FROM stock_checks'))
+                ? 1
+                : 0,
           },
         ] as T;
       }
@@ -319,6 +324,32 @@ describe('MariaDB catalogue repository', () => {
     expect(events).toEqual(['begin', 'rollback', 'release']);
     expect(
       queries.some(({ sql }) => sql.startsWith('INSERT INTO skus')),
+    ).toBe(false);
+  });
+
+  it('blocks catalogue replacement after an unchanged stock check before deleting rows', async () => {
+    const { events, queries, repository } = commitHarness({
+      stockCheckActivity: true,
+      existingCatalogue: true,
+    });
+
+    await expect(
+      repository.commit(
+        record,
+        workbook,
+        new Date('2026-07-30T02:00:00.000Z'),
+      ),
+    ).rejects.toMatchObject({
+      code: 'LIVE_TRANSACTIONS_EXIST',
+      statusCode: 409,
+    });
+
+    expect(events).toEqual(['begin', 'rollback', 'release']);
+    expect(
+      queries.some(({ sql }) => sql.includes('FROM stock_checks')),
+    ).toBe(true);
+    expect(
+      queries.some(({ sql }) => sql.startsWith('DELETE FROM')),
     ).toBe(false);
   });
 

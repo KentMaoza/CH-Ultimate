@@ -176,10 +176,10 @@ export function applyNotaLineChange(
           if (page.id !== row.pageId) return page;
           const lines = [...page.lines];
           if (change.operation === 'delete' || row.deletedAt) {
-            lines[row.linePosition] = blankCoreLine(
-              page.id,
-              row.linePosition,
-            );
+            lines[row.linePosition] = {
+              ...blankCoreLine(page.id, row.linePosition),
+              id: row.id,
+            };
           } else {
             const price = integerFromDecimal(
               row.unitPriceRupiah,

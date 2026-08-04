@@ -10,6 +10,7 @@ import type {
   UpdateHeaderRequest,
   UpdateLineRequest,
 } from './validation.js';
+import { addPageBody } from './validation.js';
 
 import { planEditableConflictOverride } from './conflicts.js';
 import {
@@ -242,12 +243,21 @@ export class MariaDbNotaConflictRepository {
         );
       }
     } else if (action === 'add-page') {
+      const original = addPageBody.safeParse(input);
+      if (!original.success) {
+        throw new NotaOperationError(
+          'CONFLICT_OVERRIDE_STALE',
+          409,
+          'The stored add-page intent is invalid',
+        );
+      }
       result = await this.operations.addPage(
         connection,
         deviceId,
         operationId,
         notaId,
         {
+          ...original.data,
           lifecycleVersion,
           structureVersion: String(row.structure_version),
         },

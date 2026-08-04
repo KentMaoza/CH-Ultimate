@@ -45,6 +45,69 @@ async function restartOffline(storage: MemoryStorage) {
   return { gateway, transport };
 }
 
+async function storageWithPersistedNotaConflict(
+  bootstrap = populatedBootstrap('7'),
+): Promise<MemoryStorage> {
+  const storage = await bootstrappedStorage(bootstrap);
+  const envelope = storage.value as unknown as CoreLocalEnvelope;
+  const operationId = '77777777-7777-4777-8777-777777777777';
+  const conflictId = '88888888-8888-4888-8888-888888888888';
+  storage.value = {
+    ...structuredClone(envelope),
+    deferredOutbox: [
+      {
+        kind: 'nota-mutation',
+        sequence: 1,
+        operationId,
+        idempotencyKey: operationId,
+        createdAt: '2026-08-04T01:00:00.000Z',
+        firstSentAt: '2026-08-04T01:01:00.000Z',
+        status: 'conflict',
+        lastError: 'CONFLICT',
+        payload: {
+          notaId: NOTA_ID,
+          targetKey: `nota:${NOTA_ID}:header:customerName`,
+          method: 'PATCH',
+          path: CORE_API_PATHS.notaHeader(NOTA_ID),
+          body: {
+            lifecycleVersion: '1',
+            fields: {
+              customerName: {
+                version: '1',
+                base: 'Amelia',
+                mine: 'Konflik Tersimpan',
+              },
+            },
+          },
+          dependsOn: [],
+          optimistic: {
+            kind: 'nota-header',
+            notaId: NOTA_ID,
+            patch: { customerName: 'Konflik Tersimpan' },
+          },
+        },
+      },
+    ],
+    nextDeferredSequence: 2,
+    offlineConflicts: [
+      {
+        operationId,
+        errorCode: 'CONFLICT',
+        conflict: {
+          id: conflictId,
+          entityType: 'nota',
+          entityId: NOTA_ID,
+          field: 'customerName',
+          base: 'Amelia',
+          mine: 'Konflik Tersimpan',
+          server: 'Versi Server',
+        },
+      },
+    ],
+  } satisfies CoreLocalEnvelope;
+  return storage;
+}
+
 function versionState(
   fieldVersions: Record<string, string>,
   lineVersion: string,
@@ -234,6 +297,93 @@ describe('Core durable offline edits for synced Nota', () => {
     gateway.dispose();
   });
 
+  it('can edit the same physical line offline after delete acknowledgement and restart', async () => {
+    const storage = await bootstrappedStorage();
+    const offline = await restartOffline(storage);
+    await offline.gateway.deleteNotaLine(NOTA_ID, PAGE_ID, LINE_ID);
+    const clearedEntity = JSON.parse(JSON.stringify(
+      offline.gateway.getSnapshot().notaTransactions
+        .find((nota) => nota.id === NOTA_ID)!,
+    )) as NotaTransaction;
+    expect(clearedEntity.pages[0]?.lines[0]?.id).toBe(LINE_ID);
+    offline.gateway.dispose();
+
+    const transport = new ScriptedTransport();
+    transport.enqueue({ status: 200, body: populatedBootstrap('8') });
+    transport.enqueue({
+      status: 200,
+      body: {
+        serverRevision: '9',
+        entityVersion: '2',
+        entity: clearedEntity,
+        versionState: versionState(
+          {
+            customerName: '1',
+            customerPlace: '1',
+            payment: '1',
+          },
+          '2',
+        ),
+      },
+    });
+    const reconnected = createCoreOperationsGateway(
+      transport,
+      storage,
+      new TestClock(),
+    );
+
+    await reconnected.initialize();
+
+    expect(transport.requests.at(-1)?.path).toBe(
+      CORE_API_PATHS.notaLine(NOTA_ID, PAGE_ID, LINE_ID),
+    );
+    expect(
+      reconnected.getSnapshot().notaTransactions[0]?.pages[0]?.lines[0]?.id,
+    ).toBe(LINE_ID);
+    expect(
+      (storage.value as unknown as CoreLocalEnvelope).notaVersions[NOTA_ID]
+        ?.lineVersions,
+    ).toEqual({ [LINE_ID]: '2' });
+    reconnected.dispose();
+
+    const restarted = await restartOffline(storage);
+    await restarted.gateway.updateNotaLine(NOTA_ID, PAGE_ID, LINE_ID, {
+      description: 'Kopi Baru',
+      quantity: 2,
+    });
+
+    expect(
+      (storage.value as unknown as CoreLocalEnvelope).deferredOutbox[0],
+    ).toMatchObject({
+      kind: 'nota-mutation',
+      payload: {
+        method: 'PATCH',
+        path: CORE_API_PATHS.notaLine(NOTA_ID, PAGE_ID, LINE_ID),
+        body: {
+          lifecycleVersion: '1',
+          pageVersion: '1',
+          lineVersion: '2',
+          base: {
+            linePosition: 0,
+            skuId: null,
+            description: '',
+            kind: '',
+            quantity: 0,
+            unit: 'pcs',
+            pcsPrice: 0,
+            lsnPrice: 0,
+          },
+          mine: expect.objectContaining({
+            linePosition: 0,
+            description: 'Kopi Baru',
+            quantity: 2,
+          }),
+        },
+      },
+    });
+    restarted.gateway.dispose();
+  });
+
   it('keeps synced transaction lifecycle operations online-only with known versions', async () => {
     const storage = await bootstrappedStorage();
     const { gateway } = await restartOffline(storage);
@@ -412,6 +562,93 @@ describe('Core durable offline page structure for synced Nota', () => {
 });
 
 describe('Core offline Nota conflict resolution', () => {
+  it('blocks every offline mutation entry point for a conflicted Nota after restart', async () => {
+    const operations = [
+      (gateway: ReturnType<typeof createCoreOperationsGateway>) =>
+        gateway.updateNotaTransaction(NOTA_ID, { customerPlace: 'Ditolak' }),
+      (gateway: ReturnType<typeof createCoreOperationsGateway>) =>
+        gateway.updateNotaLine(NOTA_ID, PAGE_ID, LINE_ID, {
+          description: 'Ditolak',
+        }),
+      (gateway: ReturnType<typeof createCoreOperationsGateway>) =>
+        gateway.deleteNotaLine(NOTA_ID, PAGE_ID, LINE_ID),
+      (gateway: ReturnType<typeof createCoreOperationsGateway>) =>
+        gateway.addNotaPage(NOTA_ID),
+      (gateway: ReturnType<typeof createCoreOperationsGateway>) =>
+        gateway.cancelNotaPage(NOTA_ID, PAGE_ID),
+      (gateway: ReturnType<typeof createCoreOperationsGateway>) =>
+        gateway.restoreNotaPage(NOTA_ID, PAGE_ID),
+    ];
+
+    for (const operation of operations) {
+      const storage = await storageWithPersistedNotaConflict();
+      const { gateway } = await restartOffline(storage);
+      const before = structuredClone(storage.value);
+
+      await expect(operation(gateway)).rejects.toThrow('Nota memiliki konflik');
+      expect(storage.value).toEqual(before);
+      gateway.dispose();
+    }
+  });
+
+  it('keeps an unrelated cached Nota editable while the conflicted Nota stays blocked offline', async () => {
+    const secondNotaId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const secondPageId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const secondLineId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    const first = populatedBootstrap('7');
+    const storage = await storageWithPersistedNotaConflict(
+      populatedBootstrap('7', {
+        notas: [
+          ...first.notas,
+          {
+            ...first.notas[0]!,
+            id: secondNotaId,
+            notaNumber: 'CHU-20260729-0002',
+            header: {
+              customerName: 'Budi',
+              customerPlace: 'Makassar',
+              payment: 'cash',
+            },
+          },
+        ],
+        notaPages: [
+          ...first.notaPages,
+          { ...first.notaPages[0]!, id: secondPageId, notaId: secondNotaId },
+        ],
+        notaLines: [
+          ...first.notaLines,
+          {
+            ...first.notaLines[0]!,
+            id: secondLineId,
+            notaId: secondNotaId,
+            pageId: secondPageId,
+          },
+        ],
+      }),
+    );
+    const { gateway } = await restartOffline(storage);
+
+    await gateway.updateNotaTransaction(secondNotaId, {
+      customerPlace: 'Parepare Offline',
+    });
+
+    expect(
+      gateway.getSnapshot().notaTransactions.find(
+        (nota) => nota.id === secondNotaId,
+      )?.customerPlace,
+    ).toBe('Parepare Offline');
+    expect(
+      (storage.value as unknown as CoreLocalEnvelope).deferredOutbox,
+    ).toEqual([
+      expect.objectContaining({ status: 'conflict' }),
+      expect.objectContaining({
+        kind: 'nota-mutation',
+        payload: expect.objectContaining({ notaId: secondNotaId }),
+      }),
+    ]);
+    gateway.dispose();
+  });
+
   it('blocks only the conflicted Nota while another Nota continues replaying', async () => {
     const secondNotaId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
     const secondPageId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';

@@ -284,9 +284,13 @@ export class MariaDbNotaLineRepository {
     const now = this.dependencies.now();
     await connection.query(
       `UPDATE nota_lines
-       SET deleted_at = ?, row_version = row_version + 1, updated_at = ?
+       SET sku_id = NULL, sku_identifier_snapshot = '',
+           sku_name_snapshot = '', kind_snapshot = '', quantity_pcs = 0,
+           unit_kind = 'pcs', unit_price_rupiah = 0, pcs_price_rupiah = 0,
+           lsn_price_rupiah = 0, line_total_rupiah = 0,
+           deleted_at = NULL, row_version = row_version + 1, updated_at = ?
        WHERE id = UNHEX(REPLACE(?, '-', ''))`,
-      [now, now, lineId],
+      [now, lineId],
     );
     const updated = await readLine(connection, id, pageId, lineId);
     if (!updated) throw new Error('Deleted line was not found');
@@ -296,7 +300,6 @@ export class MariaDbNotaLineRepository {
       lineId,
       coreLinePayload(updated),
       now,
-      'delete',
     );
     await writeOperationAudit(
       connection,

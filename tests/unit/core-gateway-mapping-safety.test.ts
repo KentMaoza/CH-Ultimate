@@ -71,6 +71,27 @@ function templateRow(
 }
 
 describe('Core gateway mapping safety', () => {
+  it('keeps a deleted Nota line blank under its physical UUID', () => {
+    const remote = change('nota_line', LINE_ID, 'delete', {
+      ...populatedBootstrap().notaLines[0]!,
+      deletedAt: '2026-07-29T01:00:02.000Z',
+      rowVersion: '2',
+      updatedAt: '2026-07-29T01:00:02.000Z',
+    });
+
+    const state = applyCoreChange(mappedState(), remote);
+
+    expect(state.notaTransactions[0]?.pages[0]?.lines[0]).toEqual({
+      id: LINE_ID,
+      description: '',
+      kind: '',
+      quantity: 0,
+      unit: 'pcs',
+      pcsPrice: 0,
+      lsnPrice: 0,
+    });
+  });
+
   it.each([
     {
       relation: 'identifier without SKU',

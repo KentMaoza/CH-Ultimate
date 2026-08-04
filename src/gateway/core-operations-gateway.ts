@@ -460,6 +460,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   ): Promise<Nota | undefined> => {
     if (!this.hasLocalNota(transactionId)) {
       if (this.isOffline()) {
+        this.requireNotaUnconflicted(transactionId);
         const transaction = this.requireEditableSyncedNota(transactionId);
         const context = this.state.requireNotaStructureContext(transactionId);
         const page = createOfflinePage(transaction.nextNoteIndex);
@@ -498,6 +499,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   ): Promise<void> => {
     if (!this.hasLocalNota(transactionId)) {
       if (this.isOffline()) {
+        this.requireNotaUnconflicted(transactionId);
         const transaction = this.requireEditableSyncedNota(transactionId);
         if (transaction.pages.filter((page) => page.status === 'active').length < 2) {
           throw new Error('Nota harus memiliki setidaknya satu halaman aktif.');
@@ -546,6 +548,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   ): Promise<void> => {
     if (!this.hasLocalNota(transactionId)) {
       if (this.isOffline()) {
+        this.requireNotaUnconflicted(transactionId);
         this.requireEditableSyncedNota(transactionId);
         const context = this.state.requireNotaPageLifecycleContext(
           transactionId,
@@ -588,6 +591,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   ): Promise<void> => {
     if (!this.hasLocalNota(id)) {
       if (this.isOffline()) {
+        this.requireNotaUnconflicted(id);
         this.requireEditableSyncedNota(id);
         for (const field of Object.keys(patch) as Array<keyof typeof patch>) {
           const mine = patch[field];
@@ -631,6 +635,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   ): Promise<void> => {
     if (!this.hasLocalNota(transactionId)) {
       if (this.isOffline()) {
+        this.requireNotaUnconflicted(transactionId);
         this.requireEditableSyncedNota(transactionId);
         const context = this.state.requireNotaLineWriteContext(
           transactionId,
@@ -689,6 +694,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   ): Promise<void> => {
     if (!this.hasLocalNota(transactionId)) {
       if (this.isOffline()) {
+        this.requireNotaUnconflicted(transactionId);
         this.requireEditableSyncedNota(transactionId);
         const context = this.state.requireNotaDeleteContext(
           transactionId,

@@ -3,6 +3,12 @@
 body { margin: 0; min-width: 1024px; min-height: 100vh; }
 button, input, select, textarea { font: inherit; }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #111; outline-offset: 2px; }
+.client-crash-screen { min-height: 100vh; display: grid; place-items: center; padding: 32px; background: #efefe9; }
+.client-crash-screen section { width: min(560px, 100%); padding: 32px; border: 2px solid #111; background: #fff; box-shadow: 10px 10px 0 #111; }
+.client-crash-screen span { font-size: 10px; font-weight: 900; letter-spacing: .14em; }
+.client-crash-screen h1 { margin: 14px 0 8px; font-size: 32px; }
+.client-crash-screen p { line-height: 1.55; }
+.client-crash-screen button { margin-top: 16px; min-height: 42px; padding: 0 18px; border: 2px solid #111; color: #fff; background: #111; font-weight: 900; cursor: pointer; }
 .app-shell { display: grid; grid-template-columns: 288px 1fr; min-height: 100vh; transition: grid-template-columns .18s ease; }
 .app-shell.rail-collapsed { grid-template-columns: 78px 1fr; }
 .app-rail { position: relative; display: flex; flex-direction: column; min-height: 100vh; padding: 20px 14px 14px; color: #fff; background: #111; }

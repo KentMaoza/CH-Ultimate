@@ -1,10 +1,12 @@
-import { act, screen } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 
 afterEach(() => {
   document.body.innerHTML = '';
+  vi.doUnmock('../../src/renderer/App');
   vi.doUnmock('../../src/renderer/core-api-bootstrap');
+  vi.restoreAllMocks();
   vi.resetModules();
   window.history.replaceState({}, '', '/');
 });
@@ -92,5 +94,44 @@ describe('desktop renderer startup', () => {
     expect(
       screen.getByText('DEMO DATA · SESSION ONLY'),
     ).toBeInTheDocument();
+  });
+
+  it('replaces a renderer crash with a retry that preserves the runtime boundary', async () => {
+    document.body.innerHTML = '<div id="root"></div>';
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    const gateway = new MockOperationsGateway();
+    const bootstrapDesktopGateway = vi.fn().mockResolvedValue({
+      kind: 'gateway',
+      source: 'test-mock',
+      gateway,
+    });
+    vi.doMock('../../src/renderer/core-api-bootstrap', async () => {
+      const actual = await vi.importActual<
+        typeof import('../../src/renderer/core-api-bootstrap')
+      >('../../src/renderer/core-api-bootstrap');
+      return { ...actual, bootstrapDesktopGateway };
+    });
+    vi.doMock('../../src/renderer/App', () => ({
+      App: () => {
+        throw new Error('renderer exploded');
+      },
+    }));
+
+    await act(async () => {
+      await import('../../src/renderer/main');
+      await Promise.resolve();
+    });
+
+    expect(
+      screen.getByRole('heading', { name: 'Aplikasi tidak dapat ditampilkan' }),
+    ).toBeInTheDocument();
+    const initialErrorCount = consoleError.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Coba lagi' }));
+    await waitFor(() => expect(bootstrapDesktopGateway).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(consoleError.mock.calls.length).toBeGreaterThan(initialErrorCount),
+    );
   });
 });

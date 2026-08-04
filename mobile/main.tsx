@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { Capacitor } from '@capacitor/core';
 import { createMobileDemoState } from '../src/domain/mobile-demo-state';
 import { MockOperationsGateway } from '../src/gateway/operations-gateway';
+import { ClientErrorBoundary } from '../src/renderer/ClientErrorBoundary';
 import { MobileApp } from './MobileApp';
 import { createMobileRuntime } from './bootstrap';
 import { CoreConnectionScreen } from './components/CoreConnectionScreen';
@@ -35,7 +36,13 @@ export function mountMobileRenderer(
   let current: MobileBootstrapResult | undefined;
   let generation = 0;
   const render = (content: ReactNode) =>
-    root.render(<StrictMode>{content}</StrictMode>);
+    root.render(
+      <StrictMode>
+        <ClientErrorBoundary key={generation} onRetry={() => void retry()}>
+          {content}
+        </ClientErrorBoundary>
+      </StrictMode>,
+    );
 
   const retry = async (): Promise<void> => {
     const activeGeneration = ++generation;

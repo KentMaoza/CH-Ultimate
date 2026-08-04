@@ -224,17 +224,32 @@ export class CatalogueService {
     if (record.status === 'committed' && record.result) {
       return { ...record.result, replayed: true };
     }
+    if (record.workbookSha256 !== this.options.expectedWorkbookSha256) {
+      throw new CatalogueError(
+        'UNEXPECTED_WORKBOOK_HASH',
+        422,
+        'Workbook bukan katalog awal yang disetujui.',
+      );
+    }
     const now = this.now();
     if (new Date(record.expiresAt).getTime() <= now.getTime()) {
       await this.options.storage.deleteStaged(record.stagedPath);
       throw new CatalogueError('IMPORT_EXPIRED', 410, 'Tahap import telah kedaluwarsa.');
     }
     const bytes = await this.options.storage.readStaged(record.stagedPath);
-    if (workbookHash(bytes) !== record.workbookSha256) {
+    const sha256 = workbookHash(bytes);
+    if (sha256 !== record.workbookSha256) {
       throw new CatalogueError(
         'STAGED_WORKBOOK_CHANGED',
         409,
         'Workbook tahap tidak lagi sesuai dengan hash.',
+      );
+    }
+    if (sha256 !== this.options.expectedWorkbookSha256) {
+      throw new CatalogueError(
+        'UNEXPECTED_WORKBOOK_HASH',
+        422,
+        'Workbook bukan katalog awal yang disetujui.',
       );
     }
     const workbook = await parseCatalogueWorkbook(bytes);

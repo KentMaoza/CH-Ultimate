@@ -137,7 +137,7 @@ export const demoStateSchema = z
           before: z.number().int(),
           after: z.number().int(),
           createdAt: timestampSchema,
-          source: z.enum(['manual', 'nota', 'reversal', 'other']).default('manual'),
+          source: z.enum(['manual', 'nota', 'reversal', 'other']).default('other'),
         })
         .strict(),
     ),
@@ -149,7 +149,7 @@ export const demoStateSchema = z
           before: z.number().int(),
           after: z.number().int(),
           createdAt: timestampSchema,
-          source: z.enum(['manual', 'catalogue_import', 'other']).default('manual'),
+          source: z.enum(['manual', 'catalogue_import', 'other']).default('other'),
         })
         .strict(),
     ),

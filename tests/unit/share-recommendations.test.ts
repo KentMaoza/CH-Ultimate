@@ -116,19 +116,21 @@ test('prioritizes imported and manual SKU baru for exactly four WITA dates, incl
 test('excludes catalogue import prices and non-manual stock sources from priority', () => {
   const importedPrice = sku('import-price', 'Harga Import CH050', '2025-01-01T00:00:00.000Z');
   const manualPrice = sku('manual-price', 'Harga Manual CH051', '2025-01-01T00:00:00.000Z');
+  const unknownPrice = sku('unknown-price', 'Harga Tidak Diketahui CH052', '2025-01-01T00:00:00.000Z');
   const manualRestock = sku('manual-restock', 'Tambah Stok CH052', '2025-01-01T00:00:00.000Z');
   const excludedRestock = sku('excluded-restock', 'Bukan Tambah CH053', '2025-01-01T00:00:00.000Z');
   const report = buildShareRecommendationReport(
     {
       ...createInitialState(),
-      skus: [importedPrice, manualPrice, manualRestock, excludedRestock],
+      skus: [importedPrice, manualPrice, unknownPrice, manualRestock, excludedRestock],
       priceChanges: [
         { id: 'import-price', skuId: importedPrice.id, before: 1, after: 2, createdAt: '2026-08-04T01:00:00.000Z', source: 'catalogue_import' as const },
         { id: 'manual-price', skuId: manualPrice.id, before: 1, after: 2, createdAt: '2026-08-04T02:00:00.000Z', source: 'manual' as const },
+        { id: 'unknown-price', skuId: unknownPrice.id, before: 1, after: 2, createdAt: '2026-08-04T03:00:00.000Z', source: 'other' as const },
       ],
       adjustments: [
         { id: 'manual-restock', skuId: manualRestock.id, quantity: 3, before: 0, after: 3, createdAt: '2026-08-04T03:00:00.000Z', source: 'manual' as const },
-        { id: 'nota-restock', skuId: excludedRestock.id, quantity: 3, before: 0, after: 3, createdAt: '2026-08-04T03:00:00.000Z', source: 'nota' as const },
+        { id: 'unknown-restock', skuId: excludedRestock.id, quantity: 3, before: 0, after: 3, createdAt: '2026-08-04T03:00:00.000Z', source: 'other' as const },
       ],
     },
     new Date('2026-08-04T04:00:00.000Z'),
@@ -136,8 +138,28 @@ test('excludes catalogue import prices and non-manual stock sources from priorit
 
   expect(report.daily.find((item) => item.sku.id === importedPrice.id)?.reasons).toEqual(['idle']);
   expect(report.daily.find((item) => item.sku.id === manualPrice.id)?.reasons).toContain('price-updated');
+  expect(report.daily.find((item) => item.sku.id === unknownPrice.id)?.reasons).toEqual(['idle']);
   expect(report.daily.find((item) => item.sku.id === manualRestock.id)?.reasons).toContain('restocked');
   expect(report.daily.find((item) => item.sku.id === excludedRestock.id)?.reasons).toEqual(['idle']);
+});
+
+test('prioritizes manual restock for exactly four WITA dates', () => {
+  const restocked = sku('restocked', 'Tambah Stok CH060', '2025-01-01T00:00:00.000Z');
+  const state = {
+    ...createInitialState(),
+    skus: [restocked],
+    adjustments: [
+      { id: 'restock', skuId: restocked.id, quantity: 5, before: 0, after: 5, createdAt: '2026-08-04T01:00:00.000Z', source: 'manual' as const },
+    ],
+  };
+
+  const eventDate = buildShareRecommendationReport(state, new Date('2026-08-04T04:00:00.000Z'));
+  const fourthDate = buildShareRecommendationReport(state, new Date('2026-08-07T04:00:00.000Z'));
+  const fifthDate = buildShareRecommendationReport(state, new Date('2026-08-08T04:00:00.000Z'));
+
+  expect(eventDate.daily[0]?.reasons).toContain('restocked');
+  expect(fourthDate.daily[0]?.reasons).toContain('restocked');
+  expect(fifthDate.daily[0]?.reasons).toEqual(['idle']);
 });
 
 test('rotates the starting supplier deterministically across consecutive WITA dates', () => {

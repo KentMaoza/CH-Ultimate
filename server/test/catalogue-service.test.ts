@@ -175,6 +175,27 @@ describe('staged catalogue service', () => {
     expect(repository.commit).toHaveBeenCalledOnce();
   });
 
+  it('rejects an uncommitted stage when the approved baseline hash changes', async () => {
+    const bytes = await workbookBytes();
+    const sha256 = createHash('sha256').update(bytes).digest('hex');
+    const { service, repository, storage } = harness(sha256);
+    const stage = await service.validate(owner, {
+      fileName: 'catalogue.xlsx',
+      bytes,
+    });
+    const currentBaseline = new CatalogueService({
+      repository,
+      storage,
+      now: () => new Date('2026-07-30T01:30:00.000Z'),
+      randomUuid: () => '33333333-3333-4333-8333-333333333333',
+      expectedWorkbookSha256: '0'.repeat(64),
+    });
+
+    await expect(currentBaseline.commit(owner, stage.importId)).rejects
+      .toMatchObject({ code: 'UNEXPECTED_WORKBOOK_HASH', statusCode: 422 });
+    expect(repository.commit).not.toHaveBeenCalled();
+  });
+
   it('allows only owners and rejects an unexpected production workbook hash', async () => {
     const bytes = await workbookBytes();
     const { service } = harness('0'.repeat(64));

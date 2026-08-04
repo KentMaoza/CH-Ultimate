@@ -28,7 +28,7 @@ function createGateway(
 }
 
 describe('Core operations gateway bootstrap and polling', () => {
-  it('treats legacy cached recommendation events without source as manual', () => {
+  it('treats legacy cached recommendation events without source as neutral', () => {
     const state = createInitialState();
 
     const cached = parseCoreCache({
@@ -52,8 +52,8 @@ describe('Core operations gateway bootstrap and polling', () => {
       outbox: [],
     });
 
-    expect(cached.state.priceChanges[0]?.source).toBe('manual');
-    expect(cached.state.adjustments[0]?.source).toBe('manual');
+    expect(cached.state.priceChanges[0]?.source).toBe('other');
+    expect(cached.state.adjustments[0]?.source).toBe('other');
   });
 
   it('enables staged catalogue import only after an owner bootstrap', async () => {

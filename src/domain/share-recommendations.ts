@@ -146,12 +146,15 @@ export function buildShareRecommendationReport(state: DemoState, asOf = new Date
   const latestPriceChangeBySku = latestEventBySku(
     state.priceChanges,
     date,
-    (change) => change.source !== 'catalogue_import',
+    (change) => change.source === 'manual',
   );
   const latestRestockBySku = latestEventBySku(
     state.adjustments,
     date,
-    (adjustment) => adjustment.source === 'manual' && adjustment.quantity > 0,
+    (adjustment) =>
+      adjustment.source === 'manual' &&
+      adjustment.quantity > 0 &&
+      isWithinFourDayPriority(witaDate(adjustment.createdAt), date),
   );
 
   const newSkuById = new Map(

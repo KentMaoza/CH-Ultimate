@@ -119,6 +119,26 @@ describe('catalogue workbook mapping', () => {
     ]);
   });
 
+  it('falls back to a positive sale price when modal is zero', async () => {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('SKU');
+    sheet.addRow([
+      'Nomor SKU', 'Judul', 'Modal Referensi', 'Harga Jual Referensi',
+      'Semua Total Stok', 'Tautan Gambar', 'Catatan SKU Gudang',
+      'Kode Produk', 'Waktu Dibuat',
+    ]);
+    sheet.addRow([
+      'SKU-FALLBACK', 'Produk Fallback', 0, 12_000, 1, '', '',
+      'CODE-FALLBACK', '2026-08-04 08:07',
+    ]);
+
+    const parsed = await parseCatalogueWorkbook(
+      Buffer.from(await workbook.xlsx.writeBuffer()),
+    );
+
+    expect(parsed.rows[0]?.selectedPrice).toBe(12_000);
+  });
+
   it('rejects empty or duplicate primary SKUs and product codes', async () => {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('SKU');

@@ -171,9 +171,9 @@ describe('CH Core guarded deployment documentation', () => {
 
     expect(readme).toContain('CH Core acceptance status');
     for (const requiredEvidence of [
-      '487',
+      '497',
       '308',
-      '88',
+      '92',
       'Playwright 8/8',
       'Windows x64 ZIP',
       'Squirrel installer',
@@ -190,6 +190,7 @@ describe('CH Core guarded deployment documentation', () => {
       'e3e57a4770bb374e6b12e5e6d1ff31e27bfef31e2bef30a7def382247f40dce5',
       'https://192.168.50.14:8443',
       'Android release signing',
+      '57e0731ce3db068e6581980c53610764af05c612184ff50e18a9f4912ca59ba5',
       'chu_test',
       'Docker/Compose',
       'router reservation',
@@ -201,7 +202,9 @@ describe('CH Core guarded deployment documentation', () => {
       expect(acceptance).toContain(requiredEvidence);
     }
     expect(acceptance).toMatch(/Windows.+not tested.+physical/is);
-    expect(acceptance).toMatch(/Android.+not installed.+physical/is);
+    expect(acceptance).toMatch(
+      /Physical Android installation.+READY.+SM-S901E/is,
+    );
     expect(acceptance).toMatch(/copied-data.+deployed.+NAS/is);
     expect(acceptance).toMatch(/not.+production|bukan.+production/i);
     expect(acceptance).toMatch(/approval.+price/is);

@@ -90,3 +90,41 @@ The first E2E invocation timed out because this isolated worktree had no `.vite/
 - No physical Android camera/device run was performed. Camera success/failure behavior is covered through the scanner port, the mobile bundle production-builds, and the responsive page was exercised in a headless browser.
 - The full renderer suite still emits the previously recorded React `act(...)` warning from `nota-core-typing.test.tsx`; all 579 tests pass and Task 6 does not touch that Nota case.
 - The mobile production build retains the previously recorded greater-than-500-kB chunk warning. Bundle splitting is outside this UI slice.
+
+## Fix round 1
+
+### Regressions closed
+
+- Desktop keyboard-wedge buffering now ignores standalone modifier/control keys without clearing printable input. A true Shift keydown/keyup HID sequence resolves correctly, as do exact one- and two-character registered identifiers. Enter submits any non-empty trimmed buffer; form and editor isolation remains intact.
+- A blank count is rejected before numeric conversion, so it cannot become an absolute zero count. Explicit `0` remains valid and fractional values remain rejected.
+- A `STOCK_CHECK_STALE` response now blocks a new review until an authoritative refresh succeeds, the resulting sync phase is `online`, and the selected active SKU exists in the refreshed snapshot. Failed/offline refresh shows an explicit Indonesian error and exposes `Coba muat ulang stok`; only a later successful refresh clears the block.
+- Owner package-barcode capability is cleared on normal authentication revocation, persisted/deferred authentication revocation, installation quarantine mismatch, and owner-to-client bootstrap. A Core-backed desktop regression proves the controls disappear when revoked; server authorization remains unchanged as defense in depth.
+- Every mobile bottom-nav label now has a bounded wrapping element. The six-item nav grows vertically as needed at 200 percent text instead of allowing labels to overflow or clip horizontally.
+
+### RED evidence
+
+1. Wedge/count focused RED: 3 failures and 9 passes. The shifted HID sequence was reduced to an unknown partial code after `Shift`/`CapsLock` cleared the buffer, one- and two-character identifiers were rejected by the three-character floor, and blank count opened a zero-count confirmation.
+2. Stale-refresh RED: the failed retry still rendered `Data terbaru dimuat` and left `Tinjau cek stok` enabled instead of producing the required refresh failure/block.
+3. Capability RED: 2 failures and 32 passes. Both the deferred-401 gateway assertion and the integrated desktop UI still retained owner package-management access after `phase=revoked`.
+4. Live mobile browser RED at 360 x 800 and 200 percent root text: the six-item nav measured `scrollWidth=364` with `clientWidth=360` before per-label containment was added.
+
+### GREEN evidence
+
+- Wedge and count UI matrix after the first fixes: 12/12 tests passed.
+- Stale success/failure/later-retry matrix: 10/10 stock-check UI tests passed.
+- Owner bootstrap/revocation/UI matrix: 34/34 tests passed.
+- Live Playwright nav containment: 1/1 passed; nav, every button, and every visual label satisfy `scrollWidth <= clientWidth` at 360 x 800 and 200 percent root text.
+- Final focused stock UI/gateway/mobile matrix: 9 files, 99/99 tests passed.
+- Renderer/mobile typecheck: `npm run typecheck` passed.
+- Full renderer suite: `npm test` passed, 80 files and 585 tests.
+- Mobile production build: `npm run mobile:build` passed.
+- Local Electron package prerequisite: `npm run package` passed.
+- Full E2E suite: `npm run test:e2e` passed, 9/9 tests including the live mobile containment regression.
+
+### Fix-round self-review and concerns
+
+- Reconfirmation remains impossible after a stale refresh failure even if the count input is edited; choosing/scanning a different SKU resets the SKU-scoped block.
+- Successful stale refresh preserves the operator's physical count while updating only the authoritative observed stock, so the difference is recalculated during the required new review.
+- Capability changes are applied before revoked sync publication, allowing subscribed UI to rerender without a privileged intermediate frame.
+- No print, export, server authorization, release, backend schema, or Android-native work was added.
+- The existing Nota `act(...)` warning and mobile greater-than-500-kB chunk warning remain unchanged. Physical Android camera verification remains outside this local fix round.

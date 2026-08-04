@@ -235,12 +235,12 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
       {view === 'more' && !scanOpen && !selectedSku ? <MoreView coreBacked={coreBacked} onOpenPrices={() => navigate('prices')} onOpenRecommendations={() => navigate('recommendations')} /> : null}
     </main>
     <nav aria-label="Navigasi utama" className="bottom-nav">
-      <button aria-current={view === 'home' ? 'page' : undefined} onClick={() => navigate('home')}><HomeIcon />Beranda</button>
-      <button aria-current={view === 'skus' ? 'page' : undefined} onClick={() => navigate('skus')}><BoxIcon />SKU</button>
-      <button aria-current={view === 'nota' ? 'page' : undefined} onClick={() => navigate('nota')}><NotaIcon />Nota</button>
-      <button aria-label="Cek Stok" title="Cek Stok" aria-current={view === 'stock' ? 'page' : undefined} onClick={() => navigate('stock')}><StockIcon /><span aria-hidden="true">Stok</span></button>
-      <button aria-current={view === 'archive' ? 'page' : undefined} onClick={() => navigate('archive')}><ArchiveIcon />Arsip</button>
-      <button aria-current={['more', 'prices', 'recommendations'].includes(view) ? 'page' : undefined} onClick={() => navigate('more')}><MoreIcon />Lainnya</button>
+      <button aria-current={view === 'home' ? 'page' : undefined} onClick={() => navigate('home')}><HomeIcon /><span className="bottom-nav__label">Beranda</span></button>
+      <button aria-current={view === 'skus' ? 'page' : undefined} onClick={() => navigate('skus')}><BoxIcon /><span className="bottom-nav__label">SKU</span></button>
+      <button aria-current={view === 'nota' ? 'page' : undefined} onClick={() => navigate('nota')}><NotaIcon /><span className="bottom-nav__label">Nota</span></button>
+      <button aria-label="Cek Stok" title="Cek Stok" aria-current={view === 'stock' ? 'page' : undefined} onClick={() => navigate('stock')}><StockIcon /><span aria-hidden="true" className="bottom-nav__label">Stok</span></button>
+      <button aria-current={view === 'archive' ? 'page' : undefined} onClick={() => navigate('archive')}><ArchiveIcon /><span className="bottom-nav__label">Arsip</span></button>
+      <button aria-current={['more', 'prices', 'recommendations'].includes(view) ? 'page' : undefined} onClick={() => navigate('more')}><MoreIcon /><span className="bottom-nav__label">Lainnya</span></button>
     </nav>
   </div>;
 }

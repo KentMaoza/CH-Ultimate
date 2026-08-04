@@ -237,6 +237,7 @@ describe('Core offline permission matrix', () => {
     );
     const initializing = gateway.initialize();
     await settleUntil(() => transport.requests.length === 2);
+    expect(gateway.capabilities.canManagePackageBarcodes).toBe(true);
 
     transport.enqueue(() => normalAResponse.promise);
     const mutationA = gateway.updateSku(SKU_ID, { name: 'Mutasi A' });
@@ -259,6 +260,7 @@ describe('Core offline permission matrix', () => {
     expect(quarantined.outbox).toEqual([]);
     expect(quarantined.quarantinedOutbox).toHaveLength(2);
     expect(gateway.getSyncSnapshot().phase).toBe('revoked');
+    expect(gateway.capabilities.canManagePackageBarcodes).toBe(false);
 
     normalAResponse.resolve({
       status: 200,

@@ -58,6 +58,7 @@ export function StockCheckView({
   const [managementTargets, setManagementTargets] = useState<Record<string, string>>({});
   const [managementAction, setManagementAction] = useState<ManagementAction | null>(null);
   const [feedback, setFeedback] = useState<{ kind: 'alert' | 'status'; text: string } | null>(null);
+  const [staleRefreshRequired, setStaleRefreshRequired] = useState(false);
   const [busy, setBusy] = useState(false);
   const selectedSku = activeSkus.find((sku) => sku.id === selectedSkuId) ?? null;
   const audits = snapshot.stockChecks
@@ -77,6 +78,7 @@ export function StockCheckView({
     setNote('');
     setReview(null);
     setRegistration(null);
+    setStaleRefreshRequired(false);
     setFeedback(null);
   }
 
@@ -115,21 +117,17 @@ export function StockCheckView({
       )) return;
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       if (event.key === 'Enter') {
-        if (buffer.length >= 3 && (!lastKeyAt || event.timeStamp - lastKeyAt <= 80)) {
-          const code = buffer;
-          buffer = '';
-          lastKeyAt = 0;
+        const code = buffer.trim();
+        buffer = '';
+        lastKeyAt = 0;
+        if (code) {
           setManualCode(code);
           resolveCodeRef.current(code);
           event.preventDefault();
         }
         return;
       }
-      if (event.key.length !== 1) {
-        buffer = '';
-        lastKeyAt = 0;
-        return;
-      }
+      if (event.key.length !== 1) return;
       if (lastKeyAt && event.timeStamp - lastKeyAt > 80) buffer = '';
       buffer += event.key;
       lastKeyAt = event.timeStamp;
@@ -158,6 +156,17 @@ export function StockCheckView({
   }
 
   function prepareReview() {
+    if (staleRefreshRequired) {
+      setFeedback({
+        kind: 'alert',
+        text: 'Stok terbaru belum dapat dimuat. Coba muat ulang sebelum mengonfirmasi.',
+      });
+      return;
+    }
+    if (!countedValue.trim()) {
+      setFeedback({ kind: 'alert', text: 'Jumlah hasil hitung wajib diisi.' });
+      return;
+    }
     const counted = Number(countedValue);
     if (!Number.isSafeInteger(counted)) {
       setFeedback({ kind: 'alert', text: 'Hasil hitung wajib berupa bilangan bulat aman.' });
@@ -170,6 +179,39 @@ export function StockCheckView({
     }
     setReview({ observed: observedStock, counted, note: trimmedNote });
     setFeedback(null);
+  }
+
+  async function refreshStaleStock(skuId: string): Promise<void> {
+    try {
+      await gateway.retryPending();
+      const refreshedSync = gateway.getSyncSnapshot();
+      const refreshed = gateway.getSnapshot().skus.find((sku) => sku.id === skuId);
+      if (refreshedSync.phase !== 'online' || !refreshed || refreshed.archived) {
+        throw new Error('authoritative stock unavailable');
+      }
+      setObservedStock(refreshed.stock);
+      setStaleRefreshRequired(false);
+      setFeedback({
+        kind: 'status',
+        text: 'Stok berubah di CH Core. Data terbaru dimuat; tinjau dan konfirmasi ulang.',
+      });
+    } catch {
+      setStaleRefreshRequired(true);
+      setFeedback({
+        kind: 'alert',
+        text: 'Stok terbaru belum dapat dimuat. Hubungkan kembali ke CH Core, lalu coba muat ulang sebelum mengonfirmasi.',
+      });
+    }
+  }
+
+  async function retryStaleRefresh() {
+    if (!selectedSku || busy) return;
+    setBusy(true);
+    try {
+      await refreshStaleStock(selectedSku.id);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function confirmCount() {
@@ -200,18 +242,9 @@ export function StockCheckView({
       });
     } catch (error) {
       if (error instanceof Error && error.message.includes('STOCK_CHECK_STALE')) {
-        try {
-          await gateway.retryPending();
-        } catch {
-          // The stale response still requires a fresh confirmation if refresh is unavailable.
-        }
-        const refreshed = gateway.getSnapshot().skus.find((sku) => sku.id === selectedSku.id);
-        if (refreshed) setObservedStock(refreshed.stock);
         setReview(null);
-        setFeedback({
-          kind: 'alert',
-          text: 'Stok berubah di CH Core. Data terbaru dimuat; tinjau dan konfirmasi ulang.',
-        });
+        setStaleRefreshRequired(true);
+        await refreshStaleStock(selectedSku.id);
       } else {
         setFeedback({
           kind: 'alert',
@@ -363,7 +396,8 @@ export function StockCheckView({
               onChange={(event) => { setNote(event.target.value); setReview(null); }}
             />
             <small>{note.length}/512 karakter</small>
-            <button type="button" onClick={prepareReview}>Tinjau cek stok</button>
+            <button type="button" disabled={busy || staleRefreshRequired} onClick={prepareReview}>Tinjau cek stok</button>
+            {staleRefreshRequired ? <button type="button" disabled={busy} onClick={() => void retryStaleRefresh()}>Coba muat ulang stok</button> : null}
           </div>
 
           {review ? <section className="stock-check__confirmation" role="region" aria-label={`Konfirmasi cek stok ${selectedSku.name}`}>

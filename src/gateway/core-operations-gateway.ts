@@ -160,10 +160,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
       clock,
       this.state,
       envelopes,
-      (role) => {
-        this.capabilities.canStageInitialCatalogue = role === 'owner';
-        this.capabilities.canManagePackageBarcodes = role === 'owner';
-      },
+      (role) => this.applyDeviceRole(role),
       (authoritativeBootstrap) => this.onAuthenticatedOnline(authoritativeBootstrap),
       () => this.onAuthenticationRevoked(),
     );
@@ -1098,6 +1095,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
         await this.transport.installationId(),
       );
       if (!resumed) {
+        this.applyDeviceRole();
         this.polling.authenticationRevoked();
         this.state.publishSync({
           phase: 'revoked',
@@ -1118,16 +1116,24 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   }
 
   private async onAuthenticationRevoked(): Promise<void> {
+    this.applyDeviceRole();
     await this.deferred.quarantineRevoked();
   }
 
   private async onPersistedAuthenticationRevoked(): Promise<void> {
+    this.applyDeviceRole();
     this.polling.authenticationRevoked();
     this.state.publishSync({
       phase: 'revoked',
       message: 'Akses perangkat dicabut. Antrean lokal dikarantina.',
     });
     this.applyOfflineProjection(await this.localStore.load(), true);
+  }
+
+  private applyDeviceRole(role?: 'owner' | 'client'): void {
+    const owner = role === 'owner';
+    this.capabilities.canStageInitialCatalogue = owner;
+    this.capabilities.canManagePackageBarcodes = owner;
   }
 }
 

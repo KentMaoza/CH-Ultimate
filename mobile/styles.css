@@ -1008,6 +1008,13 @@ input:focus-visible,
   font-weight: 700;
 }
 
+.bottom-nav__label {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .bottom-nav button[aria-current="page"]::before {
   position: absolute;
   top: 0;

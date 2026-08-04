@@ -115,8 +115,47 @@ test('requires a review that shows observed, counted, difference, trimmed note, 
   expect(await screen.findByRole('status')).toHaveTextContent('Cek stok tersimpan');
 });
 
+test('rejects a blank counted quantity instead of coercing it to zero', () => {
+  render(<StockCheckView gateway={new MockOperationsGateway(stockState)} mode="desktop" />);
+  fireEvent.click(screen.getByRole('button', { name: 'Cek stok Produk CH002' }));
+  fireEvent.change(screen.getByRole('spinbutton', { name: 'Jumlah hasil hitung (PCS)' }), {
+    target: { value: '' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Tinjau cek stok' }));
+
+  expect(screen.getByRole('alert')).toHaveTextContent('Jumlah hasil hitung wajib diisi');
+  expect(screen.queryByRole('region', { name: /Konfirmasi cek stok/ })).not.toBeInTheDocument();
+});
+
+test('accepts an explicitly entered zero count', () => {
+  render(<StockCheckView gateway={new MockOperationsGateway(stockState)} mode="desktop" />);
+  fireEvent.click(screen.getByRole('button', { name: 'Cek stok Produk CH002' }));
+  fireEvent.change(screen.getByRole('spinbutton', { name: 'Jumlah hasil hitung (PCS)' }), {
+    target: { value: '0' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Tinjau cek stok' }));
+
+  expect(screen.getByRole('region', { name: 'Konfirmasi cek stok Produk CH002' })).toHaveTextContent('Hasil hitung0 PCS');
+});
+
+test('rejects a non-integer counted quantity', () => {
+  render(<StockCheckView gateway={new MockOperationsGateway(stockState)} mode="desktop" />);
+  fireEvent.click(screen.getByRole('button', { name: 'Cek stok Produk CH002' }));
+  fireEvent.change(screen.getByRole('spinbutton', { name: 'Jumlah hasil hitung (PCS)' }), {
+    target: { value: '1.5' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Tinjau cek stok' }));
+
+  expect(screen.getByRole('alert')).toHaveTextContent('bilangan bulat aman');
+  expect(screen.queryByRole('region', { name: /Konfirmasi cek stok/ })).not.toBeInTheDocument();
+});
+
 test('stale online rejection refreshes the observed stock and requires confirmation again', async () => {
   const gateway = new MockOperationsGateway(stockState);
+  const onlineSync = {
+    phase: 'online' as const, serverRevision: '1', pendingCount: 0, conflictCount: 0,
+  };
+  gateway.getSyncSnapshot = () => onlineSync;
   const originalCheck = gateway.checkStock.bind(gateway);
   vi.spyOn(gateway, 'checkStock')
     .mockImplementationOnce(async () => {
@@ -134,10 +173,45 @@ test('stale online rejection refreshes the observed stock and requires confirmat
   fireEvent.click(screen.getByRole('button', { name: 'Tinjau cek stok' }));
   fireEvent.click(screen.getByRole('button', { name: 'Konfirmasi cek stok' }));
 
-  expect(await screen.findByRole('alert')).toHaveTextContent('Stok berubah di CH Core');
+  expect(await screen.findByRole('status')).toHaveTextContent('Stok berubah di CH Core');
   expect(retry).toHaveBeenCalledOnce();
   expect(screen.queryByRole('region', { name: /Konfirmasi cek stok/ })).not.toBeInTheDocument();
   expect(screen.getByText('Stok teramati: 12 PCS')).toBeInTheDocument();
+});
+
+test('stale refresh failure blocks reconfirmation until a later online refresh succeeds', async () => {
+  const gateway = new MockOperationsGateway(stockState);
+  let syncSnapshot = {
+    phase: 'offline' as 'offline' | 'online', serverRevision: '1', pendingCount: 0, conflictCount: 0,
+  };
+  gateway.getSyncSnapshot = () => syncSnapshot;
+  vi.spyOn(gateway, 'checkStock').mockRejectedValueOnce(
+    new Error('Perubahan ditolak oleh CH Core (STOCK_CHECK_STALE).'),
+  );
+  vi.spyOn(gateway, 'retryPending')
+    .mockRejectedValueOnce(new Error('LAN tidak tersedia'))
+    .mockImplementationOnce(async () => {
+      await gateway.updateSku('never', { stock: 12 });
+      syncSnapshot = { ...syncSnapshot, phase: 'online' };
+    });
+  render(<StockCheckView gateway={gateway} mode="desktop" />);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Cek stok Produk CH002' }));
+  fireEvent.change(screen.getByRole('spinbutton', { name: 'Jumlah hasil hitung (PCS)' }), {
+    target: { value: '8' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Tinjau cek stok' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Konfirmasi cek stok' }));
+
+  expect(await screen.findByText(/Stok terbaru belum dapat dimuat/)).toHaveAttribute('role', 'alert');
+  expect(screen.getByRole('button', { name: 'Tinjau cek stok' })).toBeDisabled();
+  expect(screen.queryByText('Data terbaru dimuat')).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Coba muat ulang stok' }));
+  expect(await screen.findByRole('status')).toHaveTextContent('Data terbaru dimuat');
+  expect(screen.getByRole('button', { name: 'Tinjau cek stok' })).toBeEnabled();
+  expect(screen.getByText('Stok teramati: 12 PCS')).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: /Konfirmasi cek stok/ })).not.toBeInTheDocument();
 });
 
 test('offline confirmation warns that reconnect overwrites central stock', async () => {

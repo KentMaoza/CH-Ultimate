@@ -67,6 +67,14 @@ describe('Core operations gateway bootstrap and polling', () => {
     await owner.gateway.initialize();
     expect(owner.gateway.capabilities.canStageInitialCatalogue).toBe(true);
     expect(owner.gateway.capabilities.canManagePackageBarcodes).toBe(true);
+    owner.transport.enqueue({ status: 410, body: { code: 'CURSOR_EXPIRED' } });
+    owner.transport.enqueue({
+      status: 200,
+      body: populatedBootstrap('2', { deviceRole: 'client' }),
+    });
+    await owner.gateway.retryPending();
+    expect(owner.gateway.capabilities.canStageInitialCatalogue).toBe(false);
+    expect(owner.gateway.capabilities.canManagePackageBarcodes).toBe(false);
 
     const client = createGateway();
     client.transport.enqueue({

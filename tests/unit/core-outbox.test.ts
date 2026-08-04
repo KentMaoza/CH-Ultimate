@@ -522,6 +522,73 @@ describe('Core deferred outbox', () => {
     ]);
   });
 
+  it('executes earlier same-entity work before a later conflict blocks that entity', async () => {
+    const skuId = '11111111-1111-4111-8111-111111111111';
+    const laterOperationId = '50505050-5050-4050-8050-505050505050';
+    const operationIds = [OPERATION_ID, laterOperationId];
+    const storage = new MemoryStorage();
+    const store = new CoreLocalStore(storage, () => INSTALLATION_ID);
+    const transport = new ScriptedTransport();
+    const outbox = new CoreDeferredOutbox(store, transport, {
+      now: () => new Date('2026-07-30T02:00:00.000Z'),
+      uuid: () => operationIds.shift()!,
+    });
+    await outbox.deferStock({
+      skuId,
+      skuIdentifier: 'SKU-1',
+      skuName: 'Produk 1',
+      referencePrice: 5_000,
+      delta: 1,
+      reason: 'Koreksi awal',
+    });
+    await outbox.deferStockCount({
+      skuId,
+      observedQuantityPcs: 11,
+      countedQuantityPcs: 9,
+      baseBalanceVersion: '4',
+      countedAt: '2026-07-30T02:01:00.000Z',
+    });
+    await store.update((envelope) => ({
+      ...envelope,
+      deferredOutbox: envelope.deferredOutbox.map((command) =>
+        command.operationId === laterOperationId
+          ? { ...command, status: 'conflict' }
+          : command,
+      ),
+      offlineConflicts: [
+        {
+          operationId: laterOperationId,
+          errorCode: 'STOCK_CHECK_STALE',
+          conflict: {
+            id: laterOperationId,
+            entityType: 'stock_balance',
+            entityId: skuId,
+            base: null,
+            mine: null,
+            server: 'STOCK_CHECK_STALE',
+          },
+        },
+      ],
+    }));
+    transport.enqueue({ status: 200, body: {} });
+
+    await outbox.pump(true);
+
+    expect(transport.requests).toEqual([
+      expect.objectContaining({
+        path: '/v1/offline/stock-adjustments',
+        body: expect.objectContaining({ skuId, reason: 'Koreksi awal' }),
+      }),
+    ]);
+    expect((await store.load()).deferredOutbox).toEqual([
+      expect.objectContaining({
+        operationId: laterOperationId,
+        sequence: 2,
+        status: 'conflict',
+      }),
+    ]);
+  });
+
   it('quarantines every pending item on 401 and resumes only after same-installation reapproval', async () => {
     let operation = 0;
     const storage = new MemoryStorage();
@@ -597,6 +664,74 @@ describe('Core deferred outbox', () => {
     expect((await store.load()).deferredOutbox).toEqual([]);
     expect((await store.load()).outbox).toHaveLength(1);
     expect(transport.requests[1]).toEqual(transport.requests[0]);
+  });
+
+  it('preserves an existing conflict while unrelated quarantined work becomes retryable', async () => {
+    const firstSkuId = '11111111-1111-4111-8111-111111111111';
+    const secondSkuId = '77777777-7777-4777-8777-777777777777';
+    const operationIds = [
+      OPERATION_ID,
+      '50505050-5050-4050-8050-505050505050',
+    ];
+    const storage = new MemoryStorage();
+    const store = new CoreLocalStore(storage, () => INSTALLATION_ID);
+    const transport = new ScriptedTransport();
+    const outbox = new CoreDeferredOutbox(store, transport, {
+      now: () => new Date('2026-07-30T02:00:00.000Z'),
+      uuid: () => operationIds.shift()!,
+    });
+    await outbox.deferStock({
+      skuId: firstSkuId,
+      skuIdentifier: 'SKU-1',
+      skuName: 'Produk 1',
+      referencePrice: 5_000,
+      delta: 1,
+      reason: 'Koreksi',
+    });
+    await outbox.deferStock({
+      skuId: secondSkuId,
+      skuIdentifier: 'SKU-2',
+      skuName: 'Produk 2',
+      referencePrice: 6_000,
+      delta: -1,
+      reason: 'Rusak',
+    });
+    transport.enqueue({ status: 409, body: { code: 'SKU_NOT_ACTIVE' } });
+    transport.enqueue({ status: 401, body: { code: 'UNAUTHORIZED' } });
+
+    await outbox.pump(true);
+
+    const quarantined = await store.load();
+    expect(quarantined.deferredOutbox).toEqual([
+      expect.objectContaining({ operationId: OPERATION_ID, status: 'conflict' }),
+      expect.objectContaining({ status: 'quarantined' }),
+    ]);
+    expect(quarantined.offlineConflicts).toEqual([
+      expect.objectContaining({ operationId: OPERATION_ID }),
+    ]);
+
+    await expect(
+      outbox.resumeAfterReapproval(INSTALLATION_ID),
+    ).resolves.toBe(true);
+    expect((await store.load()).deferredOutbox).toEqual([
+      expect.objectContaining({ operationId: OPERATION_ID, status: 'conflict' }),
+      expect.objectContaining({ status: 'error' }),
+    ]);
+
+    transport.enqueue({ status: 200, body: {} });
+    await outbox.pump(true);
+
+    expect(transport.requests.map((request) => request.body)).toEqual([
+      expect.objectContaining({ skuId: firstSkuId }),
+      expect.objectContaining({ skuId: secondSkuId }),
+      expect.objectContaining({ skuId: secondSkuId }),
+    ]);
+    expect(await store.load()).toMatchObject({
+      deferredOutbox: [
+        expect.objectContaining({ operationId: OPERATION_ID, status: 'conflict' }),
+      ],
+      offlineConflicts: [expect.objectContaining({ operationId: OPERATION_ID })],
+    });
   });
 
   it('retains a permanent rejection as an actionable offline conflict', async () => {

@@ -967,25 +967,33 @@ function acknowledgeOfflineCommand(
     if (!envelope.state.skus.some((sku) => sku.id === stockCheck.skuId)) {
       throw new Error('SKU hasil cek stok tidak ditemukan.');
     }
+    const cachedBalanceVersion = envelope.balanceVersions[stockCheck.skuId];
+    const acknowledgementIsStale =
+      acknowledgement.entityVersion !== undefined &&
+      cachedBalanceVersion !== undefined &&
+      BigInt(acknowledgement.entityVersion) < BigInt(cachedBalanceVersion);
     return {
       ...envelope,
-      balanceVersions: acknowledgement.entityVersion
-        ? {
-            ...envelope.balanceVersions,
-            [stockCheck.skuId]: acknowledgement.entityVersion,
-          }
-        : envelope.balanceVersions,
+      balanceVersions:
+        acknowledgement.entityVersion && !acknowledgementIsStale
+          ? {
+              ...envelope.balanceVersions,
+              [stockCheck.skuId]: acknowledgement.entityVersion,
+            }
+          : envelope.balanceVersions,
       state: {
         ...envelope.state,
-        skus: envelope.state.skus.map((sku) =>
-          sku.id === stockCheck.skuId
-            ? {
-                ...sku,
-                stock: stockCheck.countedQuantityPcs,
-                lastStockCheckedAt: stockCheck.countedAt,
-              }
-            : sku,
-        ),
+        skus: acknowledgementIsStale
+          ? envelope.state.skus
+          : envelope.state.skus.map((sku) =>
+              sku.id === stockCheck.skuId
+                ? {
+                    ...sku,
+                    stock: stockCheck.countedQuantityPcs,
+                    lastStockCheckedAt: stockCheck.countedAt,
+                  }
+                : sku,
+            ),
         stockChecks: [
           ...envelope.state.stockChecks.filter(
             (candidate) => candidate.id !== stockCheck.id,

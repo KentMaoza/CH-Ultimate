@@ -437,7 +437,7 @@ describe('Core offline permission matrix', () => {
     expect(transport.requests).toHaveLength(1);
   });
 
-  it('persists an absolute stock count before optimism and replays the immutable forced request after restart', async () => {
+  it('replays an immutable forced count without rolling a newer balance backward on duplicate acknowledgement', async () => {
     const clock = new TestClock();
     clock.current = new Date('2026-08-04T02:00:00.000Z');
     const observedBootstrap = populatedBootstrap('7');
@@ -445,7 +445,7 @@ describe('Core offline permission matrix', () => {
       {
         ...observedBootstrap.balances[0],
         quantityPcs: '10',
-        rowVersion: '4',
+        rowVersion: '2',
       },
     ];
     const storage = new MemoryStorage();
@@ -487,7 +487,7 @@ describe('Core offline permission matrix', () => {
           skuId: SKU_ID,
           observedQuantityPcs: 10,
           countedQuantityPcs: 8,
-          baseBalanceVersion: '4',
+          baseBalanceVersion: '2',
           countedAt: clock.now().toISOString(),
           note: 'Hitung rak depan',
         },
@@ -502,7 +502,7 @@ describe('Core offline permission matrix', () => {
       countedQuantityPcs: '8',
       serverQuantityBeforePcs: '7',
       appliedDeltaPcs: '1',
-      baseBalanceVersion: '4',
+      baseBalanceVersion: '2',
       forcedOffline: true,
       countedAt: clock.now().toISOString(),
       appliedAt: '2026-08-04T02:01:00.000Z',
@@ -516,7 +516,7 @@ describe('Core offline permission matrix', () => {
       {
         ...serverBeforeReplay.balances[0],
         quantityPcs: '7',
-        rowVersion: '5',
+        rowVersion: '2',
       },
     ];
     firstReplayTransport.enqueue({ status: 200, body: serverBeforeReplay });
@@ -541,8 +541,8 @@ describe('Core offline permission matrix', () => {
     appliedBootstrap.balances = [
       {
         ...appliedBootstrap.balances[0],
-        quantityPcs: '8',
-        rowVersion: '6',
+        quantityPcs: '11',
+        rowVersion: '5',
         lastCheckedAt: clock.now().toISOString(),
       },
     ];
@@ -552,7 +552,7 @@ describe('Core offline permission matrix', () => {
       status: 200,
       body: {
         serverRevision: '9',
-        entityVersion: '6',
+        entityVersion: '3',
         entity: serverCheck,
       },
     });
@@ -564,7 +564,7 @@ describe('Core offline permission matrix', () => {
     await duplicateReplay.initialize();
 
     expect(duplicateReplayTransport.requests[1]).toEqual(immutableRequest);
-    expect(duplicateReplay.getSnapshot().skus[0]?.stock).toBe(8);
+    expect(duplicateReplay.getSnapshot().skus[0]?.stock).toBe(11);
     expect(duplicateReplay.getSnapshot().stockChecks).toEqual([
       expect.objectContaining({
         id: serverCheck.id,
@@ -580,7 +580,7 @@ describe('Core offline permission matrix', () => {
     ).toEqual([]);
     expect(
       (storage.value as unknown as CoreLocalEnvelope).balanceVersions[SKU_ID],
-    ).toBe('6');
+    ).toBe('5');
   });
 
   it('rejects every shared mutation with visible Indonesian read-only copy', async () => {

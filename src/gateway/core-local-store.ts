@@ -576,11 +576,15 @@ export class CoreLocalStore {
         ...envelope,
         outbox: [],
         quarantinedOutbox: [...combined.values()],
-        deferredOutbox: envelope.deferredOutbox.map((command) => ({
-          ...command,
-          status: 'quarantined',
-          lastError: 'Akses perangkat dicabut.',
-        })),
+        deferredOutbox: envelope.deferredOutbox.map((command) =>
+          command.status === 'conflict'
+            ? command
+            : {
+                ...command,
+                status: 'quarantined',
+                lastError: 'Akses perangkat dicabut.',
+              },
+        ),
         quarantine: {
           active: true,
           quarantinedAt,

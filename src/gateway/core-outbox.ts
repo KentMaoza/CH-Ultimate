@@ -217,21 +217,22 @@ export class CoreDeferredOutbox {
     while (true) {
       const envelope = await this.store.load();
       if (envelope.quarantine.active) return;
-      const blockedEntities = new Set(
-        envelope.deferredOutbox
-          .filter(
-            (command) =>
-              command.status === 'conflict' ||
-              command.status === 'quarantined',
-          )
-          .map(deferredEntityKey),
-      );
-      const candidate = envelope.deferredOutbox.find(
-        (command) =>
-          command.status !== 'conflict' &&
-          command.status !== 'quarantined' &&
-          !blockedEntities.has(deferredEntityKey(command)),
-      );
+      const blockedEntities = new Set<string>();
+      let candidate: CoreDeferredCommand | undefined;
+      for (const command of envelope.deferredOutbox) {
+        const entityKey = deferredEntityKey(command);
+        if (
+          command.status === 'conflict' ||
+          command.status === 'quarantined'
+        ) {
+          blockedEntities.add(entityKey);
+          continue;
+        }
+        if (!blockedEntities.has(entityKey)) {
+          candidate = command;
+          break;
+        }
+      }
       if (!candidate) return;
       const firstSentAt =
         candidate.firstSentAt ?? this.dependencies.now().toISOString();

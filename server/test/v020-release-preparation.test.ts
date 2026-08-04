@@ -174,14 +174,25 @@ describe('v0.2.0 repository-local release preparation', () => {
   });
 
   it('separates repository evidence from every unperformed live and physical gate', async () => {
-    const [acceptance, deployment] = await Promise.all([
+    const [acceptance, deployment, businessLan] = await Promise.all([
       repositoryText('docs/ch-core-acceptance-status.md'),
       repositoryText('docs/ch-core-nas-deployment.md'),
+      repositoryText('docs/ch-core-business-lan.md'),
     ]);
     const currentSection = markdownSection(
       acceptance,
       '### Pilot v0.2.0 — persiapan repository lokal',
       '## Local implementation and regression',
+    );
+    const localEvidence = markdownSection(
+      acceptance,
+      '## Local implementation and regression',
+      '## Client release artifacts',
+    );
+    const workbookReview = markdownSection(
+      acceptance,
+      '## Workbook owner review',
+      '## NAS preflight and deployment gates',
     );
 
     for (const status of ['PASS', 'READY', 'BLOCKED']) {
@@ -204,7 +215,42 @@ describe('v0.2.0 repository-local release preparation', () => {
     expect(currentSection).not.toContain('24-hour');
     expect(deployment).toContain('four-day copied-data pilot');
     expect(deployment).not.toContain('24-hour copied-data pilot');
-    expect(acceptance).toContain('### Client stabilization v0.1.5');
+    expect(businessLan).toMatch(/four-day\s+copied-data pilot/);
+    expect(businessLan).not.toContain('24 hours');
+
+    for (const currentWorkbookFact of [
+      'SKU_Gudang20260804080716145.xlsx',
+      'f1f4675327fac107ef9f78c114b8afe86389d5543b204540ed45e74f9b15e49c',
+      '3,144 SKU',
+      '6,288 identifiers',
+      '2,786 refs',
+      '358 missing',
+      '3 Modal selections',
+      'Rp276,285,615',
+      '3,988 PCS',
+    ]) {
+      expect(localEvidence).toContain(currentWorkbookFact);
+    }
+    expect(acceptance).not.toContain('Rp276,267,011');
+    expect(acceptance).not.toContain('4,115 PCS');
+    expect(acceptance).not.toContain(
+      'The fixed selection rule uses a positive `Harga Jual Referensi`',
+    );
+    expect(workbookReview).toContain('Modal Referensi');
+    for (const reviewedRow of ['1018', '1088', '1180']) {
+      expect(workbookReview).toMatch(
+        new RegExp(`\\| ${reviewedRow} \\| Modal Referensi \\|`),
+      );
+    }
+
+    for (const historicalReleaseHeading of [
+      '### Client stabilization v0.1.5',
+      '### Private pilot release receipt v0.1.3',
+      '### Private pilot release receipt v0.1.2',
+      '### Historical private pilot release receipt v0.1.1',
+    ]) {
+      expect(acceptance).toContain(historicalReleaseHeading);
+    }
   });
 
   it('points the repository guide at the current guarded pilot contract', async () => {

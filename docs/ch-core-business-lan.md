@@ -130,11 +130,11 @@ health and all isolation probes after the NAS restart.
 
 The physical acceptance gate remains blocked until the independent encrypted
 backup and clean scratch restore, SMART, UPS, restart, load, and device gates
-pass. Then run one Windows laptop and one Android phone for 24 hours before the
-one-hour seven-client soak. The seven-client gate requires no restart or
-sustained swap, p95 reads below 500 ms, p95 writes below one second, no
-duplicate Nota, stock, or omzet postings, and no lost acknowledged transaction
-across restart.
+pass. Then run one Windows laptop and one Android phone through the four-day
+copied-data pilot before the one-hour seven-client soak. The seven-client gate
+requires no restart or sustained swap, p95 reads below 500 ms, p95 writes below
+one second, no duplicate Nota, stock, or omzet postings, and no lost
+acknowledged transaction across restart.
 
 ## Rollback boundary
 

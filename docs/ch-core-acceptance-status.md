@@ -56,7 +56,7 @@ bukti langsung dan statusnya diubah melalui receipt yang ditinjau.
 | Desktop application and gateway | PASS | v0.1.5 `npm run verify`: 69 files / 497 tests |
 | Mobile application | PASS | v0.1.5 `npm run test:mobile`: 12 files / 92 tests |
 | CH Core unit and artifact tests | PASS | `npm run server:test`: 44 files / 308 tests plus one intentional workbook skip |
-| Approved workbook parser | PASS | Exact SHA-256 and 3,144 / 2,786 / 358 / 3 / Rp276,267,011 / 4,115 PCS acceptance: 1/1 |
+| Approved workbook parser | PASS | `SKU_Gudang20260804080716145.xlsx` at SHA-256 `f1f4675327fac107ef9f78c114b8afe86389d5543b204540ed45e74f9b15e49c`: 3,144 SKU / 6,288 identifiers / 2,786 refs / 358 missing / 3 Modal selections / Rp276,285,615 / 3,988 PCS acceptance: 1/1 |
 | Desktop mock isolation | PASS | Packaged startup fails closed; explicit unpackaged test marker only; Playwright 8/8 |
 | Mobile production bundle | PASS | 591-module Vite build and Capacitor Android sync |
 | Android JVM and lint gates | PASS | Debug/release unit tests and lint pass with Android Studio JDK 21 |
@@ -205,18 +205,20 @@ runtime acceptance on a physical Windows laptop or Android phone.
 
 ## Workbook owner review
 
-The fixed selection rule uses a positive `Harga Jual Referensi`; otherwise it
-uses `Modal Referensi`. On 2026-07-31, owner approval was recorded for the
-three selected price differences:
+For the approved v0.2 source `SKU_Gudang20260804080716145.xlsx`, the fixed
+selection rule uses a positive `Modal Referensi`; only a missing/non-positive
+Modal value falls back to a positive `Harga Jual Referensi`. The three coded
+price differences therefore select the same source:
 
-| Excel row | Primary SKU | Modal | Jual selected |
-| --- | --- | ---: | ---: |
-| 1018 | `PR010215 Pigeon Softouch BPP Nursing Bottle PPSU 160ml Safari Doodles CH058` | Rp338,148 | Rp338,184 |
-| 1088 | `PR060522 Pigeon Baby Cologne Rejuv 200ml CH058` | Rp40,440 | Rp25,800 |
-| 1180 | `PR050339 Pigeon 2 Way Baby Bibs - Check CH058` | Rp187,320 | Rp183,320 |
+| Excel row | Selected source | Status |
+| --- | --- | --- |
+| 1018 | Modal Referensi | Recorded in v0.2 workbook evidence |
+| 1088 | Modal Referensi | Recorded in v0.2 workbook evidence |
+| 1180 | Modal Referensi | Recorded in v0.2 workbook evidence |
 
-The price-review gate is complete. No import has been committed because the
-copied-data runtime is not yet an approved production endpoint.
+This v0.2 contract supersedes the former unversioned Jual-first description;
+the v0.1.x release receipts above remain historical records. The workbook
+review gate is complete, but no live import has been performed or authorized.
 
 ## NAS preflight and deployment gates
 

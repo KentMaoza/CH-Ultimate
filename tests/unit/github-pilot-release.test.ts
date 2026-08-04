@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 const workflowPath = '.github/workflows/pilot-release.yml';
-const pilotVersion = '0.1.5';
+const pilotVersion = '0.2.0';
 const androidSignerSha256 =
   '57e0731ce3db068e6581980c53610764af05c612184ff50e18a9f4912ca59ba5';
 

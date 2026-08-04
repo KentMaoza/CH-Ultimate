@@ -25,17 +25,19 @@ pilots, and the seven-client resource/load soak.
 
 QuickConnect and Tailscale are for DSM/SMB administration only. The CH Core
 API must remain reachable only from the business LAN at
-`https://192.168.1.14:8443/v1`; it must never use QuickConnect, Tailscale
+`https://192.168.50.14:8443/v1`; it must never use QuickConnect, Tailscale
 Serve/Funnel, router forwarding, or UPnP.
 
 See:
 
 - [NAS deployment runbook](docs/ch-core-nas-deployment.md)
 - [Backup and clean-restore runbook](docs/ch-core-backup-restore.md)
+- [API v0.2 maintenance and rollback runbook](docs/ch-core-v0.2-maintenance-rollback.md)
 - [CH Core acceptance status](docs/ch-core-acceptance-status.md)
 
-Production printing, automatic client updates, Internet/remote CH Core access,
-and recurring BigSeller synchronization are not implemented.
+Physical printing acceptance is still open. Automatic client updates,
+Internet/remote CH Core access, and recurring BigSeller synchronization are not
+implemented.
 
 ## Runtime modes
 
@@ -52,20 +54,23 @@ the Core-backed runtime.
 
 ## Private pilot distribution
 
-`.github/workflows/pilot-release.yml` defines a gated private GitHub
-prerelease. It builds these two installable pilot files only after the source
-gates pass:
+`.github/workflows/pilot-release.yml` defines a gated private GitHub prerelease.
+After all source and guarded publication gates pass, its exact installable
+payload names are:
 
-- `CH-Ultimate-0.1.2-Setup.exe` for Windows x64
-- `CHU-Companion-Mobile-0.1.2-pilot-debug.apk` for Android
+- `CH-Ultimate-0.2.0-Setup.exe` for Windows x64
+- `CHU-Companion-Mobile-0.2.0-release.apk` for Android
 
 Publication is manual. Until a GitHub Actions run and downloaded checksums are
 recorded in the acceptance ledger, the workflow is only a ready build path,
-not evidence that the installers exist or work on physical devices. The
-Android file is a debug-signed copied-data pilot; permanent Android release
-signing remains a separate production gate. Install it only while connected to
-the `CH-Business` Wi-Fi. See the
-[v0.1.2 pilot installation notes](docs/releases/pilot-0.1.2.md).
+not evidence that the installers exist or work on physical devices. Android
+publication requires the permanent Android pilot signer and its pinned digest;
+the four signing secrets fail closed. A debug APK is verification-only and is
+never published. Windows remains an unsigned private pilot without
+Authenticode. Install only while connected to the `CH-Business` Wi-Fi and run a
+four-day copied-data pilot. See the
+[v0.2.0 pilot notes](docs/releases/pilot-0.2.0.md) and the
+[v0.2 maintenance runbook](docs/ch-core-v0.2-maintenance-rollback.md).
 
 ## Approved initial catalogue
 

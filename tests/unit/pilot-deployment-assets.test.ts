@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 const endpoint = 'https://192.168.50.14:8443';
-const pilotVersion = '0.1.5';
+const pilotVersion = '0.2.0';
 const caFingerprint =
   '39:7C:7A:74:5A:F5:99:ED:D7:F8:98:CE:FF:50:D3:F5:11:7C:7F:7D:1B:61:00:AC:8F:9C:AB:7D:E9:98:76:3C';
 
@@ -55,7 +55,7 @@ describe('pilot deployment assets', () => {
       packages: { '': { version: pilotVersion } },
     });
     expect(androidBuild).toContain(`versionName \"${pilotVersion}\"`);
-    expect(androidBuild).toContain('versionCode 6');
+    expect(androidBuild).toContain('versionCode 7');
     expect(settingsPage).toContain(`CH Ultimate ${pilotVersion}`);
     expect(releaseCopy).toContain(
       `CHU-Companion-Mobile-${pilotVersion}-release.apk`,

@@ -21,6 +21,34 @@ Status meanings:
 Historical v0.1.0/v0.1.1 release evidence remains retained as historical
 evidence. The business-LAN partial live receipt does not amend those receipts.
 
+### Pilot v0.2.0 — persiapan repository lokal
+
+Bagian ini hanya mencatat kesiapan source untuk **four-day copied-data pilot**.
+Ia tidak mengubah receipt historis v0.1.x dan tidak menjadi izin menjalankan
+maintenance, clear data, migrasi, impor, deployment, pairing, atau publikasi.
+
+| Gate | Status | Bukti repository atau pekerjaan yang masih wajib |
+| --- | --- | --- |
+| Metadata klien v0.2.0 | PASS | `package.json`, lockfile, Settings, Android `versionName 0.2.0`/`versionCode 7`, copy script, dan test alignment memakai versi yang sama |
+| Kontrak release privat | PASS | Workflow mengunci `pilot-v0.2.0`, kedua nama payload, notes, empat secret Android, digest signer permanen, dan tidak memublikasikan debug APK |
+| Baseline katalog | PASS | Evidence lokal mencatat workbook/hash yang disetujui, 3,144 SKU, 6,288 identifier, 3,988 PCS, 2,786 referensi gambar, 358 missing, total Rp276,285,615, dan tiga pilihan Modal; belum ada impor live |
+| Notes, runbook, dan receipt template | READY | `docs/releases/pilot-0.2.0.md`, evidence katalog/gambar, dan runbook API v0.2 tersedia untuk review operator |
+| Template progres gambar | READY | Kolom matched/included/succeeded/failed/retry-visible tersedia; nilainya belum diisi dari perangkat fisik |
+| Live import workbook | BLOCKED | Belum dijalankan; perlu maintenance, backup/restore, preview, count, dan persetujuan pemilik |
+| Deploy Core API v2 | BLOCKED | Migrasi/Core v2 belum diterapkan pada NAS dan tidak ada receipt health/schema pascadeploy |
+| Artefak signed v0.2.0 | BLOCKED | Installer Windows dan APK release permanen belum dibuat atau diverifikasi checksum/signer-nya |
+| Publikasi GitHub | BLOCKED | Tag/prerelease `pilot-v0.2.0` belum diterbitkan dan belum ada fresh-download verification |
+| Windows printing fisik | BLOCKED | Dialog sistem, printer dokumen, dan printer thermal belum diterima pada laptop Windows fisik |
+| Kamera/share fisik | BLOCKED | Scan kamera, preprocessing gambar, dan Android share sheet belum diterima pada ponsel fisik |
+| Penerimaan fisik dua perangkat | BLOCKED | Nota typing/conflict/restart, gambar dua arah, QR/barcode paket, forced-stock audit, PDF/XLSX, restart Core, dan retry gambar belum lulus pada laptop + ponsel |
+| Pilot copied-data empat hari | BLOCKED | Empat hari kalender belum dimulai; hasil harian dan keputusan lanjut/henti belum direkam |
+
+Windows tetap private pilot tanpa Authenticode. Hanya APK release dengan signer
+permanen yang boleh dipublikasikan; debug APK adalah artefak verifikasi saja.
+Jangan menyebut v0.2.0 published, deployed, imported, signed-artifact complete,
+physically accepted, atau production-ready sampai baris `BLOCKED` memperoleh
+bukti langsung dan statusnya diubah melalui receipt yang ditinjau.
+
 ## Local implementation and regression
 
 | Requirement | Status | Current evidence |
@@ -282,7 +310,7 @@ still open unless explicitly marked `PASS`:
 - UPS shutdown and restart pass.
 - Clean restore reproduces catalogue, ledger, Nota, omzet, audit, change,
   and image-reference invariants.
-- One Windows laptop and one Android phone pass a 24-hour copied-data pilot.
+- One Windows laptop and one Android phone pass a four-day copied-data pilot.
 - Both Windows laptops and the remaining phones are then enrolled.
 - The one-hour seven-client soak has no restart or sustained swap; p95 reads
   stay below 500 ms and p95 writes below one second.

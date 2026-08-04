@@ -74,13 +74,13 @@ test('label output uses chosen template, SKU, and exact quantity', async () => {
 
   fireEvent.click(screen.getByRole('button', { name: 'Print label' }));
   await waitFor(() => expect(output.printDocument).toHaveBeenCalledWith({
-    kind: 'label', widthMm: 50, heightMm: 30,
+    kind: 'label', widthMm: 54, heightMm: 34,
   }));
   expect((output.rendered[0]!.match(/BRS-108-BLK/g) ?? [])).toHaveLength(3);
 
   fireEvent.click(screen.getByRole('button', { name: 'Simpan PDF label' }));
   await waitFor(() => expect(output.savePdf).toHaveBeenCalledWith(expect.objectContaining({
-    kind: 'label', widthMm: 50, heightMm: 30,
+    kind: 'label', widthMm: 54, heightMm: 34,
   })));
 });
 
@@ -94,13 +94,13 @@ test('warehouse barcode uses the trusted bridge for print and PDF with visible p
 
   fireEvent.click(within(dialog).getByRole('button', { name: 'Print barcode sekarang' }));
   await waitFor(() => expect(output.printDocument).toHaveBeenCalledWith({
-    kind: 'barcode', widthMm: 50, heightMm: 30,
+    kind: 'barcode', widthMm: 54, heightMm: 34,
   }));
   expect((output.rendered[0]!.match(/Kode Produk: BRS-108-BLK/g) ?? [])).toHaveLength(2);
 
   fireEvent.click(within(dialog).getByRole('button', { name: 'Simpan PDF barcode' }));
   await waitFor(() => expect(output.savePdf).toHaveBeenCalledWith(expect.objectContaining({
-    kind: 'barcode', widthMm: 50, heightMm: 30,
+    kind: 'barcode', widthMm: 54, heightMm: 34,
   })));
 });
 

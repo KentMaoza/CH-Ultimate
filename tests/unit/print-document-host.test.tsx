@@ -58,6 +58,15 @@ test('trusted barcode host renders every QR with a human-readable Kode Produk', 
 
   expect(screen.getAllByText('Kode Produk: BRS-108-BLK')).toHaveLength(2);
   expect(screen.getAllByTestId('output-product-qr')).toHaveLength(2);
+  const pages = screen.getAllByTestId('output-label-page');
+  expect(pages).toHaveLength(2);
+  for (const page of pages) {
+    expect(page).toHaveStyle({ width: '54mm', minHeight: '34mm', padding: '2mm' });
+    expect(page.querySelector('.output-document__product-card')).toHaveStyle({
+      width: '50mm',
+      minHeight: '30mm',
+    });
+  }
 });
 
 function OutputHarness({ plan }: { plan: ReturnType<typeof notaPlan> }) {

@@ -17,6 +17,7 @@ Assumptions kept intentionally narrow:
 - Added a two-method `window.chOutput` bridge: `printDocument` and `savePdf`.
 - Added fixed IPC handlers with exact-key validation, bounded document kinds/dimensions/filenames, trusted sender/main-frame/locked-URL checks, and one active native output at a time.
 - Print uses the visible system dialog with `silent: false` and `printBackground: true`.
+- Print custom paper dimensions are converted from millimetres to Electron print microns; save-PDF custom paper dimensions are converted separately to the inches expected by `printToPDF`.
 - Save PDF uses a native save dialog, validates the Electron result as bounded `%PDF-` bytes, and writes only to the path chosen by the user.
 - The renderer sends only document kind, dimensions, and a safe PDF filename. It cannot send HTML, printer/device identifiers, a silent flag, or an arbitrary path.
 - Added an E2E-only fake output bridge selected by the main process's locked URL marker. It opens no native dialog and does not invoke IPC.
@@ -24,10 +25,10 @@ Assumptions kept intentionally narrow:
 ### Trusted document rendering
 
 - Added a print-only React host that mounts before output, waits for fonts and bounded image readiness, and remains outside the interactive layout.
-- Nota and invoice share the configured invoice dimensions, store identity, font, page content, and inclusive PPN calculation.
+- Nota and invoice share one canonical semantic layout for the configured identity visibility/order/logo, all eight item columns, and `Total Nota` / `PPN 12%` / `Total Transaksi` values. Both the desktop React host and mobile jsPDF renderer consume that model.
 - Current active page is the default; all active pages can be selected. Cancelled pages are excluded, cancelled transactions are rejected/skipped, draft/reopened output displays `DRAF`, and completed Arsip output does not.
 - Nota, completed Arsip Nota, invoice, label, and product barcode expose matching Print and Simpan PDF controls.
-- Label and barcode plans honor thermal/A4 layout and exact quantity. Every barcode includes QR data plus human-readable `Kode Produk`.
+- Label and barcode plans honor thermal/A4 layout and exact quantity. Thermal paper includes the configured margins around the card (the default 50×30 mm card uses 54×34 mm paper), renders exactly one card per physical page, and exposes deterministic page capacity/count. Every barcode includes QR data plus human-readable `Kode Produk`.
 - Mobile Nota builds the same selected current/all plan and shares its PDF through the generalized `PdfSharePort` used by browser and Android adapters.
 
 ### Ekspor Data
@@ -59,14 +60,17 @@ Assumptions kept intentionally narrow:
 8. The first updated E2E run reached real native print and failed with `No printers available`; Vite had compiled the preload `process.env` check to an empty shim. The fake bridge was moved to the locked E2E URL marker and a focused no-IPC regression was added.
 9. The first mobile build after export showed ExcelJS in the shared bundle. Workbook generation was moved to a desktop-only dynamically imported module, then a recursive import-graph guard was added to prevent that coupling from returning.
 10. Final CSS review found the obsolete direct-`window.print` barcode rule could expose the interactive barcode sheet alongside the trusted host. A focused host-only print CSS test failed until the legacy rule was removed.
+11. Review found `printToPDF` was receiving micron values although Electron expects custom PDF page sizes in inches. The regression failed on 210000×297000 until PDF and print conversions were split.
+12. Review found the mobile Nota PDF had an independent reduced layout that hardcoded CHU and omitted configured identity semantics, three columns, and two totals. A semantic parity test failed until both desktop and mobile consumed one canonical layout model.
+13. Review found the default 50×30 mm thermal card was placed inside a 50×30 mm page with 2 mm host padding and multiple cards in one grid. Geometry/page-count tests failed until paper included margins and the host paginated one thermal card per section.
 
 ## Final verification
 
 - Focused operational/output/preload/mobile-boundary matrix: all tests passed.
-- Full renderer suite after the final CSS correction: `npm test` passed, 89 files and 619 tests.
+- Full renderer suite after the review corrections: `npm test` passed, 89 files and 620 tests.
 - Renderer/mobile TypeScript: `npm run typecheck` passed.
 - Mobile production build: `npm run mobile:build` passed.
-  - Main mobile chunk after ExcelJS isolation: 844.00 kB uncompressed / 248.09 kB gzip.
+  - Main mobile chunk after the review corrections: 845.80 kB uncompressed / 248.84 kB gzip.
   - jsPDF chunk: 388.08 kB uncompressed / 127.39 kB gzip.
   - Before isolation, the main chunk was 1,789.15 kB / 521.51 kB gzip.
 - Local Electron arm64 package prerequisite: `npm run package` passed.
@@ -77,8 +81,10 @@ Assumptions kept intentionally narrow:
 
 - Confirmed the preload exposes no raw IPC and main-process validation rejects extra HTML, path, printer, device, and silent-print fields before native APIs run.
 - Confirmed the print host remains mounted until native output resolves and print/PDF consume the same plan.
+- Confirmed Electron print and PDF paths now apply their distinct custom-page unit contracts, and thermal cards fit their page content boxes without host-margin clipping.
+- Confirmed desktop and mobile Nota output use the same configured identity, columns, row cells, and totals model without importing desktop React into the mobile graph.
 - Confirmed PDF limits apply after deterministic sorting and XLSX uses uncapped matching plans.
 - Confirmed mobile has no static or dynamic dependency on ExcelJS or either workbook parser.
 - No physical printer, Windows print dialog, physical Android share sheet, signed package, or deployed Core was exercised. These remain Task 8 physical/release gates; local mocks, generated PDF signatures, arm64 packaging, mobile build, and E2E are green.
-- The mobile build still reports a non-fatal greater-than-500-kB warning for the 844.00-kB main chunk. ExcelJS has been removed from that graph; further application-wide splitting is outside this task.
-- The full suite still emits the pre-existing React `act(...)` warning from `nota-core-typing.test.tsx`; all 619 tests pass.
+- The mobile build still reports a non-fatal greater-than-500-kB warning for the 845.80-kB main chunk. ExcelJS has been removed from that graph; further application-wide splitting is outside this task.
+- The full suite still emits the pre-existing React `act(...)` warning from `nota-core-typing.test.tsx`; all 620 tests pass.

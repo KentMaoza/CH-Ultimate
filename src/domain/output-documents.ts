@@ -2,6 +2,7 @@ import { lineTotal } from './nota';
 import type { OperationalPdfPlan } from './operational-exports';
 import type {
   InvoiceTemplate,
+  InvoiceElementId,
   LabelTemplate,
   NotaLine,
   NotaTransaction,
@@ -43,6 +44,89 @@ export interface NotaDocumentPlan {
   pages: NotaDocumentPage[];
 }
 
+export type NotaDocumentColumnKey =
+  | 'code'
+  | 'description'
+  | 'kind'
+  | 'quantity'
+  | 'unit'
+  | 'pcsPrice'
+  | 'lsnPrice'
+  | 'total';
+
+export interface NotaDocumentLayout {
+  identity: Array<{
+    id: InvoiceElementId;
+    text: string;
+    imageUrl?: string;
+  }>;
+  columns: Array<{
+    key: NotaDocumentColumnKey;
+    label: string;
+    numeric: boolean;
+  }>;
+  pages: Array<{
+    id: string;
+    suffix: string;
+    documentNumber: string;
+    rows: Array<{
+      id: string;
+      cells: Record<NotaDocumentColumnKey, string | number>;
+    }>;
+    totals: Array<{ label: string; value: number }>;
+  }>;
+}
+
+const NOTA_COLUMNS: NotaDocumentLayout['columns'] = [
+  { key: 'code', label: 'NO', numeric: false },
+  { key: 'description', label: 'NAMA BARANG', numeric: false },
+  { key: 'kind', label: 'JENIS', numeric: false },
+  { key: 'quantity', label: 'JUMLAH', numeric: true },
+  { key: 'unit', label: 'PCS/LSN', numeric: false },
+  { key: 'pcsPrice', label: 'HARGA PCS', numeric: true },
+  { key: 'lsnPrice', label: 'HARGA LSN', numeric: true },
+  { key: 'total', label: 'TOTAL', numeric: true },
+];
+
+export function buildNotaDocumentLayout(plan: NotaDocumentPlan): NotaDocumentLayout {
+  const identityValues: Record<InvoiceElementId, NotaDocumentLayout['identity'][number]> = {
+    logo: { id: 'logo', text: 'CHU', ...(plan.identity.logoUrl ? { imageUrl: plan.identity.logoUrl } : {}) },
+    address: { id: 'address', text: plan.identity.address },
+    phone: { id: 'phone', text: plan.identity.phone },
+    bank: { id: 'bank', text: plan.identity.bankAccount },
+  };
+
+  return {
+    identity: plan.identity.elements
+      .filter((element) => element.visible)
+      .map((element) => identityValues[element.id]),
+    columns: NOTA_COLUMNS.map((column) => ({ ...column })),
+    pages: plan.pages.map((page) => ({
+      id: page.id,
+      suffix: page.suffix,
+      documentNumber: page.documentNumber,
+      rows: page.rows.map((row) => ({
+        id: row.line.id,
+        cells: {
+          code: row.code,
+          description: row.line.description,
+          kind: row.line.kind || '—',
+          quantity: row.line.quantity,
+          unit: row.line.unit.toUpperCase(),
+          pcsPrice: row.line.pcsPrice,
+          lsnPrice: row.line.lsnPrice,
+          total: row.total,
+        },
+      })),
+      totals: [
+        { label: 'Total Nota', value: page.subtotalBeforeTax },
+        { label: 'PPN 12%', value: page.tax },
+        { label: 'Total Transaksi', value: page.total },
+      ],
+    })),
+  };
+}
+
 export interface ProductLabelItem {
   qrValue: string;
   productCode: string;
@@ -54,9 +138,13 @@ export interface LabelDocumentPlan {
   kind: 'label';
   widthMm: number;
   heightMm: number;
+  contentWidthMm: number;
+  contentHeightMm: number;
   cardWidthMm: number;
   cardHeightMm: number;
   columns: number;
+  cardsPerPage: number;
+  pageCount: number;
   marginMm: number;
   gapMm: number;
   fontSize: number;
@@ -70,9 +158,13 @@ export interface BarcodeDocumentPlan {
   kind: 'barcode';
   widthMm: number;
   heightMm: number;
+  contentWidthMm: number;
+  contentHeightMm: number;
   cardWidthMm: number;
   cardHeightMm: number;
   columns: number;
+  cardsPerPage: number;
+  pageCount: number;
   marginMm: number;
   gapMm: number;
   fontSize: number;
@@ -169,10 +261,36 @@ function requireQuantity(quantity: number): number {
   return quantity;
 }
 
-function sheetLayout(template: LabelTemplate) {
-  return template.medium === 'a4'
-    ? { widthMm: 210, heightMm: 297, columns: template.columns }
-    : { widthMm: template.widthMm, heightMm: template.heightMm, columns: 1 };
+function sheetLayout(template: LabelTemplate, itemCount: number) {
+  if (template.medium === 'thermal') {
+    return {
+      widthMm: template.widthMm + (template.marginMm * 2),
+      heightMm: template.heightMm + (template.marginMm * 2),
+      contentWidthMm: template.widthMm,
+      contentHeightMm: template.heightMm,
+      columns: 1,
+      cardsPerPage: 1,
+      pageCount: itemCount,
+    };
+  }
+
+  const widthMm = 210;
+  const heightMm = 297;
+  const contentWidthMm = widthMm - (template.marginMm * 2);
+  const contentHeightMm = heightMm - (template.marginMm * 2);
+  const rows = Math.max(1, Math.floor(
+    (contentHeightMm + template.gapMm) / (template.heightMm + template.gapMm),
+  ));
+  const cardsPerPage = Math.max(1, template.columns * rows);
+  return {
+    widthMm,
+    heightMm,
+    contentWidthMm,
+    contentHeightMm,
+    columns: template.columns,
+    cardsPerPage,
+    pageCount: Math.ceil(itemCount / cardsPerPage),
+  };
 }
 
 export function buildLabelDocumentPlan(
@@ -183,7 +301,7 @@ export function buildLabelDocumentPlan(
   const count = requireQuantity(quantity);
   return {
     kind: 'label',
-    ...sheetLayout(template),
+    ...sheetLayout(template, count),
     cardWidthMm: template.widthMm,
     cardHeightMm: template.heightMm,
     marginMm: template.marginMm,
@@ -209,7 +327,7 @@ export function buildBarcodeDocumentPlan(
   const count = requireQuantity(quantity);
   return {
     kind: 'barcode',
-    ...sheetLayout(template),
+    ...sheetLayout(template, count),
     cardWidthMm: template.widthMm,
     cardHeightMm: template.heightMm,
     marginMm: template.marginMm,

@@ -149,7 +149,7 @@ test('prints a chosen quantity of warehouse SKU barcodes through the output brid
   expect(screen.getAllByTestId('barcode-print-item')).toHaveLength(3);
   expect(screen.getAllByTestId('barcode-product-qr')[0]).toHaveAttribute('data-value', 'BRS-108-BLK');
   fireEvent.click(printNow);
-  await waitFor(() => expect(printDocument).toHaveBeenCalledWith({ kind: 'barcode', widthMm: 50, heightMm: 30 }));
+  await waitFor(() => expect(printDocument).toHaveBeenCalledWith({ kind: 'barcode', widthMm: 54, heightMm: 34 }));
   expect(print).not.toHaveBeenCalled();
   print.mockRestore();
 });

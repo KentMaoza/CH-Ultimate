@@ -113,7 +113,7 @@ describe('CH output main boundary', () => {
 
     expect(printToPDF).toHaveBeenCalledWith({
       printBackground: true,
-      pageSize: { width: 210_000, height: 297_000 },
+      pageSize: { width: 210 / 25.4, height: 297 / 25.4 },
     });
     expect(showSaveDialog).toHaveBeenCalledWith(expect.objectContaining({
       defaultPath: 'CHU-SKU-Stok-2026-08-04.pdf',

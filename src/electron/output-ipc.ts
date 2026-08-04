@@ -120,10 +120,17 @@ function parseSavePdfRequest(input: unknown): SavePdfRequest {
   return { ...print, fileName };
 }
 
-function pageSize(input: PrintDocumentRequest) {
+function printPageSize(input: PrintDocumentRequest) {
   return {
     width: Math.round(input.widthMm * 1_000),
     height: Math.round(input.heightMm * 1_000),
+  };
+}
+
+function pdfPageSize(input: PrintDocumentRequest) {
+  return {
+    width: input.widthMm / 25.4,
+    height: input.heightMm / 25.4,
   };
 }
 
@@ -169,7 +176,7 @@ export function registerOutputIpcHandlers({
       webContents.print({
         silent: false,
         printBackground: true,
-        pageSize: pageSize(request),
+        pageSize: printPageSize(request),
       }, (success, reason) => {
         if (success) resolve();
         else reject(new Error(reason || 'Dokumen tidak dapat dicetak.'));
@@ -189,7 +196,7 @@ export function registerOutputIpcHandlers({
     if (result.canceled || !result.filePath) return { status: 'cancelled' as const };
     const bytes = requirePdfBytes(await webContents.printToPDF({
       printBackground: true,
-      pageSize: pageSize(request),
+      pageSize: pdfPageSize(request),
     }));
     await writeFile(result.filePath, bytes);
     return { status: 'saved' as const };

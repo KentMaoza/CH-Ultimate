@@ -110,9 +110,29 @@ describe('label and product-barcode plans', () => {
       medium: 'a4', widthMm: 60, heightMm: 35, columns: 3,
     }, 7);
 
-    expect(thermal).toMatchObject({ widthMm: 50, heightMm: 30, columns: 1 });
+    expect(thermal).toMatchObject({
+      widthMm: 54,
+      heightMm: 34,
+      contentWidthMm: 50,
+      contentHeightMm: 30,
+      cardWidthMm: 50,
+      cardHeightMm: 30,
+      columns: 1,
+      cardsPerPage: 1,
+      pageCount: 4,
+    });
+    expect(thermal.cardWidthMm + (thermal.marginMm * 2)).toBeLessThanOrEqual(thermal.widthMm);
+    expect(thermal.cardHeightMm + (thermal.marginMm * 2)).toBeLessThanOrEqual(thermal.heightMm);
     expect(thermal.items).toHaveLength(4);
-    expect(a4).toMatchObject({ widthMm: 210, heightMm: 297, columns: 3 });
+    expect(a4).toMatchObject({
+      widthMm: 210,
+      heightMm: 297,
+      contentWidthMm: 206,
+      contentHeightMm: 293,
+      columns: 3,
+      cardsPerPage: 21,
+      pageCount: 1,
+    });
     expect(a4.items).toHaveLength(7);
   });
 

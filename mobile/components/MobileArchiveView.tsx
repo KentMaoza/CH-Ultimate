@@ -1,11 +1,12 @@
-import { useMemo, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { lineTotal } from '../../src/domain/nota';
 import type { OperationsGateway } from '../../src/gateway/operations-gateway';
 import { notaPageTheme } from '../../src/renderer/nota/nota-page-colors';
+import { useOperationsSnapshot } from '../../src/renderer/use-operations-snapshot';
 import { formatRupiah } from '../format';
 
 export function MobileArchiveView({ coreBacked = false, gateway, onEdit }: { coreBacked?: boolean; gateway: OperationsGateway; onEdit: (transactionId: string) => void }) {
-  const snapshot = useSyncExternalStore(gateway.subscribe, gateway.getSnapshot, gateway.getSnapshot);
+  const snapshot = useOperationsSnapshot(gateway);
   const archived = useMemo(() => snapshot.notaTransactions
     .filter((transaction) => transaction.status === 'completed' && (transaction.completionDestination ?? 'archive') === 'archive')
     .sort((a, b) => Date.parse(b.completedAt ?? '') - Date.parse(a.completedAt ?? '')), [snapshot.notaTransactions]);

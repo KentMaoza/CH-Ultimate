@@ -1,9 +1,10 @@
 # CH Core acceptance status
 
-Updated 2026-08-03 WITA. This is an evidence ledger, not a production
+Updated 2026-08-04 WITA. This is an evidence ledger, not a production
 deployment receipt. A v0.1.3-compatible copied-data CH Core runtime is
 deployed on the NAS, but CH Core is not deployed as a production endpoint.
-The catalogue workbook has not been imported and no client is enrolled.
+The catalogue workbook has not been imported. The Windows owner is enrolled;
+Android v0.1.5 is installed and awaiting a fresh one-use pairing code.
 
 Status meanings:
 
@@ -24,12 +25,12 @@ evidence. The business-LAN partial live receipt does not amend those receipts.
 
 | Requirement | Status | Current evidence |
 | --- | --- | --- |
-| Desktop application and gateway | PASS | `npm run verify`: 63 files / 487 tests |
-| Mobile application | PASS | `npm run test:mobile`: 9 files / 88 tests |
+| Desktop application and gateway | PASS | v0.1.5 `npm run verify`: 69 files / 497 tests |
+| Mobile application | PASS | v0.1.5 `npm run test:mobile`: 12 files / 92 tests |
 | CH Core unit and artifact tests | PASS | `npm run server:test`: 44 files / 308 tests plus one intentional workbook skip |
 | Approved workbook parser | PASS | Exact SHA-256 and 3,144 / 2,786 / 358 / 3 / Rp276,267,011 / 4,115 PCS acceptance: 1/1 |
 | Desktop mock isolation | PASS | Packaged startup fails closed; explicit unpackaged test marker only; Playwright 8/8 |
-| Mobile production bundle | PASS | 589-module Vite build and Capacitor Android sync |
+| Mobile production bundle | PASS | 591-module Vite build and Capacitor Android sync |
 | Android JVM and lint gates | PASS | Debug/release unit tests and lint pass with Android Studio JDK 21 |
 | Electron package | PASS | Reproducible darwin-arm64 package succeeds |
 | Source hygiene | PASS | `git diff --check`, shell syntax, and tracked-secret/private-artifact scans pass |
@@ -37,6 +38,29 @@ evidence. The business-LAN partial live receipt does not amend those receipts.
 | Docker/Compose and ARM64 image | PASS | Container Manager built the merged ARM64 image on the DS223j and started one healthy container from project `ch-ultimate-core-4482af7`; the prior `ch-ultimate-core-d5bb4b6` project is stopped and retained for rollback |
 
 ## Client release artifacts
+
+### Client stabilization v0.1.5 — implementation in progress
+
+This release is a client-only stabilization of the existing copied-data CH
+Core pilot. It does not migrate MariaDB, modify the NAS container, or import a
+new catalogue. Publication and physical acceptance remain open.
+
+| Requirement | Status | Current evidence or missing action |
+| --- | --- | --- |
+| Real-Core render stability | PASS | Focused Android/desktop renderer tests reproduce populated CH Core snapshots without the React maximum-update-depth loop; both entry points have a visible Indonesian retry boundary |
+| Rapid Nota edit ordering | PASS | Focused actual-Core gateway tests prove queued header and line edits rebase against the first acknowledgement before sending |
+| Desktop and mobile Nota input | PASS | Delayed-write tests keep fields focused and enabled; rejected mobile creation and edit promises are converted into visible alerts |
+| v0.1.5 release metadata | READY | Desktop, Android `versionCode 6`, Settings, copy script, filenames, and release notes are aligned at `0.1.5` |
+| Permanent Android signing identity | PASS | The off-repository keystore has public certificate SHA-256 `57e0731ce3db068e6581980c53610764af05c612184ff50e18a9f4912ca59ba5`; the password is stored in Apple Passwords and macOS Keychain, a checksum-verified JKS and recovery instructions are on the NAS `home` share, all four GitHub secret names exist, and the plaintext environment file was removed |
+| Local signed v0.1.5 APK | PASS | `assembleRelease` produced a one-signer v2 APK of 43,077,815 bytes with SHA-256 `d01e9a4362dac8a7a8c1fe076bd6425371d624cc51192a4f623167ec3cf4eb8e`; `apksigner` matched the pinned permanent certificate |
+| Signed-only GitHub publication | READY | The manual main-branch publisher requires all four signing secrets, builds `assembleRelease`, rejects any signer other than the pinned certificate, and never publishes the debug verification APK |
+| v0.1.5 GitHub artifacts | BLOCKED | Source integration, repository-visibility decision, workflow publication, fresh download, checksum verification, and downloaded-signer verification remain outstanding |
+| Physical Android installation | READY | Samsung SM-S901E was moved from debug-signed v0.1.4 to permanently signed v0.1.5; the pairing form renders without React error 185. Fresh pairing, shared data rendering, Nota typing/synchronization, restart, and exact-once posting remain open |
+| Physical Windows acceptance | BLOCKED | The Windows v0.1.5 installer has not yet been built by GitHub or installed over v0.1.4 on either laptop |
+| Exact MariaDB integration suite | BLOCKED | Unit/type gates pass, but this Mac has no local MariaDB/Docker service and no explicitly isolated `chu_test` URL; the suite correctly refused to use an unspecified database and was not pointed at the NAS |
+
+Do not describe v0.1.5 as published, physically accepted, or production-ready
+until those missing actions have direct evidence below.
 
 ### Owner-pairing release v0.1.3
 
@@ -276,8 +300,10 @@ LAN computer; MariaDB and private files remain on the NAS.
    production backup and restore drill remain unresolved.
 4. External UPS hardware is reported connected; DSM signaling and safe
    shutdown remain unverified.
-5. Android release-signing identity creation is deferred. Development/debug
-    builds may continue, but no production Android release may be claimed.
-6. Private GitHub Releases will distribute the Windows installer and Android
-   debug APK for the copied-data pilot. This does not relax physical-client or
-   production acceptance gates.
+5. A permanent Android pilot signing identity now exists off-repository. Its
+   recovery copies and GitHub secrets must be verified before the first signed
+   v0.1.5 publication; no production Android release may be claimed.
+6. Private GitHub Releases will distribute the Windows installer and the
+   permanently signed Android release APK for v0.1.5. Pull-request debug APKs
+   are verification-only and must never be published. This does not relax
+   physical-client or production acceptance gates.

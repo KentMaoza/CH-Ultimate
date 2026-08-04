@@ -138,6 +138,16 @@ export function NotaWorkspace({ coreBacked = false, onBack, initialSelection, on
       }
     }
   };
+  const saveEdit = (operation: () => Promise<unknown>, fallback = 'Perubahan nota tidak dapat disimpan.') => {
+    setMessage('');
+    try {
+      void operation().catch((error) => {
+        setMessage(error instanceof Error && error.message ? error.message : fallback);
+      });
+    } catch (error) {
+      setMessage(error instanceof Error && error.message ? error.message : fallback);
+    }
+  };
   const choose = (choice: Selection) => { setSelected(choice); setDrawer(null); setQuery(''); setHighlight(0); };
   const selectPage = (choice: Selection) => choose(choice);
   const openDrawer = (kind: Exclude<DrawerKind, null>, target: EventTarget | null) => {
@@ -215,14 +225,14 @@ export function NotaWorkspace({ coreBacked = false, onBack, initialSelection, on
     if (!transaction) return;
     const keys = (Object.keys(patch) as Array<keyof TransactionPatch>).sort();
     if (!keys.some((key) => transaction[key] !== patch[key])) return;
-    void run(() => gateway.updateNotaTransaction(transactionId, patch));
+    saveEdit(() => gateway.updateNotaTransaction(transactionId, patch));
   };
   const updateLine = (transactionId: string, pageId: string, lineId: string, patch: Partial<NotaLine>) => {
     const line = gateway.getSnapshot().notaTransactions.find((item) => item.id === transactionId)?.pages.find((item) => item.id === pageId)?.lines.find((item) => item.id === lineId);
     if (!line) return;
     const keys = (Object.keys(patch) as Array<keyof NotaLine>).sort();
     if (!keys.some((key) => line[key] !== patch[key])) return;
-    void run(() => gateway.updateNotaLine(transactionId, pageId, lineId, patch));
+    saveEdit(() => gateway.updateNotaLine(transactionId, pageId, lineId, patch));
   };
   const deleteLine = (transactionId: string, pageId: string, lineId: string) => {
     void run(() => gateway.deleteNotaLine(transactionId, pageId, lineId));

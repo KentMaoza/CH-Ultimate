@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { OperationsGateway } from '../src/gateway/operations-gateway';
 import type { Sku } from '../src/domain/types';
 import { findSkuByScanCode } from '../src/domain/mobile-demo-state';
+import { useOperationsSnapshot } from '../src/renderer/use-operations-snapshot';
 import type { BarcodeScannerPort, LocalNotificationPort, RecommendationPdfSharePort } from './ports';
 import { ArchiveIcon, BoxIcon, HomeIcon, MoreIcon, NotaIcon } from './components/Icons';
 import { DashboardView } from './components/DashboardView';
@@ -26,7 +27,7 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
   share: RecommendationPdfSharePort;
   coreBacked?: boolean;
 }) {
-  const snapshot = useSyncExternalStore(gateway.subscribe, gateway.getSnapshot, gateway.getSnapshot);
+  const snapshot = useOperationsSnapshot(gateway);
   const [view, setView] = useState<MainView>('home');
   const [editingNotaId, setEditingNotaId] = useState<string | null>(null);
   const [focusSearch, setFocusSearch] = useState(false);

@@ -3,7 +3,9 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 const workflowPath = '.github/workflows/pilot-release.yml';
-const pilotVersion = '0.1.4';
+const pilotVersion = '0.1.5';
+const androidSignerSha256 =
+  '57e0731ce3db068e6581980c53610764af05c612184ff50e18a9f4912ca59ba5';
 
 describe('GitHub pilot release workflow', () => {
   it('gates both platform builds and manual prerelease publication', async () => {
@@ -38,25 +40,34 @@ describe('GitHub pilot release workflow', () => {
     expect(workflow).toContain('contents: write');
     expect(workflow.match(/contents: write/g)).toHaveLength(1);
     expect(workflow).toContain(
-      "github.event_name == 'workflow_dispatch' && inputs.publish",
+      "github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'",
     );
     expect(workflow).toContain('--prerelease');
-    expect(workflow).not.toContain('actions/upload-artifact');
-    expect(workflow).not.toContain('actions/download-artifact');
     const publisher = workflow.slice(
       workflow.indexOf('publish-prerelease:'),
     );
     expect(publisher).toContain('runs-on: windows-latest');
     expect(publisher).toContain('npm run make:windows');
     expect(publisher).toContain('npm run android:sync');
-    expect(publisher).toContain('.\\gradlew.bat assembleDebug');
+    expect(publisher).toContain('.\\gradlew.bat assembleRelease');
+    expect(publisher).toContain('CHU_COMPANION_KEYSTORE_B64');
+    expect(publisher).toContain('CHU_COMPANION_STORE_PASSWORD');
+    expect(publisher).toContain('CHU_COMPANION_KEY_ALIAS');
+    expect(publisher).toContain('CHU_COMPANION_KEY_PASSWORD');
+    expect(publisher).toContain(androidSignerSha256);
+    expect(publisher).toContain('apksigner.bat');
+    expect(publisher).toContain('if: always()');
     expect(publisher).toContain('$portableManifest = ($lines -join "`n") + "`n"');
     expect(publisher).toContain('[System.IO.File]::WriteAllText');
     expect(publisher).not.toContain('[System.IO.File]::WriteAllLines');
     expect(workflow).toContain(`CH-Ultimate-${pilotVersion}-Setup.exe`);
     expect(workflow).toContain(
-      `CHU-Companion-Mobile-${pilotVersion}-pilot-debug.apk`,
+      `CHU-Companion-Mobile-${pilotVersion}-release.apk`,
     );
+    expect(publisher).not.toContain('assembleDebug');
+    expect(publisher).not.toContain('pilot-debug.apk');
+    expect(workflow.slice(0, workflow.indexOf('publish-prerelease:')))
+      .not.toContain('CHU_COMPANION_KEYSTORE_B64');
     expect(workflow).toContain(`pilot-v${pilotVersion}`);
     expect(workflow).toContain(`docs/releases/pilot-${pilotVersion}.md`);
   });

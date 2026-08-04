@@ -7,6 +7,7 @@ import {
   type OperationsGateway,
 } from '../gateway/operations-gateway';
 import { App } from './App';
+import { ClientErrorBoundary } from './ClientErrorBoundary';
 import { CoreConnectionScreen } from './CoreConnectionScreen';
 import {
   bootstrapDesktopGateway,
@@ -36,7 +37,13 @@ export function mountDesktopRenderer(
   let generation = 0;
 
   const render = (content: ReactNode) => {
-    root.render(<StrictMode>{content}</StrictMode>);
+    root.render(
+      <StrictMode>
+        <ClientErrorBoundary key={generation} onRetry={() => void retry()}>
+          {content}
+        </ClientErrorBoundary>
+      </StrictMode>,
+    );
   };
 
   const retry = async (): Promise<void> => {

@@ -680,6 +680,36 @@ export class CoreGatewayState {
     ) {
       return item;
     }
+    if (
+      item.path === acknowledgedPath &&
+      item.optimistic?.kind === 'nota-header'
+    ) {
+      return {
+        ...item,
+        body: asCoreJson(
+          this.requireNotaHeaderWriteContext(
+            item.optimistic.notaId,
+            item.optimistic.patch,
+          ),
+        ),
+      };
+    }
+    if (
+      item.path === acknowledgedPath &&
+      item.optimistic?.kind === 'nota-line'
+    ) {
+      return {
+        ...item,
+        body: asCoreJson(
+          this.requireNotaLineWriteContext(
+            item.optimistic.notaId,
+            item.optimistic.pageId,
+            item.optimistic.lineId,
+            item.optimistic.patch,
+          ),
+        ),
+      };
+    }
     const skuMatch = /^\/v1\/skus\/([^/]+)(?:\/image)?$/.exec(item.path);
     const acknowledgedSku =
       /^\/v1\/skus\/([^/]+)(?:\/image)?$/.exec(acknowledgedPath);

@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import type { OperationsGateway } from '../gateway/operations-gateway';
+import { useOperationsSnapshot } from './use-operations-snapshot';
 
 const GatewayContext = createContext<OperationsGateway | null>(null);
 
@@ -11,10 +12,6 @@ export function OperationsProvider({ children, gateway }: { children: ReactNode;
 export function useOperations() {
   const gateway = useContext(GatewayContext);
   if (!gateway) throw new Error('OperationsProvider is missing.');
-  const [state, setState] = useState(gateway.getSnapshot);
-  useEffect(() => {
-    setState(gateway.getSnapshot());
-    return gateway.subscribe(() => setState(gateway.getSnapshot()));
-  }, [gateway]);
+  const state = useOperationsSnapshot(gateway);
   return { state, gateway };
 }

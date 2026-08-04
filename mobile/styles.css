@@ -11,6 +11,27 @@
   box-sizing: border-box;
 }
 
+.client-crash-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: calc(24px + var(--safe-area-top, 0px)) 20px calc(24px + var(--safe-area-bottom, 0px));
+  background: #efefe9;
+}
+
+.client-crash-screen section {
+  width: 100%;
+  padding: 24px;
+  border: 2px solid #111;
+  background: #fff;
+  box-shadow: 8px 8px 0 #111;
+}
+
+.client-crash-screen span { font-size: 9px; font-weight: 900; letter-spacing: .14em; }
+.client-crash-screen h1 { margin: 12px 0 8px; font-size: 28px; }
+.client-crash-screen p { line-height: 1.5; }
+.client-crash-screen button { width: 100%; min-height: 48px; margin-top: 16px; border: 2px solid #111; color: #fff; background: #111; font-weight: 900; }
+
 html,
 body,
 #root {

@@ -1,0 +1,2 @@
+ALTER TABLE stock_movements
+  MODIFY COLUMN reason VARCHAR(512) NOT NULL;

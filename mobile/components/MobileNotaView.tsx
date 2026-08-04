@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { lineTotal, noteSuffixFromIndex } from '../../src/domain/nota';
 import { findSkuByScanCode, searchMobileSkus } from '../../src/domain/mobile-demo-state';
 import type { NotaLine, NotaTransaction, Unit } from '../../src/domain/types';
 import type { OperationsGateway } from '../../src/gateway/operations-gateway';
 import { createNotaVoicePlayer, type NotaVoicePlayer } from '../../src/renderer/nota/nota-voice';
 import { notaPageTheme } from '../../src/renderer/nota/nota-page-colors';
+import { useOperationsSnapshot } from '../../src/renderer/use-operations-snapshot';
 import { formatRupiah } from '../format';
 import type { BarcodeScannerPort } from '../ports';
 import { ScanIcon } from './Icons';
@@ -36,8 +37,8 @@ function availableSlot(transaction: NotaTransaction, preferredPageId?: string) {
   return null;
 }
 
-export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: OperationsGateway; scanner: BarcodeScannerPort; transactionId?: string }) {
-  const snapshot = useSyncExternalStore(gateway.subscribe, gateway.getSnapshot, gateway.getSnapshot);
+export function MobileNotaView({ coreBacked = false, gateway, scanner, transactionId }: { coreBacked?: boolean; gateway: OperationsGateway; scanner: BarcodeScannerPort; transactionId?: string }) {
+  const snapshot = useOperationsSnapshot(gateway);
   const transaction = workingTransaction(snapshot.notaTransactions, transactionId);
   const [selectedPageId, setSelectedPageId] = useState('');
   const [manualOpen, setManualOpen] = useState(false);
@@ -57,7 +58,12 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
   useEffect(() => {
     if (transaction || creating.current || completionStarted.current) return;
     creating.current = true;
-    void gateway.createNotaTransaction().finally(() => { creating.current = false; });
+    void gateway.createNotaTransaction()
+      .catch((error) => {
+        setNoticeKind('alert');
+        setNotice(error instanceof Error && error.message ? error.message : 'Nota baru tidak dapat dibuat.');
+      })
+      .finally(() => { creating.current = false; });
   }, [gateway, transaction]);
 
   useEffect(() => {
@@ -84,6 +90,20 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
     () => searchMobileSkus(snapshot.skus, skuQuery),
     [snapshot.skus, skuQuery],
   );
+
+  function reportError(error: unknown, fallback: string) {
+    setNoticeKind('alert');
+    setNotice(error instanceof Error && error.message ? error.message : fallback);
+  }
+
+  function saveEdit(operation: () => Promise<unknown>, fallback = 'Perubahan nota tidak dapat disimpan.') {
+    setNotice('');
+    try {
+      void operation().catch((error) => reportError(error, fallback));
+    } catch (error) {
+      reportError(error, fallback);
+    }
+  }
 
   async function findSlot(current: NotaTransaction) {
     const existing = availableSlot(current, selectedPage?.id);
@@ -156,6 +176,8 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
     setNotice('');
     try {
       await addSkuCode(skuNumber, 'catalogue');
+    } catch (error) {
+      reportError(error, 'Barang dari SKU tidak dapat ditambahkan.');
     } finally {
       setBusy(false);
     }
@@ -240,29 +262,23 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
     if (!transaction) return;
     completionStarted.current = true;
     setBusy(true);
-    let saved = false;
     try {
       await gateway.completeNotaTransaction(transaction.id, 'archive');
       const completed = gateway.getSnapshot().notaTransactions.find((item) => item.id === transaction.id);
       if (completed?.status !== 'completed') throw new Error('Nota tidak dapat disimpan.');
-      saved = true;
       setCompletionOpen(false);
-      const transfer = await gateway.transferNotaToDesktop(transaction.id);
-      if (!transfer.sent) {
-        setNoticeKind('alert');
-        setNotice(`Nota tersimpan di Arsip. Pengiriman ke desktop gagal: ${transfer.reason ?? 'Alasan tidak tersedia.'}`);
-        return;
-      }
       setNoticeKind('status');
-      setNotice('Nota tersimpan di Arsip dan berhasil dikirim ke desktop.');
+      setNotice(
+        !coreBacked
+          ? 'Nota tersimpan di Arsip sesi demo lokal.'
+          : gateway.getSyncSnapshot().phase === 'offline'
+          ? 'Menunggu sinkronisasi — stok dan omzet pusat belum berubah.'
+          : 'Nota tersimpan di Arsip dan tersedia di semua perangkat.',
+      );
     } catch (error) {
       setNoticeKind('alert');
-      if (saved) {
-        setNotice(`Nota tersimpan di Arsip. Pengiriman ke desktop gagal: ${error instanceof Error ? error.message : 'Alasan tidak tersedia.'}`);
-      } else {
-        completionStarted.current = false;
-        setNotice(error instanceof Error ? error.message : 'Nota tidak dapat disimpan.');
-      }
+      completionStarted.current = false;
+      setNotice(error instanceof Error ? error.message : 'Nota tidak dapat disimpan.');
     } finally {
       setBusy(false);
     }
@@ -279,14 +295,14 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
 
   return <section className="mobile-nota-view" aria-busy={busy || undefined}>
     <header className="mobile-header mobile-nota-header">
-      <div><span className="eyebrow">FRONTEND DEMO · SESSION ONLY</span><h1 data-page-heading tabIndex={-1}>Nota Barang</h1></div>
+      <div><span className="eyebrow">{coreBacked ? 'CH CORE · NOTA TERSINKRONISASI' : 'FRONTEND DEMO · SESSION ONLY'}</span><h1 data-page-heading tabIndex={-1}>Nota Barang</h1></div>
       <strong>{formatRupiah(transactionTotal)}</strong>
     </header>
     {notice && <p className={`mobile-nota-notice mobile-nota-notice--${noticeKind}`} role={noticeKind}>{notice}</p>}
     {transaction && selectedPage ? <>
       <section className="mobile-nota-meta" aria-label="Data nota mobile">
-        <label><span>Pelanggan</span><input value={transaction.customerName} onChange={(event) => void gateway.updateNotaTransaction(transaction.id, { customerName: event.target.value })} /></label>
-        <label><span>Tempat</span><input value={transaction.customerPlace} onChange={(event) => void gateway.updateNotaTransaction(transaction.id, { customerPlace: event.target.value })} /></label>
+        <label><span>Pelanggan</span><input value={transaction.customerName} onChange={(event) => saveEdit(() => gateway.updateNotaTransaction(transaction.id, { customerName: event.target.value }))} /></label>
+        <label><span>Tempat</span><input value={transaction.customerPlace} onChange={(event) => saveEdit(() => gateway.updateNotaTransaction(transaction.id, { customerPlace: event.target.value }))} /></label>
       </section>
       <div className="mobile-nota-actions">
         <button className="primary-action mobile-nota-actions__scan" disabled={busy} onClick={() => void scan()}>
@@ -353,13 +369,13 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
         <label><span>Jenis</span><input aria-label="Jenis barang manual" value={manual.kind} onChange={(event) => setManual({ ...manual, kind: event.target.value })} /></label>
         <div><label><span>Jumlah</span><input aria-label="Jumlah barang manual" inputMode="numeric" value={manual.quantity} onChange={(event) => setManual({ ...manual, quantity: event.target.value })} /></label><label><span>Unit</span><select aria-label="Unit barang manual" value={manual.unit} onChange={(event) => setManual({ ...manual, unit: event.target.value as Unit })}><option value="pcs">PCS</option><option value="lsn">LSN</option></select></label></div>
         <div><label><span>Harga PCS</span><input aria-label="Harga PCS barang manual" inputMode="numeric" value={manual.pcsPrice} onChange={(event) => setManual({ ...manual, pcsPrice: event.target.value })} /></label><label><span>Harga Lusin</span><input aria-label="Harga Lusin barang manual" inputMode="numeric" value={manual.lsnPrice} onChange={(event) => setManual({ ...manual, lsnPrice: event.target.value })} /></label></div>
-        <button className="primary-action" onClick={() => void addManual()}>Simpan barang</button>
+        <button className="primary-action" onClick={() => saveEdit(addManual, 'Barang tidak dapat ditambahkan.')}>Simpan barang</button>
       </section>}
       <div className="mobile-nota-pages" aria-label="Bagian nota">{activePages.map((page) => {
         const index = transaction.pages.findIndex((candidate) => candidate.id === page.id);
         const pageTheme = notaPageTheme(index);
         return <button key={page.id} aria-label={`Bagian ${page.suffix}`} aria-pressed={page.id === selectedPage.id} style={{ '--mobile-nota-accent': pageTheme.background, '--mobile-nota-accent-text': pageTheme.foreground } as CSSProperties} onClick={() => setSelectedPageId(page.id)}>{page.suffix}</button>;
-      })}<button className="mobile-nota-pages__add" onClick={() => void addPage()}>Tambah Bagian {noteSuffixFromIndex(transaction.nextNoteIndex)}</button></div>
+      })}<button className="mobile-nota-pages__add" onClick={() => saveEdit(addPage, 'Bagian baru tidak dapat dibuat.')}>Tambah Bagian {noteSuffixFromIndex(transaction.nextNoteIndex)}</button></div>
       <section className="mobile-nota-section" style={themeStyle} aria-label={`Isi Bagian ${selectedPage.suffix}`}>
         <header><div><span>BAGIAN</span><strong>{selectedPage.suffix}</strong></div><p>Maksimal 15 nomor</p><b>{formatRupiah(pageTotal)}</b></header>
         <div className="mobile-nota-lines">{selectedPage.lines.map((line, index) => {
@@ -367,15 +383,15 @@ export function MobileNotaView({ gateway, scanner, transactionId }: { gateway: O
           const label = `${index + 1}${selectedPage.suffix}`;
           return <article className="mobile-nota-line" key={line.id} role="region" aria-label={`Barang ${label}: ${line.description}`}>
             <span className="mobile-nota-line__number">{label}</span>
-            <label><span>Nama barang</span><input aria-label={`Nama barang ${label}`} value={line.description} onChange={(event) => void updateLine(line, { description: event.target.value, skuId: undefined })} /></label>
-            <label><span>Jenis</span><input aria-label={`Jenis barang ${label}`} value={line.kind} onChange={(event) => void updateLine(line, { kind: event.target.value })} /></label>
-            <div className="mobile-nota-line__numbers"><label><span>Jumlah</span><input aria-label={`Jumlah barang ${label}`} inputMode="numeric" type="number" min="1" value={line.quantity} onChange={(event) => void updateLine(line, { quantity: Number(event.target.value) })} /></label><label><span>Unit</span><select aria-label={`Unit barang ${label}`} value={line.unit} onChange={(event) => void updateLine(line, { unit: event.target.value as Unit })}><option value="pcs">PCS</option><option value="lsn">LSN</option></select></label><label><span>Harga</span><input aria-label={`Harga barang ${label}`} inputMode="numeric" type="number" min="0" value={rowPrice(line)} onChange={(event) => void updateLine(line, line.unit === 'pcs' ? { pcsPrice: Number(event.target.value) } : { lsnPrice: Number(event.target.value) })} /></label></div>
-            <footer><strong>{formatRupiah(lineTotal(line))}</strong><button aria-label={`Hapus barang ${label}`} onClick={() => transaction && void gateway.deleteNotaLine(transaction.id, selectedPage.id, line.id)}>Hapus</button></footer>
+            <label><span>Nama barang</span><input aria-label={`Nama barang ${label}`} value={line.description} onChange={(event) => saveEdit(() => updateLine(line, { description: event.target.value, skuId: undefined }))} /></label>
+            <label><span>Jenis</span><input aria-label={`Jenis barang ${label}`} value={line.kind} onChange={(event) => saveEdit(() => updateLine(line, { kind: event.target.value }))} /></label>
+            <div className="mobile-nota-line__numbers"><label><span>Jumlah</span><input aria-label={`Jumlah barang ${label}`} inputMode="numeric" type="number" min="1" value={line.quantity} onChange={(event) => saveEdit(() => updateLine(line, { quantity: Number(event.target.value) }))} /></label><label><span>Unit</span><select aria-label={`Unit barang ${label}`} value={line.unit} onChange={(event) => saveEdit(() => updateLine(line, { unit: event.target.value as Unit }))}><option value="pcs">PCS</option><option value="lsn">LSN</option></select></label><label><span>Harga</span><input aria-label={`Harga barang ${label}`} inputMode="numeric" type="number" min="0" value={rowPrice(line)} onChange={(event) => saveEdit(() => updateLine(line, line.unit === 'pcs' ? { pcsPrice: Number(event.target.value) } : { lsnPrice: Number(event.target.value) }))} /></label></div>
+            <footer><strong>{formatRupiah(lineTotal(line))}</strong><button aria-label={`Hapus barang ${label}`} onClick={() => transaction && saveEdit(() => gateway.deleteNotaLine(transaction.id, selectedPage.id, line.id), 'Barang tidak dapat dihapus.')}>Hapus</button></footer>
           </article>;
         })}{!selectedPage.lines.some(populated) && <p className="mobile-nota-empty">Belum ada barang di Bagian {selectedPage.suffix}.</p>}</div>
       </section>
       <footer className="mobile-nota-finish"><div><span>Total transaksi</span><strong>{formatRupiah(transactionTotal)}</strong></div><button className="primary-action" disabled={busy} onClick={() => setCompletionOpen(true)}>Selesaikan nota</button></footer>
     </> : !notice && <p className="mobile-nota-empty">Menyiapkan nota baru…</p>}
-    {completionOpen && <div className="mobile-nota-dialog-backdrop"><section role="dialog" aria-modal="true" aria-label="Selesaikan nota mobile?" className="mobile-nota-dialog"><h2>Selesaikan nota mobile?</h2><p>Nota disimpan ke Arsip lalu dicoba dikirim ke desktop.</p><button className="primary-action" disabled={busy} onClick={() => void complete()}>Simpan ke Arsip dan kirim ke desktop</button><button disabled={busy} onClick={() => setCompletionOpen(false)}>Batal</button></section></div>}
+    {completionOpen && <div className="mobile-nota-dialog-backdrop"><section role="dialog" aria-modal="true" aria-label="Selesaikan nota mobile?" className="mobile-nota-dialog"><h2>Selesaikan nota mobile?</h2><p>{coreBacked ? 'Nota disimpan ke Arsip dan tersedia di semua perangkat setelah sinkronisasi.' : 'Nota disimpan ke Arsip pada sesi demo lokal ini.'}</p><button className="primary-action" disabled={busy} onClick={() => void complete()}>Simpan ke Arsip</button><button disabled={busy} onClick={() => setCompletionOpen(false)}>Batal</button></section></div>}
   </section>;
 }

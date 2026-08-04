@@ -71,11 +71,13 @@ export function ShareRecommendationsView({
   onBack,
   onOpenSku,
   onSharePdf,
+  coreBacked = false,
 }: {
   snapshot: DemoState;
   onBack: () => void;
   onOpenSku: (sku: Sku) => void;
   onSharePdf: RecommendationPdfSharePort['sharePdf'];
+  coreBacked?: boolean;
 }) {
   const [tab, setTab] = useState<RecommendationTab>('daily');
   const [date, setDate] = useState(witaToday);
@@ -90,7 +92,14 @@ export function ShareRecommendationsView({
     setStatus(null);
     try {
       const blob = await createRecommendationPdfBlob(pdfPlan);
-      await onSharePdf({ blob, fileName: pdfPlan.fileName, title: pdfPlan.title });
+      await onSharePdf({
+        blob,
+        fileName: pdfPlan.fileName,
+        title: pdfPlan.title,
+        shareText: coreBacked
+          ? 'CH Core · Data tersinkronisasi melalui NAS lokal'
+          : 'DATA DEMO · SESSION ONLY',
+      });
       setStatus({ kind: 'success', message: `PDF ${pdfPlan.title} siap dibagikan.` });
     } catch {
       setStatus({ kind: 'error', message: 'PDF belum dibagikan. Coba lagi.' });

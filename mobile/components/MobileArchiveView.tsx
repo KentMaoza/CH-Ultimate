@@ -1,19 +1,18 @@
-import { useMemo, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { lineTotal } from '../../src/domain/nota';
 import type { OperationsGateway } from '../../src/gateway/operations-gateway';
 import { notaPageTheme } from '../../src/renderer/nota/nota-page-colors';
+import { useOperationsSnapshot } from '../../src/renderer/use-operations-snapshot';
 import { formatRupiah } from '../format';
 
-export function MobileArchiveView({ gateway, onEdit }: { gateway: OperationsGateway; onEdit: (transactionId: string) => void }) {
-  const snapshot = useSyncExternalStore(gateway.subscribe, gateway.getSnapshot, gateway.getSnapshot);
+export function MobileArchiveView({ coreBacked = false, gateway, onEdit }: { coreBacked?: boolean; gateway: OperationsGateway; onEdit: (transactionId: string) => void }) {
+  const snapshot = useOperationsSnapshot(gateway);
   const archived = useMemo(() => snapshot.notaTransactions
     .filter((transaction) => transaction.status === 'completed' && (transaction.completionDestination ?? 'archive') === 'archive')
     .sort((a, b) => Date.parse(b.completedAt ?? '') - Date.parse(a.completedAt ?? '')), [snapshot.notaTransactions]);
   const [selectedId, setSelectedId] = useState('');
   const [editing, setEditing] = useState(false);
   const [editError, setEditError] = useState('');
-  const [syncingId, setSyncingId] = useState('');
-  const [syncError, setSyncError] = useState('');
   const selected = archived.find((transaction) => transaction.id === selectedId);
 
   async function editSelected() {
@@ -32,25 +31,10 @@ export function MobileArchiveView({ gateway, onEdit }: { gateway: OperationsGate
     }
   }
 
-  async function retryTransfer(transactionId: string) {
-    if (syncingId) return;
-    setSyncingId(transactionId);
-    setSyncError('');
-    try {
-      const result = await gateway.transferNotaToDesktop(transactionId);
-      if (!result.sent) setSyncError(`Sinkronisasi ulang gagal: ${result.reason ?? 'Alasan tidak tersedia.'}`);
-    } catch (error) {
-      setSyncError(`Sinkronisasi ulang gagal: ${error instanceof Error ? error.message : 'Alasan tidak tersedia.'}`);
-    } finally {
-      setSyncingId('');
-    }
-  }
-
   return <section className="mobile-archive-view">
-    <header className="mobile-header"><div><span className="eyebrow">ARSIP SAJA · SESSION ONLY</span><h1 data-page-heading tabIndex={-1}>Arsip Nota</h1></div></header>
-    <p className="mobile-archive-badge">Belum terkirim ke desktop · frontend demo</p>
+    <header className="mobile-header"><div><span className="eyebrow">{coreBacked ? 'ARSIP CH CORE' : 'ARSIP SAJA · SESSION ONLY'}</span><h1 data-page-heading tabIndex={-1}>Arsip Nota</h1></div></header>
+    <p className="mobile-archive-badge">{coreBacked ? 'Tersedia di semua perangkat yang tersinkronisasi' : 'Arsip hanya tersedia pada sesi demo lokal ini'}</p>
     {editError && <p className="mobile-nota-notice mobile-nota-notice--alert" role="alert">{editError}</p>}
-    {syncError && <p className="mobile-nota-notice mobile-nota-notice--alert" role="alert">{syncError}</p>}
     {!archived.length ? <p className="mobile-nota-empty">Arsip mobile belum memiliki nota.</p> : <>
       <div className="mobile-archive-list" aria-label="Daftar arsip nota">{archived.map((transaction) => {
         const total = transaction.pages.filter((page) => page.status === 'active').flatMap((page) => page.lines).reduce((sum, line) => sum + lineTotal(line), 0);
@@ -69,18 +53,6 @@ export function MobileArchiveView({ gateway, onEdit }: { gateway: OperationsGate
           </button>
           {expanded && <section className="mobile-archive-detail" id={detailId} aria-label={`Nota arsip ${transaction.baseNumber}`}>
             <header><span>{transaction.baseNumber}</span><button className="secondary-action" disabled={editing} onClick={() => void editSelected()}>Edit nota</button></header>
-            {transaction.desktopTransferStatus === 'failed' && <section className="mobile-archive-transfer" aria-label={`Status pengiriman ${transaction.baseNumber}`}>
-              <strong>Gagal terkirim ke desktop · frontend demo</strong>
-              <span>{transaction.desktopTransferError ?? 'Alasan tidak tersedia.'}</span>
-              <button
-                className="secondary-action"
-                aria-label={`Sinkronisasi ulang ${transaction.baseNumber}`}
-                disabled={Boolean(syncingId)}
-                onClick={() => void retryTransfer(transaction.id)}
-              >
-                {syncingId === transaction.id ? 'Menyinkronkan…' : 'Sinkronisasi ulang'}
-              </button>
-            </section>}
             {transaction.pages.filter((page) => page.status === 'active').map((page) => {
               const pageIndex = transaction.pages.findIndex((candidate) => candidate.id === page.id);
               const theme = notaPageTheme(pageIndex);

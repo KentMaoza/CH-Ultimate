@@ -4,3 +4,13 @@ declare module 'electron-squirrel-startup' {
 }
 
 declare module '*.css';
+
+interface Window {
+  chCore?: import('./electron/core-bridge-contract').ChCoreBridge;
+}
+
+interface ImportMeta {
+  readonly env: {
+    readonly PROD: boolean;
+  }
+}

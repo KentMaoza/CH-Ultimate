@@ -1,9 +1,10 @@
 import { writeFile } from 'node:fs/promises';
 import ExcelJS from 'exceljs';
-import { _electron as electron, expect, test, type Page, type TestInfo } from '@playwright/test';
+import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { launchTestElectron } from './electron-launch';
 
 async function launch() {
-  const application = await electron.launch({ args: ['.vite/build/main.js'] });
+  const application = await launchTestElectron();
   const window = await application.firstWindow();
   await expect(window).toHaveTitle('CH Ultimate');
   return { application, window };

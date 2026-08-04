@@ -11,6 +11,7 @@ export function DashboardView({
   onOpenUnread,
   onOpenSku,
   onOpenRecommendations,
+  coreBacked = false,
 }: {
   snapshot: DemoState;
   unreadCount: number;
@@ -20,6 +21,7 @@ export function DashboardView({
   onOpenUnread: () => void;
   onOpenSku: (sku: Sku) => void;
   onOpenRecommendations: () => void;
+  coreBacked?: boolean;
 }) {
   const activeSkus = snapshot.skus.filter((sku) => !sku.archived);
   const lowStockCount = activeSkus.filter((sku) => sku.tracked && sku.stock <= 2).length;
@@ -33,9 +35,9 @@ export function DashboardView({
         {unreadCount > 0 ? <span className="unread-badge">{unreadCount}</span> : null}
       </button>
     </header>
-    <aside className="demo-banner" aria-label="Mode Demo">
+    <aside className="demo-banner" aria-label={coreBacked ? 'Data CH Core' : 'Mode Demo'}>
       <InfoIcon />
-      <span><strong>Mode Demo</strong><small>Data yang ditampilkan adalah contoh.</small></span>
+      <span><strong>{coreBacked ? 'Data CH Core' : 'Mode Demo'}</strong><small>{coreBacked ? 'Tersinkronisasi melalui NAS lokal.' : 'Data yang ditampilkan adalah contoh.'}</small></span>
     </aside>
     <section className="quick-actions" aria-label="Aksi cepat">
       <button className="quick-action primary" onClick={onScan}><ScanIcon />Scan Barcode</button>

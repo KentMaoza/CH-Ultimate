@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!--
+      Release deployment adds:
+      - res/values/ch_core_config.xml with the reserved HTTPS endpoint
+      - res/raw/ch_core_ca.pem with the public private-CA certificate
+
+      Until both exist, CoreApiPlugin reports missing configuration. The
+      WebView itself trusts no network anchors; the plugin builds its own TLS
+      context from ch_core_ca only.
+    -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors />
+    </base-config>
+</network-security-config>

@@ -1,7 +1,8 @@
-import { _electron as electron, expect, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { launchTestElectron } from './electron-launch';
 
 test('desktop recommendation downloads one catalogue PDF for the active tab', async ({}, testInfo) => {
-  const application = await electron.launch({ args: ['.vite/build/main.js'] });
+  const application = await launchTestElectron();
   const window = await application.firstWindow();
   try {
     await window.setViewportSize({ width: 1024, height: 720 });

@@ -1,0 +1,221 @@
+name: Pilot release
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the verified installers as a GitHub prerelease
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pilot-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run verify
+      - run: npm run test:mobile
+      - run: npm run mobile:build
+      - run: npm run server:test
+      - run: npm run server:typecheck
+      - name: Build Electron before end-to-end tests
+        run: npm run package
+      - name: Install virtual display
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes xvfb
+      - name: Run Electron end-to-end tests
+        run: xvfb-run --auto-servernum npm run test:e2e
+      - name: Reject tracked private keys
+        shell: bash
+        run: |
+          if git grep -IEn -- '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----' -- .; then
+            echo 'A private key is tracked. Publication is blocked.' >&2
+            exit 1
+          fi
+      - run: git diff --check
+
+  windows-installer:
+    needs: source-gates
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run make:windows
+      - name: Collect exactly one installer
+        shell: pwsh
+        run: |
+          $setups = @(Get-ChildItem -Path out/make -Recurse -Filter '*Setup.exe')
+          if ($setups.Count -ne 1) {
+            throw "Expected exactly one Setup.exe, found $($setups.Count)."
+          }
+          New-Item -ItemType Directory -Path release -Force | Out-Null
+          Copy-Item $setups[0].FullName release/CH-Ultimate-0.1.5-Setup.exe
+          Get-FileHash -Algorithm SHA256 release/CH-Ultimate-0.1.5-Setup.exe
+
+  android-apk:
+    needs: source-gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - uses: android-actions/setup-android@v4
+      - run: npm ci
+      - run: npm run android:sync
+      - run: npm run android:test
+      - run: npm run android:lint
+      - name: Build non-published debug verification APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+      - name: Verify exactly one debug APK was built
+        shell: bash
+        run: |
+          mapfile -t apks < <(find android/app/build/outputs/apk/debug -type f -name '*-debug.apk')
+          if [ "${#apks[@]}" -ne 1 ]; then
+            echo "Expected exactly one debug APK, found ${#apks[@]}." >&2
+            exit 1
+          fi
+          sha256sum "${apks[0]}"
+
+  publish-prerelease:
+    needs: [windows-installer, android-apk]
+    if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - uses: android-actions/setup-android@v4
+      - run: npm ci
+      - name: Rebuild Windows release payload
+        run: npm run make:windows
+      - run: npm run android:sync
+      - name: Restore Android signing key
+        shell: pwsh
+        env:
+          CHU_COMPANION_KEYSTORE_B64: ${{ secrets.CHU_COMPANION_KEYSTORE_B64 }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CHU_COMPANION_KEYSTORE_B64)) {
+            throw 'The Android signing keystore secret is missing.'
+          }
+          $keyPath = Join-Path $env:RUNNER_TEMP 'chu-companion-release.jks'
+          [System.IO.File]::WriteAllBytes(
+            $keyPath,
+            [System.Convert]::FromBase64String($env:CHU_COMPANION_KEYSTORE_B64)
+          )
+      - name: Build signed Android release payload
+        working-directory: android
+        shell: pwsh
+        env:
+          CHU_COMPANION_STORE_FILE: ${{ runner.temp }}\chu-companion-release.jks
+          CHU_COMPANION_STORE_PASSWORD: ${{ secrets.CHU_COMPANION_STORE_PASSWORD }}
+          CHU_COMPANION_KEY_ALIAS: ${{ secrets.CHU_COMPANION_KEY_ALIAS }}
+          CHU_COMPANION_KEY_PASSWORD: ${{ secrets.CHU_COMPANION_KEY_PASSWORD }}
+        run: .\gradlew.bat assembleRelease
+      - name: Verify the permanent Android signer
+        shell: pwsh
+        run: |
+          $apks = @(Get-ChildItem -Path android/app/build/outputs/apk/release -Recurse -Filter '*.apk')
+          if ($apks.Count -ne 1) {
+            throw "Expected exactly one release APK, found $($apks.Count)."
+          }
+          $apksigner = Get-ChildItem -Path "$env:ANDROID_HOME\build-tools\*\apksigner.bat" |
+            Sort-Object FullName |
+            Select-Object -Last 1
+          if (-not $apksigner) {
+            throw 'Android apksigner was not found.'
+          }
+          $signerOutput = & $apksigner.FullName verify --print-certs $apks[0].FullName 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Android APK signature verification failed.'
+          }
+          $expected = '57e0731ce3db068e6581980c53610764af05c612184ff50e18a9f4912ca59ba5'
+          $actualLine = $signerOutput | Where-Object { $_ -match 'certificate SHA-256 digest:' } | Select-Object -First 1
+          $digestMatch = [regex]::Match(
+            [string]$actualLine,
+            'certificate SHA-256 digest:\s*([0-9A-Fa-f]{64})\s*$'
+          )
+          if (-not $digestMatch.Success) {
+            throw 'Android signing certificate digest was missing or malformed.'
+          }
+          $actual = $digestMatch.Groups[1].Value.ToLowerInvariant()
+          if ($actual -ne $expected) {
+            throw "Unexpected Android signing certificate: $actual"
+          }
+      - name: Collect exact release payload and create checksums
+        shell: pwsh
+        run: |
+          $setups = @(Get-ChildItem -Path out/make -Recurse -Filter '*Setup.exe')
+          $apks = @(Get-ChildItem -Path android/app/build/outputs/apk/release -Recurse -Filter '*.apk')
+          if ($setups.Count -ne 1) {
+            throw "Expected exactly one Setup.exe, found $($setups.Count)."
+          }
+          if ($apks.Count -ne 1) {
+            throw "Expected exactly one release APK, found $($apks.Count)."
+          }
+          New-Item -ItemType Directory -Path release -Force | Out-Null
+          Copy-Item $setups[0].FullName release/CH-Ultimate-0.1.5-Setup.exe
+          Copy-Item $apks[0].FullName release/CHU-Companion-Mobile-0.1.5-release.apk
+          $names = @(
+            'CH-Ultimate-0.1.5-Setup.exe',
+            'CHU-Companion-Mobile-0.1.5-release.apk'
+          )
+          $lines = foreach ($name in $names) {
+            $hash = (Get-FileHash -Algorithm SHA256 (Join-Path release $name)).Hash.ToLowerInvariant()
+            "$hash  $name"
+          }
+          $checksumPath = Join-Path (Resolve-Path release) 'SHA256SUMS.txt'
+          $portableManifest = ($lines -join "`n") + "`n"
+          [System.IO.File]::WriteAllText($checksumPath, $portableManifest, [System.Text.Encoding]::ASCII)
+      - name: Publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh release create pilot-v0.1.5 `
+            release/CH-Ultimate-0.1.5-Setup.exe `
+            release/CHU-Companion-Mobile-0.1.5-release.apk `
+            release/SHA256SUMS.txt `
+            --prerelease `
+            --target "$env:GITHUB_SHA" `
+            --title 'CH Ultimate pilot v0.1.5' `
+            --notes-file docs/releases/pilot-0.1.5.md
+      - name: Remove restored Android signing key
+        if: always()
+        shell: pwsh
+        run: Remove-Item -LiteralPath (Join-Path $env:RUNNER_TEMP 'chu-companion-release.jks') -Force -ErrorAction SilentlyContinue

@@ -19,6 +19,7 @@ export interface RecommendationPdfSharePayload {
   blob: Blob;
   fileName: string;
   title: string;
+  shareText?: string;
 }
 
 export interface RecommendationPdfSharePort {
@@ -36,7 +37,7 @@ export const browserLocalNotifications: LocalNotificationPort = {
 };
 
 export const browserRecommendationPdfShare: RecommendationPdfSharePort = {
-  async sharePdf({ blob, fileName, title }) {
+  async sharePdf({ blob, fileName, title, shareText = 'DATA DEMO · SESSION ONLY' }) {
     if (!navigator.share) throw new Error('Menu berbagi tidak tersedia di browser ini.');
     const file = new File([blob], fileName, { type: 'application/pdf' });
     if (navigator.canShare && !navigator.canShare({ files: [file] })) {
@@ -45,7 +46,7 @@ export const browserRecommendationPdfShare: RecommendationPdfSharePort = {
     await navigator.share({
       files: [file],
       title,
-      text: 'DATA DEMO · SESSION ONLY',
+      text: shareText,
     });
   },
 };

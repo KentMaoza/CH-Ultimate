@@ -11,7 +11,7 @@ const elementLabels: Record<InvoiceElementId, string> = {
 
 function invoicePrice(value: number) { return value > 0 ? integerFormat.format(value) : '—'; }
 
-export function InvoiceTemplateBuilder() {
+export function InvoiceTemplateBuilder({ coreBacked = false }: { coreBacked?: boolean }) {
   const { state, gateway } = useOperations();
   const template = state.invoiceTemplate;
   const transaction = state.notaTransactions[0];
@@ -24,6 +24,7 @@ export function InvoiceTemplateBuilder() {
         .filter(({ line }) => line.description.trim()),
     })) ?? [];
   const [selectedPageId, setSelectedPageId] = useState<string>();
+  const [message, setMessage] = useState('');
   useEffect(() => {
     if (!pages.some((page) => page.id === selectedPageId)) setSelectedPageId(pages[0]?.id);
   }, [pages, selectedPageId]);
@@ -31,7 +32,18 @@ export function InvoiceTemplateBuilder() {
   const transactionTotal = selectedPage?.rows.reduce((sum, { line }) => sum + lineTotal(line), 0) ?? 0;
   const ppn = Math.round(transactionTotal * 12 / 112);
   const noteTotal = transactionTotal - ppn;
-  const update = (patch: Partial<InvoiceTemplate>) => void gateway.setInvoiceTemplate({ ...template, ...patch });
+  const update = (patch: Partial<InvoiceTemplate>) => {
+    setMessage('');
+    void gateway
+      .setInvoiceTemplate({ ...template, ...patch })
+      .catch((error) =>
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : 'Template invoice gagal disimpan.',
+        ),
+      );
+  };
   const updateElement = (id: InvoiceElementId, visible: boolean) => update({ elements: template.elements.map((element) => element.id === id ? { ...element, visible } : element) });
   const moveElement = (id: InvoiceElementId, direction: -1 | 1) => {
     const index = template.elements.findIndex((element) => element.id === id);
@@ -51,6 +63,7 @@ export function InvoiceTemplateBuilder() {
   return <div className="label-layout">
     <section className="builder-panel">
       <div className="section-heading"><span>INVOICE BUILDER</span><h2>Template invoice</h2><p>Atur ukuran serta identitas toko. Gunakan tombol naik/turun untuk memindahkan elemen.</p></div>
+      {message && <div className="notice" role="status">{message}</div>}
       <div className="form-grid compact">
         <label><span>Lebar invoice (mm)</span><input type="number" min="80" max="297" value={template.widthMm} onChange={(event) => update({ widthMm: Number(event.target.value) })} /></label>
         <label><span>Tinggi invoice (mm)</span><input type="number" min="80" max="420" value={template.heightMm} onChange={(event) => update({ heightMm: Number(event.target.value) })} /></label>
@@ -64,7 +77,7 @@ export function InvoiceTemplateBuilder() {
       <div className="form-actions"><button className="button secondary" disabled aria-label="Export PDF invoice">Export PDF</button><button className="button primary" disabled aria-label="Print invoice">Print</button></div>
     </section>
     <section className="preview-panel invoice-preview-wrap">
-      <div className="preview-title"><strong>Preview invoice</strong><span>Session-only · output produksi belum aktif</span></div>
+      <div className="preview-title"><strong>Preview invoice</strong><span>{coreBacked ? 'Tersimpan di CH Core · output produksi belum aktif' : 'Session-only · output produksi belum aktif'}</span></div>
       <div className="invoice-page-selector" aria-label="Pilih Nota untuk preview">{pages.map((page) => <button type="button" key={page.id} aria-label={`Preview Nota ${page.suffix}`} aria-pressed={page.id === selectedPage?.id} onClick={() => setSelectedPageId(page.id)}>Nota {page.suffix}</button>)}</div>
       <article className="invoice-paper" data-testid="invoice-preview" style={{ width: `${template.widthMm}mm`, minHeight: `${template.heightMm}mm`, fontSize: `${template.fontSize}px` }}>
         <header>{template.elements.filter((element) => element.visible).map((element) => <div key={element.id} data-testid={`invoice-element-${element.id}`}>{renderElement(element.id)}</div>)}</header>

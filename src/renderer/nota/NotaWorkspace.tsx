@@ -37,7 +37,8 @@ function focusTarget(target: EventTarget | null) {
   return target instanceof HTMLElement ? target : null;
 }
 
-export function NotaWorkspace({ onBack, initialSelection, onOpenCompletionDestination }: {
+export function NotaWorkspace({ coreBacked = false, onBack, initialSelection, onOpenCompletionDestination }: {
+  coreBacked?: boolean;
   onBack: () => void;
   initialSelection?: Selection;
   onOpenCompletionDestination?: (destination: NotaCompletionDestination) => void;
@@ -137,6 +138,16 @@ export function NotaWorkspace({ onBack, initialSelection, onOpenCompletionDestin
       }
     }
   };
+  const saveEdit = (operation: () => Promise<unknown>, fallback = 'Perubahan nota tidak dapat disimpan.') => {
+    setMessage('');
+    try {
+      void operation().catch((error) => {
+        setMessage(error instanceof Error && error.message ? error.message : fallback);
+      });
+    } catch (error) {
+      setMessage(error instanceof Error && error.message ? error.message : fallback);
+    }
+  };
   const choose = (choice: Selection) => { setSelected(choice); setDrawer(null); setQuery(''); setHighlight(0); };
   const selectPage = (choice: Selection) => choose(choice);
   const openDrawer = (kind: Exclude<DrawerKind, null>, target: EventTarget | null) => {
@@ -197,6 +208,7 @@ export function NotaWorkspace({ onBack, initialSelection, onOpenCompletionDestin
     setMessage('');
     setCompletion({ ...pending, phase: 'saving', destination, reason: undefined });
     try {
+      await gateway.flushNota(pending.transactionId);
       await gateway.completeNotaTransaction(pending.transactionId, destination);
       const completed = gateway.getSnapshot().notaTransactions.find((item) => item.id === pending.transactionId);
       if (completed?.status !== 'completed' || (completed.completionDestination ?? 'archive') !== destination) throw new Error('Nota tidak dapat disimpan ke tujuan yang dipilih.');
@@ -213,14 +225,14 @@ export function NotaWorkspace({ onBack, initialSelection, onOpenCompletionDestin
     if (!transaction) return;
     const keys = (Object.keys(patch) as Array<keyof TransactionPatch>).sort();
     if (!keys.some((key) => transaction[key] !== patch[key])) return;
-    void run(() => gateway.updateNotaTransaction(transactionId, patch));
+    saveEdit(() => gateway.updateNotaTransaction(transactionId, patch));
   };
   const updateLine = (transactionId: string, pageId: string, lineId: string, patch: Partial<NotaLine>) => {
     const line = gateway.getSnapshot().notaTransactions.find((item) => item.id === transactionId)?.pages.find((item) => item.id === pageId)?.lines.find((item) => item.id === lineId);
     if (!line) return;
     const keys = (Object.keys(patch) as Array<keyof NotaLine>).sort();
     if (!keys.some((key) => line[key] !== patch[key])) return;
-    void run(() => gateway.updateNotaLine(transactionId, pageId, lineId, patch));
+    saveEdit(() => gateway.updateNotaLine(transactionId, pageId, lineId, patch));
   };
   const deleteLine = (transactionId: string, pageId: string, lineId: string) => {
     void run(() => gateway.deleteNotaLine(transactionId, pageId, lineId));
@@ -251,7 +263,10 @@ export function NotaWorkspace({ onBack, initialSelection, onOpenCompletionDestin
       setMessage('Nota yang dikonfirmasi sudah tidak tersedia. Tidak ada perubahan dibuat.');
       return;
     }
-    const result = await run(() => gateway.cancelNotaTransaction(pending.transactionId), 'Transaksi tidak dapat dibatalkan.');
+    const result = await run(async () => {
+      await gateway.flushNota(pending.transactionId);
+      await gateway.cancelNotaTransaction(pending.transactionId);
+    }, 'Transaksi tidak dapat dibatalkan.');
     const cancelled = gateway.getSnapshot().notaTransactions.find((item) => item.id === pending.transactionId);
     if (result.ok && cancelled?.status !== 'cancelled') setMessage('Transaksi tidak dapat dibatalkan.');
     setConfirm(null);
@@ -271,7 +286,7 @@ export function NotaWorkspace({ onBack, initialSelection, onOpenCompletionDestin
       <div className="chu-nota-workspace__search"><input ref={searchInput} aria-label="Cari nota" role="combobox" aria-expanded={Boolean(query)} aria-controls="nota-search-results" aria-activedescendant={query && results[highlight] ? `nota-search-result-${results[highlight]!.transaction.id}-${results[highlight]!.page.id}` : undefined} value={query} placeholder="Cari nota" onChange={(event) => { setQuery(event.target.value); setHighlight(0); }} onKeyDown={(event) => { if (event.key === 'ArrowDown') { event.preventDefault(); setHighlight((value) => Math.min(Math.max(0, results.length - 1), value + 1)); } else if (event.key === 'ArrowUp') { event.preventDefault(); setHighlight((value) => Math.max(0, value - 1)); } else if (event.key === 'Enter') { event.preventDefault(); const result = results[highlight]; if (result) openSearchResult(result); } else if (event.key === 'Escape') { event.preventDefault(); clearSearch(true); } }} />{query && <div id="nota-search-results" role="listbox" aria-label="Hasil pencarian nota">{results.map((result, index) => <div id={`nota-search-result-${result.transaction.id}-${result.page.id}`} role="option" aria-selected={highlight === index} key={`${result.transaction.id}-${result.page.id}`} onMouseDown={(event) => event.preventDefault()} onClick={() => openSearchResult(result)}>{result.label}</div>)}{!results.length && <span>Tidak ada nota yang cocok.</span>}</div>}</div>
       <div className="chu-nota-workspace__zoom" aria-label="Ukuran tulisan"><button aria-label="Perkecil tulisan" disabled={fontScale === 100} onClick={() => setFontScale((value) => stepFontScale(value, -1))}>−</button><button aria-label={`Ukuran tulisan ${fontScale}%`} onClick={() => setFontScale(150)}>{fontScale}%</button><button aria-label="Perbesar tulisan" disabled={fontScale === 175} onClick={() => setFontScale((value) => stepFontScale(value, 1))}>+</button></div>
       <div className="chu-nota-workspace__voice-controls"><button aria-pressed={voiceEnabled} onClick={toggleVoice}>{voiceEnabled ? 'Suara aktif' : 'Suara nonaktif'}</button><button disabled={!voiceEnabled} onClick={() => voicePlayer.current?.test()}>Tes suara</button></div>
-      <span className="chu-nota-workspace__demo">DEMO DATA · SESSION ONLY</span>
+      <span className="chu-nota-workspace__demo">{coreBacked ? 'CH CORE · TERSINKRONISASI' : 'DEMO DATA · SESSION ONLY'}</span>
       <button disabled={busy} className="chu-nota-workspace__new" onClick={(event) => openNew(event.currentTarget)}>Transaksi Baru</button>
     </header>
     {busy && <p className="chu-nota-workspace__notice chu-nota-workspace__busy" role="status" aria-label="Operasi nota sedang diproses">Sedang memproses…</p>}
@@ -298,6 +313,8 @@ export function NotaWorkspace({ onBack, initialSelection, onOpenCompletionDestin
       onChoose={(destination) => void complete(destination)}
       onRetry={() => completion?.destination && void complete(completion.destination)}
       onClose={() => setCompletion(null)}
+      pendingCentral={gateway.getSyncSnapshot().phase === 'offline'}
+      coreBacked={coreBacked}
       onOpenDestination={(destination) => {
         setCompletion(null);
         onOpenCompletionDestination?.(destination);

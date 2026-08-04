@@ -3,7 +3,7 @@ import { App } from '../../src/renderer/App';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 
 test('renders a configurable QR label preview and keeps export disabled', () => {
-  render(<App />);
+  render(<App gateway={new MockOperationsGateway()} />);
   fireEvent.click(screen.getByRole('button', { name: 'Template Label & Invoice' }));
   expect(screen.getByTestId('label-qr')).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Media label'), { target: { value: 'a4' } });
@@ -108,7 +108,7 @@ test('previews one Nota page at a time with inclusive PPN totals', () => {
 });
 
 test('completes a lsn nota from the CH Nota workspace and deducts twelve pieces', async () => {
-  render(<App />);
+  render(<App gateway={new MockOperationsGateway()} />);
   fireEvent.click(screen.getByRole('button', { name: 'Nota' }));
   fireEvent.change(screen.getByLabelText('Jumlah baris 1'), { target: { value: '2' } });
   fireEvent.click(screen.getByRole('button', { name: 'LSN baris 1' }));

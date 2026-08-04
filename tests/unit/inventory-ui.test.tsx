@@ -326,10 +326,11 @@ test('loads an imported SKU image through the gateway cache boundary', async () 
 
   render(<App gateway={gateway} />);
 
-  const image = await within(
-    screen.getByRole('button', { name: 'Ubah gambar BRS-108-BLK' }),
-  ).findByRole('img', { name: 'Gambar BRS-108-BLK' });
-  expect(image).toHaveAttribute('src', 'data:image/png;base64,iVBORw==');
+  const imageButton = screen.getByRole('button', { name: 'Ubah gambar BRS-108-BLK' });
+  await waitFor(() => expect(imageButton.querySelector('img')).toHaveAttribute(
+    'src',
+    'data:image/png;base64,iVBORw==',
+  ));
   expect(load).toHaveBeenCalledWith(
     expect.objectContaining({ imageHash: 'a'.repeat(64) }),
   );

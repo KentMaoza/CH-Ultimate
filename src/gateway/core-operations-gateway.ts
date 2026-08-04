@@ -1112,7 +1112,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     }
     await this.deferred.pump(true);
     await this.refreshOfflineProjection();
-    void this.images.refresh(authoritativeBootstrap);
+    void this.images.refresh(authoritativeBootstrap, true);
   }
 
   private async onAuthenticationRevoked(): Promise<void> {

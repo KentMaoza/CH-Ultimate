@@ -7,6 +7,16 @@ import type { ImagePrefetchSnapshot } from './operations-gateway-contract';
 
 const SHA256 = /^[0-9a-f]{64}$/;
 const CONCURRENCY = 2;
+type ImageFailureKind = 'transient' | 'quota' | 'source';
+
+class ImageRequestError extends Error {
+  constructor(
+    readonly kind: Extract<ImageFailureKind, 'transient' | 'source'>,
+    message: string,
+  ) {
+    super(message);
+  }
+}
 
 function requireHash(hash: string): string {
   if (!SHA256.test(hash)) throw new Error('Hash gambar SHA-256 tidak valid.');
@@ -47,15 +57,17 @@ export class CoreImageCacheCoordinator {
   };
   private referencedHashes = new Set<string>();
   private cachedHashes = new Set<string>();
-  private failedHashes = new Set<string>();
+  private failures = new Map<string, ImageFailureKind>();
   private queue: string[] = [];
   private active = 0;
   private generation = 0;
   private userPaused = false;
+  private quotaPaused = false;
   private disposed = false;
   private readonly inFlight = new Map<string, Promise<Blob>>();
   private networkActive = 0;
   private readonly networkWaiters: Array<() => void> = [];
+  private storageOperations: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly transport: CoreApiTransport,
@@ -88,45 +100,51 @@ export class CoreImageCacheCoordinator {
   async seed(hash: string, image: Blob): Promise<void> {
     const validated = requireHash(hash);
     if (!this.storage.saveImage) return;
-    try {
-      await this.storage.saveImage(validated, image);
-      this.cachedHashes.add(validated);
-      this.failedHashes.delete(validated);
-    } catch {
-      this.failedHashes.add(validated);
-      this.userPaused = true;
-    }
+    this.generation += 1;
+    await this.storeBlob(validated, image);
     this.publish();
   }
 
-  async refresh(pruneUnreferenced: boolean): Promise<void> {
+  async refresh(
+    pruneUnreferenced: boolean,
+    retryTransient = false,
+  ): Promise<void> {
     if (this.disposed || !supportsImageStorage(this.storage)) return;
+    const storage = this.storage;
     const generation = ++this.generation;
-    const skus = this.getSkus();
-    this.referencedHashes = new Set(
-      skus.flatMap((sku) => sku.imageHash ? [requireHash(sku.imageHash)] : []),
-    );
-    let cached = new Set(
-      (await this.storage.listImageHashes()).filter((hash) => SHA256.test(hash)),
-    );
-    if (this.disposed || generation !== this.generation) return;
-    if (pruneUnreferenced) {
-      const stale = [...cached].filter((hash) => !this.referencedHashes.has(hash));
-      if (stale.length > 0) {
-        await this.storage.deleteImages(stale);
-        cached = new Set([...cached].filter((hash) => this.referencedHashes.has(hash)));
+    await this.runStorageOperation(async () => {
+      if (this.disposed || generation !== this.generation) return;
+      const skus = this.getSkus();
+      this.referencedHashes = new Set(
+        skus.flatMap((sku) => sku.imageHash ? [requireHash(sku.imageHash)] : []),
+      );
+      let cached = new Set(
+        (await storage.listImageHashes()).filter((hash) => SHA256.test(hash)),
+      );
+      if (this.disposed || generation !== this.generation) return;
+      if (pruneUnreferenced) {
+        const stale = [...cached].filter((hash) => !this.referencedHashes.has(hash));
+        if (stale.length > 0) {
+          await storage.deleteImages(stale);
+          cached = new Set([...cached].filter((hash) => this.referencedHashes.has(hash)));
+        }
       }
-    }
-    if (this.disposed || generation !== this.generation) return;
-    this.cachedHashes = cached;
-    this.failedHashes = new Set(
-      [...this.failedHashes].filter((hash) => this.referencedHashes.has(hash)),
-    );
-    this.queue = [...this.referencedHashes].filter(
-      (hash) => !cached.has(hash) && !this.failedHashes.has(hash) && !this.inFlight.has(hash),
-    );
-    this.publish();
-    this.pump(generation);
+      if (this.disposed || generation !== this.generation) return;
+      this.cachedHashes = cached;
+      this.failures = new Map(
+        [...this.failures].filter(([hash]) => this.referencedHashes.has(hash)),
+      );
+      if (retryTransient) {
+        this.failures.forEach((kind, hash) => {
+          if (kind === 'transient') this.failures.delete(hash);
+        });
+      }
+      this.queue = [...this.referencedHashes].filter(
+        (hash) => !cached.has(hash) && !this.failures.has(hash) && !this.inFlight.has(hash),
+      );
+      this.publish();
+      this.pump(generation);
+    });
   }
 
   pause(): void {
@@ -136,7 +154,8 @@ export class CoreImageCacheCoordinator {
 
   retry(): void {
     this.userPaused = false;
-    this.failedHashes.clear();
+    this.quotaPaused = false;
+    this.failures.clear();
     void this.refresh(false);
   }
 
@@ -148,7 +167,8 @@ export class CoreImageCacheCoordinator {
 
   private pump(generation: number): void {
     if (
-      this.disposed || generation !== this.generation || this.userPaused ||
+      this.disposed || generation !== this.generation ||
+      this.userPaused || this.quotaPaused ||
       !this.clock.isForeground() || !this.isBusinessOnline()
     ) {
       this.publish();
@@ -158,18 +178,7 @@ export class CoreImageCacheCoordinator {
       const hash = this.queue.shift()!;
       this.active += 1;
       void this.fetchAndStore(hash)
-        .then(() => {
-          if (this.referencedHashes.has(hash)) {
-            this.cachedHashes.add(hash);
-            this.failedHashes.delete(hash);
-          }
-        })
-        .catch((error) => {
-          if (this.referencedHashes.has(hash)) this.failedHashes.add(hash);
-          if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-            this.userPaused = true;
-          }
-        })
+        .catch(() => {})
         .finally(() => {
           this.active -= 1;
           this.publish();
@@ -182,13 +191,17 @@ export class CoreImageCacheCoordinator {
   private fetchAndStore(hash: string): Promise<Blob> {
     const existing = this.inFlight.get(hash);
     if (existing) return existing;
+    this.queue = this.queue.filter((candidate) => candidate !== hash);
     const request = this.withNetworkSlot(async () => {
       const response = await this.transport.request({
         method: 'GET',
         path: CORE_API_PATHS.image(hash),
       });
       if (response.status < 200 || response.status >= 300) {
-        throw new Error(
+        throw new ImageRequestError(
+          response.status >= 500 || response.status === 408 || response.status === 429
+            ? 'transient'
+            : 'source',
           typeof response.body === 'object' && response.body &&
           typeof Reflect.get(response.body, 'code') === 'string'
             ? String(Reflect.get(response.body, 'code'))
@@ -197,8 +210,11 @@ export class CoreImageCacheCoordinator {
       }
       const image = parseCatalogueImage(response.body);
       const blob = imageBlobFromBase64(image.mimeType, image.bytesBase64);
-      if (this.storage.saveImage) await this.storage.saveImage(hash, blob);
+      await this.storeBlob(hash, blob);
       return blob;
+    }).catch((error) => {
+      if (this.referencedHashes.has(hash)) this.recordFailure(hash, error);
+      throw error;
     }).finally(() => this.inFlight.delete(hash));
     this.inFlight.set(hash, request);
     return request;
@@ -217,16 +233,49 @@ export class CoreImageCacheCoordinator {
     }
   }
 
+  private async storeBlob(hash: string, blob: Blob): Promise<boolean> {
+    if (!this.storage.saveImage) return false;
+    return this.runStorageOperation(async () => {
+      try {
+        await this.storage.saveImage!(hash, blob);
+        this.cachedHashes.add(hash);
+        this.failures.delete(hash);
+        return true;
+      } catch (error) {
+        this.recordFailure(hash, error);
+        return false;
+      }
+    });
+  }
+
+  private runStorageOperation<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.storageOperations.then(operation, operation);
+    this.storageOperations = result.then(() => undefined, () => undefined);
+    return result;
+  }
+
+  private recordFailure(hash: string, error: unknown): void {
+    const kind: ImageFailureKind =
+      error instanceof DOMException && error.name === 'QuotaExceededError'
+        ? 'quota'
+        : error instanceof ImageRequestError
+          ? error.kind
+          : 'transient';
+    this.failures.set(hash, kind);
+    if (kind === 'quota') this.quotaPaused = true;
+    this.publish();
+  }
+
   private publish(): void {
     const total = this.getSkus().length;
     const serverAvailable = this.referencedHashes.size;
     const cached = [...this.referencedHashes]
       .filter((hash) => this.cachedHashes.has(hash)).length;
     const failed = [...this.referencedHashes]
-      .filter((hash) => this.failedHashes.has(hash)).length;
+      .filter((hash) => this.failures.has(hash)).length;
     const hasPending = cached + failed < serverAvailable;
     const phase: ImagePrefetchSnapshot['phase'] =
-      this.userPaused ||
+      this.userPaused || this.quotaPaused ||
       (failed > 0 && this.active === 0 && this.queue.length === 0) ||
       ((!this.clock.isForeground() || !this.isBusinessOnline()) && hasPending)
         ? 'paused'

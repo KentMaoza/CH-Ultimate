@@ -46,6 +46,19 @@ class ImageMemoryStorage extends MemoryStorage implements CoreGatewayStorage {
   }
 }
 
+class DelayedDeleteImageStorage extends ImageMemoryStorage {
+  readonly deleteStarted = deferred<void>();
+  readonly releaseDelete = deferred<void>();
+  readonly deleteFinished = deferred<void>();
+
+  override async deleteImages(hashes: string[]): Promise<void> {
+    this.deleteStarted.resolve(undefined);
+    await this.releaseDelete.promise;
+    await super.deleteImages(hashes);
+    this.deleteFinished.resolve(undefined);
+  }
+}
+
 function imageBootstrap(hashes: Array<string | null>, revision = '1') {
   const original = populatedBootstrap(revision);
   const skuId = (index: number) =>
@@ -209,6 +222,115 @@ describe('Core durable image cache and prefetch', () => {
     });
   });
 
+  it('automatically retries transient image failures after an authenticated reconnect', async () => {
+    const storage = new ImageMemoryStorage();
+    const transport = new ScriptedTransport();
+    const gateway = createCoreOperationsGateway(transport, storage, new TestClock());
+    transport.enqueue({ status: 200, body: imageBootstrap([HASH_A]) });
+    transport.enqueue(new Error('LAN image request interrupted'));
+
+    await gateway.initialize();
+    await vi.waitFor(() => expect(gateway.getSyncSnapshot().imagePrefetch).toMatchObject({
+      phase: 'paused', failed: 1,
+    }));
+    transport.enqueue({
+      status: 200,
+      body: { serverRevision: '1', nextAfter: '1', changes: [] },
+    });
+    transport.enqueue(imageResponse('cmVjb25uZWN0ZWQ='));
+
+    await gateway.retryPending();
+
+    await vi.waitFor(() => expect(storage.images.has(HASH_A)).toBe(true));
+    expect(gateway.getSyncSnapshot().imagePrefetch).toMatchObject({
+      phase: 'complete', cached: 1, failed: 0,
+    });
+  });
+
+  it('does not override an explicit image pause on authenticated reconnect', async () => {
+    const storage = new ImageMemoryStorage();
+    const transport = new ScriptedTransport();
+    const gateway = createCoreOperationsGateway(transport, storage, new TestClock());
+    transport.enqueue({ status: 200, body: imageBootstrap([HASH_A]) });
+    transport.enqueue(new Error('LAN image request interrupted'));
+    await gateway.initialize();
+    await vi.waitFor(() => expect(gateway.getSyncSnapshot().imagePrefetch?.failed).toBe(1));
+    gateway.pauseImagePrefetch();
+    transport.enqueue({
+      status: 200,
+      body: { serverRevision: '1', nextAfter: '1', changes: [] },
+    });
+    transport.enqueue(imageResponse('dW51c2Vk'));
+
+    await gateway.retryPending();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(transport.requests.map((request) => request.path)).toEqual([
+      '/v1/bootstrap',
+      `/v1/images/${HASH_A}`,
+      '/v1/changes?after=1&limit=500',
+    ]);
+    expect(gateway.getSyncSnapshot().imagePrefetch).toMatchObject({
+      phase: 'paused', cached: 0,
+    });
+  });
+
+  it('does not override a quota image pause on authenticated reconnect', async () => {
+    const storage = new ImageMemoryStorage();
+    storage.failNextImageSave = true;
+    const transport = new ScriptedTransport();
+    const gateway = createCoreOperationsGateway(transport, storage, new TestClock());
+    transport.enqueue({ status: 200, body: imageBootstrap([HASH_A]) });
+    transport.enqueue(imageResponse());
+    await gateway.initialize();
+    await vi.waitFor(() => expect(gateway.getSyncSnapshot().imagePrefetch?.failed).toBe(1));
+    transport.enqueue({
+      status: 200,
+      body: { serverRevision: '1', nextAfter: '1', changes: [] },
+    });
+    transport.enqueue(imageResponse('dW51c2Vk'));
+
+    await gateway.retryPending();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(transport.requests.map((request) => request.path)).toEqual([
+      '/v1/bootstrap',
+      `/v1/images/${HASH_A}`,
+      '/v1/changes?after=1&limit=500',
+    ]);
+    expect(gateway.getSyncSnapshot().imagePrefetch).toMatchObject({
+      phase: 'paused', cached: 0, failed: 1,
+    });
+  });
+
+  it('keeps a non-transient source failure for manual retry after reconnect', async () => {
+    const storage = new ImageMemoryStorage();
+    const transport = new ScriptedTransport();
+    const gateway = createCoreOperationsGateway(transport, storage, new TestClock());
+    transport.enqueue({ status: 200, body: imageBootstrap([HASH_A]) });
+    transport.enqueue({ status: 404, body: { code: 'IMAGE_UNAVAILABLE' } });
+    await gateway.initialize();
+    await vi.waitFor(() => expect(gateway.getSyncSnapshot().imagePrefetch?.failed).toBe(1));
+    transport.enqueue({
+      status: 200,
+      body: { serverRevision: '1', nextAfter: '1', changes: [] },
+    });
+    transport.enqueue(imageResponse('bWFudWFs'));
+
+    await gateway.retryPending();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(transport.requests).toHaveLength(3);
+    expect(gateway.getSyncSnapshot().imagePrefetch).toMatchObject({
+      phase: 'paused', cached: 0, failed: 1,
+    });
+
+    gateway.retryImagePrefetch();
+    await vi.waitFor(() => expect(storage.images.has(HASH_A)).toBe(true));
+    expect(gateway.getSyncSnapshot().imagePrefetch).toMatchObject({
+      phase: 'complete', cached: 1, failed: 0,
+    });
+  });
+
   it('reports quota failure without blocking online business sync', async () => {
     const storage = new ImageMemoryStorage();
     storage.failNextImageSave = true;
@@ -219,6 +341,59 @@ describe('Core durable image cache and prefetch', () => {
 
     await expect(gateway.initialize()).resolves.toBeUndefined();
     await vi.waitFor(() => expect(gateway.getSyncSnapshot().imagePrefetch?.failed).toBe(1));
+    expect(gateway.getSyncSnapshot()).toMatchObject({
+      phase: 'online',
+      imagePrefetch: { phase: 'paused', cached: 0, failed: 1 },
+    });
+  });
+
+  it('renders an on-demand cache miss when its Blob write exceeds quota and stops queued work', async () => {
+    const storage = new ImageMemoryStorage();
+    storage.failNextImageSave = true;
+    const transport = new ScriptedTransport();
+    const clock = new TestClock();
+    const gateway = createCoreOperationsGateway(transport, storage, clock);
+    gateway.pauseImagePrefetch();
+    transport.enqueue({ status: 200, body: imageBootstrap([HASH_A, HASH_B]) });
+    await gateway.initialize();
+    expect(gateway.getSyncSnapshot().phase).toBe('online');
+    clock.foreground = false;
+    gateway.retryImagePrefetch();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    clock.foreground = true;
+    transport.enqueue(imageResponse('dmlzaWJsZQ=='));
+
+    await expect(gateway.loadSkuImage(gateway.getSnapshot().skus[0]!))
+      .resolves.toBe('data:image/png;base64,dmlzaWJsZQ==');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(transport.requests.map((request) => request.path)).toEqual([
+      '/v1/bootstrap',
+      `/v1/images/${HASH_A}`,
+    ]);
+    expect(gateway.getSyncSnapshot()).toMatchObject({
+      phase: 'online',
+      imagePrefetch: { phase: 'paused', cached: 0, failed: 1 },
+    });
+  });
+
+  it('records an on-demand network failure through the shared transient classifier', async () => {
+    const storage = new ImageMemoryStorage();
+    const transport = new ScriptedTransport();
+    const clock = new TestClock();
+    const gateway = createCoreOperationsGateway(transport, storage, clock);
+    gateway.pauseImagePrefetch();
+    transport.enqueue({ status: 200, body: imageBootstrap([HASH_A]) });
+    await gateway.initialize();
+    clock.foreground = false;
+    gateway.retryImagePrefetch();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    clock.foreground = true;
+    transport.enqueue(new Error('LAN image request interrupted'));
+
+    await expect(gateway.loadSkuImage(gateway.getSnapshot().skus[0]!))
+      .rejects.toThrow('LAN image request interrupted');
+
     expect(gateway.getSyncSnapshot()).toMatchObject({
       phase: 'online',
       imagePrefetch: { phase: 'paused', cached: 0, failed: 1 },
@@ -254,6 +429,52 @@ describe('Core durable image cache and prefetch', () => {
 
     await gateway.initialize();
     await vi.waitFor(() => expect([...storage.images.keys()]).toEqual([HASH_A]));
+  });
+
+  it('does not delete a newly referenced seeded hash when stale bootstrap pruning is in flight', async () => {
+    const storage = new DelayedDeleteImageStorage();
+    storage.images.set(HASH_B, new Blob(['prior'], { type: 'image/png' }));
+    const transport = new ScriptedTransport();
+    const gateway = createCoreOperationsGateway(transport, storage, new TestClock());
+    transport.enqueue({ status: 200, body: imageBootstrap([HASH_A]) });
+    await gateway.initialize();
+    await storage.deleteStarted.promise;
+    const sku = gateway.getSnapshot().skus[0]!;
+    transport.enqueue({
+      status: 200,
+      body: {
+        serverRevision: '2',
+        entityVersion: '2',
+        entity: {
+          ...imageBootstrap([HASH_B], '2').skus[0]!,
+          id: sku.id,
+          rowVersion: '2',
+        },
+      },
+    });
+    transport.enqueue({
+      status: 200,
+      body: { serverRevision: '2', nextAfter: '1', changes: [] },
+    });
+    const update = gateway.updateSku(sku.id, {
+      imageUrl: 'data:image/png;base64,aW1hZ2U=',
+    });
+    await vi.waitFor(() => expect(gateway.getSnapshot().skus[0]?.imageHash).toBe(HASH_B));
+
+    storage.releaseDelete.resolve(undefined);
+    await update;
+    await storage.deleteFinished.promise;
+
+    expect(storage.images.has(HASH_B)).toBe(true);
+    expect(gateway.getSnapshot().skus[0]?.imageHash).toBe(HASH_B);
+    expect(transport.requests.map((request) => request.path)).toEqual([
+      '/v1/bootstrap',
+      `/v1/skus/${sku.id}/image`,
+      '/v1/changes?after=1&limit=500',
+    ]);
+    await vi.waitFor(() => expect(gateway.getSyncSnapshot().imagePrefetch).toMatchObject({
+      serverAvailable: 1, cached: 1, failed: 0,
+    }));
   });
 
   it('prefetches a changed authoritative hash without pruning the prior hash on a change poll', async () => {

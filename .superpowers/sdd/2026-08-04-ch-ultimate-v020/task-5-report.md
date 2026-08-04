@@ -104,6 +104,58 @@ GREEN:
 - Desktop and mobile status surfaces show cache progress and explicit `Jeda gambar` / `Coba lagi gambar` controls.
 - Progress remains separate from server source-image processing: only authoritative hashes are server-available; hashless/missing sources use fallback.
 
+## Round 1 Important-finding remediation
+
+### Reconnect failure classification
+
+RED:
+
+- The transient reconnect regression remained uncached after the authenticated change poll and timed out at `storage.images.has(HASH_A) === false`.
+- A 404 source failure was incorrectly retried during reconnect, producing four requests instead of the expected three.
+
+GREEN:
+
+- Image failures are classified as transient network/server, non-transient source, or quota failures.
+- Authenticated reconnect clears and requeues only transient failures. Explicit user pause and quota pause remain authoritative.
+- A non-transient source failure remains visible in failed progress until `Coba lagi gambar` explicitly clears it.
+
+### On-demand quota and shared failure state
+
+RED:
+
+- A successful cache-miss download rejected with `QuotaExceededError` when the Blob-store write failed, so the visible image could not render.
+- An on-demand network failure left `failed: 0`, proving it bypassed the prefetch classifier.
+
+GREEN:
+
+- The shared Blob writer returns the fetched Blob even when persistence exceeds quota, records `failed: 1`, activates quota pause, leaves business sync online, and prevents queued prefetch from advancing.
+- Automatic and on-demand downloads now share the same transient/source/quota state classifier and the same two-slot network limiter.
+
+### Visibility-gated consumers and bounded PDF hydration
+
+RED:
+
+- Mounting 40 offscreen `GatewaySkuImage` consumers immediately called `loadSkuImage` 40 times.
+- The observer-unavailable fallback had an `aria-label` but no accessible `img` role.
+- All three bounded-PDF tests failed: the thumbnail function was absent, the supplied thumbnail result was ignored, and the 300-row path never entered the two-worker thumbnail stage.
+
+GREEN:
+
+- `GatewaySkuImage` waits for `IntersectionObserver` visibility with a `240px` root margin, disconnects on unmount, and keeps an immediate-load fallback with an accessible image role when the observer API is unavailable.
+- Recommendation hydration uses two workers, converts each full image immediately to a JPEG thumbnail with longest edge at most 320 px and encoded size at most 96 KiB, and accumulates only bounded thumbnail data.
+- The 300-row regression verifies maximum thumbnail concurrency of two and that no `ORIGINAL-` data URL survives in the hydrated plan.
+
+### Prune time-of-check/time-of-use race
+
+RED:
+
+- A deterministic delayed-delete test showed the stale bootstrap prune deleting the newly authoritative seeded hash (`storage.images.has(HASH_B) === false`).
+
+GREEN:
+
+- Cache list/delete/write operations are serialized, authoritative refreshes are generation-checked, and a new seed invalidates an older prune generation before queued work resumes.
+- The delayed-delete regression ends with the changed hash present and progress at `serverAvailable: 1`, `cached: 1`, `failed: 0`.
+
 ## Verification
 
 - Focused image/cache/prefetch/consumer/native adapter/upload suites passed.
@@ -114,6 +166,11 @@ GREEN:
 - Mobile production build: `npm run mobile:build` passed.
 - Android tests were not run because no Android/native source changed.
 - `git diff --check` passed.
+- Round 1 focused cache/consumer/PDF/preprocessing result: 4 files, 27 tests passed.
+- Round 1 renderer typecheck: `npm run typecheck` passed.
+- Round 1 server typecheck: `npm run server:typecheck` passed.
+- Round 1 full renderer suite: `npm test` passed, 76 files and 563 tests.
+- Round 1 mobile production build: `npm run mobile:build` passed with the existing large-chunk warning.
 
 ## Remaining concerns
 

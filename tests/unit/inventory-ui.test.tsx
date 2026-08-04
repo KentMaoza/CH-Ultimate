@@ -246,8 +246,8 @@ test('previews exact CH Core catalogue totals before an explicit commit', async 
       imageJobCount: 2_786,
       missingImageCount: 358,
       priceMismatchCount: 3,
-      selectedPriceTotal: 276_267_011,
-      stockTotal: 4_115,
+      selectedPriceTotal: 276_285_615,
+      stockTotal: 3_988,
       maximumCellTextLength: 168,
       warnings: ['3 baris memakai harga terpilih yang berbeda.'],
       priceMismatches: [
@@ -256,7 +256,7 @@ test('previews exact CH Core catalogue totals before an explicit commit', async 
           primarySku: 'SKU-017',
           modalPrice: 80_000,
           salePrice: 90_000,
-          selectedPrice: 90_000,
+          selectedPrice: 80_000,
         },
       ],
     },
@@ -297,8 +297,8 @@ test('previews exact CH Core catalogue totals before an explicit commit', async 
   expect(within(dialog).getByText('3.144')).toBeInTheDocument();
   expect(within(dialog).getByText('2.786')).toBeInTheDocument();
   expect(within(dialog).getByText('358')).toBeInTheDocument();
-  expect(within(dialog).getByText('Rp 276.267.011')).toBeInTheDocument();
-  expect(within(dialog).getByText('4.115')).toBeInTheDocument();
+  expect(within(dialog).getByText('Rp 276.285.615')).toBeInTheDocument();
+  expect(within(dialog).getByText('3.988')).toBeInTheDocument();
   expect(within(dialog).getByText('SKU-017')).toBeInTheDocument();
 
   fireEvent.click(

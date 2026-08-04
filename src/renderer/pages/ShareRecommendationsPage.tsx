@@ -11,8 +11,9 @@ import { useOperations } from '../operations-context';
 
 type RecommendationTab = RecommendationPdfMode;
 const reasonLabels = {
+  'new-sku': 'SKU Baru',
   'price-updated': 'Harga diperbarui',
-  restocked: 'Restock',
+  restocked: 'Baru Restock',
   idle: 'Stok lama',
 } as const;
 

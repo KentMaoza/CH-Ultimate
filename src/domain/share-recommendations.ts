@@ -9,7 +9,7 @@ export interface ShareRecommendationItem {
   reasons: ShareRecommendationReason[];
 }
 
-export type ShareRecommendationReason = 'price-updated' | 'restocked' | 'idle';
+export type ShareRecommendationReason = 'new-sku' | 'price-updated' | 'restocked' | 'idle';
 
 export interface ShareRecommendationGroup {
   supplierCode: string | null;
@@ -43,6 +43,24 @@ function eightMonthsBefore(key: string): string {
   const [year, month, day] = key.split('-').map(Number);
   const cutoff = new Date(Date.UTC(year, month - 1 - 8, day));
   return cutoff.toISOString().slice(0, 10);
+}
+
+function sourceDate(value: string): string {
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(value);
+  return match?.[1] ?? witaDate(value);
+}
+
+function skuCreatedAt(sku: Sku): string {
+  return sku.sourceCreatedAt || sku.createdAt;
+}
+
+function skuCreatedDate(sku: Sku): string {
+  return sku.sourceCreatedAt ? sourceDate(sku.sourceCreatedAt) : witaDate(sku.createdAt);
+}
+
+function isWithinFourDayPriority(eventDate: string, date: string): boolean {
+  const elapsedDays = Math.floor((dateValue(date) - dateValue(eventDate)) / DAY_MS);
+  return elapsedDays >= 0 && elapsedDays < 4;
 }
 
 export function supplierCodeFromSku(sku: Sku): string | null {
@@ -125,20 +143,33 @@ export function buildShareRecommendationReport(state: DemoState, asOf = new Date
       if (!previous || transaction.completedAt > previous) lastSaleBySku.set(skuId, transaction.completedAt);
     }
   }
-  const latestPriceChangeBySku = latestEventBySku(state.priceChanges, date);
+  const latestPriceChangeBySku = latestEventBySku(
+    state.priceChanges,
+    date,
+    (change) => change.source !== 'catalogue_import',
+  );
   const latestRestockBySku = latestEventBySku(
     state.adjustments,
     date,
     (adjustment) => adjustment.source === 'manual' && adjustment.quantity > 0,
   );
 
+  const newSkuById = new Map(
+    state.skus.flatMap((sku) => {
+      const createdDate = skuCreatedDate(sku);
+      return isWithinFourDayPriority(createdDate, date)
+        ? [[sku.id, createdDate] as const]
+        : [];
+    }),
+  );
   const eligible = state.skus
-    .filter((sku) => !sku.archived && sku.stock > 0 && witaDate(sku.createdAt) <= date)
+    .filter((sku) => !sku.archived && skuCreatedDate(sku) <= date && (sku.stock > 0 || newSkuById.has(sku.id)))
     .map((sku): ShareRecommendationItem => {
-      const lastOutAt = lastSaleBySku.get(sku.id) ?? sku.createdAt;
+      const lastOutAt = lastSaleBySku.get(sku.id) ?? skuCreatedAt(sku);
       const lastOutDate = witaDate(lastOutAt);
       const idleDays = Math.max(0, Math.floor((dateValue(date) - dateValue(lastOutDate)) / DAY_MS));
       const reasons: ShareRecommendationReason[] = [];
+      if (newSkuById.has(sku.id)) reasons.push('new-sku');
       if (latestPriceChangeBySku.has(sku.id)) reasons.push('price-updated');
       if (latestRestockBySku.has(sku.id)) reasons.push('restocked');
       if (idleDays > 0 || reasons.length === 0) reasons.push('idle');
@@ -153,6 +184,12 @@ export function buildShareRecommendationReport(state: DemoState, asOf = new Date
     })
     .sort((left, right) => left.lastOutAt.localeCompare(right.lastOutAt) || left.sku.skuNumber.localeCompare(right.sku.skuNumber, 'id-ID'));
   const safeLimit = Math.min(300, Math.max(0, Math.floor(limit)));
+  const newSkuQueue = roundRobinSuppliers(
+    eligible
+      .filter((item) => newSkuById.has(item.sku.id))
+      .sort((left, right) => newSkuById.get(right.sku.id)!.localeCompare(newSkuById.get(left.sku.id)!)),
+    date,
+  );
   const priceQueue = roundRobinSuppliers(
     eligible
       .filter((item) => latestPriceChangeBySku.has(item.sku.id))
@@ -170,7 +207,7 @@ export function buildShareRecommendationReport(state: DemoState, asOf = new Date
     date,
   );
   const daily = interleaveUnique(
-    [priceQueue, restockQueue, idleQueue],
+    [newSkuQueue, priceQueue, restockQueue, idleQueue],
     roundRobinSuppliers(eligible, date),
     safeLimit,
   );

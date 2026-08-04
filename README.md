@@ -71,16 +71,17 @@ the `CH-Business` Wi-Fi. See the
 
 The authoritative workbook for the guarded first import is:
 
-`/Users/hamlet/Downloads/SKU_Gudang20260730092414031.xlsx`
+`/Users/hamlet/Downloads/SKU_Gudang20260804080716145.xlsx`
 
 SHA-256:
 
-`64fcb734d84462060f76fa7f27495ee1e2dff6201ad2d7a2d13d5c6c27923817`
+`f1f4675327fac107ef9f78c114b8afe86389d5543b204540ed45e74f9b15e49c`
 
-Acceptance is 3,144 products, 2,786 image jobs, 358 missing images, three
-price mismatches for review, selected-price total Rp276,267,011, and stock
-total 4,115 PCS. The owner desktop stages and previews the workbook before one
-transactional commit. Replaying the same hash is idempotent.
+Acceptance is 3,144 products, 6,288 identifiers, 2,786 image jobs, 358
+missing images, three price mismatches for review, selected-price total
+Rp276,285,615, and stock total 3,988 PCS. The owner desktop stages and previews
+the workbook before one transactional commit. Replaying the same hash is
+idempotent.
 
 ## Development
 

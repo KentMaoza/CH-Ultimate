@@ -150,10 +150,10 @@ describe('CH Core guarded deployment documentation', () => {
     );
     expect(readme).toContain('explicit test-only mock');
     expect(readme).toContain(
-      'SKU_Gudang20260730092414031.xlsx',
+      'SKU_Gudang20260804080716145.xlsx',
     );
     expect(readme).toContain(
-      '64fcb734d84462060f76fa7f27495ee1e2dff6201ad2d7a2d13d5c6c27923817',
+      'f1f4675327fac107ef9f78c114b8afe86389d5543b204540ed45e74f9b15e49c',
     );
     expect(readme).toContain('3,144');
     expect(readme).toContain('2,786');

@@ -256,7 +256,7 @@ test('share recommendations use the Windows daily and urgent grouping rules', ()
   fireEvent.change(screen.getByLabelText('Tanggal rekomendasi'), { target: { value: '2026-07-23' } });
 
   expect(screen.getByRole('tab', { name: 'Rekomendasi Harian' })).toHaveAttribute('aria-selected', 'true');
-  expect(screen.getByText('3 dari 3 SKU dipilih')).toBeInTheDocument();
+  expect(screen.getByText('5 dari 5 SKU dipilih')).toBeInTheDocument();
   const ch009 = screen.getByRole('region', { name: 'Grup supplier CH009' });
   expect(within(ch009).getByText('Beras Lama CH009')).toBeInTheDocument();
   expect(within(ch009).getByText('Kemeja Lama CH009')).toBeInTheDocument();

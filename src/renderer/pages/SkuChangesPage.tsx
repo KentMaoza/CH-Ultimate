@@ -36,7 +36,7 @@ function priceChangesCsv(changes: SkuPriceChange[], skus: Sku[]): string {
   return ['Tanggal WITA;Nomor SKU;Nama SKU;Harga Sebelumnya;Harga Sesudahnya', ...rows].join('\n');
 }
 
-const adjustmentSource: Record<StockAdjustment['source'], string> = { manual: 'Manual', nota: 'Nota', reversal: 'Pembalikan Nota' };
+const adjustmentSource: Record<StockAdjustment['source'], string> = { manual: 'Manual', nota: 'Nota', reversal: 'Pembalikan Nota', other: 'Lainnya' };
 
 function ChangeSkuImage({ sku }: { sku?: Sku }) {
   const [failed, setFailed] = useState(false);

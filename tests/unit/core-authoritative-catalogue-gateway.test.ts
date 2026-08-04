@@ -667,4 +667,59 @@ describe('Core authoritative catalogue version tracking', () => {
       expect.objectContaining({ quantity: -2, before: 14, after: 12 }),
     ]);
   });
+
+  it('maps exact Core event sources for recommendation priority', async () => {
+    const { gateway } = setup(
+      populatedBootstrap('5', {
+        priceHistory: [
+          {
+            id: '88888888-8888-4888-8888-888888888888', skuId: SKU_ID,
+            priceRupiah: '26000', beforePriceRupiah: '25000', source: 'catalogue_import',
+            changedByDeviceId: '66666666-6666-4666-8666-666666666666', effectiveAt: '2026-07-30T05:00:00.000Z',
+          },
+          {
+            id: '99999999-9999-4999-8999-999999999999', skuId: SKU_ID,
+            priceRupiah: '27000', beforePriceRupiah: '26000', source: 'manual',
+            changedByDeviceId: '66666666-6666-4666-8666-666666666666', effectiveAt: '2026-07-30T05:01:00.000Z',
+          },
+        ],
+        stockMovements: [
+          {
+            id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', skuId: SKU_ID, deltaPcs: '2', reason: 'manual_adjustment',
+            deviceId: '66666666-6666-4666-8666-666666666666', operationId: null, createdAt: '2026-07-30T05:02:00.000Z',
+          },
+          {
+            id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', skuId: SKU_ID, deltaPcs: '2', reason: 'nota_posting',
+            deviceId: '66666666-6666-4666-8666-666666666666', operationId: null, createdAt: '2026-07-30T05:03:00.000Z',
+          },
+          {
+            id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', skuId: SKU_ID, deltaPcs: '2', reason: 'stock_check',
+            deviceId: '66666666-6666-4666-8666-666666666666', operationId: null, createdAt: '2026-07-30T05:04:00.000Z',
+          },
+          {
+            id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', skuId: SKU_ID, deltaPcs: '2', reason: 'nota_reversal',
+            deviceId: '66666666-6666-4666-8666-666666666666', operationId: null, createdAt: '2026-07-30T05:05:00.000Z',
+          },
+          {
+            id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', skuId: SKU_ID, deltaPcs: '2', reason: 'unknown_source',
+            deviceId: '66666666-6666-4666-8666-666666666666', operationId: null, createdAt: '2026-07-30T05:06:00.000Z',
+          },
+        ],
+      }),
+    );
+
+    await gateway.initialize();
+
+    expect(gateway.getSnapshot().priceChanges.map((change) => change.source)).toEqual([
+      'catalogue_import',
+      'manual',
+    ]);
+    expect(gateway.getSnapshot().adjustments.map((adjustment) => adjustment.source)).toEqual([
+      'manual',
+      'nota',
+      'other',
+      'reversal',
+      'other',
+    ]);
+  });
 });

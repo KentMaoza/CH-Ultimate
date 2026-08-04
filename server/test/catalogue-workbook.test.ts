@@ -82,7 +82,7 @@ async function workbookWithValue(
 }
 
 describe('catalogue workbook mapping', () => {
-  it('selects positive sale price, falls back to modal, and preserves aliases', async () => {
+  it('selects positive modal price, falls back to sale price, and preserves aliases', async () => {
     const result = await parseCatalogueWorkbook(await catalogueFixture());
 
     expect(result.preview).toMatchObject({
@@ -90,14 +90,14 @@ describe('catalogue workbook mapping', () => {
       imageJobCount: 1,
       missingImageCount: 1,
       priceMismatchCount: 1,
-      selectedPriceTotal: 23000,
+      selectedPriceTotal: 20000,
       stockTotal: 10,
     });
     expect(result.rows).toEqual([
       expect.objectContaining({
         primarySku: 'SKU-panjang-tetap-utuh',
         productCode: '87000001',
-        selectedPrice: 15000,
+        selectedPrice: 12000,
         stockPcs: 12,
         note: 'Rak A',
       }),
@@ -114,7 +114,7 @@ describe('catalogue workbook mapping', () => {
         primarySku: 'SKU-panjang-tetap-utuh',
         modalPrice: 12000,
         salePrice: 15000,
-        selectedPrice: 15000,
+        selectedPrice: 12000,
       },
     ]);
   });

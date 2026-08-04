@@ -91,7 +91,7 @@ test('native notifications create the price channel before scheduling the SKU pr
   const notifications = createNativeLocalNotifications(native.plugin);
   const state = createMobileDemoState();
   const sku = state.skus[0]!;
-  const change = { id: 'price-native-1', skuId: sku.id, before: 42_000, after: 43_000, createdAt: new Date().toISOString() };
+  const change = { id: 'price-native-1', skuId: sku.id, before: 42_000, after: 43_000, createdAt: new Date().toISOString(), source: 'manual' as const };
 
   await notifications.notifyPriceChange(change, sku);
 

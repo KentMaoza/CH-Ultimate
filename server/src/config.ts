@@ -3,7 +3,7 @@ import { isAbsolute, resolve } from 'node:path';
 import { z } from 'zod';
 
 export const APPROVED_INITIAL_CATALOGUE_SHA256 =
-  '64fcb734d84462060f76fa7f27495ee1e2dff6201ad2d7a2d13d5c6c27923817';
+  'f1f4675327fac107ef9f78c114b8afe86389d5543b204540ed45e74f9b15e49c';
 
 const databaseUrl = z.string().min(1).refine((value) => {
   try {

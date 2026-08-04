@@ -197,6 +197,11 @@ export function mapCoreBootstrapToDemoState(
         before,
         after,
         createdAt: row.effectiveAt,
+        source: row.source === 'catalogue_import'
+          ? 'catalogue_import' as const
+          : row.source === 'manual'
+            ? 'manual' as const
+            : 'other' as const,
       };
     });
   const runningBalances = new Map(balances);
@@ -222,7 +227,9 @@ export function mapCoreBootstrapToDemoState(
           ? ('reversal' as const)
           : row.reason.includes('nota')
             ? ('nota' as const)
-            : ('manual' as const),
+            : row.reason === 'manual_adjustment'
+              ? ('manual' as const)
+              : ('other' as const),
       };
     })
     .reverse();

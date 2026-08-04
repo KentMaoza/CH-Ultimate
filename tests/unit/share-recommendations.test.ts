@@ -55,8 +55,8 @@ test('interleaves repriced, restocked, and idle SKU while retaining every applic
     ...createInitialState(),
     skus: [idle, both, restocked, repriced],
     priceChanges: [
-      { id: 'price-1', skuId: repriced.id, before: 9_000, after: 10_000, createdAt: '2026-07-22T02:00:00.000Z' },
-      { id: 'price-2', skuId: both.id, before: 8_000, after: 10_000, createdAt: '2026-07-21T02:00:00.000Z' },
+      { id: 'price-1', skuId: repriced.id, before: 9_000, after: 10_000, createdAt: '2026-07-22T02:00:00.000Z', source: 'manual' as const },
+      { id: 'price-2', skuId: both.id, before: 8_000, after: 10_000, createdAt: '2026-07-21T02:00:00.000Z', source: 'manual' as const },
     ],
     adjustments: [
       { id: 'stock-1', skuId: restocked.id, quantity: 5, before: 0, after: 5, createdAt: '2026-07-22T03:00:00.000Z', source: 'manual' as const },
@@ -71,6 +71,73 @@ test('interleaves repriced, restocked, and idle SKU while retaining every applic
   expect(report.daily.find((item) => item.sku.id === 'repriced')?.reasons).toEqual(['price-updated', 'idle']);
   expect(report.daily.find((item) => item.sku.id === 'restocked')?.reasons).toEqual(['restocked', 'idle']);
   expect(report.daily.find((item) => item.sku.id === 'both')?.reasons).toEqual(['price-updated', 'restocked', 'idle']);
+});
+
+test('prioritizes imported and manual SKU baru for exactly four WITA dates, including zero stock', () => {
+  const imported = sku(
+    'imported',
+    'Barang Import CH040',
+    '2025-01-01T00:00:00.000Z',
+    0,
+    { sourceCreatedAt: '2026-08-04 08:07' },
+  );
+  const manual = sku(
+    'manual',
+    'Barang Manual CH041',
+    '2026-08-04T00:00:00.000Z',
+    0,
+  );
+  const state = { ...createInitialState(), skus: [imported, manual] };
+
+  const firstDay = buildShareRecommendationReport(
+    state,
+    new Date('2026-08-04T04:00:00.000Z'),
+  );
+  const fourthDay = buildShareRecommendationReport(
+    state,
+    new Date('2026-08-07T04:00:00.000Z'),
+  );
+  const fifthDay = buildShareRecommendationReport(
+    state,
+    new Date('2026-08-08T04:00:00.000Z'),
+  );
+
+  expect(firstDay.daily.map((item) => [item.sku.id, item.reasons])).toEqual([
+    ['imported', ['new-sku']],
+    ['manual', ['new-sku']],
+  ]);
+  expect(fourthDay.daily.map((item) => item.sku.id).sort()).toEqual([
+    'imported',
+    'manual',
+  ]);
+  expect(fifthDay.daily).toEqual([]);
+});
+
+test('excludes catalogue import prices and non-manual stock sources from priority', () => {
+  const importedPrice = sku('import-price', 'Harga Import CH050', '2025-01-01T00:00:00.000Z');
+  const manualPrice = sku('manual-price', 'Harga Manual CH051', '2025-01-01T00:00:00.000Z');
+  const manualRestock = sku('manual-restock', 'Tambah Stok CH052', '2025-01-01T00:00:00.000Z');
+  const excludedRestock = sku('excluded-restock', 'Bukan Tambah CH053', '2025-01-01T00:00:00.000Z');
+  const report = buildShareRecommendationReport(
+    {
+      ...createInitialState(),
+      skus: [importedPrice, manualPrice, manualRestock, excludedRestock],
+      priceChanges: [
+        { id: 'import-price', skuId: importedPrice.id, before: 1, after: 2, createdAt: '2026-08-04T01:00:00.000Z', source: 'catalogue_import' as const },
+        { id: 'manual-price', skuId: manualPrice.id, before: 1, after: 2, createdAt: '2026-08-04T02:00:00.000Z', source: 'manual' as const },
+      ],
+      adjustments: [
+        { id: 'manual-restock', skuId: manualRestock.id, quantity: 3, before: 0, after: 3, createdAt: '2026-08-04T03:00:00.000Z', source: 'manual' as const },
+        { id: 'nota-restock', skuId: excludedRestock.id, quantity: 3, before: 0, after: 3, createdAt: '2026-08-04T03:00:00.000Z', source: 'nota' as const },
+      ],
+    },
+    new Date('2026-08-04T04:00:00.000Z'),
+  );
+
+  expect(report.daily.find((item) => item.sku.id === importedPrice.id)?.reasons).toEqual(['idle']);
+  expect(report.daily.find((item) => item.sku.id === manualPrice.id)?.reasons).toContain('price-updated');
+  expect(report.daily.find((item) => item.sku.id === manualRestock.id)?.reasons).toContain('restocked');
+  expect(report.daily.find((item) => item.sku.id === excludedRestock.id)?.reasons).toEqual(['idle']);
 });
 
 test('rotates the starting supplier deterministically across consecutive WITA dates', () => {

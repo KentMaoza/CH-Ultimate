@@ -35,8 +35,8 @@ export function createMobileDemoState(): DemoState {
       archived: sku.id === 'sku-4',
     })),
     priceChanges: [
-      { id: 'mobile-price-1', skuId: 'sku-1', before: 39_000, after: 42_000, createdAt: '2026-07-21T10:15:00+08:00' },
-      { id: 'mobile-price-2', skuId: 'sku-6', before: 230_000, after: 245_000, createdAt: '2026-07-22T07:45:00+08:00' },
+      { id: 'mobile-price-1', skuId: 'sku-1', before: 39_000, after: 42_000, createdAt: '2026-07-21T10:15:00+08:00', source: 'manual' },
+      { id: 'mobile-price-2', skuId: 'sku-6', before: 230_000, after: 245_000, createdAt: '2026-07-22T07:45:00+08:00', source: 'manual' },
     ],
     sourceLabel: 'Fixture sintetis mobile',
   };

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { CoreCacheEnvelope } from '../../src/gateway/core-operations-gateway';
 import { createCoreOperationsGateway } from '../../src/gateway/core-operations-gateway';
+import { parseCoreCache } from '../../src/gateway/core-cache';
+import { createInitialState } from '../../src/domain/operations';
 import {
   IDENTIFIER_ID,
   SKU_ID,
@@ -26,6 +28,34 @@ function createGateway(
 }
 
 describe('Core operations gateway bootstrap and polling', () => {
+  it('treats legacy cached recommendation events without source as manual', () => {
+    const state = createInitialState();
+
+    const cached = parseCoreCache({
+      cacheVersion: 1,
+      state: {
+        ...state,
+        priceChanges: [
+          {
+            id: 'legacy-price', skuId: 'sku-1', before: 42_000, after: 43_000,
+            createdAt: '2026-08-04T00:00:00.000Z',
+          },
+        ],
+        adjustments: [
+          {
+            id: 'legacy-stock', skuId: 'sku-1', quantity: 2, before: 1, after: 3,
+            createdAt: '2026-08-04T00:00:00.000Z',
+          },
+        ],
+      },
+      serverRevision: '1',
+      outbox: [],
+    });
+
+    expect(cached.state.priceChanges[0]?.source).toBe('manual');
+    expect(cached.state.adjustments[0]?.source).toBe('manual');
+  });
+
   it('enables staged catalogue import only after an owner bootstrap', async () => {
     const owner = createGateway();
     owner.transport.enqueue({

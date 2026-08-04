@@ -18,7 +18,7 @@ function createRecommendationState() {
       sku('new', 'Baju Baru CH010', '2026-06-10T00:00:00.000Z', 8),
     ],
     priceChanges: [
-      { id: 'price-new', skuId: 'new', before: 20_000, after: 25_000, createdAt: '2026-07-22T02:00:00.000Z' },
+      { id: 'price-new', skuId: 'new', before: 20_000, after: 25_000, createdAt: '2026-07-22T02:00:00.000Z', source: 'manual' as const },
     ],
     adjustments: [
       { id: 'stock-same', skuId: 'same', quantity: 2, before: 0, after: 2, createdAt: '2026-07-22T03:00:00.000Z', source: 'manual' as const },
@@ -50,7 +50,7 @@ test('shows daily share recommendations grouped by supplier and a separate urgen
   expect(screen.getByText('3 dari 3 SKU dipilih untuk hari ini')).toBeInTheDocument();
   expect(screen.getByText('Rotasi harga baru, restock, stok lama, dan supplier.')).toBeInTheDocument();
   expect(screen.getByText('Harga diperbarui')).toBeInTheDocument();
-  expect(screen.getByText('Restock')).toBeInTheDocument();
+  expect(screen.getByText('Baru Restock')).toBeInTheDocument();
   const group = screen.getByRole('region', { name: 'Grup supplier CH009' });
   expect(within(group).getByText('Kemeja Lama CH009')).toBeInTheDocument();
   expect(within(group).getByText('Rok Lama CH009')).toBeInTheDocument();

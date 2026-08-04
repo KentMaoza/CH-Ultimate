@@ -290,7 +290,7 @@ export async function parseCatalogueWorkbook(
       rowNumber,
       true,
     );
-    const selectedPrice = salePrice > 0 ? salePrice : modalPrice;
+    const selectedPrice = modalPrice > 0 ? modalPrice : salePrice;
     const rawImageSource = cellText(value(source, 'Tautan Gambar'));
     const validImageSource = imageSource(rawImageSource);
     if (rawImageSource !== '' && validImageSource === null) {

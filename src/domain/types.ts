@@ -30,7 +30,7 @@ export interface StockAdjustment {
   before: number;
   after: number;
   createdAt: string;
-  source: 'manual' | 'nota' | 'reversal';
+  source: 'manual' | 'nota' | 'reversal' | 'other';
 }
 
 export interface SkuPriceChange {
@@ -39,6 +39,7 @@ export interface SkuPriceChange {
   before: number;
   after: number;
   createdAt: string;
+  source: 'manual' | 'catalogue_import' | 'other';
 }
 
 export interface NotaLine {

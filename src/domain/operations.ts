@@ -68,7 +68,7 @@ export function reduceOperation(state: DemoState, operation: Operation): DemoSta
     skus: state.skus.map((sku) => sku.id === current.id ? { ...sku, ...operation.patch, skuNumber: nextNumber || current.skuNumber, aliases } : sku),
     priceChanges: priceChanged ? [...state.priceChanges, {
       id: `price-${Date.now()}-${state.priceChanges.length}`, skuId: current.id,
-      before: current.referencePrice, after: operation.patch.referencePrice!, createdAt: new Date().toISOString(),
+      before: current.referencePrice, after: operation.patch.referencePrice!, createdAt: new Date().toISOString(), source: 'manual',
     }] : state.priceChanges,
   };
 }

@@ -136,6 +136,11 @@ function applyPriceHistory(state: DemoState, change: CoreChange): DemoState {
         before,
         after,
         createdAt: row.effectiveAt,
+        source: row.source === 'catalogue_import'
+          ? 'catalogue_import'
+          : row.source === 'manual'
+            ? 'manual'
+            : 'other',
       },
     ],
   };
@@ -169,7 +174,9 @@ function applyStockMovement(state: DemoState, change: CoreChange): DemoState {
           ? 'reversal'
           : row.reason.includes('nota')
             ? 'nota'
-            : 'manual',
+            : row.reason === 'manual_adjustment'
+              ? 'manual'
+              : 'other',
       },
     ],
   };

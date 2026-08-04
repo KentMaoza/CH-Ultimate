@@ -11,6 +11,7 @@ test('mock keeps a stable demo sync snapshot through initialization and listener
     canResetDemoData: true,
     canImportInitialCatalogue: true,
     canStageInitialCatalogue: false,
+    canManagePackageBarcodes: false,
   });
   expect(gateway.getSyncSnapshot()).toEqual({
     phase: 'demo',

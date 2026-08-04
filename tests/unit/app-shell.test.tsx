@@ -14,17 +14,26 @@ test('shows all operational modules and switches the active page', () => {
     'src',
     '/brand/ch-ultimate-mark.svg',
   );
-  for (const label of ['SKU Gudang', 'Perubahan SKU', 'Rekomendasi Share', 'Buat SKU', 'Template Label & Invoice', 'Nota', 'Arsip Nota', 'Laporan Omzet', 'Barang Kosong', 'Settings']) {
+  for (const label of ['SKU Gudang', 'Cek Stok', 'Perubahan SKU', 'Rekomendasi Share', 'Buat SKU', 'Template Label & Invoice', 'Nota', 'Arsip Nota', 'Laporan Omzet', 'Barang Kosong', 'Settings']) {
     expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
   }
   const navigation = screen.getByRole('navigation', { name: 'Modul CH Ultimate' });
-  expect(navigation.querySelectorAll('.nav-glyph')).toHaveLength(10);
-  expect(navigation.querySelectorAll('.nav-glyph svg')).toHaveLength(10);
+  expect(navigation.querySelectorAll('.nav-glyph')).toHaveLength(11);
+  expect(navigation.querySelectorAll('.nav-glyph svg')).toHaveLength(11);
   const navigationLabels = Array.from(navigation.querySelectorAll('button')).map((button) => button.getAttribute('aria-label'));
-  expect(navigationLabels.slice(0, 3)).toEqual(['SKU Gudang', 'Perubahan SKU', 'Rekomendasi Share']);
+  expect(navigationLabels.slice(0, 3)).toEqual(['SKU Gudang', 'Cek Stok', 'Perubahan SKU']);
   expect(screen.getByText('DEMO DATA · SESSION ONLY')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Template Label & Invoice' }));
   expect(screen.getByRole('heading', { name: 'Template Label & Invoice', level: 1 })).toBeInTheDocument();
+});
+
+test('opens Cek Stok as a first-class desktop module', () => {
+  render(<App gateway={new MockOperationsGateway()} />);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Cek Stok' }));
+
+  expect(screen.getByRole('heading', { name: 'Cek Stok', level: 1 })).toBeInTheDocument();
+  expect(screen.getByRole('region', { name: 'Cek Stok' })).toBeInTheDocument();
 });
 
 test('opens Arsip Nota as a dedicated sidebar module', () => {

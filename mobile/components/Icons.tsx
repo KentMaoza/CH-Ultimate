@@ -24,6 +24,10 @@ export function BoxIcon(props: IconProps) {
   return <IconBase {...props}><path d="m4 7 8-4 8 4-8 4-8-4Z" /><path d="m4 7 8 4v10l-8-4V7ZM20 7l-8 4v10l8-4V7Z" /></IconBase>;
 }
 
+export function StockIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M4 7h16v13H4Z" /><path d="m4 7 8-4 8 4-8 4Z" /><path d="M8 15h8M12 11v8" /></IconBase>;
+}
+
 export function TrendIcon(props: IconProps) {
   return <IconBase {...props}><path d="m4 7 5 5 4-4 7 7" /><path d="M20 10v5h-5" /></IconBase>;
 }

@@ -1,5 +1,6 @@
 import { createInitialState } from './operations';
 import type { DemoState, Sku } from './types';
+import { resolveSkuByIdentifier } from './stock-checks';
 
 const mobileAliases: Record<string, string[]> = {
   'sku-1': ['BRS-108', 'BERAS-HITAM-1KG'],
@@ -43,11 +44,7 @@ export function createMobileDemoState(): DemoState {
 }
 
 export function findSkuByScanCode(skus: Sku[], rawCode: string): Sku | null {
-  const code = normalized(rawCode);
-  if (!code) return null;
-  return skus.find((sku) => normalized(sku.skuNumber) === code)
-    ?? skus.find((sku) => sku.aliases.some((alias) => normalized(alias) === code))
-    ?? null;
+  return resolveSkuByIdentifier(skus, rawCode);
 }
 
 export function searchMobileSkus(skus: Sku[], query: string): Sku[] {

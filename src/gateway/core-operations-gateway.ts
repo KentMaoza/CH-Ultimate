@@ -112,6 +112,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     canResetDemoData: false,
     canImportInitialCatalogue: false,
     canStageInitialCatalogue: false,
+    canManagePackageBarcodes: false,
   };
 
   private readonly state = new CoreGatewayState();
@@ -161,6 +162,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
       envelopes,
       (role) => {
         this.capabilities.canStageInitialCatalogue = role === 'owner';
+        this.capabilities.canManagePackageBarcodes = role === 'owner';
       },
       (authoritativeBootstrap) => this.onAuthenticatedOnline(authoritativeBootstrap),
       () => this.onAuthenticationRevoked(),

@@ -56,15 +56,17 @@ describe('Core operations gateway bootstrap and polling', () => {
     expect(cached.state.adjustments[0]?.source).toBe('other');
   });
 
-  it('enables staged catalogue import only after an owner bootstrap', async () => {
+  it('enables owner-only capabilities only after an owner bootstrap', async () => {
     const owner = createGateway();
     owner.transport.enqueue({
       status: 200,
       body: populatedBootstrap('1'),
     });
     expect(owner.gateway.capabilities.canStageInitialCatalogue).toBe(false);
+    expect(owner.gateway.capabilities.canManagePackageBarcodes).toBe(false);
     await owner.gateway.initialize();
     expect(owner.gateway.capabilities.canStageInitialCatalogue).toBe(true);
+    expect(owner.gateway.capabilities.canManagePackageBarcodes).toBe(true);
 
     const client = createGateway();
     client.transport.enqueue({
@@ -73,6 +75,7 @@ describe('Core operations gateway bootstrap and polling', () => {
     });
     await client.gateway.initialize();
     expect(client.gateway.capabilities.canStageInitialCatalogue).toBe(false);
+    expect(client.gateway.capabilities.canManagePackageBarcodes).toBe(false);
   });
   it('publishes a valid cached snapshot before replacing it with canonical bootstrap data', async () => {
     const cached: CoreCacheEnvelope = {

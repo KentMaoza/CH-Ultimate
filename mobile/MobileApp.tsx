@@ -4,7 +4,7 @@ import type { Sku } from '../src/domain/types';
 import { findSkuByScanCode } from '../src/domain/mobile-demo-state';
 import { useOperationsSnapshot } from '../src/renderer/use-operations-snapshot';
 import type { BarcodeScannerPort, LocalNotificationPort, RecommendationPdfSharePort } from './ports';
-import { ArchiveIcon, BoxIcon, HomeIcon, MoreIcon, NotaIcon } from './components/Icons';
+import { ArchiveIcon, BoxIcon, HomeIcon, MoreIcon, NotaIcon, StockIcon } from './components/Icons';
 import { DashboardView } from './components/DashboardView';
 import { SkuCatalog } from './components/SkuCatalog';
 import { ScanSurface } from './components/ScanSurface';
@@ -16,8 +16,9 @@ import { MobileArchiveView } from './components/MobileArchiveView';
 import { MoreView } from './components/MoreView';
 import { OperationsSyncStatus } from './components/OperationsSyncStatus';
 import { formatRupiah } from './format';
+import { StockCheckView } from '../src/renderer/stock-check/StockCheckView';
 
-type MainView = 'home' | 'skus' | 'nota' | 'archive' | 'more' | 'prices' | 'recommendations';
+type MainView = 'home' | 'skus' | 'nota' | 'stock' | 'archive' | 'more' | 'prices' | 'recommendations';
 type PriceMode = 'all' | 'unread';
 
 export function MobileApp({ gateway, scanner, notifications, share, coreBacked = false }: {
@@ -186,6 +187,11 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
     }
   }
 
+  async function scanStockCode(): Promise<string | null> {
+    const result = await scanner.scan();
+    return result?.rawValue ?? null;
+  }
+
   return <div className={`mobile-app${coreBacked ? ' mobile-app--core' : ''}`}>
     {coreBacked ? (
       <OperationsSyncStatus gateway={gateway} />
@@ -220,6 +226,11 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
         coreBacked={coreBacked}
       /> : null}
       {view === 'nota' && !scanOpen && !selectedSku ? <MobileNotaView coreBacked={coreBacked} gateway={gateway} scanner={scanner} transactionId={editingNotaId ?? undefined} /> : null}
+      {view === 'stock' && !scanOpen && !selectedSku ? <section className="page-view mobile-stock-check-page">
+        <h1 data-page-heading tabIndex={-1}>Cek Stok</h1>
+        <p>Hitung stok fisik dalam PCS, lalu konfirmasi sebelum disimpan.</p>
+        <StockCheckView gateway={gateway} mode="mobile" onCameraScan={scanStockCode} />
+      </section> : null}
       {view === 'archive' && !scanOpen && !selectedSku ? <MobileArchiveView coreBacked={coreBacked} gateway={gateway} onEdit={editArchivedNota} /> : null}
       {view === 'more' && !scanOpen && !selectedSku ? <MoreView coreBacked={coreBacked} onOpenPrices={() => navigate('prices')} onOpenRecommendations={() => navigate('recommendations')} /> : null}
     </main>
@@ -227,6 +238,7 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
       <button aria-current={view === 'home' ? 'page' : undefined} onClick={() => navigate('home')}><HomeIcon />Beranda</button>
       <button aria-current={view === 'skus' ? 'page' : undefined} onClick={() => navigate('skus')}><BoxIcon />SKU</button>
       <button aria-current={view === 'nota' ? 'page' : undefined} onClick={() => navigate('nota')}><NotaIcon />Nota</button>
+      <button aria-label="Cek Stok" title="Cek Stok" aria-current={view === 'stock' ? 'page' : undefined} onClick={() => navigate('stock')}><StockIcon /><span aria-hidden="true">Stok</span></button>
       <button aria-current={view === 'archive' ? 'page' : undefined} onClick={() => navigate('archive')}><ArchiveIcon />Arsip</button>
       <button aria-current={['more', 'prices', 'recommendations'].includes(view) ? 'page' : undefined} onClick={() => navigate('more')}><MoreIcon />Lainnya</button>
     </nav>

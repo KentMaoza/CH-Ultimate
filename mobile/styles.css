@@ -982,7 +982,7 @@ input:focus-visible,
   min-height: calc(72px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   margin: 0 auto;
   padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   border-top: 1px solid #cfcfcf;
   background: rgb(255 255 255 / 96%);
   backdrop-filter: blur(12px);
@@ -1022,6 +1022,8 @@ input:focus-visible,
   width: 25px;
   height: 25px;
 }
+
+.mobile-stock-check-page > .stock-check { margin-top: 18px; }
 
 .mobile-nota-view { display: grid; gap: 14px; }
 .mobile-nota-header { align-items: end; }

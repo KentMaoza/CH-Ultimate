@@ -1,0 +1,93 @@
+.stock-check { display: grid; min-width: 0; gap: 14px; }
+.stock-check button, .stock-check input, .stock-check select, .stock-check textarea { font: inherit; }
+.stock-check__scan { display: grid; padding: 14px; grid-template-columns: minmax(180px, .7fr) auto minmax(360px, 1fr); align-items: end; gap: 12px; border: 2px solid #111; background: #fff; }
+.stock-check__scan strong, .stock-check__scan span { display: block; }
+.stock-check__scan strong { font-size: 10px; letter-spacing: .11em; }
+.stock-check__scan span { margin-top: 4px; color: #555; font-size: 11px; }
+.stock-check__scan form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+.stock-check__scan form label { grid-column: 1 / -1; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.stock-check__scan input, .stock-check__scan button, .stock-check__registration input, .stock-check__registration select, .stock-check__registration button, .stock-check__form input, .stock-check__form textarea, .stock-check__form button, .stock-check__actions button { min-height: 42px; padding: 8px 10px; border: 1px solid #111; border-radius: 0; background: #fff; }
+.stock-check__scan button, .stock-check__registration button, .stock-check__form button, .stock-check__actions button { font-weight: 850; cursor: pointer; }
+.stock-check__scan button:last-child, .stock-check__registration > button, .stock-check__form button, .stock-check__actions button:last-child { color: #fff; background: #111; }
+.stock-check button:disabled { cursor: not-allowed; opacity: .5; }
+.stock-check__feedback, .stock-check__warning { margin: 0; padding: 11px 13px; border: 2px solid #111; background: #f0f0ec; font-weight: 750; overflow-wrap: anywhere; }
+.stock-check__registration { display: grid; padding: 18px; gap: 10px; border: 3px solid #111; background: #fff; }
+.stock-check__registration h2, .stock-check__registration p { margin: 0; }
+.stock-check__registration label { font-size: 10px; font-weight: 850; text-transform: uppercase; }
+.stock-check__registration code { padding: 2px 4px; background: #eee; overflow-wrap: anywhere; }
+.stock-check__layout { display: grid; min-width: 0; grid-template-columns: minmax(340px, .78fr) minmax(430px, 1.22fr); align-items: start; gap: 14px; }
+.stock-check__list-panel, .stock-check__workspace { min-width: 0; border: 2px solid #111; background: #fff; }
+.stock-check__list-panel > header { display: flex; min-height: 42px; padding: 10px 12px; align-items: center; justify-content: space-between; color: #fff; background: #111; font-size: 10px; letter-spacing: .1em; }
+.stock-check__list { display: grid; max-height: calc(100vh - 280px); margin: 0; padding: 0; overflow: auto; list-style: none; }
+.stock-check__list li { min-width: 0; }
+.stock-check__list li > button { display: grid; width: 100%; min-width: 0; min-height: 74px; padding: 11px 12px; grid-template-columns: minmax(0, 1fr) minmax(150px, .7fr); align-items: center; gap: 10px; border: 0; border-bottom: 1px solid #bbb; background: #fff; text-align: left; cursor: pointer; }
+.stock-check__list li > button[aria-current="true"] { box-shadow: inset 5px 0 0 #111; background: #f0f0ec; }
+.stock-check__list span, .stock-check__list strong, .stock-check__list small, .stock-check__list b { display: block; min-width: 0; overflow-wrap: anywhere; }
+.stock-check__list small { margin-top: 4px; color: #555; font-size: 10px; }
+.stock-check__list li > button > span:last-child { text-align: right; }
+.stock-check__workspace { padding: 20px; }
+.stock-check__empty { min-height: 260px; display: grid; place-content: center; text-align: center; }
+.stock-check__empty p { color: #555; }
+.stock-check__workspace > header > span { font-size: 10px; font-weight: 850; letter-spacing: .12em; }
+.stock-check__workspace > header h2 { margin: 5px 0; font-size: 24px; }
+.stock-check__workspace > header p { margin: 0; font-weight: 750; }
+.stock-check__form { display: grid; margin-top: 18px; gap: 7px; }
+.stock-check__form label { margin-top: 5px; font-size: 10px; font-weight: 850; text-transform: uppercase; }
+.stock-check__form textarea { min-height: 82px; resize: vertical; }
+.stock-check__form small { color: #666; text-align: right; }
+.stock-check__confirmation { margin-top: 16px; padding: 15px; border: 3px solid #111; background: #f3f3ef; }
+.stock-check__confirmation h3, .stock-check__audit h3 { margin: 0 0 12px; }
+.stock-check dl { margin: 0; }
+.stock-check dl div { display: flex; min-width: 0; padding: 7px 0; justify-content: space-between; gap: 14px; border-bottom: 1px solid #bbb; }
+.stock-check dt, .stock-check dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.stock-check dd { font-weight: 850; text-align: right; }
+.stock-check__actions { display: grid; margin-top: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.stock-check__warning { margin-top: 12px; border-left-width: 7px; }
+.stock-check__audit { margin-top: 22px; padding-top: 18px; border-top: 2px solid #111; }
+.stock-check__audit details { border-top: 1px solid #aaa; }
+.stock-check__audit summary { display: flex; min-height: 46px; padding: 8px 0; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; }
+.stock-check__audit summary b { padding: 4px 6px; color: #fff; background: #111; font-size: 9px; letter-spacing: .08em; }
+.stock-check__audit details dl { padding: 4px 10px 12px; }
+.stock-check__management { padding: 18px; border: 2px solid #111; background: #fff; }
+.stock-check__management > header span { font-size: 9px; font-weight: 850; letter-spacing: .11em; }
+.stock-check__management > header h2 { margin: 4px 0 14px; }
+.stock-check__management-row { display: grid; min-width: 0; padding: 12px 0; grid-template-columns: minmax(180px, 1fr) minmax(170px, .7fr) minmax(230px, 1fr) auto; align-items: end; gap: 8px; border-top: 1px solid #aaa; }
+.stock-check__management-row strong, .stock-check__management-row span { display: block; overflow-wrap: anywhere; }
+.stock-check__management-row span { margin-top: 4px; color: #555; font-size: 10px; }
+.stock-check__management-row label { grid-column: 2; font-size: 9px; font-weight: 850; text-transform: uppercase; }
+.stock-check__management-row select { grid-column: 3; min-height: 40px; padding: 7px; border: 1px solid #111; }
+.stock-check__management-actions { display: flex; grid-column: 4; gap: 6px; }
+.stock-check__management-actions button, .stock-check__management-confirmation button { min-height: 40px; padding: 7px 10px; border: 1px solid #111; background: #fff; font-weight: 800; }
+.stock-check__management-confirmation { display: grid; grid-column: 1 / -1; padding: 10px; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px; border: 2px solid #111; background: #f0f0ec; }
+.stock-check__management-confirmation p { margin: 0; }
+.stock-check__management-confirmation button:last-child { color: #fff; background: #111; }
+
+@media (max-width: 1180px) {
+  .stock-check__scan { grid-template-columns: 1fr minmax(360px, 1fr); }
+  .stock-check__scan > div { grid-column: 1 / -1; }
+  .stock-check__layout { grid-template-columns: 1fr; }
+  .stock-check__list { max-height: 360px; }
+  .stock-check__management-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .stock-check__management-row label { grid-column: 1; }
+  .stock-check__management-row select { grid-column: 2; }
+  .stock-check__management-actions { grid-column: 1 / -1; }
+}
+
+.stock-check--mobile { gap: 12px; }
+.stock-check--mobile .stock-check__scan, .stock-check--mobile .stock-check__layout { grid-template-columns: minmax(0, 1fr); }
+.stock-check--mobile .stock-check__scan > div { grid-column: auto; }
+.stock-check--mobile .stock-check__scan form { grid-template-columns: minmax(0, 1fr); }
+.stock-check--mobile .stock-check__scan form label { grid-column: auto; }
+.stock-check--mobile .stock-check__scan input, .stock-check--mobile .stock-check__scan button, .stock-check--mobile .stock-check__registration input, .stock-check--mobile .stock-check__registration select, .stock-check--mobile .stock-check__registration button, .stock-check--mobile .stock-check__form input, .stock-check--mobile .stock-check__form textarea, .stock-check--mobile .stock-check__form button, .stock-check--mobile .stock-check__actions button { min-height: 48px; }
+.stock-check--mobile .stock-check__list { max-height: none; }
+.stock-check--mobile .stock-check__list li > button { grid-template-columns: minmax(0, 1fr); }
+.stock-check--mobile .stock-check__list li > button > span:last-child { text-align: left; }
+.stock-check--mobile .stock-check__workspace { padding: 15px; }
+
+@media (width <= 370px) {
+  .stock-check--mobile .stock-check__scan, .stock-check--mobile .stock-check__registration, .stock-check--mobile .stock-check__workspace { padding: 12px; }
+  .stock-check--mobile .stock-check__actions { grid-template-columns: minmax(0, 1fr); }
+  .stock-check--mobile dl div { align-items: flex-start; flex-direction: column; gap: 3px; }
+  .stock-check--mobile dd { text-align: left; }
+  .stock-check--mobile .stock-check__audit summary { align-items: flex-start; flex-direction: column; }
+}

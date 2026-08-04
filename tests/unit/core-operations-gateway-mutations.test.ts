@@ -737,6 +737,7 @@ describe('Core operations gateway mutation coordination', () => {
       canResetDemoData: false,
       canImportInitialCatalogue: false,
       canStageInitialCatalogue: true,
+      canManagePackageBarcodes: true,
     });
     await expect(gateway.reset()).rejects.toThrow(
       'Reset data demo tidak tersedia',

@@ -20,6 +20,7 @@ export class MockOperationsGateway implements OperationsGateway {
     canResetDemoData: true,
     canImportInitialCatalogue: true,
     canStageInitialCatalogue: false,
+    canManagePackageBarcodes: false,
   };
   private readonly syncSnapshot: SyncSnapshot = {
     phase: 'demo',

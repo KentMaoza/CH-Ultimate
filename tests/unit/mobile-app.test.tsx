@@ -167,7 +167,7 @@ test('Core and demo price/archive empty states describe their real storage scope
   ).toBeInTheDocument();
 });
 
-test('bottom navigation has five destinations and moves legacy feeds under Lainnya', () => {
+test('bottom navigation has exactly six destinations and moves legacy feeds under Lainnya', () => {
   renderMobile();
 
   const navigation = screen.getByRole('navigation', { name: 'Navigasi utama' });
@@ -175,6 +175,7 @@ test('bottom navigation has five destinations and moves legacy feeds under Lainn
     'Beranda',
     'SKU',
     'Nota',
+    'Stok',
     'Arsip',
     'Lainnya',
   ]);
@@ -238,7 +239,7 @@ test('dashboard search action opens the searchable SKU list', () => {
   expect(screen.getByRole('searchbox', { name: 'Cari SKU' })).toHaveFocus();
 });
 
-test('dashboard keeps its recommendation shortcut while mobile navigation has five destinations', () => {
+test('dashboard keeps its recommendation shortcut while mobile navigation has six destinations', () => {
   renderMobile({}, createRecommendationState);
 
   const quickActions = screen.getByRole('region', { name: 'Aksi cepat' });
@@ -247,7 +248,7 @@ test('dashboard keeps its recommendation shortcut while mobile navigation has fi
 
   expect(screen.getByRole('heading', { name: 'Rekomendasi Share' })).toHaveFocus();
   expect(screen.getByLabelText('Tanggal rekomendasi')).toHaveValue('2026-07-23');
-  expect(within(screen.getByRole('navigation', { name: 'Navigasi utama' })).getAllByRole('button')).toHaveLength(5);
+  expect(within(screen.getByRole('navigation', { name: 'Navigasi utama' })).getAllByRole('button')).toHaveLength(6);
 });
 
 test('share recommendations use the Windows daily and urgent grouping rules', () => {

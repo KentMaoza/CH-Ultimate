@@ -35,6 +35,7 @@ export interface OperationsGatewayCapabilities {
   canResetDemoData: boolean;
   canImportInitialCatalogue: boolean;
   canStageInitialCatalogue: boolean;
+  canManagePackageBarcodes: boolean;
 }
 
 export interface CataloguePriceMismatch {

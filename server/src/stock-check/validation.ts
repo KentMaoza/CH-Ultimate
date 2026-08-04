@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { canonicalUuid } from '../http/request-validation.js';
+
 const safeQuantity = z.number().int().safe();
 const canonicalVersion = z.string().regex(/^[1-9]\d*$/);
 const countedAt = z.string().datetime({ offset: true });
@@ -21,7 +23,7 @@ export const onlineStockCheckBody = z
 
 export const offlineStockCheckBody = z
   .object({
-    skuId: z.string().uuid(),
+    skuId: canonicalUuid,
     ...fields,
     baseBalanceVersion: canonicalVersion.optional(),
   })

@@ -233,6 +233,34 @@ describe('executeIdempotent', () => {
     expect(pool.state.businessRows).toEqual([entityId]);
   });
 
+  it('adds the v2 marker when replaying a persisted legacy acknowledgement', async () => {
+    const pool = new FakeProtocolPool();
+    let callbackCalls = 0;
+    const callback = async (): Promise<IdempotentMutation<unknown>> => {
+      callbackCalls += 1;
+      return {
+        statusCode: 202,
+        body: { accepted: true },
+        audits: [],
+        changes: [],
+      };
+    };
+
+    await execute(pool, { amount: '1000' }, callback);
+    const receipt = pool.state.receipts.get(`${deviceId}:${idempotencyKey}`);
+    if (!receipt) throw new Error('Expected persisted receipt');
+    receipt.body = '{"accepted":true}';
+
+    const replay = await execute(pool, { amount: '1000' }, callback);
+
+    expect(replay).toEqual({
+      statusCode: 202,
+      body: { apiSchemaVersion: 2, accepted: true },
+      replayed: true,
+    });
+    expect(callbackCalls).toBe(1);
+  });
+
   it('returns 409 when the same device and key carry a different payload', async () => {
     const pool = new FakeProtocolPool();
     await execute(pool, { amount: '1000' });

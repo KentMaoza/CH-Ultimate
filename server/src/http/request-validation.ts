@@ -6,6 +6,7 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const uuid = z.string().regex(UUID_PATTERN);
+export const canonicalUuid = uuid.transform((value) => value.toLowerCase());
 const opaqueSecret = z.string().refine((value) => {
   if (!/^[A-Za-z0-9_-]+$/.test(value)) {
     return false;
@@ -64,7 +65,7 @@ export const rotateTokenBody = z
   .object({ nextDeviceToken: opaqueSecret })
   .strict();
 
-export const uuidPath = z.object({ id: uuid }).strict();
+export const uuidPath = z.object({ id: canonicalUuid }).strict();
 
 const decimalLimit = z
   .string()

@@ -249,7 +249,9 @@ async function readReplay<T>(
     transactionStarted = false;
     return {
       statusCode,
-      body: parseStoredJson(existing.response_json) as T,
+      body: apiV2Acknowledgement(
+        parseStoredJson(existing.response_json) as T,
+      ),
       replayed: true,
     };
   } catch (error) {

@@ -56,6 +56,14 @@ describe('GitHub pilot release workflow', () => {
     expect(publisher).toContain('CHU_COMPANION_KEY_PASSWORD');
     expect(publisher).toContain(androidSignerSha256);
     expect(publisher).toContain('apksigner.bat');
+    expect(publisher).toContain('$digestMatch = [regex]::Match(');
+    expect(publisher).toContain(
+      "'certificate SHA-256 digest:\\s*([0-9A-Fa-f]{64})\\s*$'",
+    );
+    expect(publisher).toContain(
+      '$actual = $digestMatch.Groups[1].Value.ToLowerInvariant()',
+    );
+    expect(publisher).not.toContain("($actualLine -split ':', 2)");
     expect(publisher).toContain('if: always()');
     expect(publisher).toContain('$portableManifest = ($lines -join "`n") + "`n"');
     expect(publisher).toContain('[System.IO.File]::WriteAllText');

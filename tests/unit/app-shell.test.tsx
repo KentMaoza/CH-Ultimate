@@ -3,6 +3,10 @@ import { App } from '../../src/renderer/App';
 
 test('shows all operational modules and switches the active page', () => {
   render(<App />);
+  expect(screen.getByRole('img', { name: 'CH Ultimate' })).toHaveAttribute(
+    'src',
+    '/brand/ch-ultimate-mark.svg',
+  );
   for (const label of ['SKU Gudang', 'Perubahan SKU', 'Rekomendasi Share', 'Buat SKU', 'Template Label & Invoice', 'Nota', 'Arsip Nota', 'Laporan Omzet', 'Barang Kosong', 'Settings']) {
     expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
   }

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 512" role="img" aria-labelledby="title">
+  <title id="title">CH Ultimate logo</title>
+  <g transform="translate(18 18) scale(.465)">
+    <g fill="#1D1D1D">
+      <path d="M100 100h460v150H300v170H100ZM310 292h258v148H310ZM620 238h160v372H650V390h-30ZM780 470h144v334H764V648h-96V516h112ZM100 470h164v176H100ZM100 690h420v154H100ZM548 710h158v188H548Z"/>
+    </g>
+    <rect x="362" y="468" width="210" height="210" fill="#C39C34"/>
+  </g>
+  <text x="500" y="325" fill="#1D1D1D" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="180" font-weight="820" letter-spacing="-6">CH</text>
+  <text x="748" y="325" fill="#C39C34" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="180" font-weight="760" letter-spacing="-6">Ultimate</text>
+</svg>

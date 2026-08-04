@@ -13,7 +13,7 @@ import { formatRupiah } from './format';
 import type {
   BarcodeScannerPort,
   LocalNotificationPort,
-  RecommendationPdfSharePort,
+  PdfSharePort,
 } from './ports';
 
 type ScannerPlugin = Pick<CapacitorBarcodeScannerPlugin, 'scanBarcode'>;
@@ -68,11 +68,11 @@ async function playScanSuccessTone() {
   }
 }
 
-export function createNativeRecommendationPdfShare(
+export function createNativePdfShare(
   sharePlugin: NativeSharePlugin = Share,
   filesystem: NativeFilesystemPlugin = Filesystem,
   convertBlob: BlobToBase64 = blobToBase64,
-): RecommendationPdfSharePort {
+): PdfSharePort {
   return {
     async sharePdf({ blob, fileName, title, shareText = 'DATA DEMO · SESSION ONLY' }) {
       const data = await convertBlob(blob);
@@ -95,6 +95,8 @@ export function createNativeRecommendationPdfShare(
     },
   };
 }
+
+export const createNativeRecommendationPdfShare = createNativePdfShare;
 
 export function createNativeBarcodeScanner(
   plugin: ScannerPlugin = CapacitorBarcodeScanner,

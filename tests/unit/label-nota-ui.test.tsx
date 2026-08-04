@@ -2,14 +2,14 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { App } from '../../src/renderer/App';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 
-test('renders a configurable QR label preview and keeps export disabled', () => {
+test('renders a configurable QR label preview with print and PDF actions', () => {
   render(<App gateway={new MockOperationsGateway()} />);
   fireEvent.click(screen.getByRole('button', { name: 'Template Label & Invoice' }));
   expect(screen.getByTestId('label-qr')).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Media label'), { target: { value: 'a4' } });
   expect(screen.getByText('Preview A4')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Print label' })).toBeDisabled();
-  expect(screen.getByRole('button', { name: 'Export PDF label' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Print label' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Simpan PDF label' })).toBeEnabled();
 });
 
 test('configures an invoice preview and reorders its business identity elements', () => {
@@ -36,8 +36,8 @@ test('configures an invoice preview and reorders its business identity elements'
   fireEvent.click(screen.getByRole('button', { name: 'Naikkan No. rekening' }));
   const order = within(preview).getAllByTestId(/invoice-element-/).map((element) => element.dataset.testid);
   expect(order).toEqual(['invoice-element-logo', 'invoice-element-address', 'invoice-element-bank', 'invoice-element-phone']);
-  expect(screen.getByRole('button', { name: 'Print invoice' })).toBeDisabled();
-  expect(screen.getByRole('button', { name: 'Export PDF invoice' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Print invoice' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Simpan PDF invoice' })).toBeEnabled();
 });
 
 test('previews one Nota page at a time with inclusive PPN totals', () => {

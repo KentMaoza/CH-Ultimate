@@ -7,6 +7,7 @@ afterEach(() => {
   vi.doUnmock('../../src/electron/core-credential-store');
   vi.doUnmock('../../src/electron/core-desktop-service');
   vi.doUnmock('../../src/electron/core-ipc');
+  vi.doUnmock('../../src/electron/output-ipc');
   vi.doUnmock('../../src/electron/core-packaged-deployment');
   vi.unstubAllGlobals();
   delete process.env.CH_ULTIMATE_E2E_TEST_MOCK;
@@ -53,6 +54,7 @@ describe('Electron CH Core startup', () => {
     };
     const ipcMain = {};
     const safeStorage = {};
+    const dialog = {};
     const store = {};
     const service = {};
     const unregister = vi.fn();
@@ -72,10 +74,16 @@ describe('Electron CH Core startup', () => {
       callOrder.push('register');
       return unregister;
     });
+    const unregisterOutput = vi.fn();
+    const registerOutputIpcHandlers = vi.fn(() => {
+      callOrder.push('output');
+      return unregisterOutput;
+    });
 
     vi.doMock('electron', () => ({
       app,
       BrowserWindow,
+      dialog,
       ipcMain,
       safeStorage,
     }));
@@ -88,6 +96,9 @@ describe('Electron CH Core startup', () => {
     }));
     vi.doMock('../../src/electron/core-ipc', () => ({
       registerCoreIpcHandlers,
+    }));
+    vi.doMock('../../src/electron/output-ipc', () => ({
+      registerOutputIpcHandlers,
     }));
     vi.doMock('../../src/electron/core-packaged-deployment', () => ({
       ensurePackagedCoreDeployment,
@@ -109,6 +120,7 @@ describe('Electron CH Core startup', () => {
       'deployment',
       'service',
       'register',
+      'output',
     ]);
     expect(BrowserWindow).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -150,6 +162,13 @@ describe('Electron CH Core startup', () => {
       trustedContents,
       rendererUrl,
     );
+    expect(registerOutputIpcHandlers).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ipcMain,
+        webContents: trustedContents,
+        expectedRendererUrl: rendererUrl,
+      }),
+    );
 
     const willNavigate = webContentsOn.mock.calls.find(
       ([event]) => event === 'will-navigate',
@@ -173,6 +192,7 @@ describe('Electron CH Core startup', () => {
     expect(closed).toEqual(expect.any(Function));
     closed();
     expect(unregister).toHaveBeenCalledTimes(1);
+    expect(unregisterOutput).toHaveBeenCalledTimes(1);
   });
 
   it('adds the locked test marker only for an unpackaged explicit E2E launch', async () => {
@@ -200,10 +220,12 @@ describe('Electron CH Core startup', () => {
       on: vi.fn(),
     };
     const registerCoreIpcHandlers = vi.fn(() => vi.fn());
+    const registerOutputIpcHandlers = vi.fn(() => vi.fn());
 
     vi.doMock('electron', () => ({
       app,
       BrowserWindow,
+      dialog: {},
       ipcMain: {},
       safeStorage: {},
     }));
@@ -216,6 +238,9 @@ describe('Electron CH Core startup', () => {
     }));
     vi.doMock('../../src/electron/core-ipc', () => ({
       registerCoreIpcHandlers,
+    }));
+    vi.doMock('../../src/electron/output-ipc', () => ({
+      registerOutputIpcHandlers,
     }));
     vi.stubGlobal('MAIN_WINDOW_VITE_DEV_SERVER_URL', undefined);
     vi.stubGlobal('MAIN_WINDOW_VITE_NAME', 'main_window');

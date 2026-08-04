@@ -14,12 +14,12 @@ test('shows all operational modules and switches the active page', () => {
     'src',
     '/brand/ch-ultimate-mark.svg',
   );
-  for (const label of ['SKU Gudang', 'Cek Stok', 'Perubahan SKU', 'Rekomendasi Share', 'Buat SKU', 'Template Label & Invoice', 'Nota', 'Arsip Nota', 'Laporan Omzet', 'Barang Kosong', 'Settings']) {
+  for (const label of ['SKU Gudang', 'Cek Stok', 'Perubahan SKU', 'Rekomendasi Share', 'Ekspor Data', 'Buat SKU', 'Template Label & Invoice', 'Nota', 'Arsip Nota', 'Laporan Omzet', 'Barang Kosong', 'Settings']) {
     expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
   }
   const navigation = screen.getByRole('navigation', { name: 'Modul CH Ultimate' });
-  expect(navigation.querySelectorAll('.nav-glyph')).toHaveLength(11);
-  expect(navigation.querySelectorAll('.nav-glyph svg')).toHaveLength(11);
+  expect(navigation.querySelectorAll('.nav-glyph')).toHaveLength(12);
+  expect(navigation.querySelectorAll('.nav-glyph svg')).toHaveLength(12);
   const navigationLabels = Array.from(navigation.querySelectorAll('button')).map((button) => button.getAttribute('aria-label'));
   expect(navigationLabels.slice(0, 3)).toEqual(['SKU Gudang', 'Cek Stok', 'Perubahan SKU']);
   expect(screen.getByText('DEMO DATA · SESSION ONLY')).toBeInTheDocument();
@@ -88,7 +88,7 @@ test('uses truthful CH Core copy across persisted desktop workflows', () => {
   );
   fireEvent.click(screen.getByRole('tab', { name: 'Invoice' }));
   expect(
-    screen.getByText('Tersimpan di CH Core · output produksi belum aktif'),
+    screen.getByText('Tersimpan di CH Core · dialog sistem aktif'),
   ).toBeInTheDocument();
   expect(screen.queryByText(/Session-only/)).not.toBeInTheDocument();
 
@@ -114,6 +114,6 @@ test('demo invoice preview remains explicitly session-only', () => {
   fireEvent.click(screen.getByRole('tab', { name: 'Invoice' }));
 
   expect(
-    screen.getByText('Session-only · output produksi belum aktif'),
+    screen.getByText('Session-only · dialog sistem aktif'),
   ).toBeInTheDocument();
 });

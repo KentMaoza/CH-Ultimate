@@ -1,9 +1,11 @@
 import {
   app,
   BrowserWindow,
+  dialog,
   ipcMain,
   safeStorage,
 } from 'electron';
+import { writeFile } from 'node:fs/promises';
 import started from 'electron-squirrel-startup';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -11,6 +13,7 @@ import { pathToFileURL } from 'node:url';
 import { createCoreCredentialStore } from './electron/core-credential-store';
 import { createCoreDesktopService } from './electron/core-desktop-service';
 import { registerCoreIpcHandlers } from './electron/core-ipc';
+import { registerOutputIpcHandlers } from './electron/output-ipc';
 import { ensurePackagedCoreDeployment } from './electron/core-packaged-deployment';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
@@ -64,13 +67,23 @@ async function createWindow(): Promise<void> {
     rendererUrl.searchParams.set('ch-ultimate-e2e-test-mock', '1');
   }
   const lockedRendererUrl = rendererUrl.href;
-  const unregister = registerCoreIpcHandlers(
+  const unregisterCore = registerCoreIpcHandlers(
     ipcMain,
     service,
     window.webContents,
     lockedRendererUrl,
   );
-  window.on('closed', unregister);
+  const unregisterOutput = registerOutputIpcHandlers({
+    ipcMain,
+    webContents: window.webContents,
+    expectedRendererUrl: lockedRendererUrl,
+    showSaveDialog: (options) => dialog.showSaveDialog(window, options),
+    writeFile,
+  });
+  window.on('closed', () => {
+    unregisterCore();
+    unregisterOutput();
+  });
   window.webContents.on('will-navigate', (event, url) => {
     if (url !== lockedRendererUrl) event.preventDefault();
   });

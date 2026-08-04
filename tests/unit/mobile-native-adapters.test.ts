@@ -8,7 +8,7 @@ import type { ActionPerformed } from '@capacitor/local-notifications';
 import {
   createNativeBarcodeScanner,
   createNativeLocalNotifications,
-  createNativeRecommendationPdfShare,
+  createNativePdfShare,
 } from '../../mobile/native-adapters';
 import { createMobileDemoState } from '../../src/domain/mobile-demo-state';
 
@@ -133,12 +133,12 @@ test('native notification actions forward only a valid skuId and expose listener
   expect(native.remove).toHaveBeenCalledOnce();
 });
 
-test('native recommendation share writes one PDF to cache, opens Android Share, and removes the file', async () => {
+test('native PDF share writes one PDF to cache, opens Android Share, and removes the file', async () => {
   const share = vi.fn(async () => ({ activityType: 'whatsapp' }));
   const writeFile = vi.fn(async () => ({ uri: 'file:///cache/CHU-Rekomendasi-Harian-2026-07-23.pdf' }));
   const deleteFile = vi.fn(async () => undefined);
   const toBase64 = vi.fn(async () => 'JVBERi0=');
-  const adapter = createNativeRecommendationPdfShare({ share }, { writeFile, deleteFile }, toBase64);
+  const adapter = createNativePdfShare({ share }, { writeFile, deleteFile }, toBase64);
   const blob = new Blob(['%PDF-1.3'], { type: 'application/pdf' });
 
   await adapter.sharePdf({
@@ -165,11 +165,11 @@ test('native recommendation share writes one PDF to cache, opens Android Share, 
   }));
 });
 
-test('native recommendation share removes its cache PDF when the share sheet rejects', async () => {
+test('native PDF share removes its cache PDF when the share sheet rejects', async () => {
   const share = vi.fn(async () => { throw new Error('share cancelled'); });
   const writeFile = vi.fn(async () => ({ uri: 'file:///cache/CHU-SKU-Urgent-2026-07-23.pdf' }));
   const deleteFile = vi.fn(async () => undefined);
-  const adapter = createNativeRecommendationPdfShare(
+  const adapter = createNativePdfShare(
     { share },
     { writeFile, deleteFile },
     async () => 'JVBERi0=',

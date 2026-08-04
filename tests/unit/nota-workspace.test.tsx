@@ -1,10 +1,16 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { vi } from 'vitest';
 import { App } from '../../src/renderer/App';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 
 function openNota(gateway = new MockOperationsGateway()) {
-  render(<App gateway={gateway} />);
+  const outputBridge = {
+    printDocument: vi.fn(async () => ({ status: 'printed' as const })),
+    savePdf: vi.fn(async () => ({ status: 'saved' as const })),
+  };
+  render(<App gateway={gateway} outputBridge={outputBridge} />);
   fireEvent.click(screen.getByRole('button', { name: 'Nota' }));
+  return outputBridge;
 }
 
 function chooseWarehouseSku(row: number, query: string) {
@@ -489,12 +495,13 @@ test('Shift+Arrow keeps native text selection and Nota text remains selectable f
   expect(fireEvent.copy(price)).toBe(true);
 });
 
-test.each(['ctrlKey', 'metaKey'] as const)('%s+P requests demo print without opening production print', (modifier) => {
-  openNota();
+test.each(['ctrlKey', 'metaKey'] as const)('%s+P requests trusted Nota print', async (modifier) => {
+  const output = openNota();
   const event = { key: 'p', [modifier]: true };
   expect(fireEvent.keyDown(window, event)).toBe(false);
-  expect(screen.getByText(/Print Nota belum aktif/)).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Print Nota' })).toBeDisabled();
+  await waitFor(() => expect(output.printDocument).toHaveBeenCalledWith({ kind: 'nota', widthMm: 210, heightMm: 148 }));
+  expect(screen.getByText('Dialog print Nota dibuka.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Print Nota' })).toBeEnabled();
 });
 
 test('click and Enter give the selected LSN or PCS unit a black selection block', () => {
@@ -541,8 +548,9 @@ test('completion confirmation traps focus, closes with Escape, and restores the 
   expect(trigger).toHaveFocus();
 });
 
-test('Nota print stays visibly disabled with its demo explanation', () => {
+test('Nota exposes active print/PDF controls and a current-page default', () => {
   openNota();
-  expect(screen.getByRole('button', { name: 'Print Nota' })).toBeDisabled();
-  expect(screen.getByText(/Printing produksi belum tersedia/i)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Print Nota' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Simpan PDF Nota' })).toBeEnabled();
+  expect(screen.getByLabelText('Ruang cetak Nota')).toHaveValue('current');
 });

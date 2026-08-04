@@ -130,9 +130,10 @@ test('lists filtered price and quantity changes and exposes price export', async
   expect(screen.getByText('Belum ada perubahan jumlah pada rentang tanggal ini.')).toBeInTheDocument();
 });
 
-test('prints a chosen quantity of warehouse SKU barcodes', () => {
+test('prints a chosen quantity of warehouse SKU barcodes through the output bridge', async () => {
   const print = vi.spyOn(window, 'print').mockImplementation(() => {});
-  render(<App gateway={new MockOperationsGateway()} />);
+  const printDocument = vi.fn(async () => ({ status: 'printed' as const }));
+  render(<App gateway={new MockOperationsGateway()} outputBridge={{ printDocument, savePdf: async () => ({ status: 'saved' }) }} />);
   const row = screen.getByRole('row', { name: /BRS-108-BLK/ });
   fireEvent.click(within(row).getByRole('button', { name: 'Print barcode BRS-108-BLK' }));
   const dialog = screen.getByRole('dialog', { name: 'Print barcode produk' });
@@ -148,7 +149,8 @@ test('prints a chosen quantity of warehouse SKU barcodes', () => {
   expect(screen.getAllByTestId('barcode-print-item')).toHaveLength(3);
   expect(screen.getAllByTestId('barcode-product-qr')[0]).toHaveAttribute('data-value', 'BRS-108-BLK');
   fireEvent.click(printNow);
-  expect(print).toHaveBeenCalledOnce();
+  await waitFor(() => expect(printDocument).toHaveBeenCalledWith({ kind: 'barcode', widthMm: 50, heightMm: 30 }));
+  expect(print).not.toHaveBeenCalled();
   print.mockRestore();
 });
 

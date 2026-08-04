@@ -15,15 +15,15 @@ export interface LocalNotificationPort {
   listenForPriceChangeActions(listener: (skuId: string) => void): Promise<() => Promise<void>>;
 }
 
-export interface RecommendationPdfSharePayload {
+export interface PdfSharePayload {
   blob: Blob;
   fileName: string;
   title: string;
   shareText?: string;
 }
 
-export interface RecommendationPdfSharePort {
-  sharePdf(payload: RecommendationPdfSharePayload): Promise<void>;
+export interface PdfSharePort {
+  sharePdf(payload: PdfSharePayload): Promise<void>;
 }
 
 export const browserBarcodeScanner: BarcodeScannerPort = {
@@ -36,7 +36,7 @@ export const browserLocalNotifications: LocalNotificationPort = {
   listenForPriceChangeActions: async () => async () => undefined,
 };
 
-export const browserRecommendationPdfShare: RecommendationPdfSharePort = {
+export const browserPdfShare: PdfSharePort = {
   async sharePdf({ blob, fileName, title, shareText = 'DATA DEMO · SESSION ONLY' }) {
     if (!navigator.share) throw new Error('Menu berbagi tidak tersedia di browser ini.');
     const file = new File([blob], fileName, { type: 'application/pdf' });
@@ -50,3 +50,7 @@ export const browserRecommendationPdfShare: RecommendationPdfSharePort = {
     });
   },
 };
+
+export type RecommendationPdfSharePayload = PdfSharePayload;
+export type RecommendationPdfSharePort = PdfSharePort;
+export const browserRecommendationPdfShare = browserPdfShare;

@@ -1,4 +1,4 @@
-import { createNativeBarcodeScanner, createNativeLocalNotifications, createNativeRecommendationPdfShare } from './native-adapters';
+import { createNativeBarcodeScanner, createNativeLocalNotifications, createNativePdfShare } from './native-adapters';
 import {
   createNativeCoreApiBridge,
   type MobileCoreBridge,
@@ -6,16 +6,16 @@ import {
 import {
   browserBarcodeScanner,
   browserLocalNotifications,
-  browserRecommendationPdfShare,
+  browserPdfShare,
   type BarcodeScannerPort,
   type LocalNotificationPort,
-  type RecommendationPdfSharePort,
+  type PdfSharePort,
 } from './ports';
 
 export interface MobilePorts {
   scanner: BarcodeScannerPort;
   notifications: LocalNotificationPort;
-  share: RecommendationPdfSharePort;
+  share: PdfSharePort;
 }
 
 export interface MobileRuntime {
@@ -25,12 +25,12 @@ export interface MobileRuntime {
 
 export function createMobilePorts(isNativePlatform: boolean): MobilePorts {
   if (!isNativePlatform) {
-    return { scanner: browserBarcodeScanner, notifications: browserLocalNotifications, share: browserRecommendationPdfShare };
+    return { scanner: browserBarcodeScanner, notifications: browserLocalNotifications, share: browserPdfShare };
   }
   return {
     scanner: createNativeBarcodeScanner(),
     notifications: createNativeLocalNotifications(),
-    share: createNativeRecommendationPdfShare(),
+    share: createNativePdfShare(),
   };
 }
 

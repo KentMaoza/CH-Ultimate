@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, vi } from 'vitest';
-import type { BarcodeScannerPort } from '../../mobile/ports';
+import type { BarcodeScannerPort, PdfSharePort } from '../../mobile/ports';
 import { MobileNotaView } from '../../mobile/components/MobileNotaView';
 import { createMobileDemoState } from '../../src/domain/mobile-demo-state';
 import type { DemoState } from '../../src/domain/types';
@@ -22,16 +22,32 @@ function renderNota(
   seedFactory: () => DemoState = createMobileDemoState,
   gateway = new MockOperationsGateway(seedFactory),
   coreBacked = false,
+  share: PdfSharePort = { sharePdf: async () => undefined },
 ) {
   render(
     <MobileNotaView
       coreBacked={coreBacked}
       gateway={gateway}
       scanner={scanner}
+      share={share}
     />,
   );
   return gateway;
 }
+
+test('mobile Nota shares a PDF through the generalized share port', async () => {
+  const sharePdf = vi.fn(async () => undefined);
+  renderNota(undefined, createMobileDemoState, undefined, false, { sharePdf });
+
+  expect(await screen.findByLabelText('Ruang PDF Nota')).toHaveValue('current');
+  fireEvent.click(screen.getByRole('button', { name: 'Bagikan PDF Nota' }));
+
+  await waitFor(() => expect(sharePdf).toHaveBeenCalledWith(expect.objectContaining({
+    blob: expect.any(Blob),
+    fileName: expect.stringMatching(/^CHU-Nota-.*\.pdf$/),
+    title: 'Nota CHU',
+  })));
+});
 
 class AsyncAddNotaPageGateway extends MockOperationsGateway {
   override async addNotaPage(transactionId: string) {

@@ -350,4 +350,48 @@ td small { display: block; margin-top: 3px; color: #777; font-size: 9px; }
 .barcode-print-item strong { font-size: 10px; }
 .barcode-print-item span { font-size: 9px; }
 @media (max-width: 1050px) { .archive-nota { grid-template-columns: 1fr; } }
-@media print { body * { visibility: hidden !important; } .barcode-print-sheet, .barcode-print-sheet * { visibility: visible !important; } .barcode-print-sheet { position: absolute; inset: 0 auto auto 0; width: 100%; max-height: none; margin: 0; padding: 0; overflow: visible; border: 0; } }
+/* Trusted document host stays outside the interactive layout until native output. */
+.print-document-host { position: fixed; left: -100000px; top: 0; color: #111; background: #fff; }
+.output-document__page { position: relative; box-sizing: border-box; padding: 8mm; background: #fff; break-after: page; overflow: hidden; }
+.output-document__draft { position: absolute; inset: 36% 10% auto; transform: rotate(-18deg); border: 2px solid #111; font-size: 42px; letter-spacing: .18em; text-align: center; opacity: .22; z-index: 2; }
+.output-document__identity { display: flex; gap: 12px; align-items: center; border-bottom: 2px solid #111; padding-bottom: 6px; }
+.output-document__identity p { margin: 2px 0; }
+.output-document__logo { display: flex; align-items: center; gap: 5px; font-size: 18px; }
+.output-document__logo img { max-width: 24mm; max-height: 16mm; object-fit: contain; }
+.output-document__heading { display: flex; justify-content: space-between; gap: 12px; margin: 8px 0; }
+.output-document__heading > div { display: grid; gap: 3px; }
+.output-document__heading dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.output-document__heading dl div { display: grid; }
+.output-document__heading dt { color: #666; font-size: .8em; }
+.output-document__heading dd { margin: 0; font-weight: 700; }
+.output-document__table { width: 100%; border-collapse: collapse; }
+.output-document__table th, .output-document__table td { border: 1px solid #111; padding: 3px; text-align: left; }
+.output-document__totals { display: flex; justify-content: flex-end; gap: 14px; padding-top: 7px; }
+.output-document__totals span { display: grid; text-align: right; }
+.output-document__labels { display: grid; align-content: start; box-sizing: border-box; background: #fff; color: #111; }
+.output-document__product-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2mm; box-sizing: border-box; border: .3mm solid #111; padding: 2mm; overflow: hidden; break-inside: avoid; }
+.output-document__labels--thermal .output-document__product-card { break-after: page; }
+.output-document__operational { font-size: 7px; }
+.output-document__operational > header { display: flex; justify-content: space-between; align-items: end; border-bottom: 2px solid #111; margin-bottom: 4mm; }
+.output-document__operational > header h1 { margin: 1mm 0 2mm; font-size: 16px; }
+.output-document__operational > header > div:last-child { display: grid; justify-items: end; padding-bottom: 2mm; }
+.output-document__operational .output-document__table th, .output-document__operational .output-document__table td { padding: 1.2mm; overflow-wrap: anywhere; }
+.output-document__thumbnail { width: 12mm; text-align: center !important; }
+.output-document__thumbnail img { display: block; width: 10mm; height: 10mm; object-fit: contain; margin: auto; }
+.operational-export-actions { display: flex; gap: 8px; }
+.operational-export-filters { display: grid; grid-template-columns: 1.4fr 1.4fr 1fr 1fr 1fr; gap: 10px; }
+.operational-export-filters label { display: grid; gap: 5px; font-size: 12px; font-weight: 800; }
+.operational-export-filters input, .operational-export-filters select { width: 100%; min-width: 0; }
+.operational-export-summary { display: flex; padding: 12px 14px; justify-content: space-between; gap: 14px; border: 1px solid #111; background: #f6f6f6; }
+.operational-export-summary span { color: #555; font-size: 12px; }
+.operational-export-preview { overflow: auto; }
+.operational-export-preview table { min-width: 1120px; }
+.archive-nota__preview-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: end; gap: 7px; }
+.archive-nota__preview-actions label { display: grid; gap: 3px; font-size: 10px; font-weight: 800; }
+.archive-nota__preview-actions select { min-width: 140px; }
+
+@media print {
+  body * { visibility: hidden !important; }
+  .print-document-host, .print-document-host * { visibility: visible !important; }
+  .print-document-host { position: absolute; left: 0; top: 0; }
+}

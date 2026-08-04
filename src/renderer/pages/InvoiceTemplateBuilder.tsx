@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { lineTotal } from '../../domain/nota';
+import { buildNotaDocumentPlan, type NotaPageScope } from '../../domain/output-documents';
 import type { InvoiceElementId, InvoiceTemplate } from '../../domain/types';
 import { formatRupiah } from '../format';
 import { useOperations } from '../operations-context';
+import { useOutput } from '../output-context';
 
 const integerFormat = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 });
 const elementLabels: Record<InvoiceElementId, string> = {
@@ -13,8 +15,9 @@ function invoicePrice(value: number) { return value > 0 ? integerFormat.format(v
 
 export function InvoiceTemplateBuilder({ coreBacked = false }: { coreBacked?: boolean }) {
   const { state, gateway } = useOperations();
+  const output = useOutput();
   const template = state.invoiceTemplate;
-  const transaction = state.notaTransactions[0];
+  const transaction = state.notaTransactions.find((item) => item.status !== 'cancelled');
   const pages = transaction?.pages
     .filter((page) => page.status === 'active')
     .map((page) => ({
@@ -24,6 +27,7 @@ export function InvoiceTemplateBuilder({ coreBacked = false }: { coreBacked?: bo
         .filter(({ line }) => line.description.trim()),
     })) ?? [];
   const [selectedPageId, setSelectedPageId] = useState<string>();
+  const [printScope, setPrintScope] = useState<NotaPageScope>('current');
   const [message, setMessage] = useState('');
   useEffect(() => {
     if (!pages.some((page) => page.id === selectedPageId)) setSelectedPageId(pages[0]?.id);
@@ -59,6 +63,19 @@ export function InvoiceTemplateBuilder({ coreBacked = false }: { coreBacked?: bo
     if (id === 'phone') return <p>{template.phone}</p>;
     return <p>{template.bankAccount}</p>;
   };
+  const requestOutput = async (action: 'print' | 'pdf') => {
+    if (!transaction || !selectedPage) return;
+    setMessage('');
+    try {
+      const plan = buildNotaDocumentPlan(transaction, template, {
+        kind: 'invoice', scope: printScope, currentPageId: selectedPage.id,
+      });
+      const result = action === 'print' ? await output.print(plan) : await output.savePdf(plan);
+      setMessage(result.status === 'cancelled' ? 'Penyimpanan PDF dibatalkan.' : action === 'print' ? 'Dialog print invoice dibuka.' : 'PDF invoice tersimpan.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Output invoice gagal dibuat.');
+    }
+  };
 
   return <div className="label-layout">
     <section className="builder-panel">
@@ -74,10 +91,11 @@ export function InvoiceTemplateBuilder({ coreBacked = false }: { coreBacked?: bo
         <label className="full"><span>No. Telp</span><input value={template.phone} onChange={(event) => update({ phone: event.target.value })} /></label>
       </div>
       <fieldset className="invoice-elements"><legend>Urutan elemen invoice</legend>{template.elements.map((element, index) => <div key={element.id}><label className="check-field"><input type="checkbox" checked={element.visible} onChange={(event) => updateElement(element.id, event.target.checked)} /><span>{elementLabels[element.id]}</span></label><button type="button" aria-label={`Naikkan ${elementLabels[element.id]}`} disabled={index === 0} onClick={() => moveElement(element.id, -1)}>↑</button><button type="button" aria-label={`Turunkan ${elementLabels[element.id]}`} disabled={index === template.elements.length - 1} onClick={() => moveElement(element.id, 1)}>↓</button></div>)}</fieldset>
-      <div className="form-actions"><button className="button secondary" disabled aria-label="Export PDF invoice">Export PDF</button><button className="button primary" disabled aria-label="Print invoice">Print</button></div>
+      <label><span>Ruang cetak invoice</span><select aria-label="Ruang cetak invoice" value={printScope} onChange={(event) => setPrintScope(event.target.value as NotaPageScope)}><option value="current">Nota aktif saat ini</option><option value="all">Semua Nota aktif</option></select></label>
+      <div className="form-actions"><button className="button secondary" disabled={!selectedPage || output.busy} aria-label="Simpan PDF invoice" onClick={() => void requestOutput('pdf')}>Simpan PDF</button><button className="button primary" disabled={!selectedPage || output.busy} aria-label="Print invoice" onClick={() => void requestOutput('print')}>Print</button></div>
     </section>
     <section className="preview-panel invoice-preview-wrap">
-      <div className="preview-title"><strong>Preview invoice</strong><span>{coreBacked ? 'Tersimpan di CH Core · output produksi belum aktif' : 'Session-only · output produksi belum aktif'}</span></div>
+      <div className="preview-title"><strong>Preview invoice</strong><span>{coreBacked ? 'Tersimpan di CH Core · dialog sistem aktif' : 'Session-only · dialog sistem aktif'}</span></div>
       <div className="invoice-page-selector" aria-label="Pilih Nota untuk preview">{pages.map((page) => <button type="button" key={page.id} aria-label={`Preview Nota ${page.suffix}`} aria-pressed={page.id === selectedPage?.id} onClick={() => setSelectedPageId(page.id)}>Nota {page.suffix}</button>)}</div>
       <article className="invoice-paper" data-testid="invoice-preview" style={{ width: `${template.widthMm}mm`, minHeight: `${template.heightMm}mm`, fontSize: `${template.fontSize}px` }}>
         <header>{template.elements.filter((element) => element.visible).map((element) => <div key={element.id} data-testid={`invoice-element-${element.id}`}>{renderElement(element.id)}</div>)}</header>

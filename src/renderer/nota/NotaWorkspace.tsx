@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { lineTotal, noteSuffixFromIndex } from '../../domain/nota';
+import { buildNotaDocumentPlan, type NotaPageScope } from '../../domain/output-documents';
 import type { NotaCompletionDestination, NotaLine, NotaTransaction, PaymentKind } from '../../domain/types';
 import { formatRupiah, formatTitleCaseInput } from '../format';
 import { useOperations } from '../operations-context';
+import { useOutput } from '../output-context';
 import { ConfirmDialog } from './ConfirmDialog';
 import { CompleteNotaDialog, type CompletionDialogPhase } from './CompleteNotaDialog';
 import { WorkingDrawer } from './NotaDrawers';
@@ -44,10 +46,12 @@ export function NotaWorkspace({ coreBacked = false, onBack, initialSelection, on
   onOpenCompletionDestination?: (destination: NotaCompletionDestination) => void;
 }) {
   const { state, sync, gateway } = useOperations();
+  const output = useOutput();
   const [selected, setSelected] = useState<Selection>(initialSelection ?? { transactionId: '', pageId: '' });
   const [fontScale, setFontScale] = useState(150);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [message, setMessage] = useState('');
+  const [printScope, setPrintScope] = useState<NotaPageScope>('current');
   const [drawer, setDrawer] = useState<DrawerKind>(null);
   const [drawerRestoreFocus, setDrawerRestoreFocus] = useState<HTMLElement | null>(null);
   const [newOpen, setNewOpen] = useState(false);
@@ -68,6 +72,30 @@ export function NotaWorkspace({ coreBacked = false, onBack, initialSelection, on
   const page = selectedTransaction && activePage(selectedTransaction, selectedTransaction.id === selected.transactionId ? selected.pageId : undefined);
   const results = useMemo(() => searchNota({ ...state, notaTransactions: working }, query), [state, working, query]);
   const validation = useNotaValidation(state.notaTransactions);
+
+  async function requestDocumentOutput(action: 'print' | 'pdf') {
+    if (!selectedTransaction || !page) return;
+    setMessage('');
+    try {
+      const plan = buildNotaDocumentPlan(
+        selectedTransaction,
+        state.invoiceTemplate,
+        { kind: 'nota', scope: printScope, currentPageId: page.id },
+      );
+      const result = action === 'print'
+        ? await output.print(plan)
+        : await output.savePdf(plan);
+      setMessage(
+        result.status === 'cancelled'
+          ? 'Penyimpanan PDF dibatalkan.'
+          : action === 'print'
+            ? 'Dialog print Nota dibuka.'
+            : 'PDF Nota tersimpan.',
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Output Nota gagal dibuat.');
+    }
+  }
 
   useEffect(() => {
     if (selectedTransaction && page && (selected.transactionId !== selectedTransaction.id || selected.pageId !== page.id)) setSelected({ transactionId: selectedTransaction.id, pageId: page.id });
@@ -92,12 +120,12 @@ export function NotaWorkspace({ coreBacked = false, onBack, initialSelection, on
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'p') {
         event.preventDefault();
-        setMessage('Print Nota belum aktif. Shortcut Ctrl/Cmd+P sudah terhubung untuk pengujian berikutnya.');
+        void requestDocumentOutput('print');
       }
     };
     window.addEventListener('keydown', shortcut);
     return () => window.removeEventListener('keydown', shortcut);
-  }, []);
+  }, [output, page, printScope, selectedTransaction, state.invoiceTemplate]);
   useEffect(() => {
     const player = createNotaVoicePlayer({ onPlaybackError: () => setMessage('Suara nota tidak dapat diputar.') });
     voicePlayer.current = player;
@@ -304,7 +332,7 @@ export function NotaWorkspace({ coreBacked = false, onBack, initialSelection, on
       <section className="chu-nota-workspace__page-totals" aria-label="Total per nota">{activePages.map((item) => { const theme = notaPageTheme(selectedTransaction.pages.findIndex((candidate) => candidate.id === item.id)); return <div key={item.id} data-testid={`nota-page-total-${item.suffix}`} aria-current={item.id === page.id ? 'true' : undefined} style={{ '--nota-page-color': theme.background } as CSSProperties}><span>Total Nota {item.suffix}</span><strong>{formatRupiah(item.lines.reduce((sum, line) => sum + lineTotal(line), 0))}</strong></div>; })}</section>
       <section className="chu-nota-workspace__meta" aria-label="Metadata nota"><div className="chu-nota-workspace__number" style={themeStyle}><span>NOTA DIBUAT</span><strong>{page.suffix}</strong><b>{selectedTransaction.baseNumber}{page.suffix}</b></div><label className="chu-nota-workspace__customer"><span>Pelanggan</span><input disabled={!editable || busy} value={selectedTransaction.customerName} onChange={(event) => updateTransaction(selectedTransaction.id, { customerName: formatTitleCaseInput(event.currentTarget) })} /></label><label className="chu-nota-workspace__customer"><span>Tempat</span><input disabled={!editable || busy} value={selectedTransaction.customerPlace} onChange={(event) => updateTransaction(selectedTransaction.id, { customerPlace: formatTitleCaseInput(event.currentTarget) })} /></label><label><span>Tanggal</span><input disabled={!editable || busy} type="date" value={selectedTransaction.transactionDate} onChange={(event) => updateTransaction(selectedTransaction.id, { transactionDate: event.target.value })} /></label><label><span>Pembayaran</span><select disabled={!editable || busy} value={selectedTransaction.payment} onChange={(event) => updateTransaction(selectedTransaction.id, { payment: event.target.value as PaymentKind })}><option value="unclassified">Belum diklasifikasi</option><option value="cash">Kas</option><option value="transfer">Transfer</option><option value="credit">Piutang</option></select></label><div className="chu-nota-workspace__meta-total"><span>TOTAL SEMUA HALAMAN AKTIF</span><strong data-testid="nota-transaction-total">{formatRupiah(total)}</strong><small>{paymentLabel(selectedTransaction.payment)}</small></div></section>
       <NotaGrid ref={grid} lines={page.lines} suffix={page.suffix} skus={state.skus} editable={editable} busy={busy} invalidValues={validation.valuesForPage(selectedTransaction.id, page.id)} onInvalidChange={(lineId, field, rawValue) => validation.report({ transactionId: selectedTransaction.id, pageId: page.id, lineId, field }, rawValue)} onUpdate={(line, patch) => updateLine(selectedTransaction.id, page.id, line.id, patch)} onDelete={(line) => deleteLine(selectedTransaction.id, page.id, line.id)} onLineCommitted={speakLine} />
-      <footer className="chu-nota-workspace__footer"><div><span>TOTAL TRANSAKSI</span><strong>{formatRupiah(total)}</strong></div><label><span>Ruang cetak</span><select disabled><option>Semua halaman aktif (segera hadir)</option></select></label><p>Printing produksi belum tersedia. Shortcut Ctrl/Cmd+P sudah disiapkan.</p><button disabled aria-label="Print Nota">Print Nota</button>{editable && <div className="chu-nota-workspace__lifecycle"><button disabled={busy || lifecycleBlocked} title={lifecycleBlocked ? 'Hubungkan CH Core untuk mengubah lifecycle transaksi.' : undefined} onClick={(event) => requestCancel(selectedTransaction.id, event.currentTarget, page.id)}>Batalkan transaksi</button><button disabled={busy || lifecycleBlocked} title={lifecycleBlocked ? 'Hubungkan CH Core untuk menyelesaikan transaksi.' : undefined} className="chu-nota-workspace__complete" aria-label="Selesaikan nota" onClick={(event) => requestComplete(event.currentTarget)}>Selesaikan nota</button></div>}</footer>
+      <footer className="chu-nota-workspace__footer"><div><span>TOTAL TRANSAKSI</span><strong>{formatRupiah(total)}</strong></div><label><span>Ruang cetak</span><select aria-label="Ruang cetak Nota" value={printScope} onChange={(event) => setPrintScope(event.target.value as NotaPageScope)}><option value="current">Halaman aktif saat ini</option><option value="all">Semua halaman aktif</option></select></label><button disabled={busy || output.busy} aria-label="Simpan PDF Nota" onClick={() => void requestDocumentOutput('pdf')}>Simpan PDF</button><button disabled={busy || output.busy} aria-label="Print Nota" onClick={() => void requestDocumentOutput('print')}>Print Nota</button>{editable && <div className="chu-nota-workspace__lifecycle"><button disabled={busy || lifecycleBlocked} title={lifecycleBlocked ? 'Hubungkan CH Core untuk mengubah lifecycle transaksi.' : undefined} onClick={(event) => requestCancel(selectedTransaction.id, event.currentTarget, page.id)}>Batalkan transaksi</button><button disabled={busy || lifecycleBlocked} title={lifecycleBlocked ? 'Hubungkan CH Core untuk menyelesaikan transaksi.' : undefined} className="chu-nota-workspace__complete" aria-label="Selesaikan nota" onClick={(event) => requestComplete(event.currentTarget)}>Selesaikan nota</button></div>}</footer>
     </> : <section className="chu-nota-workspace__empty"><p>Belum ada nota yang sedang dikerjakan pada sesi ini.</p><button onClick={(event) => openNew(event.currentTarget)}>Transaksi Baru</button></section>}
     {drawer === 'working' && <WorkingDrawer transactions={state.notaTransactions} selected={selected} onClose={() => setDrawer(null)} onSelect={choose} onAdd={(id) => void addPage(id)} onCancelPage={(choice) => void cancelPage(choice)} onCancelTransaction={(id, target) => requestCancel(id, target)} transactionLifecycleBlocked={(id) => sync.phase === 'offline' && gateway.isNotaLifecycleOnlineOnly(id)} restoreFocusTo={drawerRestoreFocus} busy={busy} />}
     <NewTransactionDialog open={newOpen} onClose={() => setNewOpen(false)} onCreate={(input) => void create(input)} restoreFocusTo={newRestoreFocus} busy={busy} />

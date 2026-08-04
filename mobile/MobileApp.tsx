@@ -3,7 +3,7 @@ import type { OperationsGateway } from '../src/gateway/operations-gateway';
 import type { Sku } from '../src/domain/types';
 import { findSkuByScanCode } from '../src/domain/mobile-demo-state';
 import { useOperationsSnapshot } from '../src/renderer/use-operations-snapshot';
-import type { BarcodeScannerPort, LocalNotificationPort, RecommendationPdfSharePort } from './ports';
+import type { BarcodeScannerPort, LocalNotificationPort, PdfSharePort } from './ports';
 import { ArchiveIcon, BoxIcon, HomeIcon, MoreIcon, NotaIcon, StockIcon } from './components/Icons';
 import { DashboardView } from './components/DashboardView';
 import { SkuCatalog } from './components/SkuCatalog';
@@ -17,15 +17,16 @@ import { MoreView } from './components/MoreView';
 import { OperationsSyncStatus } from './components/OperationsSyncStatus';
 import { formatRupiah } from './format';
 import { StockCheckView } from '../src/renderer/stock-check/StockCheckView';
+import { OperationalExportView } from './components/OperationalExportView';
 
-type MainView = 'home' | 'skus' | 'nota' | 'stock' | 'archive' | 'more' | 'prices' | 'recommendations';
+type MainView = 'home' | 'skus' | 'nota' | 'stock' | 'archive' | 'more' | 'prices' | 'recommendations' | 'dataExport';
 type PriceMode = 'all' | 'unread';
 
 export function MobileApp({ gateway, scanner, notifications, share, coreBacked = false }: {
   gateway: OperationsGateway;
   scanner: BarcodeScannerPort;
   notifications: LocalNotificationPort;
-  share: RecommendationPdfSharePort;
+  share: PdfSharePort;
   coreBacked?: boolean;
 }) {
   const snapshot = useOperationsSnapshot(gateway);
@@ -225,14 +226,15 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
         snapshot={snapshot}
         coreBacked={coreBacked}
       /> : null}
-      {view === 'nota' && !scanOpen && !selectedSku ? <MobileNotaView coreBacked={coreBacked} gateway={gateway} scanner={scanner} transactionId={editingNotaId ?? undefined} /> : null}
+      {view === 'nota' && !scanOpen && !selectedSku ? <MobileNotaView coreBacked={coreBacked} gateway={gateway} scanner={scanner} share={share} transactionId={editingNotaId ?? undefined} /> : null}
       {view === 'stock' && !scanOpen && !selectedSku ? <section className="page-view mobile-stock-check-page">
         <h1 data-page-heading tabIndex={-1}>Cek Stok</h1>
         <p>Hitung stok fisik dalam PCS, lalu konfirmasi sebelum disimpan.</p>
         <StockCheckView gateway={gateway} mode="mobile" onCameraScan={scanStockCode} />
       </section> : null}
       {view === 'archive' && !scanOpen && !selectedSku ? <MobileArchiveView coreBacked={coreBacked} gateway={gateway} onEdit={editArchivedNota} /> : null}
-      {view === 'more' && !scanOpen && !selectedSku ? <MoreView coreBacked={coreBacked} onOpenPrices={() => navigate('prices')} onOpenRecommendations={() => navigate('recommendations')} /> : null}
+      {view === 'dataExport' && !scanOpen && !selectedSku ? <OperationalExportView coreBacked={coreBacked} gateway={gateway} onBack={() => navigate('more')} share={share} /> : null}
+      {view === 'more' && !scanOpen && !selectedSku ? <MoreView coreBacked={coreBacked} onOpenDataExport={() => navigate('dataExport')} onOpenPrices={() => navigate('prices')} onOpenRecommendations={() => navigate('recommendations')} /> : null}
     </main>
     <nav aria-label="Navigasi utama" className="bottom-nav">
       <button aria-current={view === 'home' ? 'page' : undefined} onClick={() => navigate('home')}><HomeIcon /><span className="bottom-nav__label">Beranda</span></button>
@@ -240,7 +242,7 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
       <button aria-current={view === 'nota' ? 'page' : undefined} onClick={() => navigate('nota')}><NotaIcon /><span className="bottom-nav__label">Nota</span></button>
       <button aria-label="Cek Stok" title="Cek Stok" aria-current={view === 'stock' ? 'page' : undefined} onClick={() => navigate('stock')}><StockIcon /><span aria-hidden="true" className="bottom-nav__label">Stok</span></button>
       <button aria-current={view === 'archive' ? 'page' : undefined} onClick={() => navigate('archive')}><ArchiveIcon /><span className="bottom-nav__label">Arsip</span></button>
-      <button aria-current={['more', 'prices', 'recommendations'].includes(view) ? 'page' : undefined} onClick={() => navigate('more')}><MoreIcon /><span className="bottom-nav__label">Lainnya</span></button>
+      <button aria-current={['more', 'prices', 'recommendations', 'dataExport'].includes(view) ? 'page' : undefined} onClick={() => navigate('more')}><MoreIcon /><span className="bottom-nav__label">Lainnya</span></button>
     </nav>
   </div>;
 }

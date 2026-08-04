@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { buildLabelDocumentPlan } from '../../domain/output-documents';
 import type { LabelTemplate } from '../../domain/types';
 import { formatRupiah } from '../format';
 import { useOperations } from '../operations-context';
+import { useOutput } from '../output-context';
 import { InvoiceTemplateBuilder } from './InvoiceTemplateBuilder';
 
 export function LabelPage({ coreBacked = false }: { coreBacked?: boolean }) {
   const { state, gateway } = useOperations();
+  const output = useOutput();
   const [mode, setMode] = useState<'label' | 'invoice'>('label');
   const [skuId, setSkuId] = useState(state.skus[0]?.id ?? '');
   const [quantity, setQuantity] = useState(1);
@@ -26,11 +29,22 @@ export function LabelPage({ coreBacked = false }: { coreBacked?: boolean }) {
       );
   };
   const toggleField = (field: LabelTemplate['fields'][number]) => update({ fields: template.fields.includes(field) ? template.fields.filter((item) => item !== field) : [...template.fields, field] });
+  const requestOutput = async (action: 'print' | 'pdf') => {
+    if (!sku) return;
+    setMessage('');
+    try {
+      const plan = buildLabelDocumentPlan(sku, template, quantity);
+      const result = action === 'print' ? await output.print(plan) : await output.savePdf(plan);
+      setMessage(result.status === 'cancelled' ? 'Penyimpanan PDF dibatalkan.' : action === 'print' ? 'Dialog print label dibuka.' : 'PDF label tersimpan.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Output label gagal dibuat.');
+    }
+  };
   if (mode === 'invoice') return <><div className="template-tabs" role="tablist" aria-label="Jenis template"><button role="tab" aria-selected={false} onClick={() => setMode('label')}>Label</button><button role="tab" aria-selected>Invoice</button></div><InvoiceTemplateBuilder coreBacked={coreBacked} /></>;
   return (
     <><div className="template-tabs" role="tablist" aria-label="Jenis template"><button role="tab" aria-selected onClick={() => setMode('label')}>Label</button><button role="tab" aria-selected={false} onClick={() => setMode('invoice')}>Invoice</button></div><div className="feature-page label-layout">
       <section className="builder-panel">
-        <div className="section-heading"><span>GUIDED BUILDER</span><h2>Template label</h2><p>Atur media, ukuran, dan isi. Output produksi belum aktif.</p></div>
+        <div className="section-heading"><span>GUIDED BUILDER</span><h2>Template label</h2><p>Atur media, ukuran, dan isi sebelum membuka dialog sistem.</p></div>
         {message && <div className="notice" role="status">{message}</div>}
         <div className="form-grid compact">
           <label><span>Media label</span><select value={template.medium} onChange={(event) => update({ medium: event.target.value as LabelTemplate['medium'], columns: event.target.value === 'a4' ? 3 : 1 })}><option value="thermal">Thermal roll</option><option value="a4">A4 grid</option></select></label>
@@ -45,7 +59,7 @@ export function LabelPage({ coreBacked = false }: { coreBacked?: boolean }) {
           <label><span>Jumlah print</span><input type="number" min="1" max="10000" value={quantity} onChange={(event) => setQuantity(Math.min(10000, Math.max(1, Number(event.target.value))))} /></label>
         </div>
         <fieldset className="field-toggles"><legend>Elemen label</legend>{(['qr', 'name', 'sku', 'price', 'chu'] as const).map((field) => <label key={field} className="check-field"><input type="checkbox" checked={template.fields.includes(field)} onChange={() => toggleField(field)} /><span>{field.toUpperCase()}</span></label>)}</fieldset>
-        <div className="form-actions"><button className="button secondary" disabled aria-label="Export PDF label">Export PDF</button><button className="button primary" disabled aria-label="Print label">Print</button></div>
+        <div className="form-actions"><button className="button secondary" disabled={!sku || output.busy} aria-label="Simpan PDF label" onClick={() => void requestOutput('pdf')}>Simpan PDF</button><button className="button primary" disabled={!sku || output.busy} aria-label="Print label" onClick={() => void requestOutput('print')}>Print</button></div>
       </section>
       <section className="preview-panel">
         <div className="preview-title"><strong>{template.medium === 'a4' ? 'Preview A4' : 'Preview thermal'}</strong><span>{quantity.toLocaleString('id-ID')} label · maksimum 10.000</span></div>

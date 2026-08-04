@@ -88,7 +88,7 @@ test('Nota is a full-window workspace, stays horizontally contained, and returns
     await window.getByRole('button', { name: 'Kembali ke CH Ultimate' }).click();
     await expect(window.getByRole('heading', { name: 'SKU Gudang', level: 1 })).toBeVisible();
     await expect(window.getByRole('navigation', { name: 'Modul CH Ultimate' })).toBeVisible();
-    await expect(window.locator('.nav-glyph svg')).toHaveCount(11);
+    await expect(window.locator('.nav-glyph svg')).toHaveCount(12);
     const rail = await window.locator('.app-rail').boundingBox();
     const templateLabel = await window.getByRole('button', { name: 'Template Label & Invoice' }).locator('span').last().boundingBox();
     expect(rail?.width).toBeGreaterThanOrEqual(288);
@@ -116,11 +116,6 @@ test('SKU changes record price and quantity history and export filtered prices',
     await expect(window.getByRole('status')).toHaveText('Gambar BRS-108-BLK diperbarui.');
     await expect(imageButton.getByRole('img', { name: 'Gambar BRS-108-BLK' })).toHaveAttribute('src', /^data:image\/png;base64,/);
 
-    await window.evaluate(() => {
-      const target = globalThis as typeof globalThis & { barcodePrintRequested?: boolean; print: () => void };
-      target.barcodePrintRequested = false;
-      target.print = () => { target.barcodePrintRequested = true; };
-    });
     await skuRow.getByRole('button', { name: 'Print barcode BRS-108-BLK' }).click();
     const barcodeQuantity = window.getByLabel('Jumlah barcode');
     await barcodeQuantity.focus();
@@ -132,7 +127,7 @@ test('SKU changes record price and quantity history and export filtered prices',
     await expect(barcodeQuantity).toHaveValue('2');
     await expect(window.getByTestId('barcode-print-item')).toHaveCount(2);
     await window.getByRole('button', { name: 'Print barcode sekarang' }).click();
-    expect(await window.evaluate(() => (globalThis as typeof globalThis & { barcodePrintRequested?: boolean }).barcodePrintRequested)).toBe(true);
+    await expect(window.getByRole('status')).toHaveText('Dialog print barcode dibuka.');
     await window.getByRole('button', { name: 'Tutup print barcode' }).click();
 
     await skuRow.getByRole('button', { name: 'Edit BRS-108-BLK' }).click();
@@ -338,7 +333,29 @@ test('Template Label and Invoice configures a movable session-only invoice previ
     expect(await preview.locator('[data-testid^="invoice-element-"]').evaluateAll((elements) => elements.map((element) => element.getAttribute('data-testid')))).toEqual([
       'invoice-element-logo', 'invoice-element-address', 'invoice-element-bank', 'invoice-element-phone',
     ]);
-    await expect(window.getByRole('button', { name: 'Print invoice' })).toBeDisabled();
+    await expect(window.getByRole('button', { name: 'Print invoice' })).toBeEnabled();
+    await window.getByRole('button', { name: 'Print invoice' }).click();
+    await expect(window.getByRole('status')).toHaveText('Dialog print invoice dibuka.');
+    await window.getByRole('button', { name: 'Simpan PDF invoice' }).click();
+    await expect(window.getByRole('status')).toHaveText('PDF invoice tersimpan.');
+  } finally {
+    await application.close();
+  }
+});
+
+test('Ekspor Data uses deterministic filters and the fake PDF bridge without native dialogs', async () => {
+  const { application, window } = await launch();
+  try {
+    await window.getByRole('button', { name: 'Ekspor Data' }).click();
+    await expect(window.getByRole('heading', { name: 'Ekspor Data', level: 1 })).toBeVisible();
+    await expect(window.getByLabel('Dataset PDF')).toHaveValue('sku-stock');
+    await expect(window.getByText('6 cocok · 6 masuk PDF')).toBeVisible();
+    await window.getByLabel('Cari data operasional').fill('BRS-108');
+    await expect(window.getByText('1 cocok · 1 masuk PDF')).toBeVisible();
+    await expect(window.getByRole('row', { name: /BRS-108-BLK/ })).toBeVisible();
+    await window.getByRole('button', { name: 'Simpan PDF data operasional' }).click();
+    await expect(window.getByRole('status')).toHaveText('PDF data operasional berhasil disimpan.');
+    await expect(window.getByRole('dialog')).toHaveCount(0);
   } finally {
     await application.close();
   }

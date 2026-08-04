@@ -7,6 +7,8 @@ import { ConfirmDialog } from '../nota/ConfirmDialog';
 import { notaPageTheme } from '../nota/nota-page-colors';
 import { archivePage, finishedPage, trashPage } from '../nota/nota-workspace-utils';
 import { useOperations } from '../operations-context';
+import { buildNotaDocumentPlan, type NotaPageScope } from '../../domain/output-documents';
+import { useOutput } from '../output-context';
 
 export interface ArchiveNotaViewState {
   tab: 'archive' | 'finished' | 'trash'; query: string; place: string; from: string; to: string; page: number;
@@ -23,8 +25,11 @@ export function ArchiveNotaPage({ view, onViewChange, onOpenNota }: {
   onOpenNota: (selection: Selection, returnToArchive: boolean) => void;
 }) {
   const { state, sync, gateway } = useOperations();
+  const output = useOutput();
   const [reopen, setReopen] = useState<NotaTransaction | null>(null);
   const [previewOpen, setPreviewOpen] = useState(true);
+  const [outputScope, setOutputScope] = useState<NotaPageScope>('current');
+  const [outputNotice, setOutputNotice] = useState('');
   const filters = { query: view.query, place: view.place, from: view.from, to: view.to };
   const archive = useMemo(() => archivePage(state.notaTransactions, filters, view.page), [state.notaTransactions, view.query, view.place, view.from, view.to, view.page]);
   const finished = useMemo(() => finishedPage(state.notaTransactions, filters, view.page), [state.notaTransactions, view.query, view.place, view.from, view.to, view.page]);
@@ -62,6 +67,24 @@ export function ArchiveNotaPage({ view, onViewChange, onOpenNota }: {
   };
   const result = view.tab === 'trash' ? trash : completed;
   const showPreview = view.tab !== 'trash' && previewOpen;
+  const outputPlan = selectedTransaction && selectedPage
+    ? buildNotaDocumentPlan(selectedTransaction, state.invoiceTemplate, {
+      kind: 'nota', scope: outputScope, currentPageId: selectedPage.id,
+    })
+    : null;
+
+  const runOutput = async (mode: 'print' | 'pdf') => {
+    if (!outputPlan) return;
+    setOutputNotice('');
+    try {
+      const result = mode === 'print' ? await output.print(outputPlan) : await output.savePdf(outputPlan);
+      setOutputNotice(result.status === 'cancelled'
+        ? 'Output dibatalkan.'
+        : mode === 'print' ? 'Dialog print dibuka.' : 'PDF arsip Nota berhasil disimpan.');
+    } catch {
+      setOutputNotice('Output arsip Nota belum dapat diproses.');
+    }
+  };
 
   return <div className={`feature-page archive-nota${showPreview ? '' : ' archive-nota--preview-collapsed'}`}>
     <section className="archive-nota__filters card">
@@ -78,7 +101,7 @@ export function ArchiveNotaPage({ view, onViewChange, onOpenNota }: {
       {!result.items.length && <p className="empty-state">{view.tab === 'archive' ? 'Arsip belum memiliki nota.' : view.tab === 'finished' ? 'Belum ada nota dengan barang dikirim sekarang.' : 'Sampah kosong.'}</p>}
       <div className="archive-nota__pagination"><button disabled={view.page === 0} onClick={() => patch({ page: view.page - 1 })}>Sebelumnya</button><span>{view.page + 1}/{result.pages}</span><button disabled={view.page + 1 >= result.pages} onClick={() => patch({ page: view.page + 1 })}>Berikutnya</button></div>
     </section>
-    {showPreview && <section id="archive-nota-preview" className="archive-nota__preview" aria-label={view.tab === 'finished' ? 'Preview selesai nota' : 'Preview arsip nota'}>{selectedTransaction && selectedPage ? <><header><div><span>{view.tab === 'finished' ? 'SELESAI · BARANG DIKIRIM SEKARANG' : 'ARSIP · BARANG DIKIRIM NANTI'}</span><strong className="archive-nota__preview-customer">{selectedTransaction.customerName || 'Tanpa pelanggan'}</strong><b className="archive-nota__preview-place">{selectedTransaction.customerPlace || 'Tanpa tempat'}</b><small className="archive-nota__preview-number">{selectedTransaction.baseNumber}{selectedPage.suffix}</small><small className="archive-nota__preview-date">{selectedTransaction.transactionDate}</small></div><button className="button primary" disabled={sync.phase === 'offline' && gateway.isNotaLifecycleOnlineOnly(selectedTransaction.id)} onClick={() => setReopen(selectedTransaction)}>Buka kembali untuk edit</button></header><div className="archive-nota__page-total">Total halaman <strong>{formatRupiah(selectedPage.lines.reduce((sum, line) => sum + lineTotal(line), 0))}</strong></div><div className="chu-nota-workspace"><NotaGrid lines={selectedPage.lines} suffix={selectedPage.suffix} skus={state.skus} editable={false} busy={false} invalidValues={{}} onInvalidChange={() => {}} onUpdate={() => {}} onDelete={() => {}} /></div></> : <p className="empty-state">Pilih transaksi untuk melihat preview.</p>}</section>}
+    {showPreview && <section id="archive-nota-preview" className="archive-nota__preview" aria-label={view.tab === 'finished' ? 'Preview selesai nota' : 'Preview arsip nota'}>{selectedTransaction && selectedPage ? <><header><div><span>{view.tab === 'finished' ? 'SELESAI · BARANG DIKIRIM SEKARANG' : 'ARSIP · BARANG DIKIRIM NANTI'}</span><strong className="archive-nota__preview-customer">{selectedTransaction.customerName || 'Tanpa pelanggan'}</strong><b className="archive-nota__preview-place">{selectedTransaction.customerPlace || 'Tanpa tempat'}</b><small className="archive-nota__preview-number">{selectedTransaction.baseNumber}{selectedPage.suffix}</small><small className="archive-nota__preview-date">{selectedTransaction.transactionDate}</small></div><div className="archive-nota__preview-actions"><label><span>Halaman output</span><select aria-label="Ruang cetak arsip Nota" value={outputScope} onChange={(event) => setOutputScope(event.target.value as NotaPageScope)}><option value="current">Halaman aktif</option><option value="all">Semua halaman aktif</option></select></label><button className="button secondary" aria-label="Print arsip Nota" disabled={output.busy} onClick={() => void runOutput('print')}>Print</button><button className="button secondary" aria-label="Simpan PDF arsip Nota" disabled={output.busy} onClick={() => void runOutput('pdf')}>Simpan PDF</button><button className="button primary" disabled={sync.phase === 'offline' && gateway.isNotaLifecycleOnlineOnly(selectedTransaction.id)} onClick={() => setReopen(selectedTransaction)}>Buka kembali untuk edit</button></div></header>{outputNotice ? <p className="action-status" role="status">{outputNotice}</p> : null}<div className="archive-nota__page-total">Total halaman <strong>{formatRupiah(selectedPage.lines.reduce((sum, line) => sum + lineTotal(line), 0))}</strong></div><div className="chu-nota-workspace"><NotaGrid lines={selectedPage.lines} suffix={selectedPage.suffix} skus={state.skus} editable={false} busy={false} invalidValues={{}} onInvalidChange={() => {}} onUpdate={() => {}} onDelete={() => {}} /></div></> : <p className="empty-state">Pilih transaksi untuk melihat preview.</p>}</section>}
     <ConfirmDialog open={Boolean(reopen)} title="Buka kembali nota?" confirmLabel="Buka kembali" onCancel={() => setReopen(null)} onConfirm={() => void confirmReopen()} restoreFocusTo={null}>Nota akan dipindahkan ke Nota Dikerjakan untuk diedit.</ConfirmDialog>
   </div>;
 }

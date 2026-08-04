@@ -1,0 +1,80 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { expect, test, vi } from 'vitest';
+
+import { MobileApp } from '../../mobile/MobileApp';
+import type { ChOutputBridge } from '../../src/electron/output-contract';
+import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
+import { App } from '../../src/renderer/App';
+import { createMobileDemoState } from '../../src/domain/mobile-demo-state';
+
+function mobilePorts(sharePdf = vi.fn(async () => undefined)) {
+  return {
+    scanner: { scan: async () => null },
+    notifications: {
+      ensurePermission: async () => 'denied' as const,
+      notifyPriceChange: async () => undefined,
+      listenForPriceChangeActions: async () => async () => undefined,
+    },
+    share: { sharePdf },
+  };
+}
+
+test('desktop Ekspor Data applies filters, downloads five-sheet XLSX, and saves selected PDF', async () => {
+  const printDocument = vi.fn(async () => ({ status: 'printed' as const }));
+  const hostText: string[] = [];
+  const savePdf = vi.fn(async () => {
+    hostText.push(screen.getByTestId('print-document-host').textContent ?? '');
+    return { status: 'saved' as const };
+  });
+  const output: ChOutputBridge = { printDocument, savePdf };
+  const createObjectURL = vi.fn(() => 'blob:operational-xlsx');
+  const revokeObjectURL = vi.fn();
+  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
+  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+  render(<App gateway={new MockOperationsGateway()} outputBridge={output} />);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Ekspor Data' }));
+  expect(screen.getByRole('heading', { name: 'Ekspor Data', level: 1 })).toBeInTheDocument();
+  expect(screen.getByLabelText('Dataset PDF')).toHaveValue('sku-stock');
+  expect(screen.getByText('6 cocok · 6 masuk PDF')).toBeInTheDocument();
+
+  fireEvent.change(screen.getByLabelText('Cari data operasional'), { target: { value: 'BRS-108' } });
+  expect(screen.getByText('1 cocok · 1 masuk PDF')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Ekspor XLSX data operasional' }));
+  await waitFor(() => expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob)));
+  expect(click).toHaveBeenCalledOnce();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Simpan PDF data operasional' }));
+  await waitFor(() => expect(savePdf).toHaveBeenCalledWith(expect.objectContaining({
+    kind: 'operational-data', widthMm: 297, heightMm: 210,
+  })));
+  expect(hostText[0]).toContain('1 dari 1 baris');
+  expect(hostText[0]).toContain('BRS-108-BLK');
+  click.mockRestore();
+});
+
+test('mobile exposes operational PDF only from Lainnya and shares one selected dataset', async () => {
+  const sharePdf = vi.fn(async () => undefined);
+  const ports = mobilePorts(sharePdf);
+  render(<MobileApp
+    gateway={new MockOperationsGateway(createMobileDemoState)}
+    scanner={ports.scanner}
+    notifications={ports.notifications}
+    share={ports.share}
+  />);
+
+  expect(screen.queryByRole('button', { name: 'Ekspor Data PDF' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Lainnya' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Ekspor Data PDF' }));
+  expect(screen.getByRole('heading', { name: 'Ekspor Data', level: 1 })).toBeInTheDocument();
+  expect(screen.getByLabelText('Dataset PDF mobile')).toHaveValue('sku-stock');
+
+  fireEvent.change(screen.getByLabelText('Dataset PDF mobile'), { target: { value: 'price-history' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Bagikan PDF data operasional' }));
+  await waitFor(() => expect(sharePdf).toHaveBeenCalledWith(expect.objectContaining({
+    blob: expect.any(Blob),
+    fileName: expect.stringMatching(/^CHU-Ekspor-Riwayat-Harga-.*\.pdf$/),
+    title: 'Ekspor Data CHU',
+  })));
+});

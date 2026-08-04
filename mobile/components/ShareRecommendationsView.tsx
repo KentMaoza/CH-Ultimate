@@ -11,7 +11,7 @@ import {
 } from '../../src/domain/share-recommendations';
 import type { DemoState, Sku } from '../../src/domain/types';
 import type { OperationsGateway } from '../../src/gateway/operations-gateway';
-import type { RecommendationPdfSharePort } from '../ports';
+import type { PdfSharePort } from '../ports';
 import { formatRupiah, formatWita } from '../format';
 import { BackIcon, ShareIcon } from './Icons';
 import { ProductImage } from './ProductImage';
@@ -82,7 +82,7 @@ export function ShareRecommendationsView({
   gateway: OperationsGateway;
   onBack: () => void;
   onOpenSku: (sku: Sku) => void;
-  onSharePdf: RecommendationPdfSharePort['sharePdf'];
+  onSharePdf: PdfSharePort['sharePdf'];
   coreBacked?: boolean;
 }) {
   const [tab, setTab] = useState<RecommendationTab>('daily');

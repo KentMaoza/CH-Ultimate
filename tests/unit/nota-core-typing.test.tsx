@@ -12,6 +12,7 @@ import type { NotaTransaction } from '../../src/domain/types';
 import { createCoreOperationsGateway } from '../../src/gateway/core-operations-gateway';
 import { OperationsProvider } from '../../src/renderer/operations-context';
 import { NotaWorkspace } from '../../src/renderer/nota/NotaWorkspace';
+import { OutputProvider } from '../../src/renderer/output-context';
 import {
   LINE_ID,
   NOTA_ID,
@@ -89,7 +90,9 @@ function renderCoreNota() {
   return gateway.initialize().then(() => {
     render(
       <OperationsProvider gateway={gateway}>
-        <NotaWorkspace coreBacked onBack={() => undefined} />
+        <OutputProvider bridge={{ printDocument: async () => ({ status: 'printed' }), savePdf: async () => ({ status: 'saved' }) }}>
+          <NotaWorkspace coreBacked onBack={() => undefined} />
+        </OutputProvider>
       </OperationsProvider>,
     );
     return { gateway, storage, transport };

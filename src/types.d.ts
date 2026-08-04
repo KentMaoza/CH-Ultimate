@@ -7,6 +7,7 @@ declare module '*.css';
 
 interface Window {
   chCore?: import('./electron/core-bridge-contract').ChCoreBridge;
+  chOutput?: import('./electron/output-contract').ChOutputBridge;
 }
 
 interface ImportMeta {

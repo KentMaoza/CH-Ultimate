@@ -18,8 +18,10 @@ describe('CH Core preload surface', () => {
 
     await import('../../src/preload');
 
-    expect(exposeInMainWorld).toHaveBeenCalledTimes(1);
-    const [key, bridge] = exposeInMainWorld.mock.calls[0]!;
+    expect(exposeInMainWorld).toHaveBeenCalledTimes(2);
+    const [key, bridge] = exposeInMainWorld.mock.calls.find(
+      ([surface]) => surface === 'chCore',
+    )!;
     expect(key).toBe('chCore');
     expect(Object.keys(bridge).sort()).toEqual([
       'approveOwnerPairing',
@@ -39,8 +41,40 @@ describe('CH Core preload surface', () => {
       CH_CORE_IPC_CHANNELS.credentialStatus,
       undefined,
     );
+    const [, outputBridge] = exposeInMainWorld.mock.calls.find(
+      ([surface]) => surface === 'chOutput',
+    )!;
+    expect(Object.keys(outputBridge).sort()).toEqual([
+      'printDocument',
+      'savePdf',
+    ]);
 
     vi.doUnmock('electron');
+  });
+
+  it('uses the locked E2E URL marker for a fake output bridge with no IPC calls', async () => {
+    vi.resetModules();
+    const exposeInMainWorld = vi.fn();
+    const invoke = vi.fn();
+    const originalUrl = globalThis.location.href;
+    globalThis.history.replaceState({}, '', '?ch-ultimate-e2e-test-mock=1');
+    vi.doMock('electron', () => ({
+      contextBridge: { exposeInMainWorld },
+      ipcRenderer: { invoke },
+    }));
+
+    try {
+      await import('../../src/preload');
+      const [, outputBridge] = exposeInMainWorld.mock.calls.find(
+        ([surface]) => surface === 'chOutput',
+      )!;
+      await expect(outputBridge.printDocument({ kind: 'nota', widthMm: 210, heightMm: 148 })).resolves.toEqual({ status: 'printed' });
+      await expect(outputBridge.savePdf({ kind: 'nota', widthMm: 210, heightMm: 148, fileName: 'Nota.pdf' })).resolves.toEqual({ status: 'saved' });
+      expect(invoke).not.toHaveBeenCalled();
+    } finally {
+      globalThis.history.replaceState({}, '', originalUrl);
+      vi.doUnmock('electron');
+    }
   });
 
   it('exposes exactly ten narrow methods without raw IPC', async () => {

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { lineTotal, noteSuffixFromIndex } from '../../src/domain/nota';
+import { createNotaPdfBlob } from '../../src/domain/nota-pdf';
+import { buildNotaDocumentPlan, type NotaPageScope } from '../../src/domain/output-documents';
 import { findSkuByScanCode, searchMobileSkus } from '../../src/domain/mobile-demo-state';
 import type { NotaLine, NotaTransaction, Unit } from '../../src/domain/types';
 import type { OperationsGateway } from '../../src/gateway/operations-gateway';
@@ -10,7 +12,7 @@ import {
   useOperationsSyncSnapshot,
 } from '../../src/renderer/use-operations-snapshot';
 import { formatRupiah } from '../format';
-import type { BarcodeScannerPort } from '../ports';
+import { browserPdfShare, type BarcodeScannerPort, type PdfSharePort } from '../ports';
 import { ScanIcon } from './Icons';
 
 type ManualDraft = { description: string; kind: string; quantity: string; unit: Unit; pcsPrice: string; lsnPrice: string };
@@ -40,7 +42,7 @@ function availableSlot(transaction: NotaTransaction, preferredPageId?: string) {
   return null;
 }
 
-export function MobileNotaView({ coreBacked = false, gateway, scanner, transactionId }: { coreBacked?: boolean; gateway: OperationsGateway; scanner: BarcodeScannerPort; transactionId?: string }) {
+export function MobileNotaView({ coreBacked = false, gateway, scanner, share = browserPdfShare, transactionId }: { coreBacked?: boolean; gateway: OperationsGateway; scanner: BarcodeScannerPort; share?: PdfSharePort; transactionId?: string }) {
   const snapshot = useOperationsSnapshot(gateway);
   const sync = useOperationsSyncSnapshot(gateway);
   const transaction = workingTransaction(snapshot.notaTransactions, transactionId);
@@ -53,6 +55,7 @@ export function MobileNotaView({ coreBacked = false, gateway, scanner, transacti
   const [noticeKind, setNoticeKind] = useState<'status' | 'alert'>('status');
   const [completionOpen, setCompletionOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [pdfScope, setPdfScope] = useState<NotaPageScope>('current');
   const creating = useRef(false);
   const completionStarted = useRef(false);
   const voicePlayer = useRef<NotaVoicePlayer | null>(null);
@@ -293,6 +296,33 @@ export function MobileNotaView({ coreBacked = false, gateway, scanner, transacti
     }
   }
 
+  async function shareNotaPdf() {
+    if (!transaction || !selectedPage || busy) return;
+    setBusy(true);
+    setNotice('');
+    try {
+      const plan = buildNotaDocumentPlan(
+        transaction,
+        snapshot.invoiceTemplate,
+        { kind: 'nota', scope: pdfScope, currentPageId: selectedPage.id },
+      );
+      await share.sharePdf({
+        blob: await createNotaPdfBlob(plan),
+        fileName: plan.fileName,
+        title: 'Nota CHU',
+        shareText: coreBacked
+          ? 'CH Core · Nota tersinkronisasi melalui NAS lokal'
+          : 'DATA DEMO · SESSION ONLY',
+      });
+      setNoticeKind('status');
+      setNotice('Menu berbagi PDF Nota dibuka.');
+    } catch (error) {
+      reportError(error, 'PDF Nota tidak dapat dibagikan.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const theme = notaPageTheme(Math.max(0, transaction?.pages.findIndex((page) => page.id === selectedPage?.id) ?? 0));
   const themeStyle = { '--mobile-nota-accent': theme.background, '--mobile-nota-accent-text': theme.foreground } as CSSProperties;
   const nextSlot = transaction ? availableSlot(transaction, selectedPage?.id) : null;
@@ -399,6 +429,7 @@ export function MobileNotaView({ coreBacked = false, gateway, scanner, transacti
           </article>;
         })}{!selectedPage.lines.some(populated) && <p className="mobile-nota-empty">Belum ada barang di Bagian {selectedPage.suffix}.</p>}</div>
       </section>
+      <section className="mobile-nota-output" aria-label="Output PDF Nota"><label><span>Ruang PDF</span><select aria-label="Ruang PDF Nota" value={pdfScope} onChange={(event) => setPdfScope(event.target.value as NotaPageScope)}><option value="current">Bagian aktif saat ini</option><option value="all">Semua bagian aktif</option></select></label><button className="secondary-action" disabled={busy} onClick={() => void shareNotaPdf()}>Bagikan PDF Nota</button></section>
       <footer className="mobile-nota-finish"><div><span>Total transaksi</span><strong>{formatRupiah(transactionTotal)}</strong></div><button className="primary-action" disabled={busy || lifecycleBlocked} title={lifecycleBlocked ? 'Hubungkan CH Core untuk menyelesaikan transaksi.' : undefined} onClick={() => setCompletionOpen(true)}>Selesaikan nota</button></footer>
     </> : !notice && <p className="mobile-nota-empty">Menyiapkan nota baru…</p>}
     {completionOpen && <div className="mobile-nota-dialog-backdrop"><section role="dialog" aria-modal="true" aria-label="Selesaikan nota mobile?" className="mobile-nota-dialog"><h2>Selesaikan nota mobile?</h2><p>{coreBacked ? 'Nota disimpan ke Arsip dan tersedia di semua perangkat setelah sinkronisasi.' : 'Nota disimpan ke Arsip pada sesi demo lokal ini.'}</p><button className="primary-action" disabled={busy} onClick={() => void complete()}>Simpan ke Arsip</button><button disabled={busy} onClick={() => setCompletionOpen(false)}>Batal</button></section></div>}

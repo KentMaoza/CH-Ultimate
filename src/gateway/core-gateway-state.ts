@@ -15,7 +15,11 @@ import type {
   CoreChange,
   CoreMutationAcknowledgement,
 } from './core-api-types';
-import { emptyCoreState } from './core-bootstrap-mapping';
+import {
+  emptyCoreState,
+  mapCoreStockCheckRow,
+} from './core-bootstrap-mapping';
+import type { CoreDeferredCommand } from './core-local-store';
 import {
   cloneCore,
   coreCacheEnvelope,
@@ -29,7 +33,9 @@ import {
 } from './core-optimistic-state';
 import { applyCoreChange } from './core-change-application';
 import {
+  coreSkuIdentifierRowSchema,
   coreSkuRowSchema,
+  coreStockCheckRowSchema,
   coreTemplateRowSchema,
 } from './core-api-types';
 import {
@@ -44,6 +50,7 @@ export class CoreGatewayState {
   private canonicalState = cloneCore(this.state);
   private outbox: CoreOutboxItem[] = [];
   private provisionalNotas: NotaTransaction[] = [];
+  private deferredCommands: CoreDeferredCommand[] = [];
   private deferredPendingCount = 0;
   private quarantinedCount = 0;
   private offlineConflicts: SyncConflict[] = [];
@@ -314,6 +321,33 @@ export class CoreGatewayState {
     return { rowVersion: version, base };
   }
 
+  requireStockCheckContext(id: string): {
+    observedQuantityPcs: number;
+    baseBalanceVersion: string;
+  } {
+    const baseBalanceVersion = this.balanceVersions.get(id);
+    const sku = this.canonicalState.skus.find((candidate) => candidate.id === id);
+    if (!sku || sku.archived) {
+      throw new Error('SKU aktif tidak ditemukan. Sinkronkan ulang lalu coba lagi.');
+    }
+    if (!baseBalanceVersion || !sku.tracked) {
+      throw new Error('Versi saldo stok belum tersedia. Sinkronkan ulang lalu coba lagi.');
+    }
+    return { observedQuantityPcs: sku.stock, baseBalanceVersion };
+  }
+
+  getBalanceVersion(id: string): string | undefined {
+    return this.balanceVersions.get(id);
+  }
+
+  getBalanceVersions(): Record<string, string> {
+    return Object.fromEntries(this.balanceVersions);
+  }
+
+  replaceCachedBalanceVersions(versions: Record<string, string>): void {
+    this.balanceVersions = new Map(Object.entries(versions));
+  }
+
   getTemplateWriteContext(
     kind: 'label' | 'invoice',
   ): {
@@ -408,6 +442,59 @@ export class CoreGatewayState {
     requestBody?: CoreOutboxItem['body'],
   ): boolean {
     const version = acknowledgement.entityVersion;
+    const registerBarcodeMatch =
+      /^\/v1\/skus\/([^/]+)\/package-barcodes$/.exec(path);
+    const packageBarcodeMatch =
+      /^\/v1\/package-barcodes\/([^/]+)$/.exec(path);
+    if (registerBarcodeMatch?.[1] || packageBarcodeMatch?.[1]) {
+      const pathId = decodeURIComponent(
+        registerBarcodeMatch?.[1] ?? packageBarcodeMatch![1]!,
+      );
+      if (acknowledgement.entity !== undefined) {
+        const entity = coreSkuIdentifierRowSchema.parse(
+          acknowledgement.entity,
+        );
+        if (
+          entity.identifierKind !== 'package_barcode' ||
+          (registerBarcodeMatch && entity.skuId !== pathId) ||
+          (packageBarcodeMatch && entity.id !== pathId)
+        ) {
+          throw new Error('Respons barcode kemasan CH Core tidak cocok.');
+        }
+        this.canonicalState = applyCoreChange(this.canonicalState, {
+          revision: acknowledgement.serverRevision ?? this.serverRevision,
+          entityType: 'sku_identifier',
+          entityId: entity.id,
+          operation: 'upsert',
+          payload: entity,
+          createdAt: entity.createdAt,
+        });
+        return true;
+      }
+      if (!packageBarcodeMatch) {
+        throw new Error('Respons barcode kemasan CH Core tidak valid.');
+      }
+      this.canonicalState = {
+        ...this.canonicalState,
+        skus: this.canonicalState.skus.map((sku) => {
+          const removed = sku.identifiers.find(
+            (identifier) => identifier.id === pathId,
+          );
+          return removed
+            ? {
+                ...sku,
+                identifiers: sku.identifiers.filter(
+                  (identifier) => identifier.id !== pathId,
+                ),
+                aliases: sku.aliases.filter(
+                  (alias) => alias !== removed.value,
+                ),
+              }
+            : sku;
+        }),
+      };
+      return true;
+    }
     if (!version) return false;
     const skuMatch = /^\/v1\/skus\/([^/]+)(?:\/image)?$/.exec(path);
     if (skuMatch?.[1]) {
@@ -440,6 +527,40 @@ export class CoreGatewayState {
     if (stockMatch?.[1]) {
       this.balanceVersions.set(decodeURIComponent(stockMatch[1]), version);
       return false;
+    }
+    const stockCheckMatch =
+      /^\/v1\/skus\/([^/]+)\/stock-checks$/.exec(path);
+    if (stockCheckMatch?.[1]) {
+      const skuId = decodeURIComponent(stockCheckMatch[1]);
+      const currentVersion = this.balanceVersions.get(skuId);
+      if (currentVersion && BigInt(version) < BigInt(currentVersion)) {
+        return false;
+      }
+      const entity = coreStockCheckRowSchema.parse(acknowledgement.entity);
+      if (entity.skuId !== skuId) {
+        throw new Error('Respons cek stok CH Core tidak cocok.');
+      }
+      const mapped = mapCoreStockCheckRow(entity);
+      this.balanceVersions.set(skuId, version);
+      this.canonicalState = {
+        ...this.canonicalState,
+        skus: this.canonicalState.skus.map((sku) =>
+          sku.id === skuId
+            ? {
+                ...sku,
+                stock: mapped.countedQuantityPcs,
+                lastStockCheckedAt: mapped.countedAt,
+              }
+            : sku,
+        ),
+        stockChecks: [
+          ...this.canonicalState.stockChecks.filter(
+            (stockCheck) => stockCheck.id !== mapped.id,
+          ),
+          mapped,
+        ],
+      };
+      return true;
     }
     const templateMatch = /^\/v1\/templates\/(label|invoice)$/.exec(path);
     if (templateMatch?.[1] === 'label' || templateMatch?.[1] === 'invoice') {
@@ -800,14 +921,18 @@ export class CoreGatewayState {
 
   setOfflineProjection(
     provisionalNotas: NotaTransaction[],
+    deferredCommands: CoreDeferredCommand[],
     deferredPendingCount: number,
     quarantinedCount: number,
     offlineConflicts: SyncConflict[],
   ): void {
     const projectionChanged =
       JSON.stringify(this.provisionalNotas) !==
-      JSON.stringify(provisionalNotas);
+        JSON.stringify(provisionalNotas) ||
+      JSON.stringify(this.deferredCommands) !==
+        JSON.stringify(deferredCommands);
     this.provisionalNotas = cloneCore(provisionalNotas);
+    this.deferredCommands = cloneCore(deferredCommands);
     this.deferredPendingCount = deferredPendingCount;
     this.quarantinedCount = quarantinedCount;
     this.offlineConflicts = cloneCore(offlineConflicts);
@@ -843,10 +968,27 @@ export class CoreGatewayState {
   }
 
   private publishProjectedState(): void {
-    const projected = previewOptimisticOutbox(
+    let projected = previewOptimisticOutbox(
       this.canonicalState,
       this.outbox,
     );
+    for (const command of this.deferredCommands) {
+      if (command.kind !== 'stock-count' || command.status === 'conflict') {
+        continue;
+      }
+      projected = {
+        ...projected,
+        skus: projected.skus.map((sku) =>
+          sku.id === command.payload.skuId
+            ? {
+                ...sku,
+                stock: command.payload.countedQuantityPcs,
+                lastStockCheckedAt: command.payload.countedAt,
+              }
+            : sku,
+        ),
+      };
+    }
     this.publishState({
       ...projected,
       notaTransactions: [

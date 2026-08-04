@@ -96,6 +96,52 @@ export class CoreMutationCoordinator {
     }).then(() => undefined);
   }
 
+  checkStock(
+    id: string,
+    input: {
+      observedQuantityPcs: number;
+      countedQuantityPcs: number;
+      baseBalanceVersion: string;
+      countedAt: string;
+      note?: string;
+    },
+  ): Promise<void> {
+    return this.command({
+      method: 'POST',
+      path: CORE_API_PATHS.stockChecks(id),
+      body: input,
+    }).then(() => undefined);
+  }
+
+  registerPackageBarcode(
+    id: string,
+    identifierValue: string,
+  ): Promise<void> {
+    return this.command({
+      method: 'POST',
+      path: CORE_API_PATHS.packageBarcodes(id),
+      body: { identifierValue },
+    }).then(() => undefined);
+  }
+
+  removePackageBarcode(identifierId: string): Promise<void> {
+    return this.command({
+      method: 'DELETE',
+      path: CORE_API_PATHS.packageBarcode(identifierId),
+    }).then(() => undefined);
+  }
+
+  reassignPackageBarcode(
+    identifierId: string,
+    skuId: string,
+  ): Promise<void> {
+    return this.command({
+      method: 'PATCH',
+      path: CORE_API_PATHS.packageBarcode(identifierId),
+      body: { skuId },
+    }).then(() => undefined);
+  }
+
   setArchived(id: string, archived: boolean): Promise<void> {
     return this.updateSku(id, { archived });
   }

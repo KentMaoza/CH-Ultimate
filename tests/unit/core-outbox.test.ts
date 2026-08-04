@@ -49,7 +49,120 @@ function legacyV2Envelope() {
   };
 }
 
-describe('Core local cache v3', () => {
+describe('Core local cache v4', () => {
+  it('losslessly migrates an owned v3 envelope and orders every deferred command', () => {
+    const legacyState = {
+      ...emptyCoreState(),
+      adjustments: [
+        {
+          id: '40404040-4040-4040-8040-404040404040',
+          skuId: '50505050-5050-4050-8050-505050505050',
+          quantity: 2,
+          before: 5,
+          after: 7,
+          createdAt: '2026-07-30T01:00:00.000Z',
+          source: 'manual' as const,
+        },
+      ],
+    };
+    const { stockChecks: _stockChecks, ...preV2State } = legacyState;
+    const legacy = {
+      cacheVersion: 3 as const,
+      installationId: INSTALLATION_ID,
+      state: preV2State,
+      serverRevision: '23',
+      outbox: [],
+      quarantinedOutbox: [
+        {
+          id: '60606060-6060-4060-8060-606060606060',
+          idempotencyKey: '70707070-7070-4070-8070-707070707070',
+          method: 'PATCH' as const,
+          path: '/v1/notas/80808080-8080-4080-8080-808080808080/header',
+          body: { patch: { customerName: 'Tertahan' } },
+          createdAt: '2026-07-30T00:59:00.000Z',
+        },
+      ],
+      deferredOutbox: [
+        {
+          kind: 'offline-nota' as const,
+          operationId: OPERATION_ID,
+          idempotencyKey: '90909090-9090-4090-8090-909090909090',
+          createdAt: '2026-07-30T01:00:00.000Z',
+          status: 'quarantined' as const,
+          firstSentAt: '2026-07-30T01:01:00.000Z',
+          lastError: 'Akses perangkat dicabut.',
+          payload: {
+            provisionalId: PROVISIONAL_ID,
+            snapshot: localNota('Tetap ada'),
+            completed: false,
+            destination: 'archive' as const,
+            skuSnapshots: [],
+          },
+        },
+        {
+          kind: 'stock-delta' as const,
+          operationId: 'a0a0a0a0-a0a0-40a0-80a0-a0a0a0a0a0a0',
+          idempotencyKey: 'b0b0b0b0-b0b0-40b0-80b0-b0b0b0b0b0b0',
+          createdAt: '2026-07-30T01:02:00.000Z',
+          status: 'quarantined' as const,
+          payload: {
+            skuId: '50505050-5050-4050-8050-505050505050',
+            skuIdentifier: 'SKU-1',
+            skuName: 'Produk',
+            referencePrice: 5_000,
+            delta: 2,
+            reason: 'Koreksi',
+          },
+        },
+      ],
+      provisionalNotas: [localNota('Tetap ada')],
+      offlineConflicts: [
+        {
+          operationId: OPERATION_ID,
+          errorCode: 'CONFLICT',
+          conflict: {
+            id: OPERATION_ID,
+            entityType: 'nota',
+            entityId: PROVISIONAL_ID,
+            base: null,
+            mine: 'Tetap ada',
+            server: 'Versi Core',
+          },
+        },
+      ],
+      quarantine: {
+        active: true as const,
+        quarantinedAt: '2026-07-30T01:03:00.000Z',
+        installationId: INSTALLATION_ID,
+      },
+    };
+    const before = structuredClone(legacy);
+
+    const migrated = migrateCoreCache(legacy, () => OTHER_INSTALLATION_ID);
+
+    expect(migrated).toMatchObject({
+      cacheVersion: 4,
+      installationId: INSTALLATION_ID,
+      state: {
+        adjustments: legacy.state.adjustments,
+        stockChecks: [],
+      },
+      serverRevision: '23',
+      outbox: [],
+      quarantinedOutbox: legacy.quarantinedOutbox,
+      provisionalNotas: legacy.provisionalNotas,
+      offlineConflicts: legacy.offlineConflicts,
+      quarantine: legacy.quarantine,
+      nextDeferredSequence: 3,
+    });
+    expect(migrated.deferredOutbox).toEqual([
+      { ...legacy.deferredOutbox[0], sequence: 1 },
+      { ...legacy.deferredOutbox[1], sequence: 2 },
+    ]);
+    expect(parseCoreLocalEnvelope(migrated)).toEqual(migrated);
+    expect(legacy).toEqual(before);
+  });
+
   it('rebinds only a clean v2 canonical cache to the native installation UUID', () => {
     const migrated = migrateCoreCache(
       legacyV2Envelope(),
@@ -57,12 +170,13 @@ describe('Core local cache v3', () => {
     );
 
     expect(migrated).toMatchObject({
-      cacheVersion: 3,
+      cacheVersion: CORE_CACHE_VERSION,
       installationId: INSTALLATION_ID,
       serverRevision: '17',
       outbox: [],
       quarantinedOutbox: [],
       deferredOutbox: [],
+      nextDeferredSequence: 1,
       provisionalNotas: [],
       offlineConflicts: [],
       quarantine: { active: false },
@@ -300,17 +414,17 @@ describe('Core deferred outbox', () => {
   });
 
   it('sends persisted commands in creation order only after online confirmation', async () => {
-    let counter = 0;
+    const operationIds = [
+      OPERATION_ID,
+      '50505050-5050-4050-8050-505050505050',
+      '60606060-6060-4060-8060-606060606060',
+    ];
     const storage = new MemoryStorage();
     const store = new CoreLocalStore(storage, () => INSTALLATION_ID);
     const transport = new ScriptedTransport();
     const outbox = new CoreDeferredOutbox(store, transport, {
-      now: () =>
-        new Date(`2026-07-30T02:00:0${counter++}.000Z`),
-      uuid: () =>
-        counter === 1
-          ? OPERATION_ID
-          : '50505050-5050-4050-8050-505050505050',
+      now: () => new Date('2026-07-30T02:00:00.000Z'),
+      uuid: () => operationIds.shift()!,
     });
     await outbox.deferNota(localNota());
     await outbox.deferStock({
@@ -321,10 +435,23 @@ describe('Core deferred outbox', () => {
       delta: -2,
       reason: 'Barang rusak',
     });
+    await outbox.deferStockCount({
+      skuId: '77777777-7777-4777-8777-777777777777',
+      observedQuantityPcs: 10,
+      countedQuantityPcs: 8,
+      baseBalanceVersion: '4',
+      countedAt: '2026-07-30T02:00:00.000Z',
+      note: 'Rak depan',
+    });
+
+    expect((await store.load()).deferredOutbox.map((command) => command.sequence))
+      .toEqual([1, 2, 3]);
+    expect((await store.load()).nextDeferredSequence).toBe(4);
 
     await outbox.pump(false);
     expect(transport.requests).toEqual([]);
 
+    transport.enqueue({ status: 200, body: {} });
     transport.enqueue({ status: 200, body: {} });
     transport.enqueue({ status: 200, body: {} });
     await outbox.pump(true);
@@ -332,6 +459,66 @@ describe('Core deferred outbox', () => {
     expect(transport.requests.map((request) => request.path)).toEqual([
       '/v1/offline/notas',
       '/v1/offline/stock-adjustments',
+      '/v1/offline/stock-checks',
+    ]);
+  });
+
+  it('keeps unrelated entities moving after a deferred command conflicts', async () => {
+    const operationIds = [
+      OPERATION_ID,
+      '50505050-5050-4050-8050-505050505050',
+      '60606060-6060-4060-8060-606060606060',
+    ];
+    const firstSkuId = '11111111-1111-4111-8111-111111111111';
+    const otherSkuId = '77777777-7777-4777-8777-777777777777';
+    const storage = new MemoryStorage();
+    const store = new CoreLocalStore(storage, () => INSTALLATION_ID);
+    const transport = new ScriptedTransport();
+    const outbox = new CoreDeferredOutbox(store, transport, {
+      now: () => new Date('2026-07-30T02:00:00.000Z'),
+      uuid: () => operationIds.shift()!,
+    });
+    await outbox.deferStock({
+      skuId: firstSkuId,
+      skuIdentifier: 'SKU-1',
+      skuName: 'Produk 1',
+      referencePrice: 5_000,
+      delta: 1,
+      reason: 'Koreksi',
+    });
+    await outbox.deferStockCount({
+      skuId: firstSkuId,
+      observedQuantityPcs: 11,
+      countedQuantityPcs: 9,
+      baseBalanceVersion: '4',
+      countedAt: '2026-07-30T02:00:00.000Z',
+    });
+    await outbox.deferStock({
+      skuId: otherSkuId,
+      skuIdentifier: 'SKU-2',
+      skuName: 'Produk 2',
+      referencePrice: 6_000,
+      delta: -1,
+      reason: 'Rusak',
+    });
+    transport.enqueue({ status: 409, body: { code: 'SKU_NOT_ACTIVE' } });
+    transport.enqueue({ status: 200, body: {} });
+
+    await outbox.pump(true);
+
+    expect(transport.requests).toEqual([
+      expect.objectContaining({
+        path: '/v1/offline/stock-adjustments',
+        body: expect.objectContaining({ skuId: firstSkuId }),
+      }),
+      expect.objectContaining({
+        path: '/v1/offline/stock-adjustments',
+        body: expect.objectContaining({ skuId: otherSkuId }),
+      }),
+    ]);
+    expect((await store.load()).deferredOutbox).toEqual([
+      expect.objectContaining({ sequence: 1, status: 'conflict' }),
+      expect.objectContaining({ sequence: 2, kind: 'stock-count' }),
     ]);
   });
 

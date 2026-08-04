@@ -17,7 +17,7 @@ import {
 } from './core-domain-schemas';
 import type { CoreConflict, CoreJsonValue } from './core-api-types';
 
-export const CORE_CACHE_VERSION = 3;
+export const CORE_CACHE_VERSION = 4;
 
 export class CoreLocalOwnershipError extends Error {}
 
@@ -59,9 +59,19 @@ export interface OfflineStockPayload {
   reason: string;
 }
 
+export interface OfflineStockCountPayload {
+  skuId: string;
+  observedQuantityPcs: number;
+  countedQuantityPcs: number;
+  baseBalanceVersion?: string;
+  countedAt: string;
+  note?: string;
+}
+
 export type CoreDeferredCommand =
   | {
       kind: 'offline-nota';
+      sequence: number;
       operationId: string;
       idempotencyKey: string;
       createdAt: string;
@@ -72,6 +82,7 @@ export type CoreDeferredCommand =
     }
   | {
       kind: 'stock-delta';
+      sequence: number;
       operationId: string;
       idempotencyKey: string;
       createdAt: string;
@@ -79,6 +90,17 @@ export type CoreDeferredCommand =
       firstSentAt?: string;
       lastError?: string;
       payload: OfflineStockPayload;
+    }
+  | {
+      kind: 'stock-count';
+      sequence: number;
+      operationId: string;
+      idempotencyKey: string;
+      createdAt: string;
+      status: CoreDeferredStatus;
+      firstSentAt?: string;
+      lastError?: string;
+      payload: OfflineStockCountPayload;
     };
 
 export interface CoreOfflineConflict {
@@ -88,13 +110,15 @@ export interface CoreOfflineConflict {
 }
 
 export interface CoreLocalEnvelope {
-  cacheVersion: 3;
+  cacheVersion: 4;
   installationId: string;
   state: DemoState;
   serverRevision: string;
+  balanceVersions: Record<string, string>;
   outbox: CoreOutboxItem[];
   quarantinedOutbox: CoreOutboxItem[];
   deferredOutbox: CoreDeferredCommand[];
+  nextDeferredSequence: number;
   provisionalNotas: NotaTransaction[];
   offlineConflicts: CoreOfflineConflict[];
   quarantine: {
@@ -114,6 +138,15 @@ const deferredStatus = z.enum([
   'conflict',
 ]);
 const commonDeferred = {
+  sequence: z.number().int().safe().min(1),
+  operationId: uuid,
+  idempotencyKey: uuid,
+  createdAt: timestampSchema,
+  status: deferredStatus,
+  firstSentAt: timestampSchema.optional(),
+  lastError: z.string().max(512).optional(),
+};
+const legacyCommonDeferred = {
   operationId: uuid,
   idempotencyKey: uuid,
   createdAt: timestampSchema,
@@ -165,7 +198,67 @@ const deferredCommandSchema: z.ZodType<CoreDeferredCommand> =
           .strict(),
       })
       .strict(),
+    z
+      .object({
+        kind: z.literal('stock-count'),
+        ...commonDeferred,
+        payload: z
+          .object({
+            skuId: uuid,
+            observedQuantityPcs: z.number().int().safe(),
+            countedQuantityPcs: z.number().int().safe(),
+            baseBalanceVersion: z.string().regex(/^[1-9]\d*$/).optional(),
+            countedAt: timestampSchema,
+            note: z.string().trim().max(512).optional(),
+          })
+          .strict(),
+      })
+      .strict(),
   ]);
+const legacyDeferredCommandSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('offline-nota'),
+      ...legacyCommonDeferred,
+      payload: z
+        .object({
+          provisionalId: uuid,
+          snapshot: notaTransactionSchema,
+          completed: z.boolean(),
+          destination: z.enum(['archive', 'finished']),
+          skuSnapshots: z
+            .array(
+              z
+                .object({
+                  skuId: uuid,
+                  identifier: z.string().trim().min(1).max(512),
+                  name: z.string().trim().min(1).max(512),
+                  referencePrice: z.number().int().safe().min(0),
+                })
+                .strict(),
+            )
+            .max(390),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('stock-delta'),
+      ...legacyCommonDeferred,
+      payload: z
+        .object({
+          skuId: uuid,
+          skuIdentifier: z.string().trim().min(1).max(512),
+          skuName: z.string().trim().min(1).max(512),
+          referencePrice: z.number().int().safe().min(0),
+          delta: z.number().int().safe().refine((value) => value !== 0),
+          reason: z.string().trim().min(1).max(512),
+        })
+        .strict(),
+    })
+    .strict(),
+]);
 const offlineConflictSchema: z.ZodType<CoreOfflineConflict> = z
   .object({
     operationId: uuid,
@@ -194,9 +287,11 @@ const localEnvelopeSchema: z.ZodType<CoreLocalEnvelope> = z
     installationId: uuid,
     state: demoStateSchema,
     serverRevision: decimalCursor,
+    balanceVersions: z.record(uuid, z.string().regex(/^[1-9]\d*$/)),
     outbox: z.array(coreOutboxItemSchema),
     quarantinedOutbox: z.array(coreOutboxItemSchema),
     deferredOutbox: z.array(deferredCommandSchema),
+    nextDeferredSequence: z.number().int().safe().min(1),
     provisionalNotas: z.array(notaTransactionSchema),
     offlineConflicts: z.array(offlineConflictSchema),
     quarantine: quarantineSchema,
@@ -222,12 +317,61 @@ const localEnvelopeSchema: z.ZodType<CoreLocalEnvelope> = z
         message: 'Inactive quarantine cannot retain pending work.',
       });
     }
+    let previousSequence = 0;
+    for (const [index, command] of envelope.deferredOutbox.entries()) {
+      if (command.sequence <= previousSequence) {
+        context.addIssue({
+          code: 'custom',
+          path: ['deferredOutbox', index, 'sequence'],
+          message: 'Deferred command sequence must be strictly increasing.',
+        });
+      }
+      previousSequence = command.sequence;
+    }
+    if (envelope.nextDeferredSequence <= previousSequence) {
+      context.addIssue({
+        code: 'custom',
+        path: ['nextDeferredSequence'],
+        message: 'Next deferred sequence must exceed every stored command.',
+      });
+    }
   });
+
+function upgradeLegacyDemoState(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return value;
+  }
+  const state = value as Record<string, unknown>;
+  const skus = Array.isArray(state.skus)
+    ? state.skus.map((sku) =>
+        typeof sku === 'object' && sku !== null && !Array.isArray(sku)
+          ? {
+              ...(sku as Record<string, unknown>),
+              identifiers: Array.isArray(
+                Reflect.get(sku, 'identifiers'),
+              )
+                ? Reflect.get(sku, 'identifiers')
+                : [],
+            }
+          : sku,
+      )
+    : state.skus;
+  return {
+    ...state,
+    skus,
+    stockChecks: Array.isArray(state.stockChecks) ? state.stockChecks : [],
+  };
+}
+
+const legacyDemoStateSchema = z.preprocess(
+  upgradeLegacyDemoState,
+  demoStateSchema,
+);
 
 const legacyV1EnvelopeSchema = z
   .object({
     cacheVersion: z.literal(1),
-    state: demoStateSchema,
+    state: legacyDemoStateSchema,
     serverRevision: decimalCursor,
     outbox: z.array(coreOutboxItemSchema),
   })
@@ -236,10 +380,10 @@ const legacyV2EnvelopeSchema = z
   .object({
     cacheVersion: z.literal(2),
     installationId: uuid,
-    state: demoStateSchema,
+    state: legacyDemoStateSchema,
     serverRevision: decimalCursor,
     outbox: z.array(coreOutboxItemSchema),
-    deferredOutbox: z.array(deferredCommandSchema),
+    deferredOutbox: z.array(legacyDeferredCommandSchema),
     provisionalNotas: z.array(notaTransactionSchema),
     offlineConflicts: z.array(offlineConflictSchema),
     quarantine: z
@@ -248,6 +392,20 @@ const legacyV2EnvelopeSchema = z
         quarantinedAt: timestampSchema.optional(),
       })
       .strict(),
+  })
+  .strict();
+const legacyV3EnvelopeSchema = z
+  .object({
+    cacheVersion: z.literal(3),
+    installationId: uuid,
+    state: legacyDemoStateSchema,
+    serverRevision: decimalCursor,
+    outbox: z.array(coreOutboxItemSchema),
+    quarantinedOutbox: z.array(coreOutboxItemSchema),
+    deferredOutbox: z.array(legacyDeferredCommandSchema),
+    provisionalNotas: z.array(notaTransactionSchema),
+    offlineConflicts: z.array(offlineConflictSchema),
+    quarantine: quarantineSchema,
   })
   .strict();
 
@@ -261,6 +419,19 @@ export function migrateCoreCache(
 ): CoreLocalEnvelope {
   const current = localEnvelopeSchema.safeParse(value);
   if (current.success) return cloneCore(current.data);
+  const v3 = legacyV3EnvelopeSchema.safeParse(value);
+  if (v3.success) {
+    return {
+      ...cloneCore(v3.data),
+      cacheVersion: CORE_CACHE_VERSION,
+      deferredOutbox: v3.data.deferredOutbox.map((command, index) => ({
+        ...cloneCore(command),
+        sequence: index + 1,
+      })),
+      balanceVersions: {},
+      nextDeferredSequence: v3.data.deferredOutbox.length + 1,
+    };
+  }
   const installationId = uuid.parse(uuidFactory());
   const v2 = legacyV2EnvelopeSchema.safeParse(value);
   if (v2.success) {
@@ -277,6 +448,9 @@ export function migrateCoreCache(
       installationId,
       outbox: [],
       quarantinedOutbox: [],
+      deferredOutbox: [],
+      balanceVersions: {},
+      nextDeferredSequence: 1,
       quarantine: { active: false },
     };
   }
@@ -287,9 +461,11 @@ export function migrateCoreCache(
     installationId,
     state: cloneCore(legacy.state),
     serverRevision: legacy.serverRevision,
+    balanceVersions: {},
     outbox: cloneCore(legacy.outbox),
     quarantinedOutbox: [],
     deferredOutbox: [],
+    nextDeferredSequence: 1,
     provisionalNotas: [],
     offlineConflicts: [],
     quarantine: { active: false },
@@ -305,9 +481,11 @@ export function emptyCoreLocalEnvelope(
     installationId: uuid.parse(installationId),
     state: cloneCore(state),
     serverRevision: '0',
+    balanceVersions: {},
     outbox: [],
     quarantinedOutbox: [],
     deferredOutbox: [],
+    nextDeferredSequence: 1,
     provisionalNotas: [],
     offlineConflicts: [],
     quarantine: { active: false },

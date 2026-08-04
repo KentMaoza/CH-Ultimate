@@ -5,6 +5,7 @@ import type {
   CoreDeferredCommand,
   CoreLocalEnvelope,
   OfflineSkuSnapshot,
+  OfflineStockCountPayload,
   OfflineStockPayload,
 } from './core-local-store';
 import { asOfflineJson, CoreLocalStore } from './core-local-store';
@@ -71,6 +72,7 @@ export class CoreDeferredOutbox {
           }
         : {
             kind: 'offline-nota',
+            sequence: envelope.nextDeferredSequence,
             operationId: this.dependencies.uuid(),
             idempotencyKey: '',
             createdAt: this.dependencies.now().toISOString(),
@@ -101,6 +103,9 @@ export class CoreDeferredOutbox {
                 : command,
             )
           : [...envelope.deferredOutbox, nextCommand],
+        nextDeferredSequence: existingNota
+          ? envelope.nextDeferredSequence
+          : envelope.nextDeferredSequence + 1,
       };
     });
   }
@@ -113,6 +118,7 @@ export class CoreDeferredOutbox {
         ...envelope.deferredOutbox,
         {
           kind: 'stock-delta',
+          sequence: envelope.nextDeferredSequence,
           operationId,
           idempotencyKey: operationId,
           createdAt: this.dependencies.now().toISOString(),
@@ -120,6 +126,27 @@ export class CoreDeferredOutbox {
           payload,
         },
       ],
+      nextDeferredSequence: envelope.nextDeferredSequence + 1,
+    }));
+  }
+
+  async deferStockCount(payload: OfflineStockCountPayload): Promise<void> {
+    const operationId = this.dependencies.uuid();
+    await this.store.update((envelope) => ({
+      ...envelope,
+      deferredOutbox: [
+        ...envelope.deferredOutbox,
+        {
+          kind: 'stock-count',
+          sequence: envelope.nextDeferredSequence,
+          operationId,
+          idempotencyKey: operationId,
+          createdAt: this.dependencies.now().toISOString(),
+          status: 'deferred',
+          payload,
+        },
+      ],
+      nextDeferredSequence: envelope.nextDeferredSequence + 1,
     }));
   }
 
@@ -190,14 +217,22 @@ export class CoreDeferredOutbox {
     while (true) {
       const envelope = await this.store.load();
       if (envelope.quarantine.active) return;
-      const candidate = envelope.deferredOutbox[0];
+      const blockedEntities = new Set(
+        envelope.deferredOutbox
+          .filter(
+            (command) =>
+              command.status === 'conflict' ||
+              command.status === 'quarantined',
+          )
+          .map(deferredEntityKey),
+      );
+      const candidate = envelope.deferredOutbox.find(
+        (command) =>
+          command.status !== 'conflict' &&
+          command.status !== 'quarantined' &&
+          !blockedEntities.has(deferredEntityKey(command)),
+      );
       if (!candidate) return;
-      if (
-        candidate.status === 'conflict' ||
-        candidate.status === 'quarantined'
-      ) {
-        return;
-      }
       const firstSentAt =
         candidate.firstSentAt ?? this.dependencies.now().toISOString();
       const sending = await this.store.update((current) => ({
@@ -224,7 +259,9 @@ export class CoreDeferredOutbox {
           path:
             command.kind === 'offline-nota'
               ? CORE_API_PATHS.offlineNotas
-              : CORE_API_PATHS.offlineStockAdjustments,
+              : command.kind === 'stock-delta'
+                ? CORE_API_PATHS.offlineStockAdjustments
+                : CORE_API_PATHS.offlineStockChecks,
           body: command.payload,
           idempotencyKey: command.idempotencyKey,
         });
@@ -237,12 +274,14 @@ export class CoreDeferredOutbox {
         return;
       }
       if (response.status < 200 || response.status >= 300) {
+        const permanent = response.status >= 400 && response.status < 500;
         await this.markError(
           command.operationId,
           responseError(response),
-          response.status >= 400 && response.status < 500,
+          permanent,
           response.body,
         );
+        if (permanent) continue;
         return;
       }
       await this.store.update((current) => {
@@ -338,6 +377,12 @@ export class CoreDeferredOutbox {
     await this.store.quarantineCurrentWork(now);
     await this.dependencies.onRevoked?.();
   }
+}
+
+function deferredEntityKey(command: CoreDeferredCommand): string {
+  return command.kind === 'offline-nota'
+    ? `nota:${command.payload.provisionalId}`
+    : `stock:${command.payload.skuId}`;
 }
 
 function responseError(response: CoreApiResponse): Error {

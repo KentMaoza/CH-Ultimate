@@ -43,8 +43,15 @@ import {
   parseCatalogueImage,
   parseCatalogueValidation,
   parseCoreApiError,
+  parseCoreMutationAcknowledgement,
+  coreBalanceRowSchema,
+  coreStockCheckRowSchema,
 } from './core-api-types';
 import { notaTransactionSchema } from './core-domain-schemas';
+import {
+  integerFromDecimal,
+  mapCoreStockCheckRow,
+} from './core-bootstrap-mapping';
 
 export type {
   CoreCacheEnvelope,
@@ -300,6 +307,68 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
       reason: boundedReason,
     });
     await this.refreshOfflineProjection();
+  };
+  checkStock = async (
+    id: string,
+    countedQuantityPcs: number,
+    note?: string,
+  ): Promise<void> => {
+    if (!Number.isSafeInteger(countedQuantityPcs)) {
+      throw new Error('Jumlah cek stok harus berupa bilangan bulat aman.');
+    }
+    const boundedNote = note?.trim() ?? '';
+    if (boundedNote.length > 512) {
+      throw new Error('Catatan cek stok maksimal 512 karakter.');
+    }
+    const countedAt = this.clock.now().toISOString();
+    if (!this.isOffline()) {
+      const context = this.state.requireStockCheckContext(id);
+      await this.mutations.checkStock(id, {
+        ...context,
+        countedQuantityPcs,
+        countedAt,
+        ...(boundedNote ? { note: boundedNote } : {}),
+      });
+      return;
+    }
+    const sku = this.state.getSnapshot().skus.find(
+      (candidate) => candidate.id === id,
+    );
+    if (!sku || sku.archived || !sku.tracked) {
+      throw new Error('SKU aktif dengan saldo stok tidak ditemukan.');
+    }
+    const baseBalanceVersion = this.state.getBalanceVersion(id);
+    await this.deferred.deferStockCount({
+      skuId: id,
+      observedQuantityPcs: sku.stock,
+      countedQuantityPcs,
+      ...(baseBalanceVersion ? { baseBalanceVersion } : {}),
+      countedAt,
+      ...(boundedNote ? { note: boundedNote } : {}),
+    });
+    await this.refreshOfflineProjection();
+  };
+  registerPackageBarcode = async (
+    id: string,
+    rawIdentifierValue: string,
+  ): Promise<void> => {
+    if (this.isOffline()) return this.offlineBlocked();
+    const identifierValue = rawIdentifierValue.trim();
+    if (!identifierValue || identifierValue.length > 512) {
+      throw new Error('Barcode kemasan wajib diisi dan maksimal 512 karakter.');
+    }
+    await this.mutations.registerPackageBarcode(id, identifierValue);
+  };
+  removePackageBarcode = async (identifierId: string): Promise<void> => {
+    if (this.isOffline()) return this.offlineBlocked();
+    await this.mutations.removePackageBarcode(identifierId);
+  };
+  reassignPackageBarcode = async (
+    identifierId: string,
+    skuId: string,
+  ): Promise<void> => {
+    if (this.isOffline()) return this.offlineBlocked();
+    await this.mutations.reassignPackageBarcode(identifierId, skuId);
   };
   setArchived = (id: string, archived: boolean): Promise<void> =>
     this.isOffline()
@@ -605,6 +674,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     envelope: CoreLocalEnvelope,
     restoreOutbox = false,
   ): void {
+    this.state.replaceCachedBalanceVersions(envelope.balanceVersions);
     this.provisionalNotaIds = new Set(
       envelope.provisionalNotas.map((nota) => nota.id),
     );
@@ -629,6 +699,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     }
     this.state.setOfflineProjection(
       envelope.provisionalNotas,
+      envelope.deferredOutbox,
       envelope.deferredOutbox.length + envelope.quarantinedOutbox.length,
       envelope.deferredOutbox.filter(
         (command) => command.status === 'quarantined',
@@ -724,7 +795,10 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   }
 
   private async onAuthenticatedOnline(): Promise<void> {
-    const envelope = await this.localStore.load();
+    const envelope = await this.localStore.update((current) => ({
+      ...current,
+      balanceVersions: this.state.getBalanceVersions(),
+    }));
     if (envelope.quarantine.active) {
       const resumed = await this.deferred.resumeAfterReapproval(
         await this.transport.installationId(),
@@ -862,13 +936,8 @@ function acknowledgeOfflineCommand(
   command: CoreDeferredCommand,
   response: { body: unknown },
 ): CoreLocalEnvelope {
-  const body =
-    response.body &&
-    typeof response.body === 'object' &&
-    !Array.isArray(response.body)
-      ? response.body
-      : {};
-  const entity = Reflect.get(body, 'entity');
+  const acknowledgement = parseCoreMutationAcknowledgement(response.body);
+  const entity = acknowledgement.entity;
   if (command.kind === 'offline-nota') {
     const parsed = notaTransactionSchema.parse(entity);
     return {
@@ -889,15 +958,48 @@ function acknowledgeOfflineCommand(
       ),
     };
   }
-  if (
-    !entity ||
-    typeof entity !== 'object' ||
-    Array.isArray(entity) ||
-    Reflect.get(entity, 'skuId') !== command.payload.skuId
-  ) {
+  if (command.kind === 'stock-count') {
+    const parsed = coreStockCheckRowSchema.parse(entity);
+    if (parsed.skuId !== command.payload.skuId) {
+      throw new Error('Respons cek stok offline CH Core tidak cocok.');
+    }
+    const stockCheck = mapCoreStockCheckRow(parsed);
+    if (!envelope.state.skus.some((sku) => sku.id === stockCheck.skuId)) {
+      throw new Error('SKU hasil cek stok tidak ditemukan.');
+    }
+    return {
+      ...envelope,
+      balanceVersions: acknowledgement.entityVersion
+        ? {
+            ...envelope.balanceVersions,
+            [stockCheck.skuId]: acknowledgement.entityVersion,
+          }
+        : envelope.balanceVersions,
+      state: {
+        ...envelope.state,
+        skus: envelope.state.skus.map((sku) =>
+          sku.id === stockCheck.skuId
+            ? {
+                ...sku,
+                stock: stockCheck.countedQuantityPcs,
+                lastStockCheckedAt: stockCheck.countedAt,
+              }
+            : sku,
+        ),
+        stockChecks: [
+          ...envelope.state.stockChecks.filter(
+            (candidate) => candidate.id !== stockCheck.id,
+          ),
+          stockCheck,
+        ],
+      },
+    };
+  }
+  const balance = coreBalanceRowSchema.parse(entity);
+  if (balance.skuId !== command.payload.skuId) {
     throw new Error('Respons stok offline CH Core tidak valid.');
   }
-  const quantity = Number(Reflect.get(entity, 'quantityPcs'));
+  const quantity = integerFromDecimal(balance.quantityPcs, 'quantityPcs');
   if (!Number.isSafeInteger(quantity)) {
     throw new Error('Respons saldo stok offline CH Core tidak valid.');
   }
@@ -909,6 +1011,12 @@ function acknowledgeOfflineCommand(
   }
   return {
     ...envelope,
+    balanceVersions: acknowledgement.entityVersion
+      ? {
+          ...envelope.balanceVersions,
+          [command.payload.skuId]: acknowledgement.entityVersion,
+        }
+      : envelope.balanceVersions,
     state: {
       ...envelope.state,
       skus: envelope.state.skus.map((sku) =>

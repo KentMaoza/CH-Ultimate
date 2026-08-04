@@ -94,6 +94,47 @@ describe('CH Core operation allowlist', () => {
       },
       { method: 'POST' as const, path: '/v1/skus', body: { name: 'Beras' } },
       {
+        method: 'POST' as const,
+        path: '/v1/offline/notas',
+        body: { provisionalId: '11111111-1111-4111-8111-111111111111' },
+        idempotencyKey: '55555555-5555-4555-8555-555555555555',
+      },
+      {
+        method: 'POST' as const,
+        path: '/v1/offline/stock-adjustments',
+        body: { skuId: '11111111-1111-4111-8111-111111111111', delta: 1 },
+        idempotencyKey: '56565656-5656-4656-8656-565656565656',
+      },
+      {
+        method: 'POST' as const,
+        path: '/v1/skus/11111111-1111-4111-8111-111111111111/stock-checks',
+        body: { countedQuantityPcs: 8 },
+        idempotencyKey: '57575757-5757-4757-8757-575757575757',
+      },
+      {
+        method: 'POST' as const,
+        path: '/v1/offline/stock-checks',
+        body: { skuId: '11111111-1111-4111-8111-111111111111' },
+        idempotencyKey: '58585858-5858-4858-8858-585858585858',
+      },
+      {
+        method: 'POST' as const,
+        path: '/v1/skus/11111111-1111-4111-8111-111111111111/package-barcodes',
+        body: { identifierValue: 'PKG-001' },
+        idempotencyKey: '59595959-5959-4959-8959-595959595959',
+      },
+      {
+        method: 'PATCH' as const,
+        path: '/v1/package-barcodes/22222222-2222-4222-8222-222222222222',
+        body: { skuId: '11111111-1111-4111-8111-111111111111' },
+        idempotencyKey: '60606060-6060-4060-8060-606060606060',
+      },
+      {
+        method: 'DELETE' as const,
+        path: '/v1/package-barcodes/22222222-2222-4222-8222-222222222222',
+        idempotencyKey: '61616161-6161-4161-8161-616161616161',
+      },
+      {
         method: 'PATCH' as const,
         path: '/v1/notas/11111111-1111-4111-8111-111111111111/header',
         body: { customerName: 'Sari' },

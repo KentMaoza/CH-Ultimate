@@ -1,5 +1,5 @@
 import { noteSuffixFromIndex } from '../domain/nota';
-import type { DemoState, Nota, NotaLine } from '../domain/types';
+import type { DemoState, Nota, NotaLine, StockCheck } from '../domain/types';
 import {
   CoreApiSchemaError,
   type CoreBootstrap,
@@ -31,6 +31,40 @@ export function safeIntegerProduct(
     (BigInt(value) * BigInt(multiplier)).toString(),
     field,
   );
+}
+
+export function mapCoreStockCheckRow(
+  row: CoreBootstrap['stockChecks'][number],
+): StockCheck {
+  return {
+    id: row.id,
+    skuId: row.skuId,
+    observedQuantityPcs: integerFromDecimal(
+      row.observedQuantityPcs,
+      'observedQuantityPcs',
+    ),
+    countedQuantityPcs: integerFromDecimal(
+      row.countedQuantityPcs,
+      'countedQuantityPcs',
+    ),
+    serverQuantityBeforePcs: integerFromDecimal(
+      row.serverQuantityBeforePcs,
+      'serverQuantityBeforePcs',
+    ),
+    appliedDeltaPcs: integerFromDecimal(
+      row.appliedDeltaPcs,
+      'appliedDeltaPcs',
+    ),
+    ...(row.baseBalanceVersion
+      ? { baseBalanceVersion: row.baseBalanceVersion }
+      : {}),
+    forcedOffline: row.forcedOffline,
+    countedAt: row.countedAt,
+    appliedAt: row.appliedAt,
+    deviceId: row.deviceId,
+    deviceDisplayName: row.deviceDisplayName,
+    ...(row.note ? { note: row.note } : {}),
+  };
 }
 
 function safeIntegerIncrement(value: number, field: string): number {
@@ -259,32 +293,7 @@ export function mapCoreBootstrapToDemoState(
       };
     })
     .reverse();
-  state.stockChecks = bootstrap.stockChecks.map((row) => ({
-    id: row.id,
-    skuId: row.skuId,
-    observedQuantityPcs: integerFromDecimal(
-      row.observedQuantityPcs,
-      'observedQuantityPcs',
-    ),
-    countedQuantityPcs: integerFromDecimal(
-      row.countedQuantityPcs,
-      'countedQuantityPcs',
-    ),
-    serverQuantityBeforePcs: integerFromDecimal(
-      row.serverQuantityBeforePcs,
-      'serverQuantityBeforePcs',
-    ),
-    appliedDeltaPcs: integerFromDecimal(row.appliedDeltaPcs, 'appliedDeltaPcs'),
-    ...(row.baseBalanceVersion
-      ? { baseBalanceVersion: row.baseBalanceVersion }
-      : {}),
-    forcedOffline: row.forcedOffline,
-    countedAt: row.countedAt,
-    appliedAt: row.appliedAt,
-    deviceId: row.deviceId,
-    deviceDisplayName: row.deviceDisplayName,
-    ...(row.note ? { note: row.note } : {}),
-  }));
+  state.stockChecks = bootstrap.stockChecks.map(mapCoreStockCheckRow);
 
   const pagesByNota = new Map<string, CoreBootstrap['notaPages']>();
   for (const page of bootstrap.notaPages) {

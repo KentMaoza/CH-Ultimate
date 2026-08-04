@@ -67,6 +67,27 @@ public class CoreSecurityBoundaryTest {
             true,
             true
         );
+        for (String path : new String[] {
+            "/v1/offline/notas",
+            "/v1/offline/stock-adjustments",
+            "/v1/offline/stock-checks",
+            "/v1/skus/11111111-1111-4111-8111-111111111111/stock-checks",
+            "/v1/skus/11111111-1111-4111-8111-111111111111/package-barcodes"
+        }) {
+            CoreRequestPolicy.requireApproved("POST", path, true, true);
+        }
+        CoreRequestPolicy.requireApproved(
+            "PATCH",
+            "/v1/package-barcodes/22222222-2222-4222-8222-222222222222",
+            true,
+            true
+        );
+        CoreRequestPolicy.requireApproved(
+            "DELETE",
+            "/v1/package-barcodes/22222222-2222-4222-8222-222222222222",
+            false,
+            true
+        );
 
         for (String path : new String[] {
             "https://192.168.50.14:8443/v1/bootstrap",

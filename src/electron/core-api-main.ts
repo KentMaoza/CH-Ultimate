@@ -50,6 +50,21 @@ const operationRules: ReadonlyArray<{
     methods: ['POST'],
     path: new RegExp(`^/v1/skus/${UUID}/stock-adjustments$`),
   },
+  { methods: ['POST'], path: /^\/v1\/offline\/notas$/ },
+  { methods: ['POST'], path: /^\/v1\/offline\/stock-adjustments$/ },
+  { methods: ['POST'], path: /^\/v1\/offline\/stock-checks$/ },
+  {
+    methods: ['POST'],
+    path: new RegExp(`^/v1/skus/${UUID}/stock-checks$`),
+  },
+  {
+    methods: ['POST'],
+    path: new RegExp(`^/v1/skus/${UUID}/package-barcodes$`),
+  },
+  {
+    methods: ['PATCH', 'DELETE'],
+    path: new RegExp(`^/v1/package-barcodes/${UUID}$`),
+  },
   { methods: ['POST'], path: /^\/v1\/imports\/validate$/ },
   {
     methods: ['POST'],

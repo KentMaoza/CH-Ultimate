@@ -40,6 +40,168 @@ function emptyPoll(revision = '1') {
 }
 
 describe('Core operations gateway mutation coordination', () => {
+  it('sends an online stock check from the observed balance version and applies the exact acknowledgement', async () => {
+    const { gateway, transport, clock } = readyGateway();
+    await gateway.initialize();
+    const checkId = '89898989-8989-4989-8989-898989898989';
+    transport.enqueue({
+      status: 200,
+      body: {
+        serverRevision: '2',
+        entityVersion: '2',
+        entity: {
+          id: checkId,
+          skuId: SKU_ID,
+          observedQuantityPcs: '12',
+          countedQuantityPcs: '8',
+          serverQuantityBeforePcs: '12',
+          appliedDeltaPcs: '-4',
+          baseBalanceVersion: '1',
+          forcedOffline: false,
+          countedAt: clock.now().toISOString(),
+          appliedAt: '2026-07-29T01:00:01.000Z',
+          deviceId: '66666666-6666-4666-8666-666666666666',
+          deviceDisplayName: 'Desktop Owner',
+          note: 'Rak depan',
+        },
+      },
+    });
+    transport.enqueue(emptyPoll('2'));
+
+    await gateway.checkStock(SKU_ID, 8, '  Rak depan  ');
+
+    expect(
+      transport.requests.find(
+        (request) => request.path === CORE_API_PATHS.stockChecks(SKU_ID),
+      ),
+    ).toEqual({
+      method: 'POST',
+      path: CORE_API_PATHS.stockChecks(SKU_ID),
+      body: {
+        observedQuantityPcs: 12,
+        countedQuantityPcs: 8,
+        baseBalanceVersion: '1',
+        countedAt: clock.now().toISOString(),
+        note: 'Rak depan',
+      },
+      idempotencyKey: expect.any(String),
+    });
+    expect(gateway.getSnapshot()).toMatchObject({
+      skus: [{ stock: 8, lastStockCheckedAt: clock.now().toISOString() }],
+      stockChecks: [
+        {
+          id: checkId,
+          serverQuantityBeforePcs: 12,
+          appliedDeltaPcs: -4,
+          forcedOffline: false,
+          note: 'Rak depan',
+        },
+      ],
+    });
+  });
+
+  it('registers, reassigns, and removes package barcodes through typed v2 acknowledgements', async () => {
+    const secondSkuId = 'abababab-abab-4bab-8bab-abababababab';
+    const packageIdentifierId = '89898989-8989-4989-8989-898989898989';
+    const transport = new ScriptedTransport();
+    const storage = new MemoryStorage();
+    const clock = new TestClock();
+    const gateway = createCoreOperationsGateway(transport, storage, clock);
+    const bootstrap = populatedBootstrap('1');
+    transport.enqueue({
+      status: 200,
+      body: {
+        ...bootstrap,
+        skus: [
+          ...bootstrap.skus,
+          {
+            ...bootstrap.skus[0],
+            id: secondSkuId,
+            primaryIdentifier: 'SKU-002',
+            name: 'Produk Kedua',
+          },
+        ],
+        balances: [
+          ...bootstrap.balances,
+          { ...bootstrap.balances[0], skuId: secondSkuId },
+        ],
+      },
+    });
+    await gateway.initialize();
+    const barcode = {
+      id: packageIdentifierId,
+      skuId: SKU_ID,
+      identifierValue: 'PKG-001',
+      identifierKind: 'package_barcode',
+      createdAt: '2026-07-29T01:00:00.000Z',
+    };
+    transport.enqueue({
+      status: 200,
+      body: { entityId: packageIdentifierId, entity: barcode },
+    });
+    transport.enqueue(emptyPoll());
+
+    await gateway.registerPackageBarcode(SKU_ID, '  PKG-001  ');
+
+    expect(
+      transport.requests.find(
+        (request) => request.path === CORE_API_PATHS.packageBarcodes(SKU_ID),
+      ),
+    ).toMatchObject({
+      method: 'POST',
+      path: CORE_API_PATHS.packageBarcodes(SKU_ID),
+      body: { identifierValue: 'PKG-001' },
+    });
+    expect(gateway.getSnapshot().skus[0]?.identifiers).toContainEqual(
+      expect.objectContaining({ id: packageIdentifierId, kind: 'package_barcode' }),
+    );
+
+    transport.enqueue({
+      status: 200,
+      body: {
+        entityId: packageIdentifierId,
+        entity: { ...barcode, skuId: secondSkuId },
+      },
+    });
+    transport.enqueue(emptyPoll());
+    await gateway.reassignPackageBarcode(packageIdentifierId, secondSkuId);
+
+    expect(
+      transport.requests.find(
+        (request) =>
+          request.method === 'PATCH' &&
+          request.path === CORE_API_PATHS.packageBarcode(packageIdentifierId),
+      ),
+    ).toMatchObject({
+      method: 'PATCH',
+      path: CORE_API_PATHS.packageBarcode(packageIdentifierId),
+      body: { skuId: secondSkuId },
+    });
+    expect(gateway.getSnapshot().skus[0]?.aliases).not.toContain('PKG-001');
+    expect(gateway.getSnapshot().skus[1]?.aliases).toContain('PKG-001');
+
+    transport.enqueue({
+      status: 200,
+      body: { entityId: packageIdentifierId },
+    });
+    transport.enqueue(emptyPoll());
+    await gateway.removePackageBarcode(packageIdentifierId);
+
+    expect(
+      transport.requests.find(
+        (request) =>
+          request.method === 'DELETE' &&
+          request.path === CORE_API_PATHS.packageBarcode(packageIdentifierId),
+      ),
+    ).toMatchObject({
+      method: 'DELETE',
+      path: CORE_API_PATHS.packageBarcode(packageIdentifierId),
+    });
+    expect(
+      gateway.getSnapshot().skus.flatMap((sku) => sku.identifiers),
+    ).not.toContainEqual(expect.objectContaining({ id: packageIdentifierId }));
+  });
+
   it('validates, previews, commits, reboots, and reads cached images through approved routes', async () => {
     const { gateway, transport } = readyGateway();
     await gateway.initialize();

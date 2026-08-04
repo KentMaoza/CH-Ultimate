@@ -437,6 +437,152 @@ describe('Core offline permission matrix', () => {
     expect(transport.requests).toHaveLength(1);
   });
 
+  it('persists an absolute stock count before optimism and replays the immutable forced request after restart', async () => {
+    const clock = new TestClock();
+    clock.current = new Date('2026-08-04T02:00:00.000Z');
+    const observedBootstrap = populatedBootstrap('7');
+    observedBootstrap.balances = [
+      {
+        ...observedBootstrap.balances[0],
+        quantityPcs: '10',
+        rowVersion: '4',
+      },
+    ];
+    const storage = new MemoryStorage();
+    const seedTransport = new ScriptedTransport();
+    seedTransport.enqueue({ status: 200, body: observedBootstrap });
+    const seeded = createCoreOperationsGateway(seedTransport, storage, clock);
+    await seeded.initialize();
+    seeded.dispose();
+    const offlineTransport = new ScriptedTransport();
+    offlineTransport.enqueue(new Error('wifi down'));
+    const offline = createCoreOperationsGateway(
+      offlineTransport,
+      storage,
+      clock,
+    );
+    await offline.initialize();
+    let commandWasDurableBeforeProjection = false;
+    const unsubscribe = offline.subscribe(() => {
+      if (offline.getSnapshot().skus[0]?.stock !== 8) return;
+      const envelope = storage.value as unknown as CoreLocalEnvelope;
+      commandWasDurableBeforeProjection =
+        envelope.deferredOutbox[0]?.kind === 'stock-count';
+    });
+
+    await offline.checkStock(SKU_ID, 8, '  Hitung rak depan  ');
+    unsubscribe();
+
+    const queued = storage.value as unknown as CoreLocalEnvelope;
+    expect(commandWasDurableBeforeProjection).toBe(true);
+    expect(offline.getSnapshot().skus[0]).toMatchObject({
+      stock: 8,
+      lastStockCheckedAt: clock.now().toISOString(),
+    });
+    expect(queued.deferredOutbox).toEqual([
+      expect.objectContaining({
+        kind: 'stock-count',
+        sequence: 1,
+        payload: {
+          skuId: SKU_ID,
+          observedQuantityPcs: 10,
+          countedQuantityPcs: 8,
+          baseBalanceVersion: '4',
+          countedAt: clock.now().toISOString(),
+          note: 'Hitung rak depan',
+        },
+      }),
+    ]);
+    offline.dispose();
+
+    const serverCheck = {
+      id: '89898989-8989-4989-8989-898989898989',
+      skuId: SKU_ID,
+      observedQuantityPcs: '10',
+      countedQuantityPcs: '8',
+      serverQuantityBeforePcs: '7',
+      appliedDeltaPcs: '1',
+      baseBalanceVersion: '4',
+      forcedOffline: true,
+      countedAt: clock.now().toISOString(),
+      appliedAt: '2026-08-04T02:01:00.000Z',
+      deviceId: '66666666-6666-4666-8666-666666666666',
+      deviceDisplayName: 'Android Gudang',
+      note: 'Hitung rak depan',
+    };
+    const firstReplayTransport = new ScriptedTransport();
+    const serverBeforeReplay = populatedBootstrap('8');
+    serverBeforeReplay.balances = [
+      {
+        ...serverBeforeReplay.balances[0],
+        quantityPcs: '7',
+        rowVersion: '5',
+      },
+    ];
+    firstReplayTransport.enqueue({ status: 200, body: serverBeforeReplay });
+    firstReplayTransport.enqueue(new Error('response lost after apply'));
+    const firstReplay = createCoreOperationsGateway(
+      firstReplayTransport,
+      storage,
+      clock,
+    );
+    await firstReplay.initialize();
+    const immutableRequest = firstReplayTransport.requests[1]!;
+    expect(immutableRequest).toMatchObject({
+      method: 'POST',
+      path: '/v1/offline/stock-checks',
+      body: queued.deferredOutbox[0]?.payload,
+      idempotencyKey: queued.deferredOutbox[0]?.idempotencyKey,
+    });
+    firstReplay.dispose();
+
+    const duplicateReplayTransport = new ScriptedTransport();
+    const appliedBootstrap = populatedBootstrap('9');
+    appliedBootstrap.balances = [
+      {
+        ...appliedBootstrap.balances[0],
+        quantityPcs: '8',
+        rowVersion: '6',
+        lastCheckedAt: clock.now().toISOString(),
+      },
+    ];
+    appliedBootstrap.stockChecks = [serverCheck];
+    duplicateReplayTransport.enqueue({ status: 200, body: appliedBootstrap });
+    duplicateReplayTransport.enqueue({
+      status: 200,
+      body: {
+        serverRevision: '9',
+        entityVersion: '6',
+        entity: serverCheck,
+      },
+    });
+    const duplicateReplay = createCoreOperationsGateway(
+      duplicateReplayTransport,
+      storage,
+      clock,
+    );
+    await duplicateReplay.initialize();
+
+    expect(duplicateReplayTransport.requests[1]).toEqual(immutableRequest);
+    expect(duplicateReplay.getSnapshot().skus[0]?.stock).toBe(8);
+    expect(duplicateReplay.getSnapshot().stockChecks).toEqual([
+      expect.objectContaining({
+        id: serverCheck.id,
+        observedQuantityPcs: 10,
+        countedQuantityPcs: 8,
+        serverQuantityBeforePcs: 7,
+        appliedDeltaPcs: 1,
+        forcedOffline: true,
+      }),
+    ]);
+    expect(
+      (storage.value as unknown as CoreLocalEnvelope).deferredOutbox,
+    ).toEqual([]);
+    expect(
+      (storage.value as unknown as CoreLocalEnvelope).balanceVersions[SKU_ID],
+    ).toBe('6');
+  });
+
   it('rejects every shared mutation with visible Indonesian read-only copy', async () => {
     const { gateway } = await offlineGateway();
     const sku = gateway.getSnapshot().skus[0]!;
@@ -758,7 +904,7 @@ describe('Core local Nota projection', () => {
   });
 
   it('uses the authoritative stock acknowledgement without retaining a synthetic movement', async () => {
-    const { gateway, transport } = await offlineGateway();
+    const { gateway, storage, transport } = await offlineGateway();
     await gateway.adjustStock(SKU_ID, 2, 'Koreksi hitung');
     transport.enqueue({
       status: 200,
@@ -783,6 +929,9 @@ describe('Core local Nota projection', () => {
 
     expect(gateway.getSnapshot().skus[0]?.stock).toBe(20);
     expect(gateway.getSnapshot().adjustments).toEqual([]);
+    expect(
+      (storage.value as unknown as CoreLocalEnvelope).balanceVersions[SKU_ID],
+    ).toBe('3');
 
     const movementId = '12121212-1212-4121-8121-121212121212';
     transport.enqueue({

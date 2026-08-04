@@ -91,6 +91,10 @@ export interface OperationsGateway {
   createSku(input: CreateSkuInput): Promise<Sku>;
   updateSku(id: string, patch: Partial<Sku>): Promise<void>;
   adjustStock(id: string, quantity: number, reason?: string): Promise<void>;
+  checkStock(id: string, countedQuantityPcs: number, note?: string): Promise<void>;
+  registerPackageBarcode(id: string, identifierValue: string): Promise<void>;
+  removePackageBarcode(identifierId: string): Promise<void>;
+  reassignPackageBarcode(identifierId: string, skuId: string): Promise<void>;
   setArchived(id: string, archived: boolean): Promise<void>;
   validateInitialCatalogue(input: {
     fileName: string;

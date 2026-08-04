@@ -90,6 +90,105 @@ export class MockOperationsGateway implements OperationsGateway {
     this.publish(reduceOperation(this.state, { type: 'update-sku', id, patch: normalized }));
   }
   async adjustStock(id: string, quantity: number): Promise<void> { this.publish(reduceOperation(this.state, { type: 'adjust-stock', id, quantity })); }
+  async checkStock(id: string, countedQuantityPcs: number, note?: string): Promise<void> {
+    const sku = this.state.skus.find((candidate) => candidate.id === id);
+    if (!sku || sku.archived || !sku.tracked) throw new Error('SKU aktif dengan saldo stok tidak ditemukan.');
+    if (!Number.isSafeInteger(countedQuantityPcs)) throw new Error('Jumlah cek stok harus berupa bilangan bulat aman.');
+    const countedAt = new Date().toISOString();
+    this.publish({
+      ...this.state,
+      skus: this.state.skus.map((candidate) =>
+        candidate.id === id
+          ? { ...candidate, stock: countedQuantityPcs, lastStockCheckedAt: countedAt }
+          : candidate,
+      ),
+      stockChecks: [
+        ...this.state.stockChecks,
+        {
+          id: `stock-check-${Date.now()}-${sequence++}`,
+          skuId: id,
+          observedQuantityPcs: sku.stock,
+          countedQuantityPcs,
+          serverQuantityBeforePcs: sku.stock,
+          appliedDeltaPcs: countedQuantityPcs - sku.stock,
+          forcedOffline: false,
+          countedAt,
+          appliedAt: countedAt,
+          deviceId: 'mock-device',
+          deviceDisplayName: 'Demo',
+          ...(note?.trim() ? { note: note.trim() } : {}),
+        },
+      ],
+    });
+  }
+  async registerPackageBarcode(id: string, rawIdentifierValue: string): Promise<void> {
+    const identifierValue = rawIdentifierValue.trim();
+    const existing = this.state.skus.flatMap((sku) => sku.identifiers).find(
+      (identifier) => identifier.value === identifierValue,
+    );
+    if (existing?.skuId === id) return;
+    if (existing || !identifierValue) throw new Error('Nomor SKU atau alias sudah digunakan.');
+    const createdAt = new Date().toISOString();
+    const identifier = {
+      id: `package-barcode-${Date.now()}-${sequence++}`,
+      skuId: id,
+      value: identifierValue,
+      kind: 'package_barcode' as const,
+      createdAt,
+    };
+    this.publish({
+      ...this.state,
+      skus: this.state.skus.map((sku) =>
+        sku.id === id
+          ? {
+              ...sku,
+              identifiers: [...sku.identifiers, identifier],
+              aliases: [...new Set([...sku.aliases, identifierValue])],
+            }
+          : sku,
+      ),
+    });
+  }
+  async removePackageBarcode(identifierId: string): Promise<void> {
+    this.publish({
+      ...this.state,
+      skus: this.state.skus.map((sku) => {
+        const identifier = sku.identifiers.find(
+          (candidate) => candidate.id === identifierId,
+        );
+        return identifier?.kind === 'package_barcode'
+          ? {
+              ...sku,
+              identifiers: sku.identifiers.filter(
+                (candidate) => candidate.id !== identifierId,
+              ),
+              aliases: sku.aliases.filter((alias) => alias !== identifier.value),
+            }
+          : sku;
+      }),
+    });
+  }
+  async reassignPackageBarcode(identifierId: string, skuId: string): Promise<void> {
+    const identifier = this.state.skus.flatMap((sku) => sku.identifiers).find(
+      (candidate) => candidate.id === identifierId,
+    );
+    if (!identifier || identifier.kind !== 'package_barcode') {
+      throw new Error('Barcode kemasan tidak ditemukan.');
+    }
+    await this.removePackageBarcode(identifierId);
+    this.publish({
+      ...this.state,
+      skus: this.state.skus.map((sku) =>
+        sku.id === skuId
+          ? {
+              ...sku,
+              identifiers: [...sku.identifiers, { ...identifier, skuId }],
+              aliases: [...new Set([...sku.aliases, identifier.value])],
+            }
+          : sku,
+      ),
+    });
+  }
   async setArchived(id: string, archived: boolean): Promise<void> { this.publish(reduceOperation(this.state, { type: 'archive-sku', id, archived })); }
   async validateInitialCatalogue(): Promise<never> {
     throw new Error('Import bertahap hanya tersedia melalui CH Core.');

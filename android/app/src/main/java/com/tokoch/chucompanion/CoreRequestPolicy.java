@@ -28,6 +28,27 @@ final class CoreRequestPolicy {
             Set.of("POST"),
             Pattern.compile("^/v1/skus/" + UUID + "/stock-adjustments$")
         ),
+        new Rule(Set.of("POST"), Pattern.compile("^/v1/offline/notas$")),
+        new Rule(
+            Set.of("POST"),
+            Pattern.compile("^/v1/offline/stock-adjustments$")
+        ),
+        new Rule(
+            Set.of("POST"),
+            Pattern.compile("^/v1/offline/stock-checks$")
+        ),
+        new Rule(
+            Set.of("POST"),
+            Pattern.compile("^/v1/skus/" + UUID + "/stock-checks$")
+        ),
+        new Rule(
+            Set.of("POST"),
+            Pattern.compile("^/v1/skus/" + UUID + "/package-barcodes$")
+        ),
+        new Rule(
+            Set.of("PATCH", "DELETE"),
+            Pattern.compile("^/v1/package-barcodes/" + UUID + "$")
+        ),
         new Rule(
             Set.of("GET"),
             Pattern.compile("^/v1/images/" + SHA256 + "$")

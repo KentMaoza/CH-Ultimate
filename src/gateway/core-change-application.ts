@@ -8,7 +8,10 @@ import {
   coreStockCheckRowSchema,
   type CoreChange,
 } from './core-api-types';
-import { integerFromDecimal } from './core-bootstrap-mapping';
+import {
+  integerFromDecimal,
+  mapCoreStockCheckRow,
+} from './core-bootstrap-mapping';
 import {
   applyNotaChange,
   applyNotaLineChange,
@@ -225,21 +228,7 @@ function applyStockCheck(state: DemoState, change: CoreChange): DemoState {
     ...state,
     stockChecks: [
       ...state.stockChecks.filter((item) => item.id !== row.id),
-      {
-        id: row.id,
-        skuId: row.skuId,
-        observedQuantityPcs: integerFromDecimal(row.observedQuantityPcs, 'observedQuantityPcs'),
-        countedQuantityPcs: integerFromDecimal(row.countedQuantityPcs, 'countedQuantityPcs'),
-        serverQuantityBeforePcs: integerFromDecimal(row.serverQuantityBeforePcs, 'serverQuantityBeforePcs'),
-        appliedDeltaPcs: integerFromDecimal(row.appliedDeltaPcs, 'appliedDeltaPcs'),
-        ...(row.baseBalanceVersion ? { baseBalanceVersion: row.baseBalanceVersion } : {}),
-        forcedOffline: row.forcedOffline,
-        countedAt: row.countedAt,
-        appliedAt: row.appliedAt,
-        deviceId: row.deviceId,
-        deviceDisplayName: row.deviceDisplayName,
-        ...(row.note ? { note: row.note } : {}),
-      },
+      mapCoreStockCheckRow(row),
     ],
   };
 }

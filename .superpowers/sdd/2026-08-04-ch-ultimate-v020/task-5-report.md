@@ -156,6 +156,19 @@ GREEN:
 - Cache list/delete/write operations are serialized, authoritative refreshes are generation-checked, and a new seed invalidates an older prune generation before queued work resumes.
 - The delayed-delete regression ends with the changed hash present and progress at `serverAvailable: 1`, `cached: 1`, `failed: 0`.
 
+## Round 2 cache-hit prune remediation
+
+RED:
+
+- Added a separate delayed-enumeration regression with no upload, seed, or network image rewrite: bootstrap referenced hash A while already-cached hashes B and C became authoritative through a later change poll.
+- Before releasing the stale enumeration, the newer authoritative refresh still exposed `serverAvailable: 0` instead of `2`, proving its reference set was blocked behind the older serialized prune work.
+
+GREEN:
+
+- Every refresh now advances its generation, derives its authoritative hashes, clears stale queued work, and publishes those references synchronously before entering serialized Blob storage work.
+- After each awaited cache enumeration the refresh rejects stale generations. Immediately before delete, candidates are filtered again against the current authoritative references.
+- The regression verifies B and C were never passed to `deleteImages`, both cached Blobs remain present, and progress settles at `serverAvailable: 2`, `cached: 2`, `failed: 0`.
+
 ## Verification
 
 - Focused image/cache/prefetch/consumer/native adapter/upload suites passed.
@@ -171,6 +184,10 @@ GREEN:
 - Round 1 server typecheck: `npm run server:typecheck` passed.
 - Round 1 full renderer suite: `npm test` passed, 76 files and 563 tests.
 - Round 1 mobile production build: `npm run mobile:build` passed with the existing large-chunk warning.
+- Round 2 focused image cache/storage result: 2 files, 21 tests passed.
+- Round 2 renderer and server typechecks passed.
+- Round 2 full renderer suite: `npm test` passed, 76 files and 564 tests.
+- Round 2 mobile production build passed with the existing large-chunk warning.
 
 ## Remaining concerns
 

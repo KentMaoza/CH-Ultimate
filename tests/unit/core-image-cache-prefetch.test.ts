@@ -59,6 +59,27 @@ class DelayedDeleteImageStorage extends ImageMemoryStorage {
   }
 }
 
+class DelayedEnumerationImageStorage extends ImageMemoryStorage {
+  readonly firstEnumerationStarted = deferred<void>();
+  readonly releaseFirstEnumeration = deferred<void>();
+  readonly deleteCalls: string[][] = [];
+  private enumerationCount = 0;
+
+  override async listImageHashes(): Promise<string[]> {
+    this.enumerationCount += 1;
+    if (this.enumerationCount === 1) {
+      this.firstEnumerationStarted.resolve(undefined);
+      await this.releaseFirstEnumeration.promise;
+    }
+    return super.listImageHashes();
+  }
+
+  override async deleteImages(hashes: string[]): Promise<void> {
+    this.deleteCalls.push([...hashes]);
+    await super.deleteImages(hashes);
+  }
+}
+
 function imageBootstrap(hashes: Array<string | null>, revision = '1') {
   const original = populatedBootstrap(revision);
   const skuId = (index: number) =>
@@ -475,6 +496,47 @@ describe('Core durable image cache and prefetch', () => {
     await vi.waitFor(() => expect(gateway.getSyncSnapshot().imagePrefetch).toMatchObject({
       serverAvailable: 1, cached: 1, failed: 0,
     }));
+  });
+
+  it('publishes a newer cache-hit reference before stale prune preparation can delete it', async () => {
+    const storage = new DelayedEnumerationImageStorage();
+    storage.images.set(HASH_B, new Blob(['b'], { type: 'image/png' }));
+    storage.images.set(HASH_C, new Blob(['c'], { type: 'image/png' }));
+    const transport = new ScriptedTransport();
+    const gateway = createCoreOperationsGateway(transport, storage, new TestClock());
+    transport.enqueue({ status: 200, body: imageBootstrap([HASH_A, null]) });
+    await gateway.initialize();
+    await storage.firstEnumerationStarted.promise;
+    const next = imageBootstrap([HASH_B, HASH_C], '3');
+    transport.enqueue({
+      status: 200,
+      body: {
+        serverRevision: '3',
+        nextAfter: '3',
+        changes: next.skus.map((payload, index) => ({
+          revision: String(index + 2),
+          entityType: 'sku',
+          entityId: String(payload.id),
+          operation: 'upsert',
+          payload: { ...payload, rowVersion: String(index + 2) },
+          createdAt: `2026-08-04T12:00:0${index}.000Z`,
+        })),
+      },
+    });
+
+    await gateway.retryPending();
+    const referencesPublishedBeforeStorageRelease =
+      gateway.getSyncSnapshot().imagePrefetch?.serverAvailable;
+    storage.releaseFirstEnumeration.resolve(undefined);
+    await vi.waitFor(() => expect(gateway.getSyncSnapshot().imagePrefetch).toMatchObject({
+      serverAvailable: 2, cached: 2, failed: 0,
+    }));
+
+    expect(referencesPublishedBeforeStorageRelease).toBe(2);
+    expect(storage.deleteCalls.flat()).not.toContain(HASH_B);
+    expect(storage.deleteCalls.flat()).not.toContain(HASH_C);
+    expect(storage.images.has(HASH_B)).toBe(true);
+    expect(storage.images.has(HASH_C)).toBe(true);
   });
 
   it('prefetches a changed authoritative hash without pruning the prior hash on a change poll', async () => {

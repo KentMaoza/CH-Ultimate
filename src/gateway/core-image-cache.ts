@@ -112,21 +112,32 @@ export class CoreImageCacheCoordinator {
     if (this.disposed || !supportsImageStorage(this.storage)) return;
     const storage = this.storage;
     const generation = ++this.generation;
+    const refreshReferences = new Set(
+      this.getSkus().flatMap(
+        (sku) => sku.imageHash ? [requireHash(sku.imageHash)] : [],
+      ),
+    );
+    this.referencedHashes = refreshReferences;
+    this.queue = [];
+    this.publish();
     await this.runStorageOperation(async () => {
       if (this.disposed || generation !== this.generation) return;
-      const skus = this.getSkus();
-      this.referencedHashes = new Set(
-        skus.flatMap((sku) => sku.imageHash ? [requireHash(sku.imageHash)] : []),
-      );
       let cached = new Set(
         (await storage.listImageHashes()).filter((hash) => SHA256.test(hash)),
       );
       if (this.disposed || generation !== this.generation) return;
       if (pruneUnreferenced) {
-        const stale = [...cached].filter((hash) => !this.referencedHashes.has(hash));
-        if (stale.length > 0) {
-          await storage.deleteImages(stale);
-          cached = new Set([...cached].filter((hash) => this.referencedHashes.has(hash)));
+        const candidates = [...cached].filter(
+          (hash) => !refreshReferences.has(hash),
+        );
+        if (this.disposed || generation !== this.generation) return;
+        const stillUnreferenced = candidates.filter(
+          (hash) => !this.referencedHashes.has(hash),
+        );
+        if (stillUnreferenced.length > 0) {
+          await storage.deleteImages(stillUnreferenced);
+          const deleted = new Set(stillUnreferenced);
+          cached = new Set([...cached].filter((hash) => !deleted.has(hash)));
         }
       }
       if (this.disposed || generation !== this.generation) return;

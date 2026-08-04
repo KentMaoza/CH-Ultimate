@@ -10,10 +10,12 @@ import {
   type ShareRecommendationItem,
 } from '../../src/domain/share-recommendations';
 import type { DemoState, Sku } from '../../src/domain/types';
+import type { OperationsGateway } from '../../src/gateway/operations-gateway';
 import type { RecommendationPdfSharePort } from '../ports';
 import { formatRupiah, formatWita } from '../format';
 import { BackIcon, ShareIcon } from './Icons';
 import { ProductImage } from './ProductImage';
+import { hydrateRecommendationPdfImages } from '../../src/renderer/recommendation-pdf-images';
 
 type RecommendationTab = RecommendationPdfMode;
 
@@ -34,14 +36,16 @@ function recommendationDate(value: string): Date {
 
 function RecommendationItem({
   item,
+  gateway,
   onOpenSku,
 }: {
   item: ShareRecommendationItem;
+  gateway: OperationsGateway;
   onOpenSku: (sku: Sku) => void;
 }) {
   return <article className="share-item">
     <div className="share-item__product">
-      <ProductImage sku={item.sku} />
+      <ProductImage gateway={gateway} sku={item.sku} />
       <div>
         <strong>{item.sku.name}</strong>
         <span>SKU: {item.sku.skuNumber}</span>
@@ -68,12 +72,14 @@ function RecommendationItem({
 
 export function ShareRecommendationsView({
   snapshot,
+  gateway,
   onBack,
   onOpenSku,
   onSharePdf,
   coreBacked = false,
 }: {
   snapshot: DemoState;
+  gateway: OperationsGateway;
   onBack: () => void;
   onOpenSku: (sku: Sku) => void;
   onSharePdf: RecommendationPdfSharePort['sharePdf'];
@@ -91,7 +97,9 @@ export function ShareRecommendationsView({
     setSharingPdf(true);
     setStatus(null);
     try {
-      const blob = await createRecommendationPdfBlob(pdfPlan);
+      const blob = await createRecommendationPdfBlob(
+        await hydrateRecommendationPdfImages(pdfPlan, snapshot.skus, gateway),
+      );
       await onSharePdf({
         blob,
         fileName: pdfPlan.fileName,
@@ -161,6 +169,7 @@ export function ShareRecommendationsView({
         <header><span><small>SUPPLIER</small><strong>{label}</strong></span><b>{group.items.length} SKU</b></header>
         <div>{group.items.map((item) => <RecommendationItem
           item={item}
+          gateway={gateway}
           key={item.sku.id}
           onOpenSku={onOpenSku}
         />)}</div>

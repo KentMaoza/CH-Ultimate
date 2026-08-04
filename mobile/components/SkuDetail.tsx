@@ -1,22 +1,49 @@
+import { useRef, useState } from 'react';
 import type { Sku, SkuPriceChange } from '../../src/domain/types';
+import type { OperationsGateway } from '../../src/gateway/operations-gateway';
 import { formatRupiah, formatWita } from '../format';
 import { BackIcon, ScanIcon } from './Icons';
 import { ProductImage } from './ProductImage';
+import { blobAsDataUrl, preprocessMobileSkuImage } from '../image-preprocessing';
 
-export function SkuDetail({ sku, changes, coreBacked = false, onBack, onScanAgain }: {
+export function SkuDetail({ gateway, sku, changes, coreBacked = false, onBack, onScanAgain }: {
+  gateway: OperationsGateway;
   sku: Sku;
   changes: SkuPriceChange[];
   coreBacked?: boolean;
   onBack: () => void;
   onScanAgain: () => void;
 }) {
+  const imageInput = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [imageStatus, setImageStatus] = useState('');
   const history = changes
     .filter((change) => change.skuId === sku.id)
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+
+  async function replaceImage(file?: File) {
+    if (!file) return;
+    setUploading(true);
+    setImageStatus('');
+    try {
+      const image = await preprocessMobileSkuImage(file);
+      await gateway.updateSku(sku.id, { imageUrl: await blobAsDataUrl(image) });
+      setImageStatus('Gambar SKU diperbarui.');
+    } catch (error) {
+      setImageStatus(error instanceof Error ? error.message : 'Gambar gagal diperbarui.');
+    } finally {
+      setUploading(false);
+      if (imageInput.current) imageInput.current.value = '';
+    }
+  }
+
   return <article className="page-view sku-detail">
     <button className="back-button" onClick={onBack}><BackIcon />Kembali</button>
     {sku.archived ? <p className="archived-warning" role="alert">SKU ini telah diarsipkan dan tidak tampil di daftar SKU aktif.</p> : null}
-    <div className="detail-hero"><ProductImage sku={sku} /><div><h1 data-page-heading tabIndex={-1}>{sku.name}</h1><p>{sku.skuNumber}</p><strong>{formatRupiah(sku.referencePrice)}</strong><span>{sku.tracked ? `Stok ${sku.stock}` : 'Stok tidak dilacak'}</span></div></div>
+    <div className="detail-hero"><ProductImage gateway={gateway} sku={sku} /><div><h1 data-page-heading tabIndex={-1}>{sku.name}</h1><p>{sku.skuNumber}</p><strong>{formatRupiah(sku.referencePrice)}</strong><span>{sku.tracked ? `Stok ${sku.stock}` : 'Stok tidak dilacak'}</span></div></div>
+    <input ref={imageInput} className="sr-only" type="file" accept="image/*" capture="environment" aria-label="Pilih gambar SKU" onChange={(event) => void replaceImage(event.target.files?.[0])} />
+    <button className="secondary-action" disabled={uploading} onClick={() => imageInput.current?.click()}>{uploading ? 'Memproses gambar…' : 'Ganti gambar'}</button>
+    {imageStatus ? <p className="action-status" role="status">{imageStatus}</p> : null}
     <section className="detail-section">
       <h2>Alias SKU</h2>
       {sku.aliases.length > 0 ? <ul className="alias-list">{sku.aliases.map((alias) => <li key={alias}>{alias}</li>)}</ul> : <p>Belum ada alias.</p>}

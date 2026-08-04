@@ -1,9 +1,11 @@
 import type { DemoState, Sku } from '../../src/domain/types';
+import type { OperationsGateway } from '../../src/gateway/operations-gateway';
 import { BellIcon, BoxIcon, ChevronIcon, InfoIcon, ScanIcon, SearchIcon, ShareIcon, TrendIcon } from './Icons';
 import { PriceChangeList } from './PriceChangeList';
 
 export function DashboardView({
   snapshot,
+  gateway,
   unreadCount,
   onScan,
   onSearch,
@@ -14,6 +16,7 @@ export function DashboardView({
   coreBacked = false,
 }: {
   snapshot: DemoState;
+  gateway: OperationsGateway;
   unreadCount: number;
   onScan: () => void;
   onSearch: () => void;
@@ -50,7 +53,7 @@ export function DashboardView({
     </section>
     <section className="latest-section">
       <div className="section-heading"><h2>Perubahan harga terbaru</h2><button onClick={onOpenPrices}>Lihat semua<ChevronIcon /></button></div>
-      <PriceChangeList changes={latest} onOpenSku={onOpenSku} skus={snapshot.skus} testId="latest-price-changes" />
+      <PriceChangeList changes={latest} gateway={gateway} onOpenSku={onOpenSku} skus={snapshot.skus} testId="latest-price-changes" />
     </section>
   </>;
 }

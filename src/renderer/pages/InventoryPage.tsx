@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { parseSkuWorkbook } from '../../domain/workbook';
 import type { Sku } from '../../domain/types';
@@ -8,8 +8,16 @@ import type {
 } from '../../gateway/operations-gateway-contract';
 import { useOperations } from '../operations-context';
 import { formatDate, formatRupiah, formatTitleCaseInput } from '../format';
+import { GatewaySkuImage } from '../components/GatewaySkuImage';
 
 const MAX_CATALOGUE_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+]);
 
 function readFileAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
@@ -29,49 +37,16 @@ async function readFileAsBase64(file: File): Promise<string> {
   return dataUrl.slice(separator + 1);
 }
 
-function SkuImage({
-  gateway,
-  sku,
-  onSelect,
-}: {
+function SkuImage({ gateway, sku, onSelect }: {
   gateway: OperationsGateway;
   sku: Sku;
   onSelect: () => void;
 }) {
-  const [source, setSource] = useState(sku.imageUrl);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    let active = true;
-    setFailed(false);
-    if (!sku.imageHash) {
-      setSource(sku.imageUrl);
-      return () => {
-        active = false;
-      };
-    }
-    setSource('');
-    void gateway
-      .loadSkuImage(sku)
-      .then((next) => {
-        if (active) setSource(next);
-      })
-      .catch(() => {
-        if (active) setFailed(true);
-      });
-    return () => {
-      active = false;
-    };
-  }, [gateway, sku.id, sku.imageHash, sku.imageUrl]);
-  const showImage = Boolean(source) && !failed;
   return (
     <button type="button" className="sku-image-button" aria-label={`Ubah gambar ${sku.skuNumber}`} onClick={onSelect}>
-      {showImage
-        ? <img className="sku-image" src={source} alt={`Gambar ${sku.skuNumber}`} onError={() => setFailed(true)} />
-        : <span className="image-placeholder">CHU</span>}
+      <GatewaySkuImage gateway={gateway} sku={sku} className="sku-image image-placeholder" alt={`Gambar ${sku.skuNumber}`} />
       <span className="sku-image-hover-preview" data-testid="sku-image-hover-preview" aria-hidden="true">
-        {showImage
-          ? <img src={source} alt="" />
-          : <span className="image-placeholder">CHU</span>}
+        <GatewaySkuImage gateway={gateway} sku={sku} className="image-placeholder" alt="" />
       </span>
     </button>
   );
@@ -162,7 +137,12 @@ export function InventoryPage() {
   async function replaceImage(file?: File) {
     if (!file || !imageTarget) return;
     try {
-      if (!file.type.startsWith('image/')) throw new Error('Pilih file gambar yang valid.');
+      if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+        throw new Error('Format gambar harus PNG, JPEG, GIF, atau WebP.');
+      }
+      if (file.size > MAX_IMAGE_BYTES) {
+        throw new Error('File gambar melebihi batas 5 MiB.');
+      }
       await gateway.updateSku(imageTarget.id, { imageUrl: await readFileAsDataUrl(file) });
       setMessage(`Gambar ${imageTarget.skuNumber} diperbarui.`);
     } catch (error) {

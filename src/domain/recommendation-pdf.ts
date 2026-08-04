@@ -52,7 +52,7 @@ export function buildRecommendationPdfPlan(
     supplierLabel: group.supplierCode ?? 'Tanpa kode supplier',
     products: group.items.map(({ sku }) => ({
       id: sku.id,
-      imageUrl: sku.imageUrl,
+      imageUrl: '',
       name: sku.name,
       referencePrice: sku.referencePrice,
       skuNumber: sku.skuNumber,

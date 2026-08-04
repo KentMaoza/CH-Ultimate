@@ -7,6 +7,7 @@ import type {
   Sku,
 } from '../domain/types';
 import type {
+  ImagePrefetchSnapshot,
   SyncConflict,
   SyncSnapshot,
 } from './operations-gateway-contract';
@@ -86,6 +87,11 @@ export class CoreGatewayState {
   };
 
   getSyncSnapshot = (): SyncSnapshot => ({ ...this.syncSnapshot });
+
+  publishImagePrefetch(imagePrefetch: ImagePrefetchSnapshot): void {
+    this.syncSnapshot = { ...this.syncSnapshot, imagePrefetch: { ...imagePrefetch } };
+    for (const listener of this.syncListeners) listener();
+  }
 
   getConflicts = (): SyncConflict[] => [
     ...this.outbox.flatMap((item) =>
@@ -1002,6 +1008,10 @@ export class CoreGatewayState {
     this.outboxVersion += 1;
     this.publishProjectedState();
     this.publishSync({});
+  }
+
+  refreshCanonicalProjection(): void {
+    this.publishProjectedState();
   }
 
   setOfflineProjection(

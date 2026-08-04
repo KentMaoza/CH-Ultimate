@@ -47,6 +47,15 @@ export function OperationsSyncStatus(
         <small>{snapshot.quarantinedCount} dikarantina</small>
       )}
       {snapshot.message && <small>{snapshot.message}</small>}
+      {snapshot.imagePrefetch && (
+        <small>{`Gambar ${snapshot.imagePrefetch.cached}/${snapshot.imagePrefetch.serverAvailable} tersimpan · ${snapshot.imagePrefetch.failed} gagal · ${snapshot.imagePrefetch.total} SKU`}</small>
+      )}
+      {snapshot.imagePrefetch?.phase === 'running' && (
+        <button onClick={() => gateway.pauseImagePrefetch()}>Jeda gambar</button>
+      )}
+      {snapshot.imagePrefetch && (snapshot.imagePrefetch.failed > 0 || snapshot.imagePrefetch.phase === 'paused') && (
+        <button onClick={() => gateway.retryImagePrefetch()}>Coba lagi gambar</button>
+      )}
       {snapshot.phase === 'offline' && (
         <button onClick={() => void gateway.retryPending()}>Coba lagi</button>
       )}

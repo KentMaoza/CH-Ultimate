@@ -198,6 +198,8 @@ export class MockOperationsGateway implements OperationsGateway {
     throw new Error('Import bertahap hanya tersedia melalui CH Core.');
   }
   async loadSkuImage(sku: Sku): Promise<string> { return sku.imageUrl; }
+  pauseImagePrefetch(): void {}
+  retryImagePrefetch(): void {}
   async replaceFromWorkbook(result: WorkbookImportResult, sourceLabel: string): Promise<void> {
     this.publish(reduceOperation(this.state, { type: 'replace-skus', skus: result.skus, sourceLabel, importSummary: { loaded: result.loaded, skipped: result.skipped, warnings: result.warnings } }));
   }

@@ -28,6 +28,10 @@ export const CORE_CACHE_VERSION = 1;
 export interface CoreGatewayStorage {
   load(): Promise<unknown>;
   save(envelope: CoreCacheEnvelope): Promise<void>;
+  loadImage?(hash: string): Promise<Blob | undefined>;
+  saveImage?(hash: string, image: Blob): Promise<void>;
+  listImageHashes?(): Promise<string[]>;
+  deleteImages?(hashes: string[]): Promise<void>;
 }
 
 export interface CoreGatewayClock {

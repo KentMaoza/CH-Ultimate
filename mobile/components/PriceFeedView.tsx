@@ -1,8 +1,10 @@
 import type { Sku, SkuPriceChange } from '../../src/domain/types';
+import type { OperationsGateway } from '../../src/gateway/operations-gateway';
 import { PriceChangeList } from './PriceChangeList';
 
 export function PriceFeedView({
   changes,
+  gateway,
   coreBacked = false,
   skus,
   unreadOnly,
@@ -11,6 +13,7 @@ export function PriceFeedView({
   onSimulate,
 }: {
   changes: SkuPriceChange[];
+  gateway: OperationsGateway;
   coreBacked?: boolean;
   skus: Sku[];
   unreadOnly: boolean;
@@ -23,6 +26,6 @@ export function PriceFeedView({
     <p>{unreadOnly ? 'Perubahan harga yang belum Anda buka.' : 'Riwayat perubahan harga terbaru untuk semua SKU.'}</p>
     {!coreBacked && !unreadOnly && onSimulate ? <button className="primary-action simulate-button" onClick={onSimulate}>Simulasikan perubahan harga</button> : null}
     {status && !unreadOnly ? <p className="action-status" role="status">{status}</p> : null}
-    {changes.length > 0 ? <PriceChangeList changes={changes} onOpenSku={onOpenSku} skus={skus} /> : <p className="empty-state">{unreadOnly ? 'Tidak ada perubahan harga yang belum dibaca.' : coreBacked ? 'Belum ada riwayat perubahan harga tersinkronisasi.' : 'Belum ada riwayat perubahan harga pada sesi ini.'}</p>}
+    {changes.length > 0 ? <PriceChangeList changes={changes} gateway={gateway} onOpenSku={onOpenSku} skus={skus} /> : <p className="empty-state">{unreadOnly ? 'Tidak ada perubahan harga yang belum dibaca.' : coreBacked ? 'Belum ada riwayat perubahan harga tersinkronisasi.' : 'Belum ada riwayat perubahan harga pada sesi ini.'}</p>}
   </section>;
 }

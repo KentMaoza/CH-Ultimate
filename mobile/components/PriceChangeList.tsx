@@ -1,15 +1,18 @@
 import type { Sku, SkuPriceChange } from '../../src/domain/types';
+import type { OperationsGateway } from '../../src/gateway/operations-gateway';
 import { formatRupiah, formatWita } from '../format';
 import { ChevronIcon } from './Icons';
 import { ProductImage } from './ProductImage';
 
 export function PriceChangeList({
   changes,
+  gateway,
   skus,
   onOpenSku,
   testId,
 }: {
   changes: SkuPriceChange[];
+  gateway: OperationsGateway;
   skus: Sku[];
   onOpenSku: (sku: Sku) => void;
   testId?: string;
@@ -23,7 +26,7 @@ export function PriceChangeList({
       const priceDescription = `Harga ${direction}. Harga lama ${formatRupiah(change.before)}. Harga baru ${formatRupiah(change.after)}.`;
       const descriptionId = `price-change-${change.id}-description`;
       return <button aria-describedby={descriptionId} className="price-row" key={change.id} onClick={() => onOpenSku(sku)}>
-        <ProductImage sku={sku} />
+        <ProductImage gateway={gateway} sku={sku} />
         <span className="price-row-copy">
           <strong>{sku.name}</strong>
           <span className="sku-code">SKU: {sku.skuNumber}</span>

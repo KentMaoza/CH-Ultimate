@@ -485,11 +485,13 @@ test.each([
   ['image source changes', { ...createMobileDemoState().skus[0]!, imageUrl: '/assets/mobile/replacement.svg' }],
 ])('product image retries after %s', async (_label, nextSku) => {
   const initialSku = createMobileDemoState().skus[0]!;
-  const { container, rerender } = render(<ProductImage sku={initialSku} />);
+  const gateway = new MockOperationsGateway();
+  const { container, rerender } = render(<ProductImage gateway={gateway} sku={initialSku} />);
+  await waitFor(() => expect(container.querySelector('img')).toBeInTheDocument());
   fireEvent.error(container.querySelector('img')!);
   expect(screen.getByTestId(`image-fallback-${initialSku.id}`)).toBeInTheDocument();
 
-  rerender(<ProductImage sku={nextSku} />);
+  rerender(<ProductImage gateway={gateway} sku={nextSku} />);
 
   await waitFor(() => expect(container.querySelector('img')).toHaveAttribute('src', nextSku.imageUrl));
 });

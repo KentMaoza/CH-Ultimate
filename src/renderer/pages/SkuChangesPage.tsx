@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Sku, SkuPriceChange, StockAdjustment } from '../../domain/types';
 import { formatRupiah } from '../format';
 import { useOperations } from '../operations-context';
+import { GatewaySkuImage } from '../components/GatewaySkuImage';
 
 type ChangeTab = 'price' | 'quantity';
 
@@ -38,14 +39,8 @@ function priceChangesCsv(changes: SkuPriceChange[], skus: Sku[]): string {
 
 const adjustmentSource: Record<StockAdjustment['source'], string> = { manual: 'Manual', nota: 'Nota', reversal: 'Pembalikan Nota', 'stock-check': 'Cek Stok', other: 'Lainnya' };
 
-function ChangeSkuImage({ sku }: { sku?: Sku }) {
-  const [failed, setFailed] = useState(false);
-  if (!sku?.imageUrl || failed) return <div className="image-placeholder" aria-label={`Gambar ${sku?.skuNumber ?? 'SKU'}`}>CHU</div>;
-  return <img className="sku-image" src={sku.imageUrl} alt={`Gambar ${sku.skuNumber}`} onError={() => setFailed(true)} />;
-}
-
 export function SkuChangesPage({ coreBacked = false }: { coreBacked?: boolean }) {
-  const { state } = useOperations();
+  const { state, gateway } = useOperations();
   const [tab, setTab] = useState<ChangeTab>('price');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -81,10 +76,10 @@ export function SkuChangesPage({ coreBacked = false }: { coreBacked?: boolean })
     <div className="table-frame change-table">
       {tab === 'price' ? <table><thead><tr><th>Gambar</th><th>Tanggal WITA</th><th>Nomor SKU</th><th>Nama SKU</th><th>Harga Sebelumnya</th><th>Harga Sesudahnya</th></tr></thead><tbody>{prices.map((change) => {
         const sku = skuById.get(change.skuId);
-        return <tr key={change.id}><td><ChangeSkuImage sku={sku} /></td><td>{formatWita(change.createdAt)}</td><td className="sku-number">{sku?.skuNumber ?? change.skuId}</td><td>{sku?.name ?? 'SKU tidak ditemukan'}</td><td>{formatRupiah(change.before)}</td><td><strong>{formatRupiah(change.after)}</strong></td></tr>;
+        return <tr key={change.id}><td>{sku ? <GatewaySkuImage gateway={gateway} sku={sku} className="sku-image image-placeholder" alt={`Gambar ${sku.skuNumber}`} /> : <span className="image-placeholder">CHU</span>}</td><td>{formatWita(change.createdAt)}</td><td className="sku-number">{sku?.skuNumber ?? change.skuId}</td><td>{sku?.name ?? 'SKU tidak ditemukan'}</td><td>{formatRupiah(change.before)}</td><td><strong>{formatRupiah(change.after)}</strong></td></tr>;
       })}</tbody></table> : <table><thead><tr><th>Gambar</th><th>Tanggal WITA</th><th>Nomor SKU</th><th>Nama SKU</th><th>Sumber</th><th>Sebelum</th><th>Perubahan</th><th>Sesudah</th></tr></thead><tbody>{quantities.map((change) => {
         const sku = skuById.get(change.skuId);
-        return <tr key={change.id}><td><ChangeSkuImage sku={sku} /></td><td>{formatWita(change.createdAt)}</td><td className="sku-number">{sku?.skuNumber ?? change.skuId}</td><td>{sku?.name ?? 'SKU tidak ditemukan'}</td><td>{adjustmentSource[change.source]}</td><td>{change.before}</td><td className={change.quantity < 0 ? 'change-negative' : 'change-positive'}>{change.quantity > 0 ? '+' : ''}{change.quantity}</td><td><strong>{change.after}</strong></td></tr>;
+        return <tr key={change.id}><td>{sku ? <GatewaySkuImage gateway={gateway} sku={sku} className="sku-image image-placeholder" alt={`Gambar ${sku.skuNumber}`} /> : <span className="image-placeholder">CHU</span>}</td><td>{formatWita(change.createdAt)}</td><td className="sku-number">{sku?.skuNumber ?? change.skuId}</td><td>{sku?.name ?? 'SKU tidak ditemukan'}</td><td>{adjustmentSource[change.source]}</td><td>{change.before}</td><td className={change.quantity < 0 ? 'change-negative' : 'change-positive'}>{change.quantity > 0 ? '+' : ''}{change.quantity}</td><td><strong>{change.after}</strong></td></tr>;
       })}</tbody></table>}
       {tab === 'price' && !prices.length && <div className="empty-state">Belum ada perubahan harga pada rentang tanggal ini.</div>}
       {tab === 'quantity' && !quantities.length && <div className="empty-state">Belum ada perubahan jumlah pada rentang tanggal ini.</div>}

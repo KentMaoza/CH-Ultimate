@@ -73,21 +73,6 @@ export class CoreMutationCoordinator {
     });
   }
 
-  async replaceSkuImage(
-    id: string,
-    image: { mimeType: string; bytesBase64: string },
-  ): Promise<void> {
-    const context = this.state.requireSkuWriteContext(id, {
-      imageHash: null,
-      sourceImageUrl: null,
-    });
-    await this.command({
-      method: 'POST',
-      path: CORE_API_PATHS.skuImage(id),
-      body: { ...context, ...image },
-    });
-  }
-
   adjustStock(id: string, quantity: number): Promise<void> {
     return this.command({
       method: 'POST',

@@ -38,7 +38,7 @@ export class CorePollingCoordinator {
     private readonly state: CoreGatewayState,
     private readonly envelopes: CoreEnvelopeCoordinator,
     private readonly onDeviceRole: (role: 'owner' | 'client') => void,
-    private readonly onAuthenticatedOnline: () => void | Promise<void> = () => {},
+    private readonly onAuthenticatedOnline: (authoritativeBootstrap: boolean) => void | Promise<void> = () => {},
     private readonly onAuthenticationRevoked: () => void | Promise<void> = () => {},
   ) {
     this.scheduler = new CoreSyncScheduler(
@@ -127,7 +127,7 @@ export class CorePollingCoordinator {
         lastSyncedAt: this.clock.now().toISOString(),
         message: undefined,
       });
-      await this.onAuthenticatedOnline();
+      await this.onAuthenticatedOnline(true);
     } catch (error) {
       if (
         error instanceof CoreApiUpgradeRequiredError ||
@@ -286,6 +286,6 @@ export class CorePollingCoordinator {
       lastSyncedAt: this.clock.now().toISOString(),
       message: undefined,
     });
-    await this.onAuthenticatedOnline();
+    await this.onAuthenticatedOnline(false);
   }
 }

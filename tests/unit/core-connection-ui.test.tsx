@@ -204,4 +204,27 @@ describe('desktop operations synchronization status', () => {
       ),
     ).toBeInTheDocument();
   });
+
+  it('shows image progress with explicit pause and retry controls', () => {
+    const gateway = new MockOperationsGateway();
+    gateway.getSyncSnapshot = () => ({
+      phase: 'online',
+      serverRevision: '7',
+      pendingCount: 0,
+      conflictCount: 0,
+      imagePrefetch: {
+        phase: 'running', total: 100, serverAvailable: 80, cached: 40, failed: 2,
+      },
+    });
+    gateway.pauseImagePrefetch = vi.fn();
+    gateway.retryImagePrefetch = vi.fn();
+
+    render(<OperationsSyncStatus gateway={gateway} />);
+
+    expect(screen.getByText('Gambar 40/80 tersimpan · 2 gagal · 100 SKU')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Jeda gambar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Coba lagi gambar' }));
+    expect(gateway.pauseImagePrefetch).toHaveBeenCalledOnce();
+    expect(gateway.retryImagePrefetch).toHaveBeenCalledOnce();
+  });
 });

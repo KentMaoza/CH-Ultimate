@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { searchMobileSkus } from '../../src/domain/mobile-demo-state';
 import type { Sku } from '../../src/domain/types';
+import type { OperationsGateway } from '../../src/gateway/operations-gateway';
 import { formatRupiah } from '../format';
 import { ChevronIcon, SearchIcon } from './Icons';
 import { ProductImage } from './ProductImage';
 
-export function SkuCatalog({ skus, onOpenSku, focusSearch }: { skus: Sku[]; onOpenSku: (sku: Sku) => void; focusSearch: boolean }) {
+export function SkuCatalog({ gateway, skus, onOpenSku, focusSearch }: { gateway: OperationsGateway; skus: Sku[]; onOpenSku: (sku: Sku) => void; focusSearch: boolean }) {
   const [query, setQuery] = useState('');
   const results = searchMobileSkus(skus, query);
   return <section className="page-view">
@@ -14,7 +15,7 @@ export function SkuCatalog({ skus, onOpenSku, focusSearch }: { skus: Sku[]; onOp
     <p className="result-count">{results.length} SKU aktif</p>
     <div className="sku-list">
       {results.map((sku) => <button className="sku-row" key={sku.id} onClick={() => onOpenSku(sku)}>
-        <ProductImage sku={sku} />
+        <ProductImage gateway={gateway} sku={sku} />
         <span><strong>{sku.name}</strong><small>{sku.skuNumber}</small><b>{formatRupiah(sku.referencePrice)}</b><em>{sku.tracked ? `Stok ${sku.stock}` : 'Stok tidak dilacak'}</em></span>
         <ChevronIcon />
       </button>)}

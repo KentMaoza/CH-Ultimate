@@ -501,7 +501,7 @@ describe('Core authoritative catalogue version tracking', () => {
     expect(transport.requests).toHaveLength(3);
   });
 
-  it('restarts and replays the exact durable image command after a lost response', async () => {
+  it('never persists failed upload bytes and allows an explicit retry after restart', async () => {
     const storage = new MemoryStorage();
     const firstTransport = new ScriptedTransport();
     const first = createCoreOperationsGateway(
@@ -519,13 +519,8 @@ describe('Core authoritative catalogue version tracking', () => {
       }),
     ).rejects.toThrow('response lost');
     first.dispose();
-    const pending = structuredClone(
-      (storage.value as { outbox: Array<Record<string, unknown>> }).outbox[0],
-    );
-    expect(pending).toMatchObject({
-      path: `/v1/skus/${SKU_ID}/image`,
-      idempotencyKey: expect.any(String),
-    });
+    expect((storage.value as { outbox: unknown[] }).outbox).toEqual([]);
+    expect(JSON.stringify(storage.value)).not.toContain(bytesBase64);
 
     const transport = new ScriptedTransport();
     const gateway = createCoreOperationsGateway(
@@ -535,21 +530,16 @@ describe('Core authoritative catalogue version tracking', () => {
     );
     transport.enqueue({
       status: 200,
-      body: populatedBootstrap('2', {
-        skus: [
-          {
-            ...populatedBootstrap().skus[0]!,
-            imageHash: 'b'.repeat(64),
-            sourceImageUrl: null,
-            rowVersion: '2',
-          },
-        ],
-      }),
+      body: populatedBootstrap('1'),
     });
     await gateway.initialize();
     transport.enqueue((request) => {
-      expect(request.idempotencyKey).toBe(pending?.idempotencyKey);
-      expect(request.body).toEqual(pending?.body);
+      expect(request).toMatchObject({
+        method: 'POST',
+        path: `/v1/skus/${SKU_ID}/image`,
+        idempotencyKey: expect.any(String),
+        body: { mimeType: 'image/png', bytesBase64 },
+      });
       return {
         status: 200,
         body: {
@@ -566,11 +556,15 @@ describe('Core authoritative catalogue version tracking', () => {
     });
     transport.enqueue({
       status: 200,
-      body: { serverRevision: '2', nextAfter: '2', changes: [] },
+      body: { serverRevision: '2', nextAfter: '1', changes: [] },
     });
 
-    await gateway.retryPending();
+    await gateway.updateSku(SKU_ID, {
+      imageUrl: `data:image/png;base64,${bytesBase64}`,
+    });
     expect(gateway.getSyncSnapshot().pendingCount).toBe(0);
+    expect((storage.value as { outbox: unknown[] }).outbox).toEqual([]);
+    expect(JSON.stringify(storage.value)).not.toContain(bytesBase64);
   });
 
   it('maps image hash and private source metadata from bootstrap and changes', async () => {

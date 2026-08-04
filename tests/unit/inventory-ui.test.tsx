@@ -335,6 +335,23 @@ test('loads an imported SKU image through the gateway cache boundary', async () 
   );
 });
 
+test.each([
+  ['image/svg+xml', 100, 'Format gambar harus PNG, JPEG, GIF, atau WebP.'],
+  ['image/png', (5 * 1024 * 1024) + 1, 'File gambar melebihi batas 5 MiB.'],
+])('rejects unsupported or oversized desktop image upload: %s', async (type, size, message) => {
+  const gateway = new MockOperationsGateway();
+  const update = vi.spyOn(gateway, 'updateSku');
+  render(<App gateway={gateway} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Ubah gambar BRS-108-BLK' }));
+  const file = new File([new Uint8Array(size)], 'produk', { type });
+  fireEvent.change(screen.getByLabelText('Pilih file gambar SKU'), {
+    target: { files: [file] },
+  });
+
+  expect(await screen.findByText(message)).toBeInTheDocument();
+  expect(update).not.toHaveBeenCalled();
+});
+
 test('hides the entire import flow when the authenticated device is not an owner', () => {
   const gateway = new MockOperationsGateway();
   Object.assign(gateway.capabilities, {

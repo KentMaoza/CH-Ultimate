@@ -8,6 +8,8 @@ import { buildShareRecommendationReport, groupShareRecommendationItems, type Sha
 import type { Sku } from '../../domain/types';
 import { formatDate, formatRupiah } from '../format';
 import { useOperations } from '../operations-context';
+import { GatewaySkuImage } from '../components/GatewaySkuImage';
+import { hydrateRecommendationPdfImages } from '../recommendation-pdf-images';
 
 type RecommendationTab = RecommendationPdfMode;
 const reasonLabels = {
@@ -27,16 +29,9 @@ function recommendationDate(value: string): Date {
   return new Date(`${value}T04:00:00.000Z`);
 }
 
-function SkuImage({ sku }: { sku: Sku }) {
-  const [failed, setFailed] = useState(false);
-  return sku.imageUrl && !failed
-    ? <img className="share-recommendation__image" src={sku.imageUrl} alt="" onError={() => setFailed(true)} />
-    : <div className="share-recommendation__image image-placeholder">CHU</div>;
-}
-
-function RecommendationRow({ item }: { item: ShareRecommendationItem }) {
+function RecommendationRow({ item, gateway }: { item: ShareRecommendationItem; gateway: ReturnType<typeof useOperations>['gateway'] }) {
   return <article className="share-recommendation__item">
-    <SkuImage sku={item.sku} />
+    <GatewaySkuImage gateway={gateway} sku={item.sku} className="share-recommendation__image image-placeholder" alt="" />
     <div className="share-recommendation__identity"><strong>{item.sku.name}</strong><span>{item.sku.skuNumber}</span></div>
     <div className="share-recommendation__stock"><span>Stok</span><strong>{item.sku.stock}</strong></div>
     <div className="share-recommendation__price"><span>Harga</span><strong>{formatRupiah(item.sku.referencePrice)}</strong></div>
@@ -48,18 +43,18 @@ function RecommendationRow({ item }: { item: ShareRecommendationItem }) {
   </article>;
 }
 
-function RecommendationGroups({ groups }: { groups: ShareRecommendationGroup[] }) {
+function RecommendationGroups({ groups, gateway }: { groups: ShareRecommendationGroup[]; gateway: ReturnType<typeof useOperations>['gateway'] }) {
   return <div className="share-recommendation__groups">{groups.map((group) => {
     const label = group.supplierCode ?? 'Tanpa kode supplier';
     return <section className="share-recommendation__group" role="region" aria-label={`Grup supplier ${label}`} key={label}>
       <header><div><span>SUPPLIER</span><h2>{label}</h2></div><strong>{group.items.length} SKU</strong></header>
-      <div>{group.items.map((item) => <RecommendationRow item={item} key={item.sku.id} />)}</div>
+      <div>{group.items.map((item) => <RecommendationRow item={item} gateway={gateway} key={item.sku.id} />)}</div>
     </section>;
   })}</div>;
 }
 
 export function ShareRecommendationsPage() {
-  const { state } = useOperations();
+  const { state, gateway } = useOperations();
   const [tab, setTab] = useState<RecommendationTab>('daily');
   const [date, setDate] = useState(witaDateToday);
   const [message, setMessage] = useState('');
@@ -72,7 +67,9 @@ export function ShareRecommendationsPage() {
     setDownloading(true);
     setMessage('');
     try {
-      const blob = await createRecommendationPdfBlob(pdfPlan);
+      const blob = await createRecommendationPdfBlob(
+        await hydrateRecommendationPdfImages(pdfPlan, state.skus, gateway),
+      );
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -112,6 +109,6 @@ export function ShareRecommendationsPage() {
       <div><span>{tab === 'daily' ? 'DAFTAR HARIAN' : 'PRIORITAS URGENT'}</span><strong>{tab === 'daily' ? `${report.daily.length} dari ${report.totalEligible} SKU dipilih untuk hari ini` : `${pdfPlan.totalIncluded} dari ${pdfPlan.totalAvailable} SKU urgent dimasukkan ke PDF`}</strong></div>
       <small>{tab === 'daily' ? 'Daftar berganti secara deterministik menurut tanggal WITA dan kode supplier.' : 'Urgent dihitung dengan ambang kalender, bukan perkiraan jumlah hari.'}</small>
     </div>
-    {groups.length ? <RecommendationGroups groups={groups} /> : <p className="empty-state">Tidak ada SKU yang memenuhi rekomendasi pada tanggal ini.</p>}
+    {groups.length ? <RecommendationGroups groups={groups} gateway={gateway} /> : <p className="empty-state">Tidak ada SKU yang memenuhi rekomendasi pada tanggal ini.</p>}
   </div>;
 }

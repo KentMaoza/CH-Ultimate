@@ -54,6 +54,11 @@ import {
   mapCoreStockCheckRow,
 } from './core-bootstrap-mapping';
 import { applyCoreOptimisticChange } from './core-optimistic-state';
+import {
+  CoreImageCacheCoordinator,
+  imageBlobFromBase64,
+  imageBlobToDataUrl,
+} from './core-image-cache';
 
 export type {
   CoreCacheEnvelope,
@@ -80,16 +85,26 @@ export class CoreGatewayNetworkBlockedError extends Error {
 
 function parseImageDataUrl(
   value: string | undefined,
-): { mimeType: string; bytesBase64: string } | null {
+): { mimeType: string; bytesBase64: string; blob: Blob } | null {
   if (!value?.startsWith('data:')) return null;
-  const match =
-    /^data:(image\/(?:png|jpeg|gif|webp));base64,((?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?)$/.exec(
-      value,
-    );
-  if (!match?.[1] || !match[2] || match[2].length > 7_000_000) {
+  const separator = value.indexOf(',');
+  const mimeMatch = /^data:(image\/(?:png|jpeg|gif|webp));base64$/.exec(
+    value.slice(0, separator),
+  );
+  const bytesBase64 = separator >= 0 ? value.slice(separator + 1) : '';
+  const padding = bytesBase64.endsWith('==') ? 2 : bytesBase64.endsWith('=') ? 1 : 0;
+  const decodedBytes = Math.floor((bytesBase64.length * 3) / 4) - padding;
+  if (
+    !mimeMatch?.[1] || !bytesBase64 || decodedBytes > 5 * 1024 * 1024 ||
+    !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(bytesBase64)
+  ) {
     throw new Error('Data gambar tidak valid atau terlalu besar.');
   }
-  return { mimeType: match[1], bytesBase64: match[2] };
+  return {
+    mimeType: mimeMatch[1],
+    bytesBase64,
+    blob: imageBlobFromBase64(mimeMatch[1], bytesBase64),
+  };
 }
 
 class CoreOperationsGatewayImpl implements CoreOperationsGateway {
@@ -102,8 +117,10 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   private readonly state = new CoreGatewayState();
   private readonly polling: CorePollingCoordinator;
   private readonly mutations: CoreMutationCoordinator;
+  private readonly envelopes: CoreEnvelopeCoordinator;
   private readonly localStore: CoreLocalStore;
   private readonly deferred: CoreDeferredOutbox;
+  private readonly images: CoreImageCacheCoordinator;
   private readonly clock: CoreGatewayClock;
   private provisionalNotaIds = new Set<string>();
 
@@ -114,6 +131,13 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   ) {
     this.clock = clock;
     this.localStore = new CoreLocalStore(storage);
+    this.images = new CoreImageCacheCoordinator(
+      transport,
+      storage,
+      clock,
+      this.state,
+      () => this.state.getSnapshot().skus,
+    );
     this.deferred = new CoreDeferredOutbox(
       this.localStore,
       transport,
@@ -128,6 +152,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
       canonicalStorage,
       this.state,
     );
+    this.envelopes = envelopes;
     this.polling = new CorePollingCoordinator(
       transport,
       canonicalStorage,
@@ -137,7 +162,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
       (role) => {
         this.capabilities.canStageInitialCatalogue = role === 'owner';
       },
-      () => this.onAuthenticatedOnline(),
+      (authoritativeBootstrap) => this.onAuthenticatedOnline(authoritativeBootstrap),
       () => this.onAuthenticationRevoked(),
     );
     this.mutations = new CoreMutationCoordinator(
@@ -196,7 +221,10 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     this.applyOfflineProjection(envelope, !legacyCacheRestored);
     await this.polling.initialize(true);
   };
-  dispose = (): void => this.polling.dispose();
+  dispose = (): void => {
+    this.polling.dispose();
+    this.images.dispose();
+  };
   flushNota = async (id: string): Promise<void> => {
     if (this.hasLocalNota(id)) return;
     this.requireNetworkAllowed();
@@ -281,7 +309,39 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
       await this.mutations.updateSku(id, patch);
       return;
     }
-    await this.mutations.replaceSkuImage(id, upload);
+    const path = CORE_API_PATHS.skuImage(id);
+    const body = asOfflineJson({
+      ...this.state.requireSkuWriteContext(id, {
+        imageHash: null,
+        sourceImageUrl: null,
+      }),
+      mimeType: upload.mimeType,
+      bytesBase64: upload.bytesBase64,
+    });
+    const response = await this.transport.request({
+      method: 'POST',
+      path,
+      idempotencyKey: crypto.randomUUID(),
+      body,
+    });
+    this.throwForApiError(response.status, response.body);
+    const acknowledgement = parseCoreMutationAcknowledgement(response.body);
+    const hasAuthoritativeEntity = this.state.recordMutationAcknowledgement(
+      path,
+      acknowledgement,
+      body,
+    );
+    if (!hasAuthoritativeEntity) {
+      throw new Error('Respons gambar CH Core tidak valid.');
+    }
+    await this.envelopes.persistCurrent();
+    this.state.refreshCanonicalProjection();
+    const updated = this.state.getSnapshot().skus.find((sku) => sku.id === id);
+    if (!updated?.imageHash) {
+      throw new Error('Hash gambar CH Core tidak tersedia.');
+    }
+    await this.images.seed(updated.imageHash, upload.blob);
+    await this.polling.refreshNow();
   };
   adjustStock = async (
     id: string,
@@ -420,6 +480,12 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
 
   async loadSkuImage(sku: Sku): Promise<string> {
     if (!sku.imageHash) return sku.imageUrl;
+    if (this.images.isEnabled()) {
+      return imageBlobToDataUrl(await this.images.load(
+        sku.imageHash,
+        () => this.requireNetworkAllowed(),
+      ));
+    }
     this.requireNetworkAllowed();
     const response = await this.transport.request({
       method: 'GET',
@@ -429,6 +495,9 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     const image = parseCatalogueImage(response.body);
     return `data:${image.mimeType};base64,${image.bytesBase64}`;
   }
+
+  pauseImagePrefetch = (): void => this.images.pause();
+  retryImagePrefetch = (): void => this.images.retry();
 
   private throwForApiError(status: number, body: unknown): void {
     if (status >= 200 && status < 300) return;
@@ -1014,7 +1083,9 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     await this.refreshOfflineProjection();
   }
 
-  private async onAuthenticatedOnline(): Promise<void> {
+  private async onAuthenticatedOnline(
+    authoritativeBootstrap: boolean,
+  ): Promise<void> {
     const envelope = await this.localStore.update((current) => ({
       ...current,
       balanceVersions: this.state.getBalanceVersions(),
@@ -1041,6 +1112,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     }
     await this.deferred.pump(true);
     await this.refreshOfflineProjection();
+    void this.images.refresh(authoritativeBootstrap);
   }
 
   private async onAuthenticationRevoked(): Promise<void> {

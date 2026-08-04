@@ -85,6 +85,7 @@ test('creates a local PDF blob and tolerates products without a usable image', a
     recommendation(1),
     recommendation(2),
   ]), 'daily');
+  plan.groups[0]!.products[1]!.imageUrl = '/assets/product-2.png';
 
   const pdf = await createRecommendationPdfBlob(plan, { loadImageDataUrl });
 
@@ -103,6 +104,8 @@ test('loads distinct product images concurrently before drawing the catalogue', 
     recommendation(2),
     recommendation(4),
   ]), 'daily');
+  plan.groups[0]!.products[0]!.imageUrl = '/assets/product-2.png';
+  plan.groups[0]!.products[1]!.imageUrl = '/assets/product-4.png';
 
   const pdfPromise = createRecommendationPdfBlob(plan, { loadImageDataUrl });
   await vi.waitFor(() => expect(loadImageDataUrl).toHaveBeenCalled());

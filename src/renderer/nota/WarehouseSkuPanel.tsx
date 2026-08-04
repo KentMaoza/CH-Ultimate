@@ -1,6 +1,8 @@
 import { useMemo, useState, type KeyboardEvent } from 'react';
 import type { Sku } from '../../domain/types';
 import { formatRupiah } from '../format';
+import { useOperations } from '../operations-context';
+import { GatewaySkuImage } from '../components/GatewaySkuImage';
 
 const PAGE_SIZE = 50;
 
@@ -10,18 +12,13 @@ function matchesSku(sku: Sku, query: string) {
     .some((value) => value.toLocaleLowerCase('id-ID').includes(needle));
 }
 
-function SkuThumbnail({ sku }: { sku: Sku }) {
-  const [failed, setFailed] = useState(false);
-  if (!sku.imageUrl || failed) return <span className="chu-nota-workspace__sku-placeholder" aria-hidden="true">CHU</span>;
-  return <img className="chu-nota-workspace__sku-image" src={sku.imageUrl} alt="" onError={() => setFailed(true)} />;
-}
-
 export function WarehouseSkuPanel({ skus, targetLabel, disabled, onSelect }: {
   skus: Sku[];
   targetLabel: string;
   disabled: boolean;
   onSelect: (sku: Sku) => void;
 }) {
+  const { gateway } = useOperations();
   const [open, setOpen] = useState(true);
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
@@ -84,7 +81,7 @@ export function WarehouseSkuPanel({ skus, targetLabel, disabled, onSelect }: {
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => onSelect(sku)}
         >
-          <SkuThumbnail sku={sku} />
+          <GatewaySkuImage gateway={gateway} sku={sku} className="chu-nota-workspace__sku-image chu-nota-workspace__sku-placeholder" alt="" />
           <span><strong>{sku.skuNumber}</strong><small>{sku.name}</small></span>
           <span><strong>{formatRupiah(sku.referencePrice)}</strong><small>{sku.tracked ? `Stok ${sku.stock}` : 'Stok tidak dilacak'}</small></span>
         </button>)}

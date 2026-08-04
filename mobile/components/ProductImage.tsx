@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react';
 import type { Sku } from '../../src/domain/types';
+import type { OperationsGateway } from '../../src/gateway/operations-gateway';
+import { GatewaySkuImage } from '../../src/renderer/components/GatewaySkuImage';
 import { BoxIcon } from './Icons';
 
-export function ProductImage({ sku }: { sku: Sku }) {
-  const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [sku.id, sku.imageUrl]);
-  if (!sku.imageUrl || failed) {
-    return <span className="product-image product-image-fallback" data-testid={`image-fallback-${sku.id}`}><BoxIcon /></span>;
-  }
-  return <img alt="" className="product-image" src={sku.imageUrl} onError={() => setFailed(true)} />;
+export function ProductImage({ gateway, sku }: { gateway: OperationsGateway; sku: Sku }) {
+  return <GatewaySkuImage
+    gateway={gateway}
+    sku={sku}
+    className="product-image product-image-fallback"
+    alt=""
+    fallback={<BoxIcon />}
+    fallbackTestId={`image-fallback-${sku.id}`}
+  />;
 }

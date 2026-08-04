@@ -197,8 +197,9 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
       </div>
     )}
     <main className="mobile-content" ref={mainContentRef}>
-      {selectedSku ? <SkuDetail changes={snapshot.priceChanges} coreBacked={coreBacked} onBack={closeSkuDetail} onScanAgain={openManualScan} sku={selectedSku} /> : scanOpen ? <ScanSurface error={scanError} initialCode={scanCode} key={scanCode} onManualLookup={manualLookup} onRetry={() => void beginScan()} /> : view === 'home' ? <DashboardView
+      {selectedSku ? <SkuDetail changes={snapshot.priceChanges} coreBacked={coreBacked} gateway={gateway} onBack={closeSkuDetail} onScanAgain={openManualScan} sku={selectedSku} /> : scanOpen ? <ScanSurface error={scanError} initialCode={scanCode} key={scanCode} onManualLookup={manualLookup} onRetry={() => void beginScan()} /> : view === 'home' ? <DashboardView
         snapshot={snapshot}
+        gateway={gateway}
         unreadCount={unreadCount}
         onOpenPrices={() => navigate('prices')}
         onOpenSku={openSku}
@@ -208,9 +209,10 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
         onSearch={() => navigate('skus', true)}
         coreBacked={coreBacked}
       /> : null}
-      {view === 'skus' && !scanOpen && !selectedSku ? <SkuCatalog focusSearch={focusSearch} onOpenSku={openSku} skus={snapshot.skus} /> : null}
-      {view === 'prices' && !scanOpen && !selectedSku ? <PriceFeedView changes={visiblePriceChanges} coreBacked={coreBacked} onOpenSku={openSku} onSimulate={coreBacked ? undefined : () => void simulatePriceChange()} skus={snapshot.skus} status={simulationStatus} unreadOnly={priceMode === 'unread'} /> : null}
+      {view === 'skus' && !scanOpen && !selectedSku ? <SkuCatalog focusSearch={focusSearch} gateway={gateway} onOpenSku={openSku} skus={snapshot.skus} /> : null}
+      {view === 'prices' && !scanOpen && !selectedSku ? <PriceFeedView changes={visiblePriceChanges} coreBacked={coreBacked} gateway={gateway} onOpenSku={openSku} onSimulate={coreBacked ? undefined : () => void simulatePriceChange()} skus={snapshot.skus} status={simulationStatus} unreadOnly={priceMode === 'unread'} /> : null}
       {view === 'recommendations' && !scanOpen && !selectedSku ? <ShareRecommendationsView
+        gateway={gateway}
         onBack={() => navigate('home')}
         onOpenSku={openSku}
         onSharePdf={share.sharePdf}

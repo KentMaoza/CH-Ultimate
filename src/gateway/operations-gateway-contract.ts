@@ -2,6 +2,14 @@ import type { DemoState, InvoiceTemplate, LabelTemplate, Nota, NotaCompletionDes
 
 export type SyncPhase = 'demo' | 'unpaired' | 'connecting' | 'online' | 'offline' | 'syncing' | 'conflict' | 'revoked' | 'upgrade-required';
 
+export interface ImagePrefetchSnapshot {
+  phase: 'idle' | 'running' | 'paused' | 'complete';
+  total: number;
+  serverAvailable: number;
+  cached: number;
+  failed: number;
+}
+
 export interface SyncSnapshot {
   phase: SyncPhase;
   serverRevision: string;
@@ -10,6 +18,7 @@ export interface SyncSnapshot {
   quarantinedCount?: number;
   lastSyncedAt?: string;
   message?: string;
+  imagePrefetch?: ImagePrefetchSnapshot;
 }
 
 export interface SyncConflict {
@@ -105,6 +114,8 @@ export interface OperationsGateway {
     importId: string,
   ): Promise<CatalogueCommitReceipt>;
   loadSkuImage(sku: Sku): Promise<string>;
+  pauseImagePrefetch(): void;
+  retryImagePrefetch(): void;
   replaceFromWorkbook(result: WorkbookImportResult, sourceLabel: string): Promise<void>;
   reset(): Promise<void>;
   setLabelTemplate(template: LabelTemplate): Promise<void>;

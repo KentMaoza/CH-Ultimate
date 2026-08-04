@@ -166,7 +166,14 @@ jobs:
           }
           $expected = '57e0731ce3db068e6581980c53610764af05c612184ff50e18a9f4912ca59ba5'
           $actualLine = $signerOutput | Where-Object { $_ -match 'certificate SHA-256 digest:' } | Select-Object -First 1
-          $actual = (($actualLine -split ':', 2)[1] -replace '[^0-9A-Fa-f]', '').ToLowerInvariant()
+          $digestMatch = [regex]::Match(
+            [string]$actualLine,
+            'certificate SHA-256 digest:\s*([0-9A-Fa-f]{64})\s*$'
+          )
+          if (-not $digestMatch.Success) {
+            throw 'Android signing certificate digest was missing or malformed.'
+          }
+          $actual = $digestMatch.Groups[1].Value.ToLowerInvariant()
           if ($actual -ne $expected) {
             throw "Unexpected Android signing certificate: $actual"
           }

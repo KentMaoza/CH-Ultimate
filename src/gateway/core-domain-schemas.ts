@@ -1,12 +1,46 @@
 import { z } from 'zod';
 
 export const timestampSchema = z.string().datetime({ offset: true });
+const safeIntegerSchema = z.number().int().safe();
+
+export const skuIdentifierKindSchema = z.enum([
+  'primary',
+  'product_code',
+  'alias',
+  'package_barcode',
+  'other',
+]);
+
+export const skuIdentifierSchema = z.object({
+  id: z.string(),
+  skuId: z.string(),
+  value: z.string(),
+  kind: skuIdentifierKindSchema,
+  createdAt: timestampSchema,
+}).strict();
+
+export const stockCheckSchema = z.object({
+  id: z.string(),
+  skuId: z.string(),
+  observedQuantityPcs: safeIntegerSchema,
+  countedQuantityPcs: safeIntegerSchema,
+  serverQuantityBeforePcs: safeIntegerSchema,
+  appliedDeltaPcs: safeIntegerSchema,
+  baseBalanceVersion: z.string().regex(/^[1-9]\d*$/).optional(),
+  forcedOffline: z.boolean(),
+  countedAt: timestampSchema,
+  appliedAt: timestampSchema,
+  deviceId: z.string(),
+  deviceDisplayName: z.string(),
+  note: z.string().trim().max(512).optional(),
+}).strict();
 
 export const skuSchema = z
   .object({
     id: z.string(),
     skuNumber: z.string(),
     aliases: z.array(z.string()),
+    identifiers: z.array(skuIdentifierSchema),
     name: z.string(),
     referencePrice: z.number().int(),
     stock: z.number().int(),
@@ -18,6 +52,7 @@ export const skuSchema = z
     sourceCreatedAt: z.string().optional(),
     createdAt: timestampSchema,
     archived: z.boolean(),
+    lastStockCheckedAt: timestampSchema.optional(),
   })
   .strict();
 
@@ -137,10 +172,11 @@ export const demoStateSchema = z
           before: z.number().int(),
           after: z.number().int(),
           createdAt: timestampSchema,
-          source: z.enum(['manual', 'nota', 'reversal', 'other']).default('other'),
+          source: z.enum(['manual', 'nota', 'reversal', 'stock-check', 'other']).default('other'),
         })
         .strict(),
     ),
+    stockChecks: z.array(stockCheckSchema),
     priceChanges: z.array(
       z
         .object({

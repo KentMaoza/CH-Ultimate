@@ -69,6 +69,7 @@ export class MockOperationsGateway implements OperationsGateway {
       id: `sku-${Date.now()}-${sequence++}`,
       skuNumber,
       aliases: [],
+      identifiers: [],
       name: input.name.trim(),
       referencePrice: Math.max(0, Math.round(input.referencePrice)),
       stock: input.openingStock,

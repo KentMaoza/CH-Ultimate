@@ -717,7 +717,7 @@ describe('Core authoritative catalogue version tracking', () => {
     expect(gateway.getSnapshot().adjustments.map((adjustment) => adjustment.source)).toEqual([
       'manual',
       'nota',
-      'other',
+      'stock-check',
       'reversal',
       'other',
     ]);

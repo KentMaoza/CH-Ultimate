@@ -207,11 +207,11 @@ export async function writeNotaPosting(
     await connection.query(
       `INSERT INTO stock_movements
          (id, sku_id, delta_pcs, reason, nota_posting_id, device_id,
-          operation_id, created_at)
+          operation_id, balance_row_version_after, created_at)
        VALUES
          (UNHEX(REPLACE(?, '-', '')), UNHEX(REPLACE(?, '-', '')), ?,
           ?, UNHEX(REPLACE(?, '-', '')), UNHEX(REPLACE(?, '-', '')),
-          UNHEX(REPLACE(?, '-', '')), ?)`,
+          UNHEX(REPLACE(?, '-', '')), ?, ?)`,
       [
         movementId,
         plan.skuId,
@@ -220,6 +220,7 @@ export async function writeNotaPosting(
         postingId,
         input.deviceId,
         input.operationId,
+        plan.afterVersion,
         input.now,
       ],
     );
@@ -246,6 +247,7 @@ export async function writeNotaPosting(
         reason,
         deviceId: input.deviceId,
         operationId: input.operationId,
+        balanceRowVersionAfter: plan.afterVersion.toString(),
         createdAt: input.now.toISOString(),
         beforeQuantityPcs: plan.beforeQuantity.toString(),
         afterQuantityPcs: plan.afterQuantity.toString(),

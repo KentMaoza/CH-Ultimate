@@ -268,6 +268,7 @@ describe('MariaDB offline stock repository', () => {
       'Barang rusak',
       DEVICE_ID,
       OPERATION_ID,
+      4n,
       NOW,
     ]);
     expect(

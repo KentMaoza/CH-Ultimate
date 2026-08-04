@@ -40,7 +40,7 @@ test('settings identifies the session data source and can reset it', async () =>
 
 test('empty stock combines supplier and search filters while preserving earlier selections', async () => {
   const gateway = new MockOperationsGateway();
-  const base = (id: string, skuNumber: string, name: string): Sku => ({ id, skuNumber, name, aliases: [], referencePrice: 0, stock: 0, tracked: true, note: '', imageUrl: '', createdAt: '', archived: false });
+  const base = (id: string, skuNumber: string, name: string): Sku => ({ id, skuNumber, name, aliases: [], identifiers: [], referencePrice: 0, stock: 0, tracked: true, note: '', imageUrl: '', createdAt: '', archived: false });
   await gateway.replaceFromWorkbook({
     skus: [base('a', 'SKU-RED', 'Kemeja Merah CH02'), base('b', 'SKU-BLUE', 'Kemeja Biru CH002'), base('c', 'SKU-PLAIN', 'Tanpa pemasok')],
     loaded: 3, skipped: 0, warnings: [],
@@ -67,7 +67,7 @@ test('empty stock combines supplier and search filters while preserving earlier 
 
 test('empty stock can isolate remaining one or two pieces without losing low-stock selections', async () => {
   const gateway = new MockOperationsGateway();
-  const base = (id: string, skuNumber: string, name: string, stock: number): Sku => ({ id, skuNumber, name, aliases: [], referencePrice: 0, stock, tracked: true, note: '', imageUrl: '', createdAt: '', archived: false });
+  const base = (id: string, skuNumber: string, name: string, stock: number): Sku => ({ id, skuNumber, name, aliases: [], identifiers: [], referencePrice: 0, stock, tracked: true, note: '', imageUrl: '', createdAt: '', archived: false });
   await gateway.replaceFromWorkbook({
     skus: [
       base('negative', 'SKU-NEGATIVE', 'Negatif CH01', -1),

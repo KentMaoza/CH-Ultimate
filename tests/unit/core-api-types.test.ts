@@ -49,11 +49,13 @@ describe('CH Core API envelope validation', () => {
     expect(() => parseCoreBootstrap(body)).toThrow(CoreApiSchemaError);
   });
 
-  it('marks an explicit unsupported API schema as upgrade-required', () => {
+  it('requires API schema v2 and marks v3 as upgrade-required', () => {
+    const { apiSchemaVersion: _version, ...missingMarker } = bootstrapBody();
+    expect(() => parseCoreBootstrap(missingMarker)).toThrow(CoreApiSchemaError);
     expect(() =>
       parseCoreBootstrap({
         ...bootstrapBody(),
-        apiSchemaVersion: 2,
+        apiSchemaVersion: 3,
       }),
     ).toThrow(
       expect.objectContaining({
@@ -64,6 +66,7 @@ describe('CH Core API envelope validation', () => {
 
   it('accepts ascending changes and validates their complete envelope', () => {
     const parsed = parseCoreChangePage({
+      apiSchemaVersion: 2,
       serverRevision: '3',
       nextAfter: '3',
       changes: [
@@ -93,6 +96,7 @@ describe('CH Core API envelope validation', () => {
     {
       name: 'out-of-order revisions',
       body: {
+        apiSchemaVersion: 2,
         serverRevision: '3',
         nextAfter: '2',
         changes: [
@@ -117,7 +121,7 @@ describe('CH Core API envelope validation', () => {
     },
     {
       name: 'noncanonical next cursor',
-      body: { serverRevision: '3', nextAfter: '03', changes: [] },
+      body: { apiSchemaVersion: 2, serverRevision: '3', nextAfter: '03', changes: [] },
     },
   ])('rejects $name', ({ body }) => {
     expect(() => parseCoreChangePage(body)).toThrow(CoreApiSchemaError);

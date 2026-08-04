@@ -19,10 +19,11 @@ export function createInitialState(): DemoState {
   ] as const;
   return {
     skus: fixture.map(([id, skuNumber, name, referencePrice, stock, note, tracked]) => ({
-      id, skuNumber, aliases: [], name, referencePrice, stock, tracked, note,
+      id, skuNumber, aliases: [], identifiers: [], name, referencePrice, stock, tracked, note,
       imageUrl: '', createdAt, archived: false,
     })),
     adjustments: [],
+    stockChecks: [],
     priceChanges: [],
     notaTransactions: [],
     labelTemplate: { medium: 'thermal', widthMm: 50, heightMm: 30, columns: 1, marginMm: 2, gapMm: 2, fontSize: 10, alignment: 'center', fields: ['qr', 'name', 'sku', 'price'] },

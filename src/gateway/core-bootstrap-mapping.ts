@@ -45,6 +45,7 @@ export function emptyCoreState(): DemoState {
   return {
     skus: [],
     adjustments: [],
+    stockChecks: [],
     priceChanges: [],
     notaTransactions: [],
     notaPostings: [],
@@ -121,6 +122,12 @@ export function mapCoreBootstrapToDemoState(
       `Balance ${balance.skuId} references a missing SKU`,
     );
   }
+  for (const stockCheck of bootstrap.stockChecks) {
+    requireRelation(
+      skuIds.has(stockCheck.skuId),
+      `Stock check ${stockCheck.id} references a missing SKU`,
+    );
+  }
   for (const line of bootstrap.notaLines) {
     requireRelation(
       pageOwners.get(line.pageId) === line.notaId,
@@ -150,27 +157,36 @@ export function mapCoreBootstrapToDemoState(
       `Revenue posting ${posting.id} references a missing posting`,
     );
   }
-  const identifiers = new Map<string, string[]>();
+  const identifiers = new Map<string, CoreBootstrap['skuIdentifiers']>();
   for (const identifier of bootstrap.skuIdentifiers) {
     const values = identifiers.get(identifier.skuId) ?? [];
-    values.push(identifier.identifierValue);
+    values.push(identifier);
     identifiers.set(identifier.skuId, values);
   }
   const balances = new Map(
     bootstrap.balances.map((balance) => [
       balance.skuId,
-      integerFromDecimal(balance.quantityPcs, 'quantityPcs'),
+      balance,
     ]),
   );
   state.skus = bootstrap.skus.map((row) => ({
     id: row.id,
     skuNumber: row.primaryIdentifier,
     aliases: (identifiers.get(row.id) ?? []).filter(
-      (value) => value !== row.primaryIdentifier,
-    ),
+      (identifier) => identifier.identifierValue !== row.primaryIdentifier,
+    ).map((identifier) => identifier.identifierValue),
+    identifiers: (identifiers.get(row.id) ?? []).map((identifier) => ({
+      id: identifier.id,
+      skuId: identifier.skuId,
+      value: identifier.identifierValue,
+      kind: identifier.identifierKind,
+      createdAt: identifier.createdAt,
+    })),
     name: row.name,
     referencePrice: integerFromDecimal(row.priceRupiah, 'priceRupiah'),
-    stock: balances.get(row.id) ?? 0,
+    stock: balances.has(row.id)
+      ? integerFromDecimal(balances.get(row.id)!.quantityPcs, 'quantityPcs')
+      : 0,
     tracked: balances.has(row.id),
     note: row.sourceNote ?? '',
     imageUrl: '',
@@ -181,6 +197,9 @@ export function mapCoreBootstrapToDemoState(
       : {}),
     createdAt: row.createdAt,
     archived: row.archivedAt !== null,
+    ...(balances.get(row.id)?.lastCheckedAt
+      ? { lastStockCheckedAt: balances.get(row.id)!.lastCheckedAt! }
+      : {}),
   }));
   const previousPrices = new Map<string, number>();
   state.priceChanges = [...bootstrap.priceHistory]
@@ -204,7 +223,12 @@ export function mapCoreBootstrapToDemoState(
             : 'other' as const,
       };
     });
-  const runningBalances = new Map(balances);
+  const runningBalances = new Map(
+    [...balances].map(([skuId, balance]) => [
+      skuId,
+      integerFromDecimal(balance.quantityPcs, 'quantityPcs'),
+    ]),
+  );
   state.adjustments = [...bootstrap.stockMovements]
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
     .map((row) => {
@@ -229,10 +253,38 @@ export function mapCoreBootstrapToDemoState(
             ? ('nota' as const)
             : row.reason === 'manual_adjustment'
               ? ('manual' as const)
+              : row.reason === 'stock_check'
+                ? ('stock-check' as const)
               : ('other' as const),
       };
     })
     .reverse();
+  state.stockChecks = bootstrap.stockChecks.map((row) => ({
+    id: row.id,
+    skuId: row.skuId,
+    observedQuantityPcs: integerFromDecimal(
+      row.observedQuantityPcs,
+      'observedQuantityPcs',
+    ),
+    countedQuantityPcs: integerFromDecimal(
+      row.countedQuantityPcs,
+      'countedQuantityPcs',
+    ),
+    serverQuantityBeforePcs: integerFromDecimal(
+      row.serverQuantityBeforePcs,
+      'serverQuantityBeforePcs',
+    ),
+    appliedDeltaPcs: integerFromDecimal(row.appliedDeltaPcs, 'appliedDeltaPcs'),
+    ...(row.baseBalanceVersion
+      ? { baseBalanceVersion: row.baseBalanceVersion }
+      : {}),
+    forcedOffline: row.forcedOffline,
+    countedAt: row.countedAt,
+    appliedAt: row.appliedAt,
+    deviceId: row.deviceId,
+    deviceDisplayName: row.deviceDisplayName,
+    ...(row.note ? { note: row.note } : {}),
+  }));
 
   const pagesByNota = new Map<string, CoreBootstrap['notaPages']>();
   for (const page of bootstrap.notaPages) {

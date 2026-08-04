@@ -18,6 +18,7 @@ export const DEVICE_ID = '66666666-6666-4666-8666-666666666666';
 export const TEMPLATE_ID = '77777777-7777-4777-8777-777777777777';
 
 interface TestBootstrapBody {
+  apiSchemaVersion: 2;
   serverRevision: string;
   deviceRole: 'owner' | 'client';
   skuIdentifiers: Array<Record<string, unknown>>;
@@ -35,11 +36,13 @@ export function bootstrapBody(
   overrides: Partial<TestBootstrapBody> = {},
 ): TestBootstrapBody {
   return {
+    apiSchemaVersion: 2,
     serverRevision,
     deviceRole: 'owner',
     skuIdentifiers: [],
     skus: [],
     balances: [],
+    stockChecks: [],
     notas: [],
     notaPages: [],
     notaLines: [],
@@ -75,6 +78,7 @@ export function exactCatalogueBootstrap(
       skuId: skuId(index),
       quantityPcs: '0',
       rowVersion: '1',
+      lastCheckedAt: null,
       updatedAt: '2026-07-30T01:24:00.000Z',
     })),
   });
@@ -115,6 +119,7 @@ export function populatedBootstrap(
         skuId: SKU_ID,
         quantityPcs: '12',
         rowVersion: '1',
+        lastCheckedAt: null,
         updatedAt: '2026-07-29T00:00:00.000Z',
       },
     ],
@@ -293,7 +298,24 @@ export class ScriptedTransport implements CoreApiTransport {
     this.requests.push(structuredClone(request));
     const handler = this.handlers.shift();
     if (!handler) throw new Error(`No response queued for ${request.path}`);
-    return handler(request);
+    const response = await handler(request);
+    const versionedEnvelope =
+      response.status >= 200 &&
+      response.status < 300 &&
+      typeof response.body === 'object' &&
+      response.body !== null &&
+      !Array.isArray(response.body) &&
+      !request.path.startsWith('/v1/imports') &&
+      !request.path.startsWith('/v1/images/');
+    return versionedEnvelope
+      ? {
+          ...response,
+          body: {
+            ...(response.body as Record<string, unknown>),
+            apiSchemaVersion: 2,
+          },
+        }
+      : response;
   }
 
   async installationId(): Promise<string> {

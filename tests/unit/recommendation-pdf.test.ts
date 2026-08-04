@@ -11,6 +11,7 @@ function recommendation(index: number, supplierCode: string | null = 'CH009'): S
     id: `sku-${index}`,
     skuNumber: `SKU-${String(index).padStart(3, '0')}`,
     aliases: [],
+    identifiers: [],
     name: `Produk ${index}`,
     referencePrice: 10_000 + index,
     stock: 50 + index,

@@ -25,6 +25,8 @@ import type {
 } from './sync/idempotency.js';
 import { NotaOperationsService } from './nota/service.js';
 import { OfflineOperationsService } from './offline/service.js';
+import { PackageBarcodeService } from './package-barcode/service.js';
+import { StockCheckService } from './stock-check/service.js';
 
 export interface RuntimeConnection
   extends MigrationConnection, ProtocolConnection {}
@@ -72,6 +74,8 @@ const defaultDependencies: StartupDependencies = {
       }),
       nota: new NotaOperationsService(pool),
       offline: new OfflineOperationsService(pool),
+      stockChecks: new StockCheckService(pool),
+      packageBarcodes: new PackageBarcodeService(pool),
     });
   },
   createMaintenance: (pool, config) => {

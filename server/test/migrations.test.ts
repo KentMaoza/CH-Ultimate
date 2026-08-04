@@ -135,7 +135,7 @@ function seedOriginalVersionThree(pool: FakeMigrationPool): void {
 }
 
 describe('runMigrations', () => {
-  it('applies versions 1 through 9 once and makes the second run a no-op', async () => {
+  it('applies versions 1 through 10 once and makes the second run a no-op', async () => {
     const pool = new FakeMigrationPool();
 
     const first = await runMigrations(pool);
@@ -144,15 +144,15 @@ describe('runMigrations', () => {
 
     expect(first).toEqual({
       fromVersion: 0,
-      toVersion: 9,
-      appliedVersions: [1, 2, 3, 4, 5, 6, 7, 8, 9],
+      toVersion: 10,
+      appliedVersions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
     });
     expect(second).toEqual({
-      fromVersion: 9,
-      toVersion: 9,
+      fromVersion: 10,
+      toVersion: 10,
       appliedVersions: [],
     });
-    expect(pool.applied.size).toBe(9);
+    expect(pool.applied.size).toBe(10);
     expect(pool.migrationStatementCount).toBe(statementsAfterFirstRun);
   });
 
@@ -172,16 +172,16 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 0,
-      toVersion: 9,
-      appliedVersions: [1, 2, 3, 4, 5, 6, 7, 8, 9],
+      toVersion: 10,
+      appliedVersions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
     });
   });
 
   it('refuses a database schema newer than this binary and releases the lock', async () => {
-    const pool = new FakeMigrationPool(10);
+    const pool = new FakeMigrationPool(11);
 
     await expect(runMigrations(pool)).rejects.toThrow(
-      'Database schema version 10 is newer than supported version 9',
+      'Database schema version 11 is newer than supported version 10',
     );
 
     expect(pool.lockHeld).toBe(false);
@@ -224,11 +224,11 @@ describe('runMigrations', () => {
 
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 1,
-      toVersion: 9,
-      appliedVersions: [2, 3, 4, 5, 6, 7, 8, 9],
+      toVersion: 10,
+      appliedVersions: [2, 3, 4, 5, 6, 7, 8, 9, 10],
     });
 
-    expect(pool.applied.size).toBe(9);
+    expect(pool.applied.size).toBe(10);
     expect(pool.migrationStatementCount).toBeGreaterThan(2);
   });
 
@@ -245,8 +245,8 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 1,
-      toVersion: 9,
-      appliedVersions: [2, 3, 4, 5, 6, 7, 8, 9],
+      toVersion: 10,
+      appliedVersions: [2, 3, 4, 5, 6, 7, 8, 9, 10],
     });
   });
 
@@ -256,8 +256,8 @@ describe('runMigrations', () => {
 
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 2,
-      toVersion: 9,
-      appliedVersions: [3, 4, 5, 6, 7, 8, 9],
+      toVersion: 10,
+      appliedVersions: [3, 4, 5, 6, 7, 8, 9, 10],
     });
   });
 
@@ -274,8 +274,8 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 2,
-      toVersion: 9,
-      appliedVersions: [3, 4, 5, 6, 7, 8, 9],
+      toVersion: 10,
+      appliedVersions: [3, 4, 5, 6, 7, 8, 9, 10],
     });
   });
 
@@ -292,8 +292,8 @@ describe('runMigrations', () => {
     pool.failOn = undefined;
     await expect(runMigrations(pool)).resolves.toEqual({
       fromVersion: 3,
-      toVersion: 9,
-      appliedVersions: [4, 5, 6, 7, 8, 9],
+      toVersion: 10,
+      appliedVersions: [4, 5, 6, 7, 8, 9, 10],
     });
   });
 });
@@ -328,6 +328,26 @@ second', "third;fourth");
 });
 
 describe('initial schema', () => {
+  it('adds stock-check audit/version columns and backfills active balances in v10', async () => {
+    const sql = await readFile(
+      new URL('../migrations/010_stock_checks.sql', import.meta.url),
+      'utf8',
+    );
+
+    expect(sql).toMatch(
+      /ALTER TABLE stock_balances[\s\S]*last_checked_at TIMESTAMP\(6\) NULL/,
+    );
+    expect(sql).toMatch(
+      /ALTER TABLE stock_movements[\s\S]*balance_row_version_after BIGINT UNSIGNED NULL/,
+    );
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS stock_checks/);
+    expect(sql).toMatch(
+      /UNIQUE KEY uq_stock_checks_device_operation \(device_id, operation_id\)/,
+    );
+    expect(sql).toMatch(
+      /INSERT INTO stock_balances[\s\S]*SELECT skus\.id, 0, 1[\s\S]*archived_at IS NULL/,
+    );
+  });
   it('enforces one active template per kind in v7', async () => {
     const sql = await readFile(
       new URL(

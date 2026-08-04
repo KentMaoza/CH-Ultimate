@@ -6,7 +6,7 @@ import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 import { App } from '../../src/renderer/App';
 
 function sku(id: string, name: string, createdAt: string, stock = 1): Sku {
-  return { id, skuNumber: `SKU-${id}`, aliases: [], name, referencePrice: 25_000, stock, tracked: true, note: '', imageUrl: '', createdAt, archived: false };
+  return { id, skuNumber: `SKU-${id}`, aliases: [], identifiers: [], name, referencePrice: 25_000, stock, tracked: true, note: '', imageUrl: '', createdAt, archived: false };
 }
 
 function createRecommendationState() {

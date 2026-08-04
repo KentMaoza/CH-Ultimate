@@ -91,8 +91,9 @@ describe('MariaDB authoritative stock repository', () => {
       sql.startsWith('INSERT INTO stock_movements'),
     );
     expect(movement?.values).toEqual(
-      expect.arrayContaining([SKU_ID, 6, DEVICE_ID, OPERATION_ID]),
+      expect.arrayContaining([SKU_ID, 6, DEVICE_ID, OPERATION_ID, 5n]),
     );
+    expect(movement?.sql).toContain('balance_row_version_after');
     expect(
       test.queries.some(({ sql }) => sql.startsWith('DELETE FROM stock_movements')),
     ).toBe(false);

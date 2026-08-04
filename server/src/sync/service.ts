@@ -4,6 +4,7 @@ export interface BootstrapCollections {
   skuIdentifiers: unknown[];
   skus: unknown[];
   balances: unknown[];
+  stockChecks: unknown[];
   priceHistory?: unknown[];
   stockMovements?: unknown[];
   notas: unknown[];
@@ -109,7 +110,7 @@ export class SyncService {
   constructor(private readonly store: SyncStore) {}
 
   async bootstrap(): Promise<
-    { serverRevision: string } & {
+    { apiSchemaVersion: 2; serverRevision: string } & {
       [Key in keyof BootstrapCollections]: JsonSafe[];
     }
   > {
@@ -117,10 +118,12 @@ export class SyncService {
       const watermark = await session.getWatermark();
       const collections = await session.getBootstrapCollections();
       return {
+        apiSchemaVersion: 2,
         serverRevision: watermark.toString(),
         skuIdentifiers: collections.skuIdentifiers.map(jsonSafe),
         skus: collections.skus.map(jsonSafe),
         balances: collections.balances.map(jsonSafe),
+        stockChecks: collections.stockChecks.map(jsonSafe),
         priceHistory: (collections.priceHistory ?? []).map(jsonSafe),
         stockMovements: (collections.stockMovements ?? []).map(jsonSafe),
         notas: collections.notas.map(jsonSafe),
@@ -134,6 +137,7 @@ export class SyncService {
   }
 
   async changes(input: { after: string; limit: number }): Promise<{
+    apiSchemaVersion: 2;
     serverRevision: string;
     nextAfter: string;
     changes: JsonSafe[];
@@ -177,6 +181,7 @@ export class SyncService {
         }),
       );
       return {
+        apiSchemaVersion: 2,
         serverRevision: watermark.toString(),
         nextAfter: ordered.at(-1)?.revision.toString() ?? after.toString(),
         changes,

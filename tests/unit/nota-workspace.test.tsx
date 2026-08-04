@@ -153,6 +153,7 @@ test('SKU Gudang paginates 3.140 imports by fifty and keeps zero, negative, and 
     id: `bulk-${index}`,
     skuNumber: `BULK-${String(index).padStart(4, '0')}`,
     aliases: index === 1 ? ['NEGATIF-LAMA'] : [],
+    identifiers: [],
     name: `Barang Bulk ${index}`,
     referencePrice: 10_000 + index,
     stock: index === 0 ? 0 : index === 1 ? -4 : index,

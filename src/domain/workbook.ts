@@ -46,6 +46,7 @@ export async function parseSkuWorkbook(buffer: ArrayBuffer | Uint8Array): Promis
       id: `import-${rowNumber}-${skuNumber.slice(0, 24)}`,
       skuNumber,
       aliases: [],
+      identifiers: [],
       name: text(row.getCell(column('Judul')!).value) || 'Tanpa nama',
       referencePrice: integer(value(row, 'Modal Referensi')),
       stock: integer(value(row, 'Semua Total Stok')),

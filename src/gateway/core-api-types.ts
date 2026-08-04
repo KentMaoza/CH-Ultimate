@@ -32,6 +32,7 @@ export {
   coreSkuIdentifierRowSchema,
   coreSkuRowSchema,
   coreStockMovementRowSchema,
+  coreStockCheckRowSchema,
   coreRevenuePostingRowSchema,
   coreTemplateRowSchema,
 } from './core-api-schemas';
@@ -138,7 +139,7 @@ export function parseCoreApiError(
 }
 
 export interface CoreMutationAcknowledgement {
-  apiSchemaVersion?: 1;
+  apiSchemaVersion: 2;
   serverRevision?: string;
   entity?: CoreJsonValue;
   entityVersion?: string;
@@ -157,7 +158,6 @@ export interface CoreMutationAcknowledgement {
 export function parseCoreMutationAcknowledgement(
   body: unknown,
 ): CoreMutationAcknowledgement {
-  if (body === undefined || body === null) return {};
   return parseEnvelope(
     mutationAcknowledgementSchema,
     body,
@@ -257,6 +257,10 @@ export const CORE_API_PATHS = {
   sku: (id: string) => `/v1/skus/${encodeId(id)}`,
   stockAdjustments: (id: string) =>
     `/v1/skus/${encodeId(id)}/stock-adjustments`,
+  stockChecks: (id: string) => `/v1/skus/${encodeId(id)}/stock-checks`,
+  offlineStockChecks: '/v1/offline/stock-checks',
+  packageBarcodes: (id: string) => `/v1/skus/${encodeId(id)}/package-barcodes`,
+  packageBarcode: (id: string) => `/v1/package-barcodes/${encodeId(id)}`,
   offlineNotas: '/v1/offline/notas',
   offlineStockAdjustments: '/v1/offline/stock-adjustments',
   validateCatalogue: '/v1/imports/validate',

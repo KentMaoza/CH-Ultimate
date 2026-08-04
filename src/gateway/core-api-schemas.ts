@@ -1,10 +1,13 @@
 import { z } from 'zod';
 
-export const CORE_API_SCHEMA_VERSION = 1;
+export const CORE_API_SCHEMA_VERSION = 2;
 
 export const canonicalDecimalSchema = z
   .string()
   .regex(/^(0|[1-9]\d*)$/, 'Expected a canonical unsigned decimal string');
+const signedDecimalSchema = z
+  .string()
+  .regex(/^(0|-?[1-9]\d*)$/, 'Expected a canonical signed decimal string');
 const isoTimestampSchema = z.string().datetime({ offset: true });
 const uuidSchema = z.string().uuid();
 
@@ -28,15 +31,19 @@ export const coreJsonValueSchema: z.ZodType<CoreJsonValue> = z.lazy(() =>
 );
 
 const apiSchemaMarker = {
-  apiSchemaVersion: z.literal(CORE_API_SCHEMA_VERSION).optional(),
+  apiSchemaVersion: z.literal(CORE_API_SCHEMA_VERSION),
 };
+
+const identifierKindSchema = z
+  .enum(['primary', 'product_code', 'alias', 'package_barcode', 'other'])
+  .catch('other');
 
 export const coreSkuIdentifierRowSchema = z
   .object({
     id: uuidSchema,
     skuId: uuidSchema,
     identifierValue: z.string(),
-    identifierKind: z.string(),
+    identifierKind: identifierKindSchema,
     createdAt: isoTimestampSchema,
   })
   .strict();
@@ -65,6 +72,7 @@ export const coreBalanceRowSchema = z
       .string()
       .regex(/^(0|-?[1-9]\d*)$/, 'Expected a canonical signed decimal string'),
     rowVersion: canonicalDecimalSchema,
+    lastCheckedAt: isoTimestampSchema.nullable().optional(),
     updatedAt: isoTimestampSchema,
   })
   .strict();
@@ -100,6 +108,25 @@ export const coreStockMovementRowSchema = z
       .string()
       .regex(/^(0|-?[1-9]\d*)$/)
       .optional(),
+    balanceRowVersionAfter: canonicalDecimalSchema.optional(),
+  })
+  .strict();
+
+export const coreStockCheckRowSchema = z
+  .object({
+    id: uuidSchema,
+    skuId: uuidSchema,
+    observedQuantityPcs: signedDecimalSchema,
+    countedQuantityPcs: signedDecimalSchema,
+    serverQuantityBeforePcs: signedDecimalSchema,
+    appliedDeltaPcs: signedDecimalSchema,
+    baseBalanceVersion: canonicalDecimalSchema.optional(),
+    forcedOffline: z.boolean(),
+    countedAt: isoTimestampSchema,
+    appliedAt: isoTimestampSchema,
+    deviceId: uuidSchema,
+    deviceDisplayName: z.string().min(1).max(160),
+    note: z.string().trim().max(512).optional(),
   })
   .strict();
 
@@ -172,10 +199,6 @@ export const coreNotaLineRowSchema = z
   })
   .strict();
 
-const signedDecimalSchema = z
-  .string()
-  .regex(/^(0|-?[1-9]\d*)$/, 'Expected a canonical signed decimal string');
-
 export const coreNotaPostingLineSchema = z
   .object({
     id: uuidSchema,
@@ -243,6 +266,7 @@ export const coreBootstrapSchema = z
     skuIdentifiers: z.array(coreSkuIdentifierRowSchema),
     skus: z.array(coreSkuRowSchema),
     balances: z.array(coreBalanceRowSchema),
+    stockChecks: z.array(coreStockCheckRowSchema),
     priceHistory: z.array(corePriceHistoryRowSchema).default([]),
     stockMovements: z.array(coreStockMovementRowSchema).default([]),
     notas: z.array(coreNotaRowSchema),

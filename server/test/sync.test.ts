@@ -24,6 +24,7 @@ class MemorySyncStore implements SyncStore {
       skuIdentifiers: [],
       skus: [],
       balances: [],
+      stockChecks: [],
       notas: [],
       notaPages: [],
       notaLines: [],
@@ -99,6 +100,7 @@ describe('SyncService.bootstrap', () => {
 
     const result = await new SyncService(store).bootstrap();
 
+    expect(result.apiSchemaVersion).toBe(2);
     expect(result.serverRevision).toBe('1');
     expect(result.skus).toEqual([
       {
@@ -123,6 +125,7 @@ describe('SyncService.changes', () => {
     const duplicate = await service.changes({ after: '1', limit: 2 });
 
     expect(first).toEqual({
+      apiSchemaVersion: 2,
       serverRevision: '3',
       nextAfter: '3',
       changes: [

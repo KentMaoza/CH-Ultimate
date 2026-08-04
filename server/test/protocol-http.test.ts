@@ -65,16 +65,19 @@ function createProtocol() {
     },
     sync: {
       bootstrap: vi.fn(async () => ({
+        apiSchemaVersion: 2 as const,
         serverRevision: '7',
         skuIdentifiers: [],
         skus: [],
         balances: [],
+        stockChecks: [],
         notas: [],
         notaPages: [],
         notaLines: [],
         templates: [],
       })),
       changes: vi.fn(async () => ({
+        apiSchemaVersion: 2 as const,
         serverRevision: '7',
         nextAfter: '7',
         changes: [],
@@ -127,8 +130,8 @@ describe('CH Core protocol routes', () => {
       headers: { authorization: 'Bearer client-token' },
     });
 
-    expect(ownerResponse.json()).toMatchObject({ deviceRole: 'owner' });
-    expect(clientResponse.json()).toMatchObject({ deviceRole: 'client' });
+    expect(ownerResponse.json()).toMatchObject({ apiSchemaVersion: 2, deviceRole: 'owner' });
+    expect(clientResponse.json()).toMatchObject({ apiSchemaVersion: 2, deviceRole: 'client' });
     await app.close();
   });
 

@@ -42,6 +42,13 @@ interface ReceiptRow {
   response_json: unknown;
 }
 
+function apiV2Acknowledgement<T>(body: T): T {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    throw new Error('Idempotent mutation acknowledgement must be an object');
+  }
+  return { ...body, apiSchemaVersion: 2 } as T;
+}
+
 export async function executeIdempotent<T>(
   pool: ProtocolPool,
   request: IdempotencyRequest,
@@ -81,7 +88,11 @@ export async function executeIdempotent<T>(
         reservationAcquired = true;
 
         await acquireBusinessWriteLock(connection);
-        const result = await mutation(connection);
+        const rawResult = await mutation(connection);
+        const result = {
+          ...rawResult,
+          body: apiV2Acknowledgement(rawResult.body),
+        };
         assertMutation(result);
         await writeMutationSideEffects(
           connection,

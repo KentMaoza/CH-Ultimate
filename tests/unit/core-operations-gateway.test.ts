@@ -83,6 +83,7 @@ describe('Core operations gateway bootstrap and polling', () => {
             id: SKU_ID,
             skuNumber: 'CACHED',
             aliases: [],
+            identifiers: [],
             name: 'Cached product',
             referencePrice: 100,
             stock: 3,
@@ -94,6 +95,7 @@ describe('Core operations gateway bootstrap and polling', () => {
           },
         ],
         adjustments: [],
+        stockChecks: [],
         priceChanges: [],
         notaTransactions: [],
         labelTemplate: {

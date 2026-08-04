@@ -17,6 +17,7 @@ function sku(id: string, name: string, createdAt: string, stock = 1, patch: Part
     createdAt,
     archived: false,
     ...patch,
+    identifiers: patch.identifiers ?? [],
   };
 }
 

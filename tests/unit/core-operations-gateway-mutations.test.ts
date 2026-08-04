@@ -343,6 +343,7 @@ describe('Core operations gateway mutation coordination', () => {
     state.recordMutationAcknowledgement(
       CORE_API_PATHS.notaLine(NOTA_ID, PAGE_ID, LINE_ID),
       {
+        apiSchemaVersion: 2,
         serverRevision: '2',
         entityVersion: '9',
         entity: asCoreJson(state.getSnapshot().notaTransactions[0]),

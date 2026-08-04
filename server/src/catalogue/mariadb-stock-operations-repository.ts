@@ -82,17 +82,19 @@ export class MariaDbStockOperationsRepository {
     );
     await connection.query(
       `INSERT INTO stock_movements
-         (id, sku_id, delta_pcs, reason, device_id, operation_id, created_at)
+         (id, sku_id, delta_pcs, reason, device_id, operation_id,
+          balance_row_version_after, created_at)
        VALUES
          (UNHEX(REPLACE(?, '-', '')), UNHEX(REPLACE(?, '-', '')), ?,
           'manual_adjustment', UNHEX(REPLACE(?, '-', '')),
-          UNHEX(REPLACE(?, '-', '')), ?)`,
+          UNHEX(REPLACE(?, '-', '')), ?, ?)`,
       [
         movementId,
         skuId,
         input.delta,
         deviceId,
         operationId,
+        nextVersion,
         now,
       ],
     );
@@ -133,6 +135,7 @@ export class MariaDbStockOperationsRepository {
         reason: 'manual_adjustment',
         deviceId,
         operationId,
+        balanceRowVersionAfter: nextVersion.toString(),
         createdAt: now.toISOString(),
         beforeQuantityPcs: quantity.toString(),
         afterQuantityPcs: nextQuantity.toString(),

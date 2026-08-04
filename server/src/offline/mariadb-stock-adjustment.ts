@@ -79,10 +79,11 @@ export const adjustOfflineStock = async (
   );
   await connection.query(
     `INSERT INTO stock_movements
-       (id, sku_id, delta_pcs, reason, device_id, operation_id, created_at)
+       (id, sku_id, delta_pcs, reason, device_id, operation_id,
+        balance_row_version_after, created_at)
      VALUES
        (UNHEX(REPLACE(?, '-', '')), UNHEX(REPLACE(?, '-', '')), ?, ?,
-        UNHEX(REPLACE(?, '-', '')), UNHEX(REPLACE(?, '-', '')), ?)`,
+        UNHEX(REPLACE(?, '-', '')), UNHEX(REPLACE(?, '-', '')), ?, ?)`,
     [
       movementId,
       input.skuId,
@@ -90,6 +91,7 @@ export const adjustOfflineStock = async (
       input.reason,
       deviceId,
       operationId,
+      version,
       now,
     ],
   );
@@ -145,6 +147,7 @@ export const adjustOfflineStock = async (
       reason: input.reason,
       deviceId,
       operationId,
+      balanceRowVersionAfter: version.toString(),
       createdAt: now.toISOString(),
       beforeQuantityPcs: before.toString(),
       afterQuantityPcs: after.toString(),

@@ -21,6 +21,9 @@ import {
   registerOfflineRoutes,
   type OfflineHttpService,
 } from './http/offline-routes.js';
+import { registerStockApiRoutes } from './http/stock-api-routes.js';
+import type { PackageBarcodeHttpService } from './package-barcode/service.js';
+import type { StockCheckHttpService } from './stock-check/service.js';
 
 export interface AppDependencies {
   pool: SchemaQueryPool;
@@ -29,6 +32,8 @@ export interface AppDependencies {
   operations?: CatalogueOperationHttpService;
   nota?: NotaHttpService;
   offline?: OfflineHttpService;
+  stockChecks?: StockCheckHttpService;
+  packageBarcodes?: PackageBarcodeHttpService;
 }
 
 export function buildApp(deps: AppDependencies): FastifyInstance {
@@ -63,6 +68,14 @@ export function buildApp(deps: AppDependencies): FastifyInstance {
     }
     if (deps.offline) {
       registerOfflineRoutes(app, deps.protocol.identity, deps.offline);
+    }
+    if (deps.stockChecks && deps.packageBarcodes) {
+      registerStockApiRoutes(
+        app,
+        deps.protocol.identity,
+        deps.stockChecks,
+        deps.packageBarcodes,
+      );
     }
   }
 

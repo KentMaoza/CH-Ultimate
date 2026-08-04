@@ -221,12 +221,12 @@ describe('executeIdempotent', () => {
 
     expect(first).toEqual({
       statusCode: 202,
-      body: { accepted: true },
+      body: { apiSchemaVersion: 2, accepted: true },
       replayed: false,
     });
     expect(replay).toEqual({
       statusCode: 202,
-      body: { accepted: true },
+      body: { apiSchemaVersion: 2, accepted: true },
       replayed: true,
     });
     expect(callbackCalls).toBe(1);

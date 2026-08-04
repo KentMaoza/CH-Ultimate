@@ -5,6 +5,7 @@ import {
   coreSkuIdentifierRowSchema,
   coreSkuRowSchema,
   coreStockMovementRowSchema,
+  coreStockCheckRowSchema,
   type CoreChange,
 } from './core-api-types';
 import { integerFromDecimal } from './core-bootstrap-mapping';
@@ -43,6 +44,7 @@ function applySku(state: DemoState, change: CoreChange): DemoState {
     id: row.id,
     skuNumber: row.primaryIdentifier,
     aliases: current?.aliases ?? [],
+    identifiers: current?.identifiers ?? [],
     name: row.name,
     referencePrice: integerFromDecimal(row.priceRupiah, 'priceRupiah'),
     stock: current?.stock ?? 0,
@@ -56,6 +58,9 @@ function applySku(state: DemoState, change: CoreChange): DemoState {
       : {}),
     createdAt: row.createdAt,
     archived: row.archivedAt !== null,
+    ...(current?.lastStockCheckedAt
+      ? { lastStockCheckedAt: current.lastStockCheckedAt }
+      : {}),
   };
   return {
     ...state,
@@ -79,14 +84,37 @@ function applyIdentifier(state: DemoState, change: CoreChange): DemoState {
   return {
     ...state,
     skus: state.skus.map((sku) => {
-      if (sku.id !== row.skuId || row.identifierValue === sku.skuNumber) {
+      const existing = sku.identifiers.find(
+        (identifier) => identifier.id === row.id,
+      );
+      const isTarget = sku.id === row.skuId;
+      if (!existing && !isTarget) {
         return sku;
       }
+      const withoutIdentifier = sku.identifiers.filter(
+        (identifier) => identifier.id !== row.id,
+      );
+      const identifiers = change.operation === 'upsert' && isTarget
+        ? [
+            ...withoutIdentifier,
+            {
+              id: row.id,
+              skuId: row.skuId,
+              value: row.identifierValue,
+              kind: row.identifierKind,
+              createdAt: row.createdAt,
+            },
+          ]
+        : withoutIdentifier;
+      const priorValue = existing?.value ?? row.identifierValue;
+      const withoutAlias = sku.aliases.filter((alias) => alias !== priorValue);
       const aliases =
-        change.operation === 'delete'
-          ? sku.aliases.filter((alias) => alias !== row.identifierValue)
-          : [...new Set([...sku.aliases, row.identifierValue])];
-      return { ...sku, aliases };
+        change.operation === 'upsert' &&
+        isTarget &&
+        row.identifierValue !== sku.skuNumber
+          ? [...new Set([...withoutAlias, row.identifierValue])]
+          : withoutAlias;
+      return { ...sku, aliases, identifiers };
     }),
   };
 }
@@ -110,6 +138,9 @@ function applyBalance(state: DemoState, change: CoreChange): DemoState {
             ...sku,
             stock: integerFromDecimal(row.quantityPcs, 'quantityPcs'),
             tracked: true,
+            ...(row.lastCheckedAt
+              ? { lastStockCheckedAt: row.lastCheckedAt }
+              : {}),
           }
         : sku,
     ),
@@ -176,7 +207,38 @@ function applyStockMovement(state: DemoState, change: CoreChange): DemoState {
             ? 'nota'
             : row.reason === 'manual_adjustment'
               ? 'manual'
+              : row.reason === 'stock_check'
+                ? 'stock-check'
               : 'other',
+      },
+    ],
+  };
+}
+
+function applyStockCheck(state: DemoState, change: CoreChange): DemoState {
+  if (change.operation !== 'upsert') {
+    throw new CoreChangeRequiresBootstrapError('Unknown stock check operation');
+  }
+  const row = coreStockCheckRowSchema.parse(change.payload);
+  requireIdentity(change, row.id);
+  return {
+    ...state,
+    stockChecks: [
+      ...state.stockChecks.filter((item) => item.id !== row.id),
+      {
+        id: row.id,
+        skuId: row.skuId,
+        observedQuantityPcs: integerFromDecimal(row.observedQuantityPcs, 'observedQuantityPcs'),
+        countedQuantityPcs: integerFromDecimal(row.countedQuantityPcs, 'countedQuantityPcs'),
+        serverQuantityBeforePcs: integerFromDecimal(row.serverQuantityBeforePcs, 'serverQuantityBeforePcs'),
+        appliedDeltaPcs: integerFromDecimal(row.appliedDeltaPcs, 'appliedDeltaPcs'),
+        ...(row.baseBalanceVersion ? { baseBalanceVersion: row.baseBalanceVersion } : {}),
+        forcedOffline: row.forcedOffline,
+        countedAt: row.countedAt,
+        appliedAt: row.appliedAt,
+        deviceId: row.deviceId,
+        deviceDisplayName: row.deviceDisplayName,
+        ...(row.note ? { note: row.note } : {}),
       },
     ],
   };
@@ -211,6 +273,7 @@ export function applyCoreChange(
   if (change.entityType === 'stock_movement') {
     return applyStockMovement(state, change);
   }
+  if (change.entityType === 'stock_check') return applyStockCheck(state, change);
   if (change.entityType === 'nota') return applyNotaChange(state, change);
   if (change.entityType === 'nota_page') {
     return applyNotaPageChange(state, change);

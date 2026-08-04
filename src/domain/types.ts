@@ -4,10 +4,26 @@ export type NotaCompletionDestination = 'archive' | 'finished';
 export type NotaPageStatus = 'active' | 'cancelled';
 export type Unit = 'pcs' | 'lsn';
 
+export type SkuIdentifierKind =
+  | 'primary'
+  | 'product_code'
+  | 'alias'
+  | 'package_barcode'
+  | 'other';
+
+export interface SkuIdentifier {
+  id: string;
+  skuId: string;
+  value: string;
+  kind: SkuIdentifierKind;
+  createdAt: string;
+}
+
 export interface Sku {
   id: string;
   skuNumber: string;
   aliases: string[];
+  identifiers: SkuIdentifier[];
   name: string;
   referencePrice: number;
   stock: number;
@@ -19,6 +35,7 @@ export interface Sku {
   sourceCreatedAt?: string;
   createdAt: string;
   archived: boolean;
+  lastStockCheckedAt?: string;
 }
 
 export interface SkuAlias { skuId: string; value: string; createdAt: string; }
@@ -30,7 +47,23 @@ export interface StockAdjustment {
   before: number;
   after: number;
   createdAt: string;
-  source: 'manual' | 'nota' | 'reversal' | 'other';
+  source: 'manual' | 'nota' | 'reversal' | 'stock-check' | 'other';
+}
+
+export interface StockCheck {
+  id: string;
+  skuId: string;
+  observedQuantityPcs: number;
+  countedQuantityPcs: number;
+  serverQuantityBeforePcs: number;
+  appliedDeltaPcs: number;
+  baseBalanceVersion?: string;
+  forcedOffline: boolean;
+  countedAt: string;
+  appliedAt: string;
+  deviceId: string;
+  deviceDisplayName: string;
+  note?: string;
 }
 
 export interface SkuPriceChange {
@@ -145,6 +178,7 @@ export interface WorkbookImportResult {
 export interface DemoState {
   skus: Sku[];
   adjustments: StockAdjustment[];
+  stockChecks: StockCheck[];
   priceChanges: SkuPriceChange[];
   notaTransactions: NotaTransaction[];
   notaPostings?: NotaPosting[];

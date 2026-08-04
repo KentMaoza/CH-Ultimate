@@ -4,7 +4,7 @@ import { addFilteredSelection, filterEmptyStockItems, supplierCodeFromName } fro
 
 const sku = (id: string, skuNumber: string, name: string): EmptyStockItem => ({
   selected: false,
-  sku: { id, skuNumber, name, aliases: [], referencePrice: 0, stock: 0, tracked: true, note: '', imageUrl: '', createdAt: '', archived: false } satisfies Sku,
+  sku: { id, skuNumber, name, aliases: [], identifiers: [], referencePrice: 0, stock: 0, tracked: true, note: '', imageUrl: '', createdAt: '', archived: false } satisfies Sku,
 });
 
 const items = [

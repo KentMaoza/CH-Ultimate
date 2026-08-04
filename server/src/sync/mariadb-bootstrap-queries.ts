@@ -51,9 +51,19 @@ export async function readBootstrapCollections(
   const balanceRows = await connection.query<
     Array<Record<string, unknown>>
   >(
-    `SELECT HEX(sku_id) AS sku_id_hex, quantity_pcs, row_version, updated_at
+    `SELECT HEX(sku_id) AS sku_id_hex, quantity_pcs, row_version,
+            last_checked_at, updated_at
      FROM stock_balances
      ORDER BY sku_id`,
+  );
+  const stockCheckRows = await connection.query<Array<Record<string, unknown>>>(
+    `SELECT HEX(id) AS id_hex, HEX(sku_id) AS sku_id_hex,
+            observed_quantity_pcs, counted_quantity_pcs,
+            server_quantity_before_pcs, applied_delta_pcs,
+            base_balance_version, forced_offline, counted_at, applied_at,
+            HEX(device_id) AS device_id_hex, device_display_name, note
+     FROM stock_checks
+     ORDER BY counted_at, id`,
   );
   const priceRows = await connection.query<Array<Record<string, unknown>>>(
     `SELECT HEX(id) AS id_hex, HEX(sku_id) AS sku_id_hex, price_rupiah,
@@ -65,7 +75,8 @@ export async function readBootstrapCollections(
   const movementRows = await connection.query<Array<Record<string, unknown>>>(
     `SELECT HEX(id) AS id_hex, HEX(sku_id) AS sku_id_hex, delta_pcs,
             reason, HEX(device_id) AS device_id_hex,
-            HEX(operation_id) AS operation_id_hex, created_at
+            HEX(operation_id) AS operation_id_hex,
+            balance_row_version_after, created_at
      FROM stock_movements
      ORDER BY created_at, id`,
   );
@@ -157,7 +168,27 @@ export async function readBootstrapCollections(
       skuId: requiredUuid(row.sku_id_hex),
       quantityPcs: BigInt(String(row.quantity_pcs)),
       rowVersion: BigInt(String(row.row_version)),
+      lastCheckedAt: nullableDatabaseDate(row.last_checked_at),
       updatedAt: databaseDate(row.updated_at),
+    })),
+    stockChecks: stockCheckRows.map((row) => ({
+      id: requiredUuid(row.id_hex),
+      skuId: requiredUuid(row.sku_id_hex),
+      observedQuantityPcs: BigInt(String(row.observed_quantity_pcs)),
+      countedQuantityPcs: BigInt(String(row.counted_quantity_pcs)),
+      serverQuantityBeforePcs: BigInt(String(row.server_quantity_before_pcs)),
+      appliedDeltaPcs: BigInt(String(row.applied_delta_pcs)),
+      ...(row.base_balance_version === null || row.base_balance_version === undefined
+        ? {}
+        : { baseBalanceVersion: BigInt(String(row.base_balance_version)) }),
+      forcedOffline: Boolean(row.forced_offline),
+      countedAt: databaseDate(row.counted_at),
+      appliedAt: databaseDate(row.applied_at),
+      deviceId: requiredUuid(row.device_id_hex),
+      deviceDisplayName: String(row.device_display_name),
+      ...(row.note === null || row.note === undefined
+        ? {}
+        : { note: String(row.note) }),
     })),
     priceHistory: priceRows.map((row) => ({
       id: requiredUuid(row.id_hex),
@@ -174,6 +205,14 @@ export async function readBootstrapCollections(
       reason: String(row.reason),
       deviceId: requiredUuid(row.device_id_hex),
       operationId: nullableHexToUuid(row.operation_id_hex),
+      ...(row.balance_row_version_after === null ||
+      row.balance_row_version_after === undefined
+        ? {}
+        : {
+            balanceRowVersionAfter: BigInt(
+              String(row.balance_row_version_after),
+            ),
+          }),
       createdAt: databaseDate(row.created_at),
     })),
     notas: notaRows.map((row) => ({

@@ -20,10 +20,11 @@ function witaToday(): string {
   return `${part('year')}-${part('month')}-${part('day')}`;
 }
 
-export function OperationalExportView({ gateway, share, coreBacked = false, onBack }: {
+export function OperationalExportView({ gateway, share, coreBacked = false, syncLabel, onBack }: {
   gateway: OperationsGateway;
   share: PdfSharePort;
   coreBacked?: boolean;
+  syncLabel?: string;
   onBack: () => void;
 }) {
   const snapshot = useOperationsSnapshot(gateway);
@@ -50,7 +51,7 @@ export function OperationalExportView({ gateway, share, coreBacked = false, onBa
         blob: await createOperationalPdfBlob(hydrated),
         fileName: plan.fileName,
         title: 'Ekspor Data CHU',
-        shareText: coreBacked ? 'CH Core · Data tersinkronisasi melalui NAS lokal' : 'DATA DEMO · SESSION ONLY',
+        shareText: coreBacked ? `CH Core · Data · ${syncLabel ?? 'Tidak terhubung'}` : 'DATA DEMO · SESSION ONLY',
       });
       setStatus('PDF data operasional siap dibagikan.');
     } catch {

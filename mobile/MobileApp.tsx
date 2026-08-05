@@ -221,7 +221,7 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
       </div>
     )}
     <main className="mobile-content" ref={mainContentRef}>
-      {selectedSku ? <SkuDetail changes={snapshot.priceChanges} coreBacked={coreBacked} gateway={gateway} onBack={closeSkuDetail} onScanAgain={openManualScan} sku={selectedSku} /> : scanOpen ? <ScanSurface error={scanError} initialCode={scanCode} key={scanCode} onManualLookup={manualLookup} onRetry={() => void beginScan()} /> : view === 'home' ? <DashboardView
+      {selectedSku ? <SkuDetail changes={snapshot.priceChanges} coreBacked={coreBacked} gateway={gateway} onBack={closeSkuDetail} onScanAgain={openManualScan} sku={selectedSku} syncLabel={syncPresentation.label} /> : scanOpen ? <ScanSurface error={scanError} initialCode={scanCode} key={scanCode} onManualLookup={manualLookup} onRetry={() => void beginScan()} /> : view === 'home' ? <DashboardView
         snapshot={snapshot}
         gateway={gateway}
         unreadCount={unreadCount}
@@ -235,7 +235,7 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
         syncLabel={syncPresentation.label}
       /> : null}
       {view === 'skus' && !scanOpen && !selectedSku ? <SkuCatalog focusSearch={focusSearch} gateway={gateway} onOpenSku={openSku} skus={snapshot.skus} /> : null}
-      {view === 'prices' && !scanOpen && !selectedSku ? <PriceFeedView changes={visiblePriceChanges} coreBacked={coreBacked} gateway={gateway} onOpenSku={openSku} onSimulate={coreBacked ? undefined : () => void simulatePriceChange()} skus={snapshot.skus} status={simulationStatus} unreadOnly={priceMode === 'unread'} /> : null}
+      {view === 'prices' && !scanOpen && !selectedSku ? <PriceFeedView changes={visiblePriceChanges} coreBacked={coreBacked} gateway={gateway} onOpenSku={openSku} onSimulate={coreBacked ? undefined : () => void simulatePriceChange()} skus={snapshot.skus} status={simulationStatus} syncLabel={syncPresentation.label} unreadOnly={priceMode === 'unread'} /> : null}
       {view === 'recommendations' && !scanOpen && !selectedSku ? <ShareRecommendationsView
         gateway={gateway}
         onBack={() => navigate('home')}
@@ -243,6 +243,7 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
         onSharePdf={share.sharePdf}
         snapshot={snapshot}
         coreBacked={coreBacked}
+        syncLabel={syncPresentation.label}
       /> : null}
       {view === 'nota' && !scanOpen && !selectedSku ? <MobileNotaView coreBacked={coreBacked} gateway={gateway} scanner={scanner} share={share} syncLabel={syncPresentation.label} transactionId={editingNotaId ?? undefined} /> : null}
       {view === 'stock' && !scanOpen && !selectedSku ? <section className="page-view mobile-stock-check-page">
@@ -251,8 +252,8 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
         <StockCheckView gateway={gateway} mode="mobile" onCameraScan={scanStockCode} />
       </section> : null}
       {view === 'archive' && !scanOpen && !selectedSku ? <MobileArchiveView coreBacked={coreBacked} gateway={gateway} onEdit={editArchivedNota} syncLabel={syncPresentation.label} /> : null}
-      {view === 'dataExport' && !scanOpen && !selectedSku ? <OperationalExportView coreBacked={coreBacked} gateway={gateway} onBack={() => navigate('more')} share={share} /> : null}
-      {view === 'more' && !scanOpen && !selectedSku ? <MoreView coreBacked={coreBacked} onOpenDataExport={() => navigate('dataExport')} onOpenPrices={() => navigate('prices')} onOpenRecommendations={() => navigate('recommendations')} /> : null}
+      {view === 'dataExport' && !scanOpen && !selectedSku ? <OperationalExportView coreBacked={coreBacked} gateway={gateway} onBack={() => navigate('more')} share={share} syncLabel={syncPresentation.label} /> : null}
+      {view === 'more' && !scanOpen && !selectedSku ? <MoreView coreBacked={coreBacked} onOpenDataExport={() => navigate('dataExport')} onOpenPrices={() => navigate('prices')} onOpenRecommendations={() => navigate('recommendations')} syncLabel={syncPresentation.label} /> : null}
     </main>
     <nav aria-label="Navigasi utama" className="bottom-nav">
       <button aria-current={view === 'home' ? 'page' : undefined} onClick={() => navigate('home')}><HomeIcon /><span className="bottom-nav__label">Beranda</span></button>

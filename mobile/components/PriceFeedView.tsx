@@ -6,6 +6,7 @@ export function PriceFeedView({
   changes,
   gateway,
   coreBacked = false,
+  syncLabel,
   skus,
   unreadOnly,
   status,
@@ -15,6 +16,7 @@ export function PriceFeedView({
   changes: SkuPriceChange[];
   gateway: OperationsGateway;
   coreBacked?: boolean;
+  syncLabel?: string;
   skus: Sku[];
   unreadOnly: boolean;
   status: string;
@@ -26,6 +28,6 @@ export function PriceFeedView({
     <p>{unreadOnly ? 'Perubahan harga yang belum Anda buka.' : 'Riwayat perubahan harga terbaru untuk semua SKU.'}</p>
     {!coreBacked && !unreadOnly && onSimulate ? <button className="primary-action simulate-button" onClick={onSimulate}>Simulasikan perubahan harga</button> : null}
     {status && !unreadOnly ? <p className="action-status" role="status">{status}</p> : null}
-    {changes.length > 0 ? <PriceChangeList changes={changes} gateway={gateway} onOpenSku={onOpenSku} skus={skus} /> : <p className="empty-state">{unreadOnly ? 'Tidak ada perubahan harga yang belum dibaca.' : coreBacked ? 'Belum ada riwayat perubahan harga tersinkronisasi.' : 'Belum ada riwayat perubahan harga pada sesi ini.'}</p>}
+    {changes.length > 0 ? <PriceChangeList changes={changes} gateway={gateway} onOpenSku={onOpenSku} skus={skus} /> : <p className="empty-state">{unreadOnly ? 'Tidak ada perubahan harga yang belum dibaca.' : coreBacked ? `CH Core · Data · ${syncLabel ?? 'Tidak terhubung'}` : 'Belum ada riwayat perubahan harga pada sesi ini.'}</p>}
   </section>;
 }

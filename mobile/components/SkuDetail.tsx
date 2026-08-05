@@ -6,11 +6,12 @@ import { BackIcon, ScanIcon } from './Icons';
 import { ProductImage } from './ProductImage';
 import { blobAsDataUrl, preprocessMobileSkuImage } from '../image-preprocessing';
 
-export function SkuDetail({ gateway, sku, changes, coreBacked = false, onBack, onScanAgain }: {
+export function SkuDetail({ gateway, sku, changes, coreBacked = false, syncLabel, onBack, onScanAgain }: {
   gateway: OperationsGateway;
   sku: Sku;
   changes: SkuPriceChange[];
   coreBacked?: boolean;
+  syncLabel?: string;
   onBack: () => void;
   onScanAgain: () => void;
 }) {
@@ -54,7 +55,7 @@ export function SkuDetail({ gateway, sku, changes, coreBacked = false, onBack, o
         const direction = change.after > change.before ? 'naik' : change.after < change.before ? 'turun' : 'tetap';
         const priceDescription = `Harga ${direction}. Harga lama ${formatRupiah(change.before)}. Harga baru ${formatRupiah(change.after)}.`;
         return <div key={change.id}><span aria-label={priceDescription} role="group"><s aria-hidden="true">{formatRupiah(change.before)}</s><b aria-hidden="true">→</b><strong aria-hidden="true">{formatRupiah(change.after)}</strong></span><time>{formatWita(change.createdAt)}</time></div>;
-      })}</div> : <p>{coreBacked ? 'Belum ada perubahan harga tersinkronisasi.' : 'Belum ada perubahan harga pada sesi ini.'}</p>}
+      })}</div> : <p>{coreBacked ? `CH Core · Data · ${syncLabel ?? 'Tidak terhubung'}` : 'Belum ada perubahan harga pada sesi ini.'}</p>}
     </section>
     <button className="secondary-action" onClick={onScanAgain}><ScanIcon />Scan kode lain</button>
   </article>;

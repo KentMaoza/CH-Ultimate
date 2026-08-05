@@ -42,8 +42,11 @@ function renderMobile(
   return { gateway, ...ports };
 }
 
-function coreGatewayAt(phase: SyncPhase) {
-  const gateway = new MockOperationsGateway(createMobileDemoState);
+function coreGatewayAt(
+  phase: SyncPhase,
+  seedFactory: () => DemoState = createMobileDemoState,
+) {
+  const gateway = new MockOperationsGateway(seedFactory);
   gateway.getSyncSnapshot = () => ({
     phase,
     serverRevision: '8',
@@ -123,7 +126,7 @@ test('core-backed mobile removes demo/session claims and labels central data', (
   expect(screen.queryByText(/SESSION ONLY/)).not.toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: 'Lainnya' }));
-  expect(screen.getByText('Lihat riwayat perubahan harga tersinkronisasi.')).toBeInTheDocument();
+  expect(screen.getByText('CH Core · Data · Tersinkronisasi')).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: 'Rekomendasi' }));
   fireEvent.change(screen.getByLabelText('Tanggal rekomendasi'), {
@@ -134,7 +137,7 @@ test('core-backed mobile removes demo/session claims and labels central data', (
   return waitFor(() =>
     expect(sharePdf).toHaveBeenCalledWith(
       expect.objectContaining({
-        shareText: 'CH Core · Data tersinkronisasi melalui NAS lokal',
+        shareText: 'CH Core · Data · Tersinkronisasi',
       }),
     ),
   );
@@ -177,6 +180,66 @@ test('blocks mobile business modules when Core needs an upgrade', () => {
   expect(screen.queryByRole('navigation', { name: 'Navigasi utama' })).not.toBeInTheDocument();
 });
 
+test('offline Core secondary routes and PDF payloads use phase-derived copy', async () => {
+  const sharePdf = vi.fn<RecommendationPdfSharePort['sharePdf']>(
+    async () => undefined,
+  );
+  const ports = createPorts();
+  const offlineState = () => ({
+    ...createRecommendationState(),
+    priceChanges: [],
+  });
+  render(
+    <MobileApp
+      {...ports}
+      coreBacked
+      gateway={coreGatewayAt('offline', offlineState)}
+      share={{ sharePdf }}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Lainnya' }));
+  expect(screen.getByText('CH Core · Data · Offline')).toBeInTheDocument();
+  expect(document.body).not.toHaveTextContent(/tersinkronisasi/i);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Perubahan Harga' }));
+  expect(screen.getByText('CH Core · Data · Offline')).toBeInTheDocument();
+  expect(document.body).not.toHaveTextContent(/tersinkronisasi/i);
+
+  fireEvent.click(screen.getByRole('button', { name: 'SKU' }));
+  fireEvent.click(screen.getByRole('button', { name: /Beras Lama CH009/ }));
+  expect(screen.getByText('CH Core · Data · Offline')).toBeInTheDocument();
+  expect(document.body).not.toHaveTextContent(/tersinkronisasi/i);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Lainnya' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Rekomendasi' }));
+  fireEvent.change(screen.getByLabelText('Tanggal rekomendasi'), {
+    target: { value: '2026-07-23' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Bagikan PDF Harian' }));
+  await waitFor(() => expect(sharePdf).toHaveBeenCalledTimes(1));
+  expect(sharePdf).toHaveBeenNthCalledWith(
+    1,
+    expect.objectContaining({ shareText: 'CH Core · Data · Offline' }),
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Lainnya' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Ekspor Data PDF' }));
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Bagikan PDF data operasional' }),
+  );
+  await waitFor(() => expect(sharePdf).toHaveBeenCalledTimes(2));
+  expect(sharePdf).toHaveBeenNthCalledWith(
+    2,
+    expect.objectContaining({ shareText: 'CH Core · Data · Offline' }),
+  );
+  expect(
+    sharePdf.mock.calls.some(([payload]) =>
+      /tersinkronisasi/i.test(payload.shareText ?? ''),
+    ),
+  ).toBe(false);
+});
+
 test('core-backed price history cannot invoke the demo price mutation', () => {
   const { gateway } = renderMobile({}, createMobileDemoState, true);
   const updateSku = vi.spyOn(gateway, 'updateSku');
@@ -199,21 +262,21 @@ test('Core and demo price/archive empty states describe their real storage scope
   const { unmount } = render(
     <MobileApp
       {...createPorts()}
-      gateway={new MockOperationsGateway(emptyHistory)}
+      gateway={coreGatewayAt('online', emptyHistory)}
       coreBacked
     />,
   );
 
   openMoreDestination('Perubahan Harga');
   expect(
-    screen.getByText('Belum ada riwayat perubahan harga tersinkronisasi.'),
+    screen.getByText('CH Core · Data · Tersinkronisasi'),
   ).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'SKU' }));
   fireEvent.click(
     screen.getByRole('button', { name: /Beras Hitam Premium 1 kg/ }),
   );
   expect(
-    screen.getByText('Belum ada perubahan harga tersinkronisasi.'),
+    screen.getByText('CH Core · Data · Tersinkronisasi'),
   ).toBeInTheDocument();
   unmount();
 

@@ -201,16 +201,21 @@ describe('v0.2.0 historical repository-local release preparation', () => {
     for (const blockedGate of [
       'Live import workbook',
       'Deploy Core API v2',
-      'Artefak signed v0.2.0',
-      'Publikasi GitHub',
       'Windows printing fisik',
       'Kamera/share fisik',
       'Penerimaan fisik dua perangkat',
+      'Pilot copied-data empat hari',
     ]) {
       expect(historicalSection).toMatch(
         new RegExp(`\\| ${blockedGate} \\| BLOCKED \\|`),
       );
     }
+    expect(historicalSection).toMatch(
+      /\| Artefak signed v0\.2\.0 \| PASS \|[^\n]*CH-Ultimate-0\.2\.0-Setup\.exe[^\n]*149265920[^\n]*1d927dae1b945f37066c03940407f9aa785ff648de71f7f8ff86a6164d3368f2[^\n]*CHU-Companion-Mobile-0\.2\.0-release\.apk[^\n]*43101247[^\n]*f55a55204a0c6b0169fc8376a096801b1d4556d57f94e686d4b370774b880c20[^\n]*SHA256SUMS\.txt/,
+    );
+    expect(historicalSection).toMatch(
+      /\| Publikasi GitHub \| PASS \|[^\n]*pilot-v0\.2\.0[^\n]*2026-08-05T03:20:20Z[^\n]*11:20:20 WITA[^\n]*da2ee77db5c9369f00508966f2d7972050acb1d1[^\n]*30970910259[^\n]*success[^\n]*releases\/tag\/pilot-v0\.2\.0/,
+    );
     expect(historicalSection).toContain('four-day copied-data pilot');
     expect(historicalSection).not.toContain('24-hour');
     expect(deployment).toContain('four-day copied-data pilot');
@@ -288,12 +293,18 @@ describe('v0.2.0 historical repository-local release preparation', () => {
       'pilot-v0.2.1',
       'docs/releases/pilot-0.2.1.md',
       'BELUM DIVERIFIKASI',
-      'BLOCKED',
     ]) {
       expect(currentSection).toContain(currentReleaseFact);
     }
-    expect(currentSection).not.toContain('published');
-    expect(currentSection).not.toContain('deployed');
-    expect(currentSection).not.toContain('physically accepted');
+    for (const currentBlockedRow of [
+      '| Publikasi GitHub | BLOCKED |',
+      '| Deploy CH Core v2 | BLOCKED |',
+      '| Windows terpasang | BLOCKED |',
+      '| Android fisik | BLOCKED |',
+      '| Cetak fisik | BLOCKED |',
+      '| Pilot copied-data empat hari | BLOCKED |',
+    ]) {
+      expect(currentSection).toContain(currentBlockedRow);
+    }
   });
 });

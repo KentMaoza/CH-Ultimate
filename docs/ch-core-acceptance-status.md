@@ -36,8 +36,8 @@ maintenance, clear data, migrasi, impor, deployment, pairing, atau publikasi.
 | Template progres gambar | READY | Kolom matched/included/succeeded/failed/retry-visible tersedia; nilainya belum diisi dari perangkat fisik |
 | Live import workbook | BLOCKED | Belum dijalankan; perlu maintenance, backup/restore, preview, count, dan persetujuan pemilik |
 | Deploy Core API v2 | BLOCKED | Migrasi/Core v2 belum diterapkan pada NAS dan tidak ada receipt health/schema pascadeploy |
-| Artefak signed v0.2.0 | BLOCKED | Installer Windows dan APK release permanen belum dibuat atau diverifikasi checksum/signer-nya |
-| Publikasi GitHub | BLOCKED | Tag/prerelease `pilot-v0.2.0` belum diterbitkan dan belum ada fresh-download verification |
+| Artefak signed v0.2.0 | PASS | `CH-Ultimate-0.2.0-Setup.exe`: 149265920 bytes, SHA-256 `1d927dae1b945f37066c03940407f9aa785ff648de71f7f8ff86a6164d3368f2`; `CHU-Companion-Mobile-0.2.0-release.apk`: 43101247 bytes, SHA-256 `f55a55204a0c6b0169fc8376a096801b1d4556d57f94e686d4b370774b880c20`; aset `SHA256SUMS.txt` tersedia |
+| Publikasi GitHub | PASS | `pilot-v0.2.0` diterbitkan 2026-08-05T03:20:20Z (11:20:20 WITA), target `da2ee77db5c9369f00508966f2d7972050acb1d1`; [workflow run 30970910259](https://github.com/KentMaoza/CH-Ultimate/actions/runs/30970910259) `success`; [GitHub prerelease](https://github.com/KentMaoza/CH-Ultimate/releases/tag/pilot-v0.2.0) |
 | Windows printing fisik | BLOCKED | Dialog sistem, printer dokumen, dan printer thermal belum diterima pada laptop Windows fisik |
 | Kamera/share fisik | BLOCKED | Scan kamera, preprocessing gambar, dan Android share sheet belum diterima pada ponsel fisik |
 | Penerimaan fisik dua perangkat | BLOCKED | Nota typing/conflict/restart, gambar dua arah, QR/barcode paket, forced-stock audit, PDF/XLSX, restart Core, dan retry gambar belum lulus pada laptop + ponsel |
@@ -45,9 +45,10 @@ maintenance, clear data, migrasi, impor, deployment, pairing, atau publikasi.
 
 Windows tetap private pilot tanpa Authenticode. Hanya APK release dengan signer
 permanen yang boleh dipublikasikan; debug APK adalah artefak verifikasi saja.
-Jangan menyebut v0.2.0 published, deployed, imported, signed-artifact complete,
-physically accepted, atau production-ready sampai baris `BLOCKED` memperoleh
-bukti langsung dan statusnya diubah melalui receipt yang ditinjau.
+Receipt publikasi dan checksum v0.2.0 membuktikan artefak serta prerelease,
+bukan deploy CH Core v2, impor workbook, penerimaan Windows/Android/cetak fisik,
+atau pilot empat hari. Semua baris tersebut tetap `BLOCKED` sampai receipt
+langsung yang ditinjau mengubah statusnya.
 
 ### Pilot v0.2.1 — current repository release contract
 

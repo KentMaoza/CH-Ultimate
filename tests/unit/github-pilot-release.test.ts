@@ -35,6 +35,10 @@ describe('GitHub pilot release workflow', () => {
     expect(workflow.indexOf('npm run package')).toBeLessThan(
       workflow.indexOf('npm run test:e2e'),
     );
+    expect(workflow).toContain('npx playwright install --with-deps chromium');
+    expect(
+      workflow.indexOf('npx playwright install --with-deps chromium'),
+    ).toBeLessThan(workflow.indexOf('npm run test:e2e'));
     expect(workflow.match(/needs: source-gates/g)).toHaveLength(2);
     expect(workflow).toContain('needs: [windows-installer, android-apk]');
     expect(workflow).toContain('contents: write');

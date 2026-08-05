@@ -34,6 +34,8 @@ jobs:
       - run: npm run server:typecheck
       - name: Build Electron before end-to-end tests
         run: npm run package
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
       - name: Install virtual display
         run: |
           sudo apt-get update

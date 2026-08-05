@@ -16,6 +16,10 @@ import {
 } from './core-api-bootstrap';
 import './styles.css';
 
+const logCoreDiagnostic = (diagnostic: unknown) => {
+  console.error('CH Core bootstrap validation failed.', diagnostic);
+};
+
 interface DesktopRendererOptions {
   bridge?: ChCoreBridge;
   mode: DesktopRuntimeMode;
@@ -64,7 +68,10 @@ export function mountDesktopRenderer(
 
     let next: DesktopBootstrapResult;
     try {
-      next = await bootstrapDesktopGateway(options);
+      next = await bootstrapDesktopGateway({
+        ...options,
+        diagnosticSink: logCoreDiagnostic,
+      });
     } catch {
       if (activeGeneration !== generation) return;
       render(

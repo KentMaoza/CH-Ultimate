@@ -4,6 +4,7 @@ import type {
   CoreOperationsGateway,
 } from '../src/gateway/core-operations-gateway';
 import { createCoreOperationsGateway } from '../src/gateway/core-operations-gateway';
+import type { CorePollingDiagnosticSink } from '../src/gateway/core-polling';
 import type { OperationsGateway } from '../src/gateway/operations-gateway';
 import {
   createCoreGatewayClock,
@@ -36,6 +37,7 @@ export interface MobileBootstrapOptions {
   demoFactory?: () => OperationsGateway;
   storage?: CoreGatewayStorage;
   clock?: CoreGatewayClock;
+  diagnosticSink?: CorePollingDiagnosticSink;
 }
 
 export async function bootstrapMobileGateway(
@@ -89,6 +91,7 @@ export async function bootstrapMobileGateway(
     options.bridge,
     options.storage ?? createCoreGatewayStorage(),
     options.clock ?? createCoreGatewayClock(),
+    options.diagnosticSink,
   );
   try {
     await gateway.initialize();

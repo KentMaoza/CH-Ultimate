@@ -7,10 +7,12 @@ import {
   useOperationsSyncSnapshot,
 } from '../../src/renderer/use-operations-snapshot';
 import { formatRupiah } from '../format';
+import { presentSyncStatus } from '../../src/gateway/sync-presentation';
 
-export function MobileArchiveView({ coreBacked = false, gateway, onEdit }: { coreBacked?: boolean; gateway: OperationsGateway; onEdit: (transactionId: string) => void }) {
+export function MobileArchiveView({ coreBacked = false, gateway, onEdit, syncLabel }: { coreBacked?: boolean; gateway: OperationsGateway; onEdit: (transactionId: string) => void; syncLabel?: string }) {
   const snapshot = useOperationsSnapshot(gateway);
   const sync = useOperationsSyncSnapshot(gateway);
+  const coreSyncLabel = syncLabel ?? presentSyncStatus(sync.phase).label;
   const archived = useMemo(() => snapshot.notaTransactions
     .filter((transaction) => transaction.status === 'completed' && (transaction.completionDestination ?? 'archive') === 'archive')
     .sort((a, b) => Date.parse(b.completedAt ?? '') - Date.parse(a.completedAt ?? '')), [snapshot.notaTransactions]);
@@ -37,7 +39,7 @@ export function MobileArchiveView({ coreBacked = false, gateway, onEdit }: { cor
 
   return <section className="mobile-archive-view">
     <header className="mobile-header"><div><span className="eyebrow">{coreBacked ? 'ARSIP CH CORE' : 'ARSIP SAJA · SESSION ONLY'}</span><h1 data-page-heading tabIndex={-1}>Arsip Nota</h1></div></header>
-    <p className="mobile-archive-badge">{coreBacked ? 'Tersedia di semua perangkat yang tersinkronisasi' : 'Arsip hanya tersedia pada sesi demo lokal ini'}</p>
+    <p className="mobile-archive-badge">{coreBacked ? `Status CH Core · ${coreSyncLabel}` : 'Arsip hanya tersedia pada sesi demo lokal ini'}</p>
     {editError && <p className="mobile-nota-notice mobile-nota-notice--alert" role="alert">{editError}</p>}
     {!archived.length ? <p className="mobile-nota-empty">Arsip mobile belum memiliki nota.</p> : <>
       <div className="mobile-archive-list" aria-label="Daftar arsip nota">{archived.map((transaction) => {

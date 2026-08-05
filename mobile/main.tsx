@@ -17,6 +17,10 @@ import {
 import type { MobilePorts } from './bootstrap';
 import './styles.css';
 
+const logCoreDiagnostic = (diagnostic: unknown) => {
+  console.error('CH Core bootstrap validation failed.', diagnostic);
+};
+
 interface MobileRendererOptions {
   native: boolean;
   bridge?: MobileCoreBridge;
@@ -67,6 +71,7 @@ export function mountMobileRenderer(
       next = await bootstrapMobileGateway({
         native: options.native,
         bridge: options.bridge,
+        diagnosticSink: logCoreDiagnostic,
         demoFactory: () =>
           new MockOperationsGateway(createMobileDemoState),
       });

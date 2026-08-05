@@ -7,6 +7,7 @@ import type { NotaLine, NotaTransaction, Unit } from '../../src/domain/types';
 import type { OperationsGateway } from '../../src/gateway/operations-gateway';
 import { createNotaVoicePlayer, type NotaVoicePlayer } from '../../src/renderer/nota/nota-voice';
 import { notaPageTheme } from '../../src/renderer/nota/nota-page-colors';
+import { presentSyncStatus } from '../../src/gateway/sync-presentation';
 import {
   useOperationsSnapshot,
   useOperationsSyncSnapshot,
@@ -42,9 +43,10 @@ function availableSlot(transaction: NotaTransaction, preferredPageId?: string) {
   return null;
 }
 
-export function MobileNotaView({ coreBacked = false, gateway, scanner, share = browserPdfShare, transactionId }: { coreBacked?: boolean; gateway: OperationsGateway; scanner: BarcodeScannerPort; share?: PdfSharePort; transactionId?: string }) {
+export function MobileNotaView({ coreBacked = false, gateway, scanner, share = browserPdfShare, syncLabel, transactionId }: { coreBacked?: boolean; gateway: OperationsGateway; scanner: BarcodeScannerPort; share?: PdfSharePort; syncLabel?: string; transactionId?: string }) {
   const snapshot = useOperationsSnapshot(gateway);
   const sync = useOperationsSyncSnapshot(gateway);
+  const coreSyncLabel = syncLabel ?? presentSyncStatus(sync.phase).label;
   const transaction = workingTransaction(snapshot.notaTransactions, transactionId);
   const [selectedPageId, setSelectedPageId] = useState('');
   const [manualOpen, setManualOpen] = useState(false);
@@ -311,7 +313,7 @@ export function MobileNotaView({ coreBacked = false, gateway, scanner, share = b
         fileName: plan.fileName,
         title: 'Nota CHU',
         shareText: coreBacked
-          ? 'CH Core · Nota tersinkronisasi melalui NAS lokal'
+          ? `CH Core · Nota · ${coreSyncLabel}`
           : 'DATA DEMO · SESSION ONLY',
       });
       setNoticeKind('status');
@@ -334,7 +336,7 @@ export function MobileNotaView({ coreBacked = false, gateway, scanner, share = b
 
   return <section className="mobile-nota-view" aria-busy={busy || undefined}>
     <header className="mobile-header mobile-nota-header">
-      <div><span className="eyebrow">{coreBacked ? 'CH CORE · NOTA TERSINKRONISASI' : 'FRONTEND DEMO · SESSION ONLY'}</span><h1 data-page-heading tabIndex={-1}>Nota Barang</h1></div>
+      <div><span className="eyebrow">{coreBacked ? `CH CORE · NOTA · ${coreSyncLabel.toUpperCase()}` : 'FRONTEND DEMO · SESSION ONLY'}</span><h1 data-page-heading tabIndex={-1}>Nota Barang</h1></div>
       <strong>{formatRupiah(transactionTotal)}</strong>
     </header>
     {notice && <p className={`mobile-nota-notice mobile-nota-notice--${noticeKind}`} role={noticeKind}>{notice}</p>}

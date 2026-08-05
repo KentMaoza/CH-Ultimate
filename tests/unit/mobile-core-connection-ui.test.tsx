@@ -120,11 +120,11 @@ describe('mobile connection screen', () => {
 describe('mobile synchronization status', () => {
   const labels: Array<[SyncPhase, string]> = [
     ['connecting', 'Menghubungkan'],
-    ['online', 'Terhubung'],
+    ['online', 'Tersinkronisasi'],
     ['syncing', 'Menyinkronkan'],
-    ['offline', 'Tidak terhubung'],
-    ['conflict', 'Konflik data'],
-    ['revoked', 'Akses dicabut'],
+    ['offline', 'Offline'],
+    ['conflict', 'Konflik perlu diselesaikan'],
+    ['revoked', 'Akses perangkat dicabut'],
     ['upgrade-required', 'Perlu pembaruan'],
   ];
 

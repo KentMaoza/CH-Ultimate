@@ -1,6 +1,22 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
+import type { SyncPhase } from '../../src/gateway/operations-gateway-contract';
 import { App } from '../../src/renderer/App';
+
+function coreGatewayAt(phase: SyncPhase) {
+  const gateway = new MockOperationsGateway();
+  gateway.getSyncSnapshot = () => ({
+    phase,
+    serverRevision: '8',
+    pendingCount: 0,
+    conflictCount: 0,
+    message:
+      phase === 'upgrade-required'
+        ? 'Invalid CH Core bootstrap envelope'
+        : undefined,
+  });
+  return gateway;
+}
 
 test('requires an explicitly injected operations gateway', () => {
   expect(() => render(<App gateway={undefined as never} />)).toThrow(
@@ -45,24 +61,40 @@ test('opens Arsip Nota as a dedicated sidebar module', () => {
 });
 
 test('shows synchronization status without stale demo labels for CH Core', () => {
-  const gateway = new MockOperationsGateway();
-  gateway.getSyncSnapshot = () => ({
-    phase: 'online',
-    serverRevision: '8',
-    pendingCount: 0,
-    conflictCount: 0,
-  });
+  const gateway = coreGatewayAt('online');
 
   render(<App gateway={gateway} coreBacked />);
 
-  expect(screen.getByText('Terhubung')).toBeInTheDocument();
+  expect(screen.getByText('Tersinkronisasi')).toBeInTheDocument();
   expect(screen.getByText('CH ULTIMATE / CH CORE')).toBeInTheDocument();
   expect(screen.queryByText('DEMO DATA · SESSION ONLY')).not.toBeInTheDocument();
   expect(screen.queryByText('Keluar / reload = data hilang')).not.toBeInTheDocument();
 });
 
+test.each([
+  ['connecting', 'Menghubungkan'],
+  ['offline', 'Offline'],
+] as const)('does not present %s Core data as synchronized', (phase, label) => {
+  render(<App gateway={coreGatewayAt(phase)} coreBacked />);
+
+  expect(screen.getByText(label)).toBeInTheDocument();
+  expect(screen.queryByText(/Tersinkronisasi/i)).not.toBeInTheDocument();
+});
+
+test('blocks desktop business modules when Core needs an upgrade', () => {
+  render(<App gateway={coreGatewayAt('upgrade-required')} coreBacked />);
+
+  expect(
+    screen.getByText(
+      'Versi CH Core tidak kompatibel. Perbarui CH Core, lalu coba hubungkan kembali.',
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByText('Invalid CH Core bootstrap envelope')).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'SKU Gudang' })).not.toBeInTheDocument();
+});
+
 test('uses truthful CH Core copy across persisted desktop workflows', () => {
-  const gateway = new MockOperationsGateway();
+  const gateway = coreGatewayAt('online');
   render(<App gateway={gateway} coreBacked />);
 
   fireEvent.click(screen.getByRole('button', { name: 'Settings' }));

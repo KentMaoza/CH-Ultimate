@@ -1,22 +1,8 @@
 import { useEffect, useState } from 'react';
 
 import type { OperationsGateway } from '../../src/gateway/operations-gateway';
-import type {
-  SyncPhase,
-  SyncSnapshot,
-} from '../../src/gateway/operations-gateway-contract';
-
-const labels: Record<SyncPhase, string> = {
-  demo: 'Demo lokal',
-  unpaired: 'Tidak terhubung',
-  connecting: 'Menghubungkan',
-  online: 'Terhubung',
-  offline: 'Tidak terhubung',
-  syncing: 'Menyinkronkan',
-  conflict: 'Konflik data',
-  revoked: 'Akses dicabut',
-  'upgrade-required': 'Perlu pembaruan',
-};
+import type { SyncSnapshot } from '../../src/gateway/operations-gateway-contract';
+import { presentSyncStatus } from '../../src/gateway/sync-presentation';
 
 export function OperationsSyncStatus(
   { gateway }: {
@@ -28,6 +14,7 @@ export function OperationsSyncStatus(
   );
   const conflicts = gateway.getConflicts();
   const blockedOperations = gateway.getBlockedOperations();
+  const presentation = presentSyncStatus(snapshot.phase);
 
   useEffect(() => {
     setSnapshot(gateway.getSyncSnapshot());
@@ -40,14 +27,16 @@ export function OperationsSyncStatus(
     <div
       className={`mobile-sync-status mobile-sync-status--${snapshot.phase}`}
     >
-      <span>{labels[snapshot.phase]}</span>
+      <span>{presentation.label}</span>
       {snapshot.pendingCount > 0 && (
         <small>{snapshot.pendingCount} menunggu</small>
       )}
       {(snapshot.quarantinedCount ?? 0) > 0 && (
         <small>{snapshot.quarantinedCount} dikarantina</small>
       )}
-      {snapshot.message && <small>{snapshot.message}</small>}
+      {(presentation.message ?? snapshot.message) && (
+        <small>{presentation.message ?? snapshot.message}</small>
+      )}
       {snapshot.imagePrefetch && (
         <small>{`Gambar ${snapshot.imagePrefetch.cached}/${snapshot.imagePrefetch.serverAvailable} tersimpan · ${snapshot.imagePrefetch.failed} gagal · ${snapshot.imagePrefetch.total} SKU`}</small>
       )}

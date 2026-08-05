@@ -29,7 +29,10 @@ import {
   type CoreDeferredCommand,
   type CoreLocalEnvelope,
 } from './core-local-store';
-import { CorePollingCoordinator } from './core-polling';
+import {
+  CorePollingCoordinator,
+  type CorePollingDiagnosticSink,
+} from './core-polling';
 import type {
   CatalogueCommitReceipt,
   CatalogueValidationResult,
@@ -130,6 +133,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     private readonly transport: CoreApiTransport,
     private readonly storage: CoreGatewayStorage,
     clock: CoreGatewayClock,
+    diagnosticSink: CorePollingDiagnosticSink = () => {},
   ) {
     this.clock = clock;
     this.localStore = new CoreLocalStore(storage);
@@ -164,6 +168,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
       (role) => this.applyDeviceRole(role),
       (authoritativeBootstrap) => this.onAuthenticatedOnline(authoritativeBootstrap),
       () => this.onAuthenticationRevoked(),
+      diagnosticSink,
     );
     this.mutations = new CoreMutationCoordinator(
       new CoreMutationQueue(
@@ -1527,6 +1532,12 @@ export function createCoreOperationsGateway(
   transport: CoreApiTransport,
   storage: CoreGatewayStorage,
   clock: CoreGatewayClock,
+  diagnosticSink?: CorePollingDiagnosticSink,
 ): CoreOperationsGateway {
-  return new CoreOperationsGatewayImpl(transport, storage, clock);
+  return new CoreOperationsGatewayImpl(
+    transport,
+    storage,
+    clock,
+    diagnosticSink,
+  );
 }

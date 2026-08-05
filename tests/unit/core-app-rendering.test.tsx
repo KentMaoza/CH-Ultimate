@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 
 import { createCoreOperationsGateway } from '../../src/gateway/core-operations-gateway';
 import { App } from '../../src/renderer/App';
@@ -6,12 +6,46 @@ import {
   MemoryStorage,
   ScriptedTransport,
   TestClock,
-  bootstrapBody,
+  populatedBootstrap,
 } from './core-gateway-test-support';
 
-test('renders the CH Core application after an empty owner bootstrap', async () => {
+test('renders editable Nota fields after a valid v2 bootstrap with stockChecks', async () => {
   const transport = new ScriptedTransport();
-  transport.enqueue({ status: 200, body: bootstrapBody('0') });
+  const bootstrap = populatedBootstrap('1');
+  bootstrap.skus = bootstrap.skus.map((sku) => ({
+    ...sku,
+    imageHash: null,
+    sourceImageUrl: null,
+  }));
+  transport.enqueue({ status: 200, body: bootstrap });
+  const gateway = createCoreOperationsGateway(
+    transport,
+    new MemoryStorage(),
+    new TestClock(),
+  );
+
+  await gateway.initialize();
+  await act(async () => {
+    render(<App gateway={gateway} coreBacked />);
+    await Promise.resolve();
+  });
+
+  expect(
+    screen.getByRole('heading', { name: 'SKU Gudang' }),
+  ).toBeInTheDocument();
+  expect(screen.getByText('Tersinkronisasi')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Nota' }));
+  expect(screen.getByLabelText('Nama barang baris 1')).not.toBeDisabled();
+  expect(screen.getByLabelText('Jenis baris 1')).not.toBeDisabled();
+  expect(screen.getByRole('button', { name: 'PCS baris 1' })).not.toBeDisabled();
+  expect(screen.getByRole('button', { name: 'LSN baris 1' })).not.toBeDisabled();
+  gateway.dispose();
+});
+
+test('blocks the desktop business shell after a malformed Core bootstrap', async () => {
+  const transport = new ScriptedTransport();
+  transport.enqueue({ status: 200, body: { serverRevision: '1', skus: [] } });
   const gateway = createCoreOperationsGateway(
     transport,
     new MemoryStorage(),
@@ -22,6 +56,12 @@ test('renders the CH Core application after an empty owner bootstrap', async () 
   render(<App gateway={gateway} coreBacked />);
 
   expect(
-    screen.getByRole('heading', { name: 'SKU Gudang' }),
+    screen.getByText(
+      'Versi CH Core tidak kompatibel. Perbarui CH Core, lalu coba hubungkan kembali.',
+    ),
   ).toBeInTheDocument();
+  expect(screen.queryByText('Invalid CH Core bootstrap envelope')).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'SKU Gudang' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('navigation', { name: 'Modul CH Ultimate' })).not.toBeInTheDocument();
+  gateway.dispose();
 });

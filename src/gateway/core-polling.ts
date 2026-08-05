@@ -24,6 +24,17 @@ import { CoreEnvelopeCoordinator } from './core-envelope-coordinator';
 import { CoreGatewayState } from './core-gateway-state';
 import { CoreSyncScheduler } from './core-sync-scheduler';
 import type { CoreApiTransport } from './core-api-transport';
+import { CORE_UPGRADE_REQUIRED_MESSAGE } from './sync-presentation';
+
+export interface CorePollingDiagnostic {
+  event: 'bootstrap-schema-error';
+  errorName: string;
+  errorMessage: string;
+}
+
+export type CorePollingDiagnosticSink = (
+  diagnostic: CorePollingDiagnostic,
+) => void;
 
 export class CorePollingCoordinator {
   private initialization?: Promise<void>;
@@ -40,6 +51,7 @@ export class CorePollingCoordinator {
     private readonly onDeviceRole: (role: 'owner' | 'client') => void,
     private readonly onAuthenticatedOnline: (authoritativeBootstrap: boolean) => void | Promise<void> = () => {},
     private readonly onAuthenticationRevoked: () => void | Promise<void> = () => {},
+    private readonly diagnosticSink: CorePollingDiagnosticSink = () => {},
   ) {
     this.scheduler = new CoreSyncScheduler(
       clock,
@@ -133,9 +145,14 @@ export class CorePollingCoordinator {
         error instanceof CoreApiUpgradeRequiredError ||
         error instanceof CoreApiSchemaError
       ) {
+        this.diagnosticSink({
+          event: 'bootstrap-schema-error',
+          errorName: error.name,
+          errorMessage: error.message,
+        });
         this.state.publishSync({
           phase: 'upgrade-required',
-          message: error.message,
+          message: CORE_UPGRADE_REQUIRED_MESSAGE,
         });
         return;
       }

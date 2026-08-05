@@ -18,6 +18,8 @@ import { OperationsSyncStatus } from './OperationsSyncStatus';
 import { StockCheckView } from './stock-check/StockCheckView';
 import { OutputProvider } from './output-context';
 import { OperationalExportPage } from './pages/OperationalExportPage';
+import { useOperationsSyncSnapshot } from './use-operations-snapshot';
+import { presentSyncStatus } from '../gateway/sync-presentation';
 
 export type ModuleId = 'inventory' | 'stockCheck' | 'skuChanges' | 'shareRecommendations' | 'dataExport' | 'create' | 'label' | 'nota' | 'notaArchive' | 'revenue' | 'empty' | 'settings';
 type NavIconName = 'warehouse' | 'stock' | 'history' | 'share' | 'export' | 'add' | 'template' | 'nota' | 'archive' | 'revenue' | 'empty' | 'settings';
@@ -67,6 +69,8 @@ function AppLayout({
   const [archiveView, setArchiveView] = useState<ArchiveNotaViewState>(initialArchiveNotaView);
   const [notaSelection, setNotaSelection] = useState<{ transactionId: string; pageId: string } | undefined>();
   const [notaReturnsToArchive, setNotaReturnsToArchive] = useState(false);
+  const sync = useOperationsSyncSnapshot(gateway);
+  const syncPresentation = presentSyncStatus(sync.phase);
   const current = modules.find((module) => module.id === active)!;
 
   const openCompletionDestination = (destination: NotaCompletionDestination) => {
@@ -74,7 +78,19 @@ function AppLayout({
     setActive('notaArchive');
   };
 
-  if (active === 'nota') return <NotaWorkspace coreBacked={coreBacked} initialSelection={notaSelection} onBack={() => setActive(notaReturnsToArchive ? 'notaArchive' : 'inventory')} onOpenCompletionDestination={openCompletionDestination} />;
+  if (coreBacked && sync.phase === 'upgrade-required') {
+    return (
+      <main className="core-connection">
+        <section className="core-connection__card" role="alert">
+          <span className="eyebrow">CH ULTIMATE / CH CORE</span>
+          <h1>{syncPresentation.label}</h1>
+          <p>{syncPresentation.message}</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (active === 'nota') return <NotaWorkspace coreBacked={coreBacked} syncLabel={syncPresentation.label} initialSelection={notaSelection} onBack={() => setActive(notaReturnsToArchive ? 'notaArchive' : 'inventory')} onOpenCompletionDestination={openCompletionDestination} />;
 
   const openNota = (selection: { transactionId: string; pageId: string }, returnToArchive: boolean) => { setNotaSelection(selection); setNotaReturnsToArchive(returnToArchive); setActive('nota'); };
   const selectModule = (module: ModuleId) => {

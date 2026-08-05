@@ -8,6 +8,7 @@ import type {
   CoreOperationsGateway,
 } from '../gateway/core-operations-gateway';
 import { createCoreOperationsGateway } from '../gateway/core-operations-gateway';
+import type { CorePollingDiagnosticSink } from '../gateway/core-polling';
 import type { OperationsGateway } from '../gateway/operations-gateway';
 import {
   createCoreGatewayClock,
@@ -39,6 +40,7 @@ export interface DesktopBootstrapOptions {
   mockFactory?: () => OperationsGateway;
   storage?: CoreGatewayStorage;
   clock?: CoreGatewayClock;
+  diagnosticSink?: CorePollingDiagnosticSink;
 }
 
 function missingBridgeStatus(
@@ -99,6 +101,7 @@ export async function bootstrapDesktopGateway(
     },
     options.storage ?? createCoreGatewayStorage(),
     options.clock ?? createCoreGatewayClock(),
+    options.diagnosticSink,
   );
   try {
     await gateway.initialize();

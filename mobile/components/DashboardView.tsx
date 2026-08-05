@@ -2,6 +2,7 @@ import type { DemoState, Sku } from '../../src/domain/types';
 import type { OperationsGateway } from '../../src/gateway/operations-gateway';
 import { BellIcon, BoxIcon, ChevronIcon, InfoIcon, ScanIcon, SearchIcon, ShareIcon, TrendIcon } from './Icons';
 import { PriceChangeList } from './PriceChangeList';
+import { presentSyncStatus } from '../../src/gateway/sync-presentation';
 
 export function DashboardView({
   snapshot,
@@ -14,6 +15,7 @@ export function DashboardView({
   onOpenSku,
   onOpenRecommendations,
   coreBacked = false,
+  syncLabel,
 }: {
   snapshot: DemoState;
   gateway: OperationsGateway;
@@ -25,10 +27,12 @@ export function DashboardView({
   onOpenSku: (sku: Sku) => void;
   onOpenRecommendations: () => void;
   coreBacked?: boolean;
+  syncLabel?: string;
 }) {
   const activeSkus = snapshot.skus.filter((sku) => !sku.archived);
   const lowStockCount = activeSkus.filter((sku) => sku.tracked && sku.stock <= 2).length;
   const latest = [...snapshot.priceChanges].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, 2);
+  const coreSyncLabel = syncLabel ?? presentSyncStatus(gateway.getSyncSnapshot().phase).label;
 
   return <>
     <header className="mobile-header">
@@ -40,7 +44,7 @@ export function DashboardView({
     </header>
     <aside className="demo-banner" aria-label={coreBacked ? 'Data CH Core' : 'Mode Demo'}>
       <InfoIcon />
-      <span><strong>{coreBacked ? 'Data CH Core' : 'Mode Demo'}</strong><small>{coreBacked ? 'Tersinkronisasi melalui NAS lokal.' : 'Data yang ditampilkan adalah contoh.'}</small></span>
+      <span><strong>{coreBacked ? 'Data CH Core' : 'Mode Demo'}</strong><small>{coreBacked ? coreSyncLabel : 'Data yang ditampilkan adalah contoh.'}</small></span>
     </aside>
     <section className="quick-actions" aria-label="Aksi cepat">
       <button className="quick-action primary" onClick={onScan}><ScanIcon />Scan Barcode</button>

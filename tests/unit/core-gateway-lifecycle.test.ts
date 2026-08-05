@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createCoreOperationsGateway } from '../../src/gateway/core-operations-gateway';
 import {
@@ -26,6 +26,34 @@ async function settleUntil(predicate: () => boolean): Promise<void> {
 }
 
 describe('Core gateway lifecycle and Nota flush races', () => {
+  it('keeps malformed bootstrap details out of sync state and sends safe diagnostics', async () => {
+    const transport = new ScriptedTransport();
+    const diagnostics = vi.fn();
+    const gateway = createCoreOperationsGateway(
+      transport,
+      new MemoryStorage(),
+      new TestClock(),
+      diagnostics,
+    );
+    transport.enqueue({ status: 200, body: { serverRevision: '1', skus: [] } });
+
+    await gateway.initialize();
+
+    expect(gateway.getSyncSnapshot()).toMatchObject({
+      phase: 'upgrade-required',
+      message:
+        'Versi CH Core tidak kompatibel. Perbarui CH Core, lalu coba hubungkan kembali.',
+    });
+    expect(gateway.getSyncSnapshot().message).not.toContain('envelope');
+    expect(diagnostics).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'bootstrap-schema-error',
+        errorName: 'CoreApiSchemaError',
+        errorMessage: 'Invalid CH Core bootstrap envelope',
+      }),
+    );
+  });
+
   it('keeps disposal terminal when initialize is called afterward', async () => {
     const clock = new TestClock();
     const transport = new ScriptedTransport();

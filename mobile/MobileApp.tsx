@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { OperationsGateway } from '../src/gateway/operations-gateway';
 import type { Sku } from '../src/domain/types';
 import { findSkuByScanCode } from '../src/domain/mobile-demo-state';
-import { useOperationsSnapshot } from '../src/renderer/use-operations-snapshot';
+import { useOperationsSnapshot, useOperationsSyncSnapshot } from '../src/renderer/use-operations-snapshot';
+import { presentSyncStatus } from '../src/gateway/sync-presentation';
 import type { BarcodeScannerPort, LocalNotificationPort, PdfSharePort } from './ports';
 import { ArchiveIcon, BoxIcon, HomeIcon, MoreIcon, NotaIcon, StockIcon } from './components/Icons';
 import { DashboardView } from './components/DashboardView';
@@ -30,6 +31,8 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
   coreBacked?: boolean;
 }) {
   const snapshot = useOperationsSnapshot(gateway);
+  const sync = useOperationsSyncSnapshot(gateway);
+  const syncPresentation = presentSyncStatus(sync.phase);
   const [view, setView] = useState<MainView>('home');
   const [editingNotaId, setEditingNotaId] = useState<string | null>(null);
   const [focusSearch, setFocusSearch] = useState(false);
@@ -193,6 +196,20 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
     return result?.rawValue ?? null;
   }
 
+  if (coreBacked && sync.phase === 'upgrade-required') {
+    return (
+      <main className="mobile-core-connection">
+        <section className="mobile-core-connection__card" role="alert">
+          <span className="mobile-core-connection__eyebrow">
+            CH ULTIMATE / CH CORE
+          </span>
+          <h1>{syncPresentation.label}</h1>
+          <p>{syncPresentation.message}</p>
+        </section>
+      </main>
+    );
+  }
+
   return <div className={`mobile-app${coreBacked ? ' mobile-app--core' : ''}`}>
     {coreBacked ? (
       <OperationsSyncStatus gateway={gateway} />
@@ -215,6 +232,7 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
         onScan={() => void beginScan()}
         onSearch={() => navigate('skus', true)}
         coreBacked={coreBacked}
+        syncLabel={syncPresentation.label}
       /> : null}
       {view === 'skus' && !scanOpen && !selectedSku ? <SkuCatalog focusSearch={focusSearch} gateway={gateway} onOpenSku={openSku} skus={snapshot.skus} /> : null}
       {view === 'prices' && !scanOpen && !selectedSku ? <PriceFeedView changes={visiblePriceChanges} coreBacked={coreBacked} gateway={gateway} onOpenSku={openSku} onSimulate={coreBacked ? undefined : () => void simulatePriceChange()} skus={snapshot.skus} status={simulationStatus} unreadOnly={priceMode === 'unread'} /> : null}
@@ -226,13 +244,13 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
         snapshot={snapshot}
         coreBacked={coreBacked}
       /> : null}
-      {view === 'nota' && !scanOpen && !selectedSku ? <MobileNotaView coreBacked={coreBacked} gateway={gateway} scanner={scanner} share={share} transactionId={editingNotaId ?? undefined} /> : null}
+      {view === 'nota' && !scanOpen && !selectedSku ? <MobileNotaView coreBacked={coreBacked} gateway={gateway} scanner={scanner} share={share} syncLabel={syncPresentation.label} transactionId={editingNotaId ?? undefined} /> : null}
       {view === 'stock' && !scanOpen && !selectedSku ? <section className="page-view mobile-stock-check-page">
         <h1 data-page-heading tabIndex={-1}>Cek Stok</h1>
         <p>Hitung stok fisik dalam PCS, lalu konfirmasi sebelum disimpan.</p>
         <StockCheckView gateway={gateway} mode="mobile" onCameraScan={scanStockCode} />
       </section> : null}
-      {view === 'archive' && !scanOpen && !selectedSku ? <MobileArchiveView coreBacked={coreBacked} gateway={gateway} onEdit={editArchivedNota} /> : null}
+      {view === 'archive' && !scanOpen && !selectedSku ? <MobileArchiveView coreBacked={coreBacked} gateway={gateway} onEdit={editArchivedNota} syncLabel={syncPresentation.label} /> : null}
       {view === 'dataExport' && !scanOpen && !selectedSku ? <OperationalExportView coreBacked={coreBacked} gateway={gateway} onBack={() => navigate('more')} share={share} /> : null}
       {view === 'more' && !scanOpen && !selectedSku ? <MoreView coreBacked={coreBacked} onOpenDataExport={() => navigate('dataExport')} onOpenPrices={() => navigate('prices')} onOpenRecommendations={() => navigate('recommendations')} /> : null}
     </main>

@@ -5,6 +5,7 @@ import type { BarcodeScannerPort, LocalNotificationPort, RecommendationPdfShareP
 import { createMobileDemoState } from '../../src/domain/mobile-demo-state';
 import type { DemoState } from '../../src/domain/types';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
+import type { SyncPhase } from '../../src/gateway/operations-gateway-contract';
 
 function createPorts(): {
   scanner: BarcodeScannerPort;
@@ -28,9 +29,32 @@ function renderMobile(
   coreBacked = false,
 ) {
   const gateway = new MockOperationsGateway(seedFactory);
+  if (coreBacked) {
+    gateway.getSyncSnapshot = () => ({
+      phase: 'online',
+      serverRevision: '8',
+      pendingCount: 0,
+      conflictCount: 0,
+    });
+  }
   const ports = { ...createPorts(), ...overrides };
   render(<MobileApp gateway={gateway} scanner={ports.scanner} notifications={ports.notifications} share={ports.share} coreBacked={coreBacked} />);
   return { gateway, ...ports };
+}
+
+function coreGatewayAt(phase: SyncPhase) {
+  const gateway = new MockOperationsGateway(createMobileDemoState);
+  gateway.getSyncSnapshot = () => ({
+    phase,
+    serverRevision: '8',
+    pendingCount: 0,
+    conflictCount: 0,
+    message:
+      phase === 'upgrade-required'
+        ? 'Invalid CH Core bootstrap envelope'
+        : undefined,
+  });
+  return gateway;
 }
 
 function openMoreDestination(name: 'Perubahan Harga' | 'Rekomendasi') {
@@ -86,16 +110,16 @@ test('core-backed mobile removes demo/session claims and labels central data', (
   );
 
   expect(screen.getByText('Data CH Core')).toBeInTheDocument();
-  expect(screen.getByText('Tersinkronisasi melalui NAS lokal.')).toBeInTheDocument();
+  expect(screen.getAllByText('Tersinkronisasi')).toHaveLength(2);
   expect(screen.queryByText('Mode Demo')).not.toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: 'Nota' }));
-  expect(screen.getByText('CH CORE · NOTA TERSINKRONISASI')).toBeInTheDocument();
+  expect(screen.getByText('CH CORE · NOTA · TERSINKRONISASI')).toBeInTheDocument();
   expect(screen.queryByText('FRONTEND DEMO · SESSION ONLY')).not.toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: 'Arsip' }));
   expect(screen.getByText('ARSIP CH CORE')).toBeInTheDocument();
-  expect(screen.getByText('Tersedia di semua perangkat yang tersinkronisasi')).toBeInTheDocument();
+  expect(screen.getByText('Status CH Core · Tersinkronisasi')).toBeInTheDocument();
   expect(screen.queryByText(/SESSION ONLY/)).not.toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: 'Lainnya' }));
@@ -114,6 +138,43 @@ test('core-backed mobile removes demo/session claims and labels central data', (
       }),
     ),
   );
+});
+
+test.each([
+  ['connecting', 'Menghubungkan'],
+  ['offline', 'Offline'],
+] as const)('does not present %s mobile Core data as synchronized', (phase, label) => {
+  const ports = createPorts();
+  render(
+    <MobileApp
+      {...ports}
+      coreBacked
+      gateway={coreGatewayAt(phase)}
+    />,
+  );
+
+  expect(screen.getAllByText(label)).toHaveLength(2);
+  expect(screen.queryByText(/Tersinkronisasi/i)).not.toBeInTheDocument();
+});
+
+test('blocks mobile business modules when Core needs an upgrade', () => {
+  const ports = createPorts();
+  render(
+    <MobileApp
+      {...ports}
+      coreBacked
+      gateway={coreGatewayAt('upgrade-required')}
+    />,
+  );
+
+  expect(
+    screen.getByText(
+      'Versi CH Core tidak kompatibel. Perbarui CH Core, lalu coba hubungkan kembali.',
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByText('Invalid CH Core bootstrap envelope')).not.toBeInTheDocument();
+  expect(screen.queryByTestId('active-sku-count')).not.toBeInTheDocument();
+  expect(screen.queryByRole('navigation', { name: 'Navigasi utama' })).not.toBeInTheDocument();
 });
 
 test('core-backed price history cannot invoke the demo price mutation', () => {

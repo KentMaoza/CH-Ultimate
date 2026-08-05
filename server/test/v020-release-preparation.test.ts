@@ -218,9 +218,11 @@ describe('v0.2.0 historical repository-local release preparation', () => {
     );
     expect(historicalSection).toContain('four-day copied-data pilot');
     expect(historicalSection).not.toContain('24-hour');
-    expect(deployment).toContain('four-day copied-data pilot');
+    expect(deployment).toContain('no time-based pilot gate');
+    expect(deployment).not.toContain('four-day copied-data pilot');
     expect(deployment).not.toContain('24-hour copied-data pilot');
-    expect(businessLan).toMatch(/four-day\s+copied-data pilot/);
+    expect(businessLan).toContain('no time-based pilot gate');
+    expect(businessLan).not.toMatch(/four-day\s+copied-data pilot/);
     expect(businessLan).not.toContain('24 hours');
 
     for (const currentWorkbookFact of [
@@ -259,9 +261,12 @@ describe('v0.2.0 historical repository-local release preparation', () => {
   });
 
   it('points the repository guide and acceptance ledger at the current guarded v0.2.2 contract', async () => {
-    const [readme, acceptance] = await Promise.all([
+    const [readme, acceptance, executionPlan] = await Promise.all([
       repositoryText('README.md'),
       repositoryText('docs/ch-core-acceptance-status.md'),
+      repositoryText(
+        'docs/superpowers/plans/2026-08-05-v021-real-use-readiness.md',
+      ),
     ]);
 
     for (const currentPilotFact of [
@@ -298,11 +303,24 @@ describe('v0.2.0 historical repository-local release preparation', () => {
     ]) {
       expect(currentSection).toContain(currentReleaseFact);
     }
-    for (const currentPreparedRow of [
-      '| Artifact signed v0.2.2 | PREPARED |',
-      '| Publikasi GitHub | BLOCKED |',
+    for (const currentPublishedRow of [
+      '| Artifact signed v0.2.2 | PASS |',
+      '| Publikasi GitHub | PASS |',
     ]) {
-      expect(currentSection).toContain(currentPreparedRow);
+      expect(currentSection).toContain(currentPublishedRow);
+    }
+    for (const publishedReceipt of [
+      'dc76d3c0529233974f0d1ec18420a230d0c768a5',
+      '30994408231',
+      '149268992',
+      'a1d484804d49ea9bce3b895b628bfb745de8eaa73181d59378a599396e007b40',
+      '43104529',
+      '496057db78f5a41a3f75adf7c5eef9f878cf33cc5ee9674eb48fa7cb2e1909c9',
+      '| Core source staging | PASS |',
+      '55f193d8b483223c322e69312b86a12f90be6f7c42d1da39517ccdd366ca4798',
+      '7b1fbbccf9938e164b310541f79c37c4ed45146516660b2b4bb1beeb34481e83',
+    ]) {
+      expect(currentSection).toContain(publishedReceipt);
     }
     for (const currentBlockedRow of [
       '| Deploy CH Core v2 | BLOCKED |',
@@ -314,6 +332,14 @@ describe('v0.2.0 historical repository-local release preparation', () => {
     }
     expect(currentSection).toContain(
       '| Pilot copied-data empat hari | REMOVED FROM CURRENT EXECUTION |',
+    );
+    expect(executionPlan).toContain('confirm product version 0.2.2');
+    expect(executionPlan).toContain(
+      'versionName 0.2.2, versionCode 9',
+    );
+    expect(executionPlan).not.toContain('confirm product version 0.2.1');
+    expect(executionPlan).not.toContain(
+      'versionName 0.2.1, versionCode 8',
     );
 
     for (const lastMeasuredSamsungFact of [

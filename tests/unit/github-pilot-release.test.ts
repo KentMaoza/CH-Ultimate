@@ -180,6 +180,17 @@ describe('GitHub pilot release workflow', () => {
       'UNAVAILABLE_AFTER_OWNER_UNINSTALL',
       '0 critical',
       '0 high',
+      'dc76d3c0529233974f0d1ec18420a230d0c768a5',
+      '30994408231',
+      '149268992',
+      'a1d484804d49ea9bce3b895b628bfb745de8eaa73181d59378a599396e007b40',
+      '43104529',
+      '496057db78f5a41a3f75adf7c5eef9f878cf33cc5ee9674eb48fa7cb2e1909c9',
+      '3773d852b65dd1773fb509bd1b38d3b8ab846edf246f6f1a99e0600470c93036',
+      'ch_ultimate-0.2.2-full.nupkg',
+      '/Volumes/home/CH_Ultimate_Pilot/dc76d3c',
+      '55f193d8b483223c322e69312b86a12f90be6f7c42d1da39517ccdd366ca4798',
+      '7b1fbbccf9938e164b310541f79c37c4ed45146516660b2b4bb1beeb34481e83',
     ]) {
       expect(evidence).toContain(preparedReceipt);
     }

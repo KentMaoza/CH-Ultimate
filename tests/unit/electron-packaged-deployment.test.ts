@@ -46,6 +46,19 @@ afterEach(async () => {
 });
 
 describe('packaged CH Core deployment bootstrap', () => {
+  it('uses a Vite-managed relative renderer asset for the sidebar mark', async () => {
+    const [app, rendererConfig] = await Promise.all([
+      readFile('src/renderer/App.tsx', 'utf8'),
+      readFile('vite.renderer.config.ts', 'utf8'),
+    ]);
+
+    expect(app).toContain(
+      "import chUltimateMark from './assets/ch-ultimate-mark.svg';",
+    );
+    expect(app).not.toContain('src="/brand/ch-ultimate-mark.svg"');
+    expect(rendererConfig).toContain("base: './'");
+  });
+
   it('seeds the fixed endpoint and public CA into user data', async () => {
     const fixture = await deploymentFixture();
 

@@ -5,6 +5,11 @@ declare module 'electron-squirrel-startup' {
 
 declare module '*.css';
 
+declare module '*.svg' {
+  const source: string;
+  export default source;
+}
+
 interface Window {
   chCore?: import('./electron/core-bridge-contract').ChCoreBridge;
   chOutput?: import('./electron/output-contract').ChOutputBridge;

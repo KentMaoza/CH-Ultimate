@@ -1,6 +1,9 @@
-import { writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import ExcelJS from 'exceljs';
-import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { _electron as electron, expect, test, type Page, type TestInfo } from '@playwright/test';
 import { launchTestElectron } from './electron-launch';
 
 async function launch() {
@@ -9,6 +12,62 @@ async function launch() {
   await expect(window).toHaveTitle('CH Ultimate');
   return { application, window };
 }
+
+test('packaged renderer loads the Vite-managed sidebar mark under file protocol', async () => {
+  const userDataDirectory = await mkdtemp(join(tmpdir(), 'ch-ultimate-packaged-logo-'));
+  const packagedResourcesDirectory = join(
+    'out',
+    `CH Ultimate-${process.platform}-${process.arch}`,
+    ...(process.platform === 'darwin'
+      ? ['CH Ultimate.app', 'Contents', 'Resources']
+      : ['resources']),
+  );
+  const packagedRendererUrl = `${pathToFileURL(join(
+    packagedResourcesDirectory,
+    'app.asar',
+    '.vite',
+    'renderer',
+    'main_window',
+    'index.html',
+  )).href}?ch-ultimate-e2e-test-mock=1`;
+  const launcherPath = join(userDataDirectory, 'packaged-renderer-launch.cjs');
+  await writeFile(
+    launcherPath,
+    `const { app, BrowserWindow } = require('electron');\napp.whenReady().then(() => new BrowserWindow({ webPreferences: { contextIsolation: true } }).loadURL(${JSON.stringify(packagedRendererUrl)}));\n`,
+  );
+  const application = await electron.launch({
+    args: [launcherPath, `--user-data-dir=${userDataDirectory}`],
+    env: {
+      ...process.env,
+      CH_ULTIMATE_E2E_TEST_MOCK: '1',
+    },
+  });
+
+  try {
+    const window = await application.firstWindow();
+    const mark = await window.getByRole('img', { name: 'CH Ultimate' }).evaluate(
+      (image) => {
+        const mark = image as HTMLImageElement;
+        return {
+          complete: mark.complete,
+          naturalWidth: mark.naturalWidth,
+          resolvedUrl: mark.currentSrc,
+        };
+      },
+    );
+
+    expect(mark.complete).toBe(true);
+    expect(mark.naturalWidth).toBeGreaterThan(0);
+    expect(mark.resolvedUrl).not.toMatch(/^file:\/\/(?:\/)?(?:brand|assets)\//);
+    expect(
+      mark.resolvedUrl.startsWith('data:image/svg+xml,') ||
+        mark.resolvedUrl.startsWith(pathToFileURL(packagedResourcesDirectory).href),
+    ).toBe(true);
+  } finally {
+    await application.close();
+    await rm(userDataDirectory, { recursive: true, force: true });
+  }
+});
 
 async function openNota(window: Page) {
   await window.getByRole('button', { name: 'Nota', exact: true }).click();

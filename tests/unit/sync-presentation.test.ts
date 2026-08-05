@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  presentCoreBlockingState,
   presentSyncStatus,
 } from '../../src/gateway/sync-presentation';
 import type { SyncPhase } from '../../src/gateway/operations-gateway-contract';
@@ -30,5 +31,16 @@ describe('sync presentation', () => {
       'Versi CH Core tidak kompatibel. Perbarui CH Core, lalu coba hubungkan kembali.',
     );
     expect(presentSyncStatus('offline').message).toBeUndefined();
+  });
+
+  it('presents revoked access before the generic untrusted bootstrap state', () => {
+    expect(presentCoreBlockingState({
+      phase: 'revoked',
+      trustedV2Bootstrap: false,
+    })).toEqual({
+      label: 'Akses perangkat dicabut',
+      message:
+        'Akses perangkat dicabut. Minta pemilik menyetujui perangkat ini kembali.',
+    });
   });
 });

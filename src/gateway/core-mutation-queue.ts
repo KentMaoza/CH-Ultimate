@@ -177,6 +177,10 @@ export class CoreMutationQueue {
         });
         if (response.status < 200 || response.status >= 300) {
           const apiError = parseCoreApiError(response.status, response.body);
+          if (apiError.code === 'UPGRADE_REQUIRED') {
+            await this.failSchema(new CoreApiUpgradeRequiredError());
+            return;
+          }
           if (apiError.code === 'CONFLICT' && 'conflict' in apiError) {
             await this.storeConflict(item, apiError.conflict);
             return;
@@ -197,18 +201,9 @@ export class CoreMutationQueue {
             this.failAllDeferred(new Error(apiError.code));
             return;
           }
-          const phase =
-            apiError.code === 'UPGRADE_REQUIRED'
-                ? 'upgrade-required'
-                : 'offline';
-          if (apiError.code === 'UPGRADE_REQUIRED') {
-            await this.failSchema(new CoreApiUpgradeRequiredError());
-            return;
-          }
           await this.failCurrent(
             item.id,
             new Error(apiError.code),
-            phase,
           );
           return;
         }

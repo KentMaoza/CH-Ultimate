@@ -92,3 +92,36 @@ test('blocks the desktop business shell when the first Core bootstrap cannot rea
   expect(screen.queryByRole('navigation', { name: 'Modul CH Ultimate' })).not.toBeInTheDocument();
   gateway.dispose();
 });
+
+test('shows actionable revoked access on desktop when a fresh Core bootstrap returns 401', async () => {
+  const transport = new ScriptedTransport();
+  const storage = new MemoryStorage();
+  transport.enqueue({ status: 401, body: { code: 'UNAUTHORIZED' } });
+  const gateway = createCoreOperationsGateway(
+    transport,
+    storage,
+    new TestClock(),
+  );
+
+  await gateway.initialize();
+  render(<App gateway={gateway} coreBacked />);
+
+  expect(
+    screen.getByRole('heading', { name: 'Akses perangkat dicabut' }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      'Akses perangkat dicabut. Minta pemilik menyetujui perangkat ini kembali.',
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Memuat CH Core' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('navigation', { name: 'Modul CH Ultimate' })).not.toBeInTheDocument();
+  const requestCount = transport.requests.length;
+  const saveCount = storage.saves.length;
+  await expect(gateway.createNotaTransaction()).rejects.toThrow(
+    'Akses perangkat dicabut',
+  );
+  expect(transport.requests).toHaveLength(requestCount);
+  expect(storage.saves).toHaveLength(saveCount);
+  gateway.dispose();
+});

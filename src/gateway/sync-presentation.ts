@@ -36,6 +36,13 @@ export function presentSyncStatus(phase: SyncPhase): SyncPresentation {
 export function presentCoreBlockingState(
   sync: Pick<SyncSnapshot, 'phase' | 'trustedV2Bootstrap'>,
 ): SyncPresentation | undefined {
+  if (sync.phase === 'revoked') {
+    return {
+      label: labels.revoked,
+      message:
+        'Akses perangkat dicabut. Minta pemilik menyetujui perangkat ini kembali.',
+    };
+  }
   if (sync.phase === 'upgrade-required') {
     return presentSyncStatus(sync.phase);
   }

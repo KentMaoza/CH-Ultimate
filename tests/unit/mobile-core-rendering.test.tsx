@@ -128,3 +128,39 @@ test('blocks the mobile business shell when the first Core bootstrap cannot reac
   expect(screen.queryByRole('navigation', { name: 'Navigasi utama' })).not.toBeInTheDocument();
   gateway.dispose();
 });
+
+test('shows actionable revoked access on mobile when a fresh Core bootstrap returns 401', async () => {
+  const transport = new ScriptedTransport();
+  transport.enqueue({ status: 401, body: { code: 'UNAUTHORIZED' } });
+  const gateway = createCoreOperationsGateway(
+    transport,
+    new MemoryStorage(),
+    new TestClock(),
+  );
+  await gateway.initialize();
+
+  render(
+    <MobileApp
+      coreBacked
+      gateway={gateway}
+      notifications={notifications}
+      scanner={scanner}
+      share={share}
+    />,
+  );
+
+  expect(
+    screen.getByRole('heading', { name: 'Akses perangkat dicabut' }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      'Akses perangkat dicabut. Minta pemilik menyetujui perangkat ini kembali.',
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Memuat CH Core' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('navigation', { name: 'Navigasi utama' })).not.toBeInTheDocument();
+  await expect(gateway.createNotaTransaction()).rejects.toThrow(
+    'Akses perangkat dicabut',
+  );
+  gateway.dispose();
+});

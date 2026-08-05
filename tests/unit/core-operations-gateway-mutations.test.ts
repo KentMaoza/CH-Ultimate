@@ -176,6 +176,49 @@ describe('Core operations gateway mutation coordination', () => {
     expect((storage.value as CoreCacheEnvelope).outbox).toHaveLength(1);
   });
 
+  it.each([400, 403, 404, 409, 422])(
+    'keeps a %i UPGRADE_REQUIRED mutation queued and enters the safe terminal state',
+    async (status) => {
+      const transport = new ScriptedTransport();
+      const storage = new MemoryStorage();
+      const diagnostics = vi.fn();
+      const gateway = createCoreOperationsGateway(
+        transport,
+        storage,
+        new TestClock(),
+        diagnostics,
+      );
+      transport.enqueue({ status: 200, body: populatedBootstrap('1') });
+      await gateway.initialize();
+      transport.enqueue({ status, body: { code: 'UPGRADE_REQUIRED' } });
+
+      await expect(gateway.adjustStock(SKU_ID, 1)).rejects.toThrow(
+        'Versi CH Core tidak kompatibel. Perbarui CH Core, lalu coba hubungkan kembali.',
+      );
+
+      expect(gateway.getSyncSnapshot()).toMatchObject({
+        phase: 'upgrade-required',
+        message:
+          'Versi CH Core tidak kompatibel. Perbarui CH Core, lalu coba hubungkan kembali.',
+      });
+      expect(diagnostics).toHaveBeenCalledWith({
+        event: 'core-schema-incompatibility',
+        source: 'mutation',
+        errorName: 'CoreApiUpgradeRequiredError',
+        errorMessage: 'CH Core API memerlukan versi aplikasi yang lebih baru.',
+      });
+      expect((storage.value as CoreCacheEnvelope).outbox).toEqual([
+        expect.objectContaining({ optimisticActive: false }),
+      ]);
+      const requestsBeforeBlockedWrite = transport.requests.length;
+      await expect(gateway.adjustStock(SKU_ID, 1)).rejects.toMatchObject({
+        name: 'CoreGatewayNetworkBlockedError',
+        code: 'UPGRADE_REQUIRED',
+      });
+      expect(transport.requests).toHaveLength(requestsBeforeBlockedWrite);
+    },
+  );
+
   it('keeps an ordinary normal-mutation network failure offline and retryable', async () => {
     const transport = new ScriptedTransport();
     const diagnostics = vi.fn();

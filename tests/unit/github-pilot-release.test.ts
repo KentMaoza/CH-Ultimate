@@ -190,7 +190,9 @@ describe('GitHub pilot release workflow', () => {
       'ch_ultimate-0.2.2-full.nupkg',
       '/Volumes/home/CH_Ultimate_Pilot/dc76d3c',
       '55f193d8b483223c322e69312b86a12f90be6f7c42d1da39517ccdd366ca4798',
-      '7b1fbbccf9938e164b310541f79c37c4ed45146516660b2b4bb1beeb34481e83',
+      'de55aec640e316fe9dd87c4b9e226cfa6a0d0db3f8b6a94f004b2ef5910d7a6b',
+      '4502396c8b83a5cfbdca81eb12a3027e38154fd5e96fbeddca52c6ff6f7c9b39',
+      'DO-NOT-RUN',
     ]) {
       expect(evidence).toContain(preparedReceipt);
     }

@@ -9,6 +9,12 @@ export interface BarcodeScannerPort {
   scan(): Promise<BarcodeScanResult | null>;
 }
 
+export type AppBackButtonHandler = () => boolean;
+
+export interface AppBackButtonPort {
+  setHandler(handler: AppBackButtonHandler): () => void;
+}
+
 export interface LocalNotificationPort {
   ensurePermission(): Promise<'granted' | 'denied'>;
   notifyPriceChange(change: SkuPriceChange, sku: Sku): Promise<void>;
@@ -28,6 +34,10 @@ export interface PdfSharePort {
 
 export const browserBarcodeScanner: BarcodeScannerPort = {
   scan: async () => null,
+};
+
+export const browserAppBackButton: AppBackButtonPort = {
+  setHandler: () => () => undefined,
 };
 
 export const browserLocalNotifications: LocalNotificationPort = {

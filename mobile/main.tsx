@@ -5,6 +5,8 @@ import { createMobileDemoState } from '../src/domain/mobile-demo-state';
 import { MockOperationsGateway } from '../src/gateway/operations-gateway';
 import { ClientErrorBoundary } from '../src/renderer/ClientErrorBoundary';
 import { MobileApp } from './MobileApp';
+import { createNativeAppBackButton } from './native-adapters';
+import { browserAppBackButton } from './ports';
 import { createMobileRuntime } from './bootstrap';
 import { CoreConnectionScreen } from './components/CoreConnectionScreen';
 import {
@@ -39,6 +41,7 @@ export function mountMobileRenderer(
 ): () => void {
   let current: MobileBootstrapResult | undefined;
   let generation = 0;
+  const backButton = options.native ? createNativeAppBackButton() : browserAppBackButton;
   const render = (content: ReactNode) =>
     root.render(
       <StrictMode>
@@ -108,6 +111,7 @@ export function mountMobileRenderer(
     }
     render(
       <MobileApp
+        backButton={backButton}
         coreBacked={next.source === 'core'}
         gateway={next.gateway}
         notifications={options.ports.notifications}

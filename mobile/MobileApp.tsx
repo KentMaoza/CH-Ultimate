@@ -4,7 +4,13 @@ import type { Sku } from '../src/domain/types';
 import { findSkuByScanCode } from '../src/domain/mobile-demo-state';
 import { useOperationsSnapshot, useOperationsSyncSnapshot } from '../src/renderer/use-operations-snapshot';
 import { presentSyncStatus } from '../src/gateway/sync-presentation';
-import type { BarcodeScannerPort, LocalNotificationPort, PdfSharePort } from './ports';
+import {
+  browserAppBackButton,
+  type AppBackButtonPort,
+  type BarcodeScannerPort,
+  type LocalNotificationPort,
+  type PdfSharePort,
+} from './ports';
 import { ArchiveIcon, BoxIcon, HomeIcon, MoreIcon, NotaIcon, StockIcon } from './components/Icons';
 import { DashboardView } from './components/DashboardView';
 import { SkuCatalog } from './components/SkuCatalog';
@@ -22,8 +28,10 @@ import { OperationalExportView } from './components/OperationalExportView';
 
 type MainView = 'home' | 'skus' | 'nota' | 'stock' | 'archive' | 'more' | 'prices' | 'recommendations' | 'dataExport';
 type PriceMode = 'all' | 'unread';
+type SubordinateOrigin = 'home' | 'more';
 
-export function MobileApp({ gateway, scanner, notifications, share, coreBacked = false }: {
+export function MobileApp({ backButton = browserAppBackButton, gateway, scanner, notifications, share, coreBacked = false }: {
+  backButton?: AppBackButtonPort;
   gateway: OperationsGateway;
   scanner: BarcodeScannerPort;
   notifications: LocalNotificationPort;
@@ -41,9 +49,11 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
   const [scanCode, setScanCode] = useState('');
   const [scanError, setScanError] = useState('');
   const [priceMode, setPriceMode] = useState<PriceMode>('all');
+  const [subordinateOrigin, setSubordinateOrigin] = useState<SubordinateOrigin>('home');
   const [readChangeIds, setReadChangeIds] = useState<Set<string>>(() => new Set());
   const [unreadFeedIds, setUnreadFeedIds] = useState<string[]>([]);
   const [simulationStatus, setSimulationStatus] = useState('');
+  const backHandlerRef = useRef<() => boolean>(() => false);
   const mainContentRef = useRef<HTMLElement>(null);
   const scanRequestToken = useRef(0);
   const selectedSku = snapshot.skus.find((sku) => sku.id === selectedSkuId) ?? null;
@@ -52,6 +62,31 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
   const visiblePriceChanges = priceMode === 'all'
     ? sortedChanges
     : sortedChanges.filter((change) => unreadFeedIds.includes(change.id));
+
+  backHandlerRef.current = () => {
+    if (coreBacked && sync.phase === 'upgrade-required') return true;
+    if (selectedSkuId) {
+      closeSkuDetail();
+      return true;
+    }
+    if (scanOpen) {
+      closeScanSurface();
+      return true;
+    }
+    if (editingNotaId) {
+      navigate('archive');
+      return true;
+    }
+    if (view === 'prices' || view === 'recommendations' || view === 'dataExport') {
+      navigate(subordinateOrigin);
+      return true;
+    }
+    if (view === 'home') return false;
+    navigate('home');
+    return true;
+  };
+
+  useEffect(() => backButton.setHandler(() => backHandlerRef.current()), [backButton]);
 
   useEffect(() => {
     const focusTarget = view === 'skus' && !selectedSkuId && !scanOpen && focusSearch
@@ -96,6 +131,9 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
     setScanOpen(false);
     setFocusSearch(shouldFocusSearch);
     setEditingNotaId(null);
+    if (next === 'prices' || next === 'recommendations' || next === 'dataExport') {
+      setSubordinateOrigin(view === 'more' ? 'more' : 'home');
+    }
     if (next === 'prices') setPriceMode('all');
     setView(next);
   }
@@ -112,6 +150,7 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
     scanRequestToken.current += 1;
     setSelectedSkuId(null);
     setScanOpen(false);
+    setSubordinateOrigin('home');
     setPriceMode('unread');
     setUnreadFeedIds(sortedChanges.filter((change) => !readChangeIds.has(change.id)).map((change) => change.id));
     setView('prices');
@@ -155,6 +194,13 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
   function closeSkuDetail() {
     scanRequestToken.current += 1;
     setSelectedSkuId(null);
+  }
+
+  function closeScanSurface() {
+    scanRequestToken.current += 1;
+    setScanOpen(false);
+    setScanCode('');
+    setScanError('');
   }
 
   function openManualScan() {
@@ -238,7 +284,7 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
       {view === 'prices' && !scanOpen && !selectedSku ? <PriceFeedView changes={visiblePriceChanges} coreBacked={coreBacked} gateway={gateway} onOpenSku={openSku} onSimulate={coreBacked ? undefined : () => void simulatePriceChange()} skus={snapshot.skus} status={simulationStatus} syncLabel={syncPresentation.label} unreadOnly={priceMode === 'unread'} /> : null}
       {view === 'recommendations' && !scanOpen && !selectedSku ? <ShareRecommendationsView
         gateway={gateway}
-        onBack={() => navigate('home')}
+        onBack={() => navigate(subordinateOrigin)}
         onOpenSku={openSku}
         onSharePdf={share.sharePdf}
         snapshot={snapshot}
@@ -252,7 +298,7 @@ export function MobileApp({ gateway, scanner, notifications, share, coreBacked =
         <StockCheckView gateway={gateway} mode="mobile" onCameraScan={scanStockCode} />
       </section> : null}
       {view === 'archive' && !scanOpen && !selectedSku ? <MobileArchiveView coreBacked={coreBacked} gateway={gateway} onEdit={editArchivedNota} syncLabel={syncPresentation.label} /> : null}
-      {view === 'dataExport' && !scanOpen && !selectedSku ? <OperationalExportView coreBacked={coreBacked} gateway={gateway} onBack={() => navigate('more')} share={share} syncLabel={syncPresentation.label} /> : null}
+      {view === 'dataExport' && !scanOpen && !selectedSku ? <OperationalExportView coreBacked={coreBacked} gateway={gateway} onBack={() => navigate(subordinateOrigin)} share={share} syncLabel={syncPresentation.label} /> : null}
       {view === 'more' && !scanOpen && !selectedSku ? <MoreView coreBacked={coreBacked} onOpenDataExport={() => navigate('dataExport')} onOpenPrices={() => navigate('prices')} onOpenRecommendations={() => navigate('recommendations')} syncLabel={syncPresentation.label} /> : null}
     </main>
     <nav aria-label="Navigasi utama" className="bottom-nav">

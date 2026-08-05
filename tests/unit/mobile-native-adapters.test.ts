@@ -5,12 +5,64 @@ import {
 } from '@capacitor/barcode-scanner';
 import { ImpactStyle } from '@capacitor/haptics';
 import type { ActionPerformed } from '@capacitor/local-notifications';
+import * as nativeAdapters from '../../mobile/native-adapters';
 import {
   createNativeBarcodeScanner,
   createNativeLocalNotifications,
   createNativePdfShare,
 } from '../../mobile/native-adapters';
 import { createMobileDemoState } from '../../src/domain/mobile-demo-state';
+
+type BackButtonPlugin = {
+  addListener: (eventName: 'backButton', listener: () => void | Promise<void>) => Promise<{ remove: () => Promise<void> }>;
+  exitApp: () => Promise<void>;
+};
+
+function createBackButtonPlugin() {
+  let listener: (() => void | Promise<void>) | undefined;
+  const plugin: BackButtonPlugin = {
+    addListener: vi.fn(async (_eventName, nextListener) => {
+      listener = nextListener;
+      return { remove: async () => undefined };
+    }),
+    exitApp: vi.fn(async () => undefined),
+  };
+  return { plugin, press: async () => listener?.() };
+}
+
+test('native App back port registers one platform backButton listener', async () => {
+  const native = createBackButtonPlugin();
+  const factory = (nativeAdapters as typeof nativeAdapters & {
+    createNativeAppBackButton?: (plugin: BackButtonPlugin) => { setHandler: (handler: () => boolean) => () => void };
+  }).createNativeAppBackButton;
+
+  factory?.(native.plugin).setHandler(() => true);
+  await Promise.resolve();
+
+  expect(native.plugin.addListener).toHaveBeenCalledTimes(1);
+});
+
+test('native App back port uses the latest handler and exits only when it reports unhandled', async () => {
+  const native = createBackButtonPlugin();
+  const factory = (nativeAdapters as typeof nativeAdapters & {
+    createNativeAppBackButton: (plugin: BackButtonPlugin) => { setHandler: (handler: () => boolean) => () => void };
+  }).createNativeAppBackButton;
+  const backButton = factory(native.plugin);
+  const earlierHandler = vi.fn(() => true);
+  const latestHandler = vi.fn(() => false);
+
+  backButton.setHandler(earlierHandler);
+  await native.press();
+  expect(earlierHandler).toHaveBeenCalledOnce();
+  expect(native.plugin.exitApp).not.toHaveBeenCalled();
+
+  backButton.setHandler(latestHandler);
+  await native.press();
+
+  expect(earlierHandler).toHaveBeenCalledOnce();
+  expect(latestHandler).toHaveBeenCalledOnce();
+  expect(native.plugin.exitApp).toHaveBeenCalledOnce();
+});
 
 function createNotificationPlugin(display: 'granted' | 'denied' | 'prompt' = 'granted') {
   let actionListener: ((action: ActionPerformed) => void) | undefined;

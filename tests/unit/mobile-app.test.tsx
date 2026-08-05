@@ -1,18 +1,20 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MobileApp } from '../../mobile/MobileApp';
 import { ProductImage } from '../../mobile/components/ProductImage';
-import type { BarcodeScannerPort, LocalNotificationPort, RecommendationPdfSharePort } from '../../mobile/ports';
+import type { AppBackButtonPort, BarcodeScannerPort, LocalNotificationPort, RecommendationPdfSharePort } from '../../mobile/ports';
 import { createMobileDemoState } from '../../src/domain/mobile-demo-state';
 import type { DemoState } from '../../src/domain/types';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 import type { SyncPhase } from '../../src/gateway/operations-gateway-contract';
 
 function createPorts(): {
+  backButton: AppBackButtonPort;
   scanner: BarcodeScannerPort;
   notifications: LocalNotificationPort;
   share: RecommendationPdfSharePort;
 } {
   return {
+    backButton: { setHandler: () => () => undefined },
     scanner: { scan: async () => null },
     notifications: {
       ensurePermission: async () => 'denied',
@@ -21,6 +23,19 @@ function createPorts(): {
     },
     share: { sharePdf: async () => undefined },
   };
+}
+
+function createBackButtonPort() {
+  let handler: (() => boolean) | undefined;
+  const port: AppBackButtonPort = {
+    setHandler(nextHandler) {
+      handler = nextHandler;
+      return () => {
+        if (handler === nextHandler) handler = undefined;
+      };
+    },
+  };
+  return { port, press: () => handler?.() };
 }
 
 function renderMobile(
@@ -38,9 +53,104 @@ function renderMobile(
     });
   }
   const ports = { ...createPorts(), ...overrides };
-  render(<MobileApp gateway={gateway} scanner={ports.scanner} notifications={ports.notifications} share={ports.share} coreBacked={coreBacked} />);
+  render(<MobileApp backButton={ports.backButton} gateway={gateway} scanner={ports.scanner} notifications={ports.notifications} share={ports.share} coreBacked={coreBacked} />);
   return { gateway, ...ports };
 }
+
+test('native Back reports clean Beranda as unhandled', () => {
+  const backButton = createBackButtonPort();
+  renderMobile({ backButton: backButton.port });
+
+  expect(backButton.press()).toBe(false);
+});
+
+test('native Back handles the blocking Core compatibility screen without exiting', () => {
+  const backButton = createBackButtonPort();
+  const gateway = coreGatewayAt('upgrade-required');
+  const ports = createPorts();
+  render(<MobileApp backButton={backButton.port} gateway={gateway} scanner={ports.scanner} notifications={ports.notifications} share={ports.share} coreBacked />);
+
+  expect(backButton.press()).toBe(true);
+});
+
+test.each([
+  ['SKU', 'SKU', 'SKU Gudang'],
+  ['Nota', 'Nota', 'Nota Barang'],
+  ['Cek Stok', 'Cek Stok', 'Cek Stok'],
+  ['Arsip', 'Arsip', 'Arsip Nota'],
+  ['Lainnya', 'Lainnya', 'Lainnya'],
+])('native Back returns top-level %s to Beranda', (_label, buttonName, headingName) => {
+  const backButton = createBackButtonPort();
+  renderMobile({ backButton: backButton.port });
+  fireEvent.click(screen.getByRole('button', { name: buttonName }));
+
+  expect(screen.getByRole('heading', { name: headingName })).toBeInTheDocument();
+  act(() => expect(backButton.press()).toBe(true));
+  expect(screen.getByRole('heading', { name: 'CHU Companion Mobile' })).toBeInTheDocument();
+});
+
+test('native Back closes SKU detail and scanner to the SKU screen that opened them', async () => {
+  const backButton = createBackButtonPort();
+  renderMobile({ backButton: backButton.port });
+  fireEvent.click(screen.getByRole('button', { name: 'SKU' }));
+  fireEvent.click(screen.getByRole('button', { name: /Beras Hitam Premium 1 kg/ }));
+
+  expect(screen.getByRole('heading', { name: 'Beras Hitam Premium 1 kg' })).toBeInTheDocument();
+  act(() => expect(backButton.press()).toBe(true));
+  expect(screen.getByRole('heading', { name: 'SKU Gudang' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: /Beras Hitam Premium 1 kg/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Scan kode lain' }));
+  expect(await screen.findByRole('heading', { name: 'Scan Barcode' })).toBeInTheDocument();
+  act(() => expect(backButton.press()).toBe(true));
+  expect(screen.getByRole('heading', { name: 'SKU Gudang' })).toBeInTheDocument();
+});
+
+test('native Back returns price, recommendation, and export flows to their recorded top-level origin', () => {
+  const backButton = createBackButtonPort();
+  renderMobile({ backButton: backButton.port });
+  fireEvent.click(screen.getByRole('button', { name: 'Notifikasi harga, 2 belum dibaca' }));
+
+  expect(screen.getByRole('heading', { name: 'Notifikasi Harga' })).toBeInTheDocument();
+  act(() => expect(backButton.press()).toBe(true));
+  expect(screen.getByRole('heading', { name: 'CHU Companion Mobile' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Rekomendasi Share' }));
+  expect(screen.getByRole('heading', { name: 'Rekomendasi Share' })).toBeInTheDocument();
+  act(() => expect(backButton.press()).toBe(true));
+  expect(screen.getByRole('heading', { name: 'CHU Companion Mobile' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Lainnya' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Perubahan Harga' }));
+  expect(screen.getByRole('heading', { name: 'Perubahan Harga' })).toBeInTheDocument();
+  act(() => expect(backButton.press()).toBe(true));
+  expect(screen.getByRole('heading', { name: 'Lainnya' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Rekomendasi' }));
+  expect(screen.getByRole('heading', { name: 'Rekomendasi Share' })).toBeInTheDocument();
+  act(() => expect(backButton.press()).toBe(true));
+  expect(screen.getByRole('heading', { name: 'Lainnya' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Ekspor Data PDF' }));
+  expect(screen.getByRole('heading', { name: 'Ekspor Data' })).toBeInTheDocument();
+  act(() => expect(backButton.press()).toBe(true));
+  expect(screen.getByRole('heading', { name: 'Lainnya' })).toBeInTheDocument();
+});
+
+test('native Back returns an archived Nota editor to Arsip', async () => {
+  const gateway = new MockOperationsGateway(createMobileDemoState);
+  await createArchivedNota(gateway);
+  const ports = createPorts();
+  const backButton = createBackButtonPort();
+  render(<MobileApp backButton={backButton.port} gateway={gateway} scanner={ports.scanner} notifications={ports.notifications} share={ports.share} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Arsip' }));
+  fireEvent.click(screen.getByRole('button', { name: /Pelanggan Back/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Edit nota' }));
+
+  expect(await screen.findByRole('heading', { name: 'Nota Barang' })).toBeInTheDocument();
+  act(() => expect(backButton.press()).toBe(true));
+  expect(screen.getByRole('heading', { name: 'Arsip Nota' })).toBeInTheDocument();
+});
 
 function coreGatewayAt(
   phase: SyncPhase,
@@ -87,6 +197,22 @@ function createDeferred<T>() {
     reject = rejectPromise;
   });
   return { promise, reject, resolve };
+}
+
+async function createArchivedNota(gateway: MockOperationsGateway) {
+  const transaction = await gateway.createNotaTransaction();
+  const page = transaction.pages[0]!;
+  const line = page.lines[0]!;
+  await gateway.updateNotaTransaction(transaction.id, { customerName: 'Pelanggan Back' });
+  await gateway.updateNotaLine(transaction.id, page.id, line.id, {
+    description: 'Barang Arsip',
+    kind: 'Demo',
+    quantity: 1,
+    unit: 'pcs',
+    pcsPrice: 10_000,
+  });
+  await gateway.completeNotaTransaction(transaction.id, 'archive');
+  return transaction;
 }
 
 test('dashboard renders fixture counts and the two newest price changes', () => {

@@ -5,17 +5,21 @@ import {
   CapacitorBarcodeScannerTypeHint,
   type CapacitorBarcodeScannerPlugin,
 } from '@capacitor/barcode-scanner';
+import { App, type AppPlugin } from '@capacitor/app';
 import { Haptics, ImpactStyle, type HapticsPlugin } from '@capacitor/haptics';
 import { LocalNotifications, type LocalNotificationsPlugin } from '@capacitor/local-notifications';
 import { Directory, Filesystem, type FilesystemPlugin } from '@capacitor/filesystem';
 import { Share, type SharePlugin } from '@capacitor/share';
 import { formatRupiah } from './format';
 import type {
+  AppBackButtonHandler,
+  AppBackButtonPort,
   BarcodeScannerPort,
   LocalNotificationPort,
   PdfSharePort,
 } from './ports';
 
+type NativeAppPlugin = Pick<AppPlugin, 'addListener' | 'exitApp'>;
 type ScannerPlugin = Pick<CapacitorBarcodeScannerPlugin, 'scanBarcode'>;
 type HapticPlugin = Pick<HapticsPlugin, 'impact'>;
 type ScanSuccessSound = () => Promise<void> | void;
@@ -24,6 +28,23 @@ type NotificationPlugin = Pick<LocalNotificationsPlugin,
 type NativeSharePlugin = Pick<SharePlugin, 'share'>;
 type NativeFilesystemPlugin = Pick<FilesystemPlugin, 'deleteFile' | 'writeFile'>;
 type BlobToBase64 = (blob: Blob) => Promise<string>;
+
+export function createNativeAppBackButton(
+  plugin: NativeAppPlugin = App,
+): AppBackButtonPort {
+  let handler: AppBackButtonHandler = () => true;
+  void plugin.addListener('backButton', async () => {
+    if (!handler()) await plugin.exitApp();
+  }).catch(() => undefined);
+  return {
+    setHandler(nextHandler) {
+      handler = nextHandler;
+      return () => {
+        if (handler === nextHandler) handler = () => true;
+      };
+    },
+  };
+}
 
 function notificationId(value: string): number {
   let hash = 0;

@@ -87,12 +87,15 @@ the exact old/new artifacts are frozen, and rollback is still available.
 
 ## Task 2: Rotate exposed credentials through an owner handoff
 
-1. The owner creates a new random MariaDB application credential using DSM's
-   approved administration path and updates the untracked Compose environment.
-2. Confirm an owner already exists. If it does, disable the one-time owner
-   bootstrap secret instead of keeping a reusable bootstrap credential. If it
-   does not, rotate the secret, bootstrap exactly once after deployment, then
-   disable it.
+1. The owner creates a separate random MariaDB application account for v0.2.2
+   using DSM's approved administration path and writes it only to the new
+   untracked Compose environment. Keep the old account and live environment
+   unchanged until cutover succeeds; retire the old account afterward.
+2. Confirm an owner already exists and determine whether the encrypted Windows
+   owner credential survived package uninstall. Do not assume uninstall erased
+   or preserved application data. If the credential is unavailable, stop:
+   v0.2.2 cannot accept a manually entered recovery credential and a new
+   bootstrap cannot replace an existing owner.
 3. Keep the backup account read-only and the restore account scratch-only. Do
    not reuse the application account for either job.
 4. Run a sanitized configuration validation that reports only presence,
@@ -189,13 +192,16 @@ write/replay, preserve data and use a test-first forward-fix.
 1. Give the owner the private GitHub release URL and exact SHA-256 values for
    the Windows installer, Android APK, and checksum manifest.
 2. **Windows owner action:** verify the installer checksum, perform a clean
-   installation, and confirm product version 0.2.2. The prior installation was
-   already removed by the owner, so no local identity or outbox is available.
+   package installation, and confirm product version 0.2.2. Test whether the
+   encrypted owner identity retained in Windows application data reconnects;
+   package uninstall alone is not evidence that this state was erased.
 3. **Android owner action:** verify package ID `com.tokoch.chucompanion`,
    versionName 0.2.2, versionCode 9, and the permanent signer; perform a clean
    installation because the prior package was already removed by the owner.
-4. Pair both clean installations. The Windows owner explicitly approves the
-   named Samsung device; never enter an owner bootstrap credential on the phone.
+4. If the Windows owner identity reconnects, use it to approve the named
+   Samsung device. If it does not reconnect, stop and use the separately
+   reviewed owner-recovery path; never attempt first-owner bootstrap over an
+   existing owner row and never enter an owner bootstrap credential on the phone.
 5. After the owner reports installation complete, verify both devices reach
    `online`, report the same Core revision and SKU count, and do not render a
    valid-looking empty state during failures. This verification does not

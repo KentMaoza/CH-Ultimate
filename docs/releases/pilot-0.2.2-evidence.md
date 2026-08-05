@@ -37,8 +37,14 @@ belum pernah dieksekusi sebagai deployment.
 | Aset staging | Bytes | SHA-256 | Verifikasi |
 | --- | ---: | --- | --- |
 | `ch-ultimate-dc76d3c0529233974f0d1ec18420a230d0c768a5.tar.gz` | 11171255 | `55f193d8b483223c322e69312b86a12f90be6f7c42d1da39517ccdd366ca4798` | `git archive` dari commit rilis; memuat `server/compose.yaml`, migrasi `010_stock_checks.sql`, helper v0.2.2, dan lockfile |
-| `ch-core-v022-preflight.sh` | 8709 | `7b1fbbccf9938e164b310541f79c37c4ed45146516660b2b4bb1beeb34481e83` | Identik dengan file di dalam archive commit rilis |
+| `ch-core-v022-preflight.sh` | 8710 | `de55aec640e316fe9dd87c4b9e226cfa6a0d0db3f8b6a94f004b2ef5910d7a6b` | Standalone helper aktif; checksum migrasi 006 dikoreksi dan seluruh manifest dicocokkan ke byte SQL aktual |
+| `ch-core-v022-prepare.sh` | 4862 | `4502396c8b83a5cfbdca81eb12a3027e38154fd5e96fbeddca52c6ff6f7c9b39` | Menyiapkan exact source dan memverifikasi migrasi 001-010; tidak membuat environment, mengakses database, atau menjalankan deployment |
 | `SKU_Gudang20260804080716145.xlsx` | 341193 | `f1f4675327fac107ef9f78c114b8afe86389d5543b204540ed45e74f9b15e49c` | Hash cocok dengan workbook yang disetujui |
+
+Helper preflight yang tertanam di archive rilis memiliki checksum migrasi 006
+yang salah satu karakter dan tidak boleh dijalankan. Salinan provenance-nya
+dipindahkan menjadi `ch-core-v022-preflight-release.DO-NOT-RUN`. Helper
+standalone aktif di atas adalah satu-satunya preflight yang diizinkan.
 
 Probe pramaintenance pada 2026-08-05 WITA lulus melalui CA: `/health/live`
 HTTP 200 `{"status":"ok"}` dan `/health/ready` HTTP 200
@@ -61,7 +67,7 @@ secara eksplisit dan menolak pencatatan outbox nol palsu.
 | Gate | Status | Bukti yang wajib diisi |
 | --- | --- | --- |
 | Publikasi GitHub | PASS | commit rilis, workflow run, tiga fresh-download artifact, checksum, metadata paket, dan signer diverifikasi |
-| Source/Core/import staging NAS | PASS | commit rilis, source archive, helper, workbook, dan `STAGING-RECEIPT.txt` tersedia dengan hash terverifikasi |
+| Source/Core/import staging NAS | PASS | commit rilis, source archive, helper prepare/preflight terkoreksi, workbook, dan `STAGING-RECEIPT.txt` tersedia dengan hash terverifikasi; helper archive lama ditandai `DO-NOT-RUN` |
 | Backup NAS-only dan scratch restore | BELUM DIVERIFIKASI | receipt, count, SHA-256, invariant restore |
 | Rotasi credential | BELUM DIVERIFIKASI | konfirmasi pemilik tanpa nilai credential |
 | deploy CH Core | BELUM DIVERIFIKASI | source commit v0.2.2, migration 010, health dan bootstrap v2 |

@@ -34,7 +34,9 @@ test('packaged renderer emits a decodable Vite-managed sidebar mark', async () =
     archivePath,
     `.vite/renderer/main_window/assets/${bundleName}`,
   ).toString('utf8');
-  const markDataUrl = bundle.match(/data:image\/svg\+xml,%3csvg[^"]+/)?.[0];
+  const markDataUrl = bundle.match(
+    /data:image\/svg\+xml,%3csvg(?=[^"]*CH%20Ultimate%20mark)[^"]+/,
+  )?.[0];
 
   expect(bundle).not.toContain('/brand/ch-ultimate-mark.svg');
   expect(markDataUrl).toBeDefined();

@@ -8,10 +8,11 @@ private key, dump, atau byte data bisnis di sini.
 
 | Gate | Status | Receipt |
 | --- | --- | --- |
-| Automated kontrak rilis, typecheck, dan package contract | PASS | `BELUM DIISI: commit, waktu WITA, output` |
+| Automated kontrak rilis, typecheck, dan package contract | BELUM DIVERIFIKASI | `BELUM DIISI: commit, waktu WITA, output` |
 
-`PASS` di atas hanya berarti gate otomatis lokal telah dijalankan. Ini bukan
-bukti penerimaan instalasi, deploy, atau penggunaan fisik.
+Template ini tetap `BELUM DIVERIFIKASI` sampai Task 5 mengisi commit, waktu
+WITA, dan output pemeriksaan otomatis yang aktual. Ini bukan bukti penerimaan
+instalasi, deploy, atau penggunaan fisik.
 
 ## Penerimaan yang belum diverifikasi
 

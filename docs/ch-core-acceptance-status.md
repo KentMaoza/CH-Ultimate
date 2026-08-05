@@ -1,6 +1,6 @@
 # CH Core acceptance status
 
-Updated 2026-08-04 WITA. This is an evidence ledger, not a production
+Updated 2026-08-05 WITA. This is an evidence ledger, not a production
 deployment receipt. A v0.1.3-compatible copied-data CH Core runtime is
 deployed on the NAS, but CH Core is not deployed as a production endpoint.
 The catalogue workbook has not been imported. The Windows owner is enrolled;
@@ -21,7 +21,7 @@ Status meanings:
 Historical v0.1.0/v0.1.1 release evidence remains retained as historical
 evidence. The business-LAN partial live receipt does not amend those receipts.
 
-### Pilot v0.2.0 — persiapan repository lokal
+### Historical pilot v0.2.0 — persiapan repository lokal
 
 Bagian ini hanya mencatat kesiapan source untuk **four-day copied-data pilot**.
 Ia tidak mengubah receipt historis v0.1.x dan tidak menjadi izin menjalankan
@@ -48,6 +48,29 @@ permanen yang boleh dipublikasikan; debug APK adalah artefak verifikasi saja.
 Jangan menyebut v0.2.0 published, deployed, imported, signed-artifact complete,
 physically accepted, atau production-ready sampai baris `BLOCKED` memperoleh
 bukti langsung dan statusnya diubah melalui receipt yang ditinjau.
+
+### Pilot v0.2.1 — current repository release contract
+
+Bagian ini adalah kontrak release repository yang aktif untuk cutover CH Core
+v2. Ia tidak mengubah receipt historis v0.2.0 dan tidak menjadi izin menjalankan
+maintenance, clear data, migrasi, impor, pairing, atau publikasi.
+
+| Gate | Status | Bukti repository atau pekerjaan yang masih wajib |
+| --- | --- | --- |
+| Metadata klien v0.2.1 | PASS | `package.json`, lockfile, Settings, Android `versionName 0.2.1`/`versionCode 8`, copy script, dan test alignment memakai versi yang sama |
+| Kontrak release privat | PASS | Workflow mengunci `pilot-v0.2.1`, kedua nama payload, notes v0.2.1, empat secret Android, dan digest signer permanen tanpa debug APK |
+| Notes, runbook, dan receipt template | READY | `docs/releases/pilot-0.2.1.md`, `docs/releases/pilot-0.2.1-evidence.md`, dan suplemen runbook tersedia; receipt otomatis tetap `BELUM DIVERIFIKASI` sampai Task 5 mengisi bukti aktual |
+| Artefak signed v0.2.1 | BLOCKED | Installer Windows dan APK release permanen belum dibuat atau diverifikasi checksum/signer-nya |
+| Publikasi GitHub | BLOCKED | Tag/prerelease `pilot-v0.2.1` belum diterbitkan dan belum ada fresh-download verification |
+| Windows terpasang | BLOCKED | Installer belum diterima pada Windows fisik; versi produk dan sidebar `file://` belum diukur |
+| Android fisik | BLOCKED | Package ID, `versionName 0.2.1`, `versionCode 8`, signer, dan Back belum diterima pada ponsel fisik |
+| Deploy CH Core v2 | BLOCKED | Migrasi/Core v2 belum diterapkan pada NAS dan bootstrap `apiSchemaVersion: 2`/`stockChecks` belum memiliki receipt pascadeploy |
+| Cetak fisik | BLOCKED | Dialog sistem, PDF, XLSX, dan printer belum diterima pada lingkungan target |
+| Pilot copied-data empat hari | BLOCKED | Empat hari kalender WITA belum dimulai; receipt Hari 1–4 dan keputusan lanjut/henti belum direkam |
+
+Jangan menyebut v0.2.1 sebagai rilis yang sudah terbit, terpasang, diterima
+secara fisik, atau siap produksi sampai setiap gate lingkungan memiliki bukti
+langsung dan statusnya diubah melalui receipt yang ditinjau.
 
 ## Local implementation and regression
 

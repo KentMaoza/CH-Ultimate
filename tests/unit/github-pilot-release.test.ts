@@ -168,7 +168,10 @@ describe('GitHub pilot release workflow', () => {
     expect(releaseNotes).toMatch(/terbitkan.+0\.2\.1.+sebelum.+CH Core v2/is);
     expect(releaseNotes).toMatch(/v0\.1\.5.+hanya.+sebelum.+Core v2/is);
 
-    expect(evidence).toMatch(/Automated.+PASS/is);
+    expect(evidence).toMatch(/Automated.+BELUM DIVERIFIKASI/is);
+    expect(evidence).not.toMatch(
+      /\|\s*[^|]+\s*\|\s*PASS\s*\|\s*`BELUM DIISI[^`]*`\s*\|/i,
+    );
     for (const unverifiedGate of [
       'Windows terpasang',
       'Android fisik',

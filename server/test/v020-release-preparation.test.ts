@@ -21,7 +21,7 @@ function markdownSection(
   return markdown.slice(start, end);
 }
 
-describe('v0.2.0 repository-local release preparation', () => {
+describe('v0.2.0 historical repository-local release preparation', () => {
   it('describes every requested revision and the copied-data pilot boundary', async () => {
     const notes = await repositoryText('docs/releases/pilot-0.2.0.md');
 
@@ -173,16 +173,16 @@ describe('v0.2.0 repository-local release preparation', () => {
     expect(evidence).not.toMatch(/fisik.+PASS/is);
   });
 
-  it('separates repository evidence from every unperformed live and physical gate', async () => {
+  it('retains historical repository evidence without treating it as current release guidance', async () => {
     const [acceptance, deployment, businessLan] = await Promise.all([
       repositoryText('docs/ch-core-acceptance-status.md'),
       repositoryText('docs/ch-core-nas-deployment.md'),
       repositoryText('docs/ch-core-business-lan.md'),
     ]);
-    const currentSection = markdownSection(
+    const historicalSection = markdownSection(
       acceptance,
-      '### Pilot v0.2.0 — persiapan repository lokal',
-      '## Local implementation and regression',
+      '### Historical pilot v0.2.0 — persiapan repository lokal',
+      '### Pilot v0.2.1 — current repository release contract',
     );
     const localEvidence = markdownSection(
       acceptance,
@@ -196,7 +196,7 @@ describe('v0.2.0 repository-local release preparation', () => {
     );
 
     for (const status of ['PASS', 'READY', 'BLOCKED']) {
-      expect(currentSection).toContain(status);
+      expect(historicalSection).toContain(status);
     }
     for (const blockedGate of [
       'Live import workbook',
@@ -207,12 +207,12 @@ describe('v0.2.0 repository-local release preparation', () => {
       'Kamera/share fisik',
       'Penerimaan fisik dua perangkat',
     ]) {
-      expect(currentSection).toMatch(
+      expect(historicalSection).toMatch(
         new RegExp(`\\| ${blockedGate} \\| BLOCKED \\|`),
       );
     }
-    expect(currentSection).toContain('four-day copied-data pilot');
-    expect(currentSection).not.toContain('24-hour');
+    expect(historicalSection).toContain('four-day copied-data pilot');
+    expect(historicalSection).not.toContain('24-hour');
     expect(deployment).toContain('four-day copied-data pilot');
     expect(deployment).not.toContain('24-hour copied-data pilot');
     expect(businessLan).toMatch(/four-day\s+copied-data pilot/);
@@ -253,13 +253,16 @@ describe('v0.2.0 repository-local release preparation', () => {
     }
   });
 
-  it('points the repository guide at the current guarded pilot contract', async () => {
-    const readme = await repositoryText('README.md');
+  it('points the repository guide and acceptance ledger at the current guarded v0.2.1 contract', async () => {
+    const [readme, acceptance] = await Promise.all([
+      repositoryText('README.md'),
+      repositoryText('docs/ch-core-acceptance-status.md'),
+    ]);
 
     for (const currentPilotFact of [
-      'CH-Ultimate-0.2.0-Setup.exe',
-      'CHU-Companion-Mobile-0.2.0-release.apk',
-      'docs/releases/pilot-0.2.0.md',
+      'CH-Ultimate-0.2.1-Setup.exe',
+      'CHU-Companion-Mobile-0.2.1-release.apk',
+      'docs/releases/pilot-0.2.1.md',
       'docs/ch-core-v0.2-maintenance-rollback.md',
       'four-day copied-data pilot',
       'permanent Android pilot signer',
@@ -273,5 +276,24 @@ describe('v0.2.0 repository-local release preparation', () => {
     expect(readme).not.toContain(
       'Production printing, automatic client updates',
     );
+
+    const currentSection = markdownSection(
+      acceptance,
+      '### Pilot v0.2.1 — current repository release contract',
+      '## Local implementation and regression',
+    );
+    for (const currentReleaseFact of [
+      'versionName 0.2.1',
+      'versionCode 8',
+      'pilot-v0.2.1',
+      'docs/releases/pilot-0.2.1.md',
+      'BELUM DIVERIFIKASI',
+      'BLOCKED',
+    ]) {
+      expect(currentSection).toContain(currentReleaseFact);
+    }
+    expect(currentSection).not.toContain('published');
+    expect(currentSection).not.toContain('deployed');
+    expect(currentSection).not.toContain('physically accepted');
   });
 });

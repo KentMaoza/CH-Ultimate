@@ -221,3 +221,18 @@ mencatat outbox sebagai nol. Gunakan state `UNINSTALLED` dengan
 `UNAVAILABLE_AFTER_OWNER_UNINSTALL` pada helper preflight. Keadaan ini berarti
 klien quiesced dan antrean lokal lama tidak tersedia; bukan bukti bahwa antrean
 lama kosong. Klien dipasang manual hanya setelah Core v2 dan impor terverifikasi.
+
+## Suplemen v0.2.3: rekonsiliasi katalog aman
+
+Suplemen ini menggantikan v0.2.2 untuk cutover aktif. Artifact Core dan klien
+wajib berasal dari commit rilis v0.2.3 yang sama. Tag v0.2.2 tidak boleh
+dideploy karena source tersebut mendahului rekonsiliasi katalog aman.
+
+Impor awal wajib mencocokkan SKU lama melalui identifier, mempertahankan ID dan
+histori, serta gagal sebelum write bila ada konflik identitas, identifier
+tambahan, atau SKU aktif yang tidak cocok. Tidak ada clear katalog otomatis.
+SKU arsip yang tidak cocok tetap dipertahankan dan dicatat untuk review.
+
+Seluruh gate backup NAS-only, scratch restore, credential owner, outbox
+`UNAVAILABLE_AFTER_OWNER_UNINSTALL`, bootstrap v2, dan batas rollback pada
+suplemen v0.2.2 tetap berlaku.

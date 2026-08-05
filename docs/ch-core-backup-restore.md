@@ -11,7 +11,7 @@ target. A connected disk is not a backup until the job and restore are proven.
 Never back up the private CA signing key to the NAS. It stays off-NAS in its
 own encrypted recovery custody.
 
-For the current v0.2.2 controlled internal-use execution, the owner requires
+For the current v0.2.3 controlled internal-use execution, the owner requires
 all backup and business data to remain on the NAS. A same-NAS logical bundle
 and scratch restore are therefore an accepted migration-recovery risk: they
 can prove logical restore before cutover, but they do not protect against loss

@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 const workflowPath = '.github/workflows/pilot-release.yml';
-const pilotVersion = '0.2.2';
+const pilotVersion = '0.2.3';
 const androidSignerSha256 =
   '57e0731ce3db068e6581980c53610764af05c612184ff50e18a9f4912ca59ba5';
 
@@ -100,7 +100,7 @@ describe('GitHub pilot release workflow', () => {
     expect(workflow).toContain('BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY');
   });
 
-  it('keeps the v0.2.2 Core v2 cutover release contract aligned', async () => {
+  it('keeps the v0.2.3 Core v2 cutover release contract aligned', async () => {
     const [
       workflow,
       packageManifest,
@@ -109,7 +109,6 @@ describe('GitHub pilot release workflow', () => {
       settingsPage,
       releaseCopy,
       releaseNotes,
-      evidence,
       runbook,
     ] = await Promise.all([
       readFile(workflowPath, 'utf8'),
@@ -119,7 +118,6 @@ describe('GitHub pilot release workflow', () => {
       readFile('src/renderer/pages/SettingsPage.tsx', 'utf8'),
       readFile('scripts/copy-android-release.mjs', 'utf8'),
       optionalRepositoryText(`docs/releases/pilot-${pilotVersion}.md`),
-      optionalRepositoryText(`docs/releases/pilot-${pilotVersion}-evidence.md`),
       readFile('docs/ch-core-v0.2-maintenance-rollback.md', 'utf8'),
     ]);
 
@@ -130,7 +128,7 @@ describe('GitHub pilot release workflow', () => {
     });
     expect(androidBuild).toContain('applicationId "com.tokoch.chucompanion"');
     expect(androidBuild).toContain(`versionName "${pilotVersion}"`);
-    expect(androidBuild).toContain('versionCode 9');
+    expect(androidBuild).toContain('versionCode 10');
     expect(settingsPage).toContain(`CH Ultimate ${pilotVersion}`);
     expect(releaseCopy).toContain(
       `CHU-Companion-Mobile-${pilotVersion}-release.apk`,
@@ -152,63 +150,20 @@ describe('GitHub pilot release workflow', () => {
     expect(releaseCopy).not.toContain('CHU-Companion-Mobile-0.2.1-release.apk');
 
     for (const releaseFact of [
-      'status sinkronisasi',
-      'pesan kompatibilitas',
-      'diagnostik teknis',
-      'Nama Barang',
-      'Tombol Kembali Android',
-      'logo sidebar Windows',
+      'rekonsiliasi katalog aman',
+      'mempertahankan ID SKU',
+      'SKU aktif yang tidak cocok',
+      'memblokir transaksi sebelum penulisan',
+      'tidak ada penghapusan katalog otomatis',
       'apiSchemaVersion: 2',
       'stockChecks: []',
-      'v0.1.5',
       'gagal tertutup',
-      'jsPDF 4.2.1',
-      'tanpa critical/high',
+      'backup dan scratch',
+      'empat hari tidak termasuk',
     ]) {
       expect(releaseNotes.toLowerCase()).toContain(releaseFact.toLowerCase());
     }
-    expect(releaseNotes).toMatch(/terbitkan.+0\.2\.2.+sebelum.+CH Core v2/is);
-    expect(releaseNotes).toMatch(/v0\.1\.5.+hanya.+sebelum.+Core v2/is);
-
-    expect(evidence).toMatch(/Kontrak dependensi.+PASS/is);
-    for (const preparedReceipt of [
-      'CH-Ultimate-0.2.2-Setup.exe',
-      'CHU-Companion-Mobile-0.2.2-release.apk',
-      androidSignerSha256,
-      'com.tokoch.chucompanion',
-      'versionCode `9`',
-      'UNAVAILABLE_AFTER_OWNER_UNINSTALL',
-      '0 critical',
-      '0 high',
-      'dc76d3c0529233974f0d1ec18420a230d0c768a5',
-      '30994408231',
-      '149268992',
-      'a1d484804d49ea9bce3b895b628bfb745de8eaa73181d59378a599396e007b40',
-      '43104529',
-      '496057db78f5a41a3f75adf7c5eef9f878cf33cc5ee9674eb48fa7cb2e1909c9',
-      '3773d852b65dd1773fb509bd1b38d3b8ab846edf246f6f1a99e0600470c93036',
-      'ch_ultimate-0.2.2-full.nupkg',
-      '/Volumes/home/CH_Ultimate_Pilot/dc76d3c',
-      '55f193d8b483223c322e69312b86a12f90be6f7c42d1da39517ccdd366ca4798',
-      'de55aec640e316fe9dd87c4b9e226cfa6a0d0db3f8b6a94f004b2ef5910d7a6b',
-      '028d6cf8c1f6c6d4bec2bcfe35e3291234688500183e4a9e574fb92751e117c9',
-      'f34cf3040757612346e1780a144a0f01ba50a89cdf34b153ace48437ae424b55',
-      'DO-NOT-RUN',
-    ]) {
-      expect(evidence).toContain(preparedReceipt);
-    }
-    expect(evidence).not.toMatch(
-      /\|\s*[^|]+\s*\|\s*PASS\s*\|\s*`BELUM DIISI[^`]*`\s*\|/i,
-    );
-    for (const unverifiedGate of [
-      'Windows terpasang',
-      'Android fisik',
-      'deploy CH Core',
-      'cetak',
-    ]) {
-      expect(evidence).toMatch(new RegExp(`${unverifiedGate}.+BELUM DIVERIFIKASI`, 'i'));
-    }
-    expect(evidence).toMatch(/pilot empat hari.+dihapus/is);
+    expect(releaseNotes).toMatch(/deploy Core.+commit rilis v0\.2\.3/is);
 
     const supplement = runbook.slice(
       runbook.indexOf('## Suplemen v0.2.2'),

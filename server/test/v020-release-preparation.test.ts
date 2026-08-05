@@ -260,7 +260,7 @@ describe('v0.2.0 historical repository-local release preparation', () => {
     }
   });
 
-  it('points the repository guide and acceptance ledger at the current guarded v0.2.2 contract', async () => {
+  it('points the repository guide and acceptance ledger at the current guarded v0.2.3 contract', async () => {
     const [readme, acceptance, executionPlan] = await Promise.all([
       repositoryText('README.md'),
       repositoryText('docs/ch-core-acceptance-status.md'),
@@ -270,9 +270,9 @@ describe('v0.2.0 historical repository-local release preparation', () => {
     ]);
 
     for (const currentPilotFact of [
-      'CH-Ultimate-0.2.2-Setup.exe',
-      'CHU-Companion-Mobile-0.2.2-release.apk',
-      'docs/releases/pilot-0.2.2.md',
+      'CH-Ultimate-0.2.3-Setup.exe',
+      'CHU-Companion-Mobile-0.2.3-release.apk',
+      'docs/releases/pilot-0.2.3.md',
       'docs/ch-core-v0.2-maintenance-rollback.md',
       'owner removed the four-day copied-data pilot',
       'permanent Android pilot signer',
@@ -289,14 +289,14 @@ describe('v0.2.0 historical repository-local release preparation', () => {
 
     const currentSection = markdownSection(
       acceptance,
-      '### Pilot v0.2.2 — current repository release contract',
+      '### Pilot v0.2.3 — current repository release contract',
       '## Local implementation and regression',
     );
     for (const currentReleaseFact of [
-      'versionName 0.2.2',
-      'versionCode 9',
-      'pilot-v0.2.2',
-      'docs/releases/pilot-0.2.2.md',
+      'versionName 0.2.3',
+      'versionCode 10',
+      'pilot-v0.2.3',
+      'docs/releases/pilot-0.2.3.md',
       'UNAVAILABLE_AFTER_OWNER_UNINSTALL',
       '0 critical',
       '0 high',
@@ -304,26 +304,13 @@ describe('v0.2.0 historical repository-local release preparation', () => {
       expect(currentSection).toContain(currentReleaseFact);
     }
     for (const currentPublishedRow of [
-      '| Artifact signed v0.2.2 | PASS |',
-      '| Publikasi GitHub | PASS |',
+      '| Artifact signed v0.2.3 | READY |',
+      '| Publikasi GitHub | BLOCKED |',
     ]) {
       expect(currentSection).toContain(currentPublishedRow);
     }
-    for (const publishedReceipt of [
-      'dc76d3c0529233974f0d1ec18420a230d0c768a5',
-      '30994408231',
-      '149268992',
-      'a1d484804d49ea9bce3b895b628bfb745de8eaa73181d59378a599396e007b40',
-      '43104529',
-      '496057db78f5a41a3f75adf7c5eef9f878cf33cc5ee9674eb48fa7cb2e1909c9',
-      '| Core source staging | PASS |',
-      '55f193d8b483223c322e69312b86a12f90be6f7c42d1da39517ccdd366ca4798',
-      'de55aec640e316fe9dd87c4b9e226cfa6a0d0db3f8b6a94f004b2ef5910d7a6b',
-      '028d6cf8c1f6c6d4bec2bcfe35e3291234688500183e4a9e574fb92751e117c9',
-      'f34cf3040757612346e1780a144a0f01ba50a89cdf34b153ace48437ae424b55',
-    ]) {
-      expect(currentSection).toContain(publishedReceipt);
-    }
+    expect(currentSection).toContain('| Core source staging | BLOCKED |');
+    expect(currentSection).toContain('rekonsiliasi katalog aman');
     for (const currentBlockedRow of [
       '| Deploy CH Core v2 | BLOCKED |',
       '| Windows terpasang | BLOCKED |',
@@ -335,9 +322,9 @@ describe('v0.2.0 historical repository-local release preparation', () => {
     expect(currentSection).toContain(
       '| Pilot copied-data empat hari | REMOVED FROM CURRENT EXECUTION |',
     );
-    expect(executionPlan).toContain('confirm product version 0.2.2');
+    expect(executionPlan).toContain('confirm product version 0.2.3');
     expect(executionPlan).toContain(
-      'versionName 0.2.2, versionCode 9',
+      'versionName 0.2.3, versionCode 10',
     );
     expect(executionPlan).not.toContain('confirm product version 0.2.1');
     expect(executionPlan).not.toContain(

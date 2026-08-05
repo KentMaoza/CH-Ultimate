@@ -13,6 +13,16 @@ export interface PreparedCatalogueRow {
   productIdentifierId: string;
   imageJobId: string | null;
   priceHistoryId: string;
+  existingSku: {
+    rowVersion: string;
+    balanceRowVersion: string | null;
+    createdAt: string;
+    imageHash: string | null;
+  } | null;
+  existingPrimaryIdentifier: boolean;
+  existingProductIdentifier: boolean;
+  primaryIdentifierCreatedAt: string | null;
+  productIdentifierCreatedAt: string | null;
 }
 
 export function normalizeIdentifier(value: string): string {
@@ -36,30 +46,34 @@ async function insertChunks<T>(
   rowPlaceholders: string,
   rows: T[],
   values: (row: T) => readonly unknown[],
+  suffix = '',
 ): Promise<void> {
   for (let offset = 0; offset < rows.length; offset += BULK_ROWS) {
     const chunk = rows.slice(offset, offset + BULK_ROWS);
     await connection.query(
       `INSERT INTO ${table} (${columns})
-       VALUES ${placeholders(chunk.length, rowPlaceholders)}`,
+       VALUES ${placeholders(chunk.length, rowPlaceholders)}${suffix}`,
       chunk.flatMap((row) => [...values(row)]),
     );
   }
 }
 
 function skuPayload(row: PreparedCatalogueRow, committedAt: Date) {
+  const rowVersion = row.existingSku
+    ? (BigInt(row.existingSku.rowVersion) + 1n).toString()
+    : '1';
   return {
     id: row.skuId,
     primaryIdentifier: row.source.primarySku,
     name: row.source.name,
     priceRupiah: row.source.selectedPrice.toString(),
-    imageHash: null,
+    imageHash: row.existingSku?.imageHash ?? null,
     sourceImageUrl: row.source.imageSourceUrl,
     sourceNote: row.source.note,
     sourceCreatedAt: row.source.sourceCreatedAt,
-    rowVersion: '1',
+    rowVersion,
     archivedAt: null,
-    createdAt: committedAt.toISOString(),
+    createdAt: row.existingSku?.createdAt ?? committedAt.toISOString(),
     updatedAt: committedAt.toISOString(),
   };
 }
@@ -70,50 +84,27 @@ function identifierPayload(
   value: string,
   kind: string,
   committedAt: Date,
+  existingCreatedAt: string | null,
 ) {
   return {
     id,
     skuId: row.skuId,
     identifierValue: value,
     identifierKind: kind,
-    createdAt: committedAt.toISOString(),
+    createdAt: existingCreatedAt ?? committedAt.toISOString(),
   };
 }
 
 function balancePayload(row: PreparedCatalogueRow, committedAt: Date) {
+  const rowVersion = row.existingSku?.balanceRowVersion
+    ? (BigInt(row.existingSku.balanceRowVersion) + 1n).toString()
+    : '1';
   return {
     skuId: row.skuId,
     quantityPcs: row.source.stockPcs.toString(),
-    rowVersion: '1',
+    rowVersion,
     updatedAt: committedAt.toISOString(),
   };
-}
-
-export async function removePreTransactionCatalogue(
-  connection: ProtocolConnection,
-  record: CatalogueImportRecord,
-  committedAt: Date,
-): Promise<void> {
-  await connection.query('DELETE FROM change_log');
-  await connection.query(
-    `DELETE FROM price_history
-     WHERE source = 'catalogue_import'`,
-  );
-  await connection.query('DELETE FROM stock_balances');
-  await connection.query('DELETE FROM sku_identifiers');
-  await connection.query('DELETE FROM skus');
-  await connection.query(
-    `INSERT INTO change_log
-       (entity_type, entity_id, operation, payload_json, created_at)
-     VALUES
-       (?, UNHEX(REPLACE(?, '-', '')), 'upsert', ?, ?)`,
-    [
-      'catalogue_epoch',
-      record.id,
-      JSON.stringify({ importId: record.id }),
-      committedAt,
-    ],
-  );
 }
 
 export async function insertCatalogue(
@@ -122,6 +113,8 @@ export async function insertCatalogue(
   rows: PreparedCatalogueRow[],
   committedAt: Date,
 ): Promise<void> {
+  const newRows = rows.filter((row) => row.existingSku === null);
+  const matchedRows = rows.filter((row) => row.existingSku !== null);
   await insertChunks(
     connection,
     'skus',
@@ -129,7 +122,7 @@ export async function insertCatalogue(
      source_import_id, source_note, source_created_at, created_at, updated_at`,
     `UNHEX(REPLACE(?, '-', '')), ?, ?, ?, ?,
      UNHEX(REPLACE(?, '-', '')), ?, ?, ?, ?`,
-    rows,
+    newRows,
     (row) => [
       row.skuId,
       row.source.primarySku,
@@ -143,6 +136,27 @@ export async function insertCatalogue(
       committedAt,
     ],
   );
+  for (const row of matchedRows) {
+    await connection.query(
+      `UPDATE skus
+       SET primary_identifier = ?, name = ?, price_rupiah = ?,
+           source_image_url = ?, source_import_id = UNHEX(REPLACE(?, '-', '')),
+           source_note = ?, source_created_at = ?, row_version = row_version + 1,
+           archived_at = NULL, updated_at = ?
+       WHERE id = UNHEX(REPLACE(?, '-', ''))`,
+      [
+        row.source.primarySku,
+        row.source.name,
+        row.source.selectedPrice,
+        row.source.imageSourceUrl,
+        record.id,
+        row.source.note,
+        row.source.sourceCreatedAt,
+        committedAt,
+        row.skuId,
+      ],
+    );
+  }
   const identifiers = rows.flatMap((row) => [
     {
       id: row.primaryIdentifierId,
@@ -157,6 +171,11 @@ export async function insertCatalogue(
       kind: 'product_code',
     },
   ]);
+  const newIdentifiers = identifiers.filter((identifier) =>
+    identifier.kind === 'primary'
+      ? !identifier.row.existingPrimaryIdentifier
+      : !identifier.row.existingProductIdentifier,
+  );
   await insertChunks(
     connection,
     'sku_identifiers',
@@ -164,7 +183,7 @@ export async function insertCatalogue(
      created_at`,
     `UNHEX(REPLACE(?, '-', '')), UNHEX(REPLACE(?, '-', '')),
      ?, ?, ?, ?`,
-    identifiers,
+    newIdentifiers,
     (identifier) => [
       identifier.id,
       identifier.row.skuId,
@@ -174,6 +193,26 @@ export async function insertCatalogue(
       committedAt,
     ],
   );
+  for (const identifier of identifiers) {
+    const existing =
+      identifier.kind === 'primary'
+        ? identifier.row.existingPrimaryIdentifier
+        : identifier.row.existingProductIdentifier;
+    if (!existing) continue;
+    await connection.query(
+      `UPDATE sku_identifiers
+       SET identifier_value = ?, identifier_hash = ?, identifier_kind = ?
+       WHERE id = UNHEX(REPLACE(?, '-', ''))
+         AND sku_id = UNHEX(REPLACE(?, '-', ''))`,
+      [
+        identifier.value,
+        identifierHash(identifier.value),
+        identifier.kind,
+        identifier.id,
+        identifier.row.skuId,
+      ],
+    );
+  }
   await insertChunks(
     connection,
     'stock_balances',
@@ -181,6 +220,11 @@ export async function insertCatalogue(
     `UNHEX(REPLACE(?, '-', '')), ?, 1, ?`,
     rows,
     (row) => [row.skuId, row.source.stockPcs, committedAt],
+    `
+     ON DUPLICATE KEY UPDATE
+       quantity_pcs = VALUES(quantity_pcs),
+       row_version = row_version + 1,
+       updated_at = VALUES(updated_at)`,
   );
   await insertChunks(
     connection,
@@ -233,6 +277,7 @@ export async function insertCatalogue(
         row.source.primarySku,
         'primary',
         committedAt,
+        row.primaryIdentifierCreatedAt,
       ),
     },
     {
@@ -244,6 +289,7 @@ export async function insertCatalogue(
         row.source.productCode,
         'product_code',
         committedAt,
+        row.productIdentifierCreatedAt,
       ),
     },
     {

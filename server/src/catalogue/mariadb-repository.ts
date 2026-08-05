@@ -2,19 +2,16 @@ import { randomUUID } from 'node:crypto';
 
 import type { SchemaQueryPool } from '../db/migrate.js';
 import { acquireBusinessWriteLock } from '../sync/business-write-lock.js';
-import type {
-  ProtocolConnection,
-  ProtocolPool,
-} from '../sync/idempotency.js';
+import type { ProtocolConnection, ProtocolPool } from '../sync/idempotency.js';
 import {
   MariaDbCatalogueImportStore,
   parseCatalogueCommitResult,
 } from './catalogue-import-store.js';
+import { insertCatalogue } from './catalogue-writer.js';
 import {
-  insertCatalogue,
-  removePreTransactionCatalogue,
-  type PreparedCatalogueRow,
-} from './catalogue-writer.js';
+  reconcileCatalogue,
+  type ExistingCatalogueRow,
+} from './catalogue-reconciliation.js';
 import {
   CatalogueError,
   type CatalogueCommitResult,
@@ -60,15 +57,11 @@ export class MariaDbCatalogueRepository implements CatalogueRepository {
     return this.imports.findById(id);
   }
 
-  createStage(
-    record: CatalogueImportRecord,
-  ): Promise<CatalogueImportRecord> {
+  createStage(record: CatalogueImportRecord): Promise<CatalogueImportRecord> {
     return this.imports.createStage(record);
   }
 
-  refreshStage(
-    record: CatalogueImportRecord,
-  ): Promise<CatalogueImportRecord> {
+  refreshStage(record: CatalogueImportRecord): Promise<CatalogueImportRecord> {
     return this.imports.refreshStage(record);
   }
 
@@ -104,9 +97,7 @@ export class MariaDbCatalogueRepository implements CatalogueRepository {
         );
       }
       if (String(locked[0].status) === 'committed') {
-        const replay = parseCatalogueCommitResult(
-          locked[0].result_json,
-        );
+        const replay = parseCatalogueCommitResult(locked[0].result_json);
         if (!replay) {
           throw new Error('Committed catalogue import has no result');
         }
@@ -138,39 +129,27 @@ export class MariaDbCatalogueRepository implements CatalogueRepository {
         );
       }
 
-      const existingRows = await connection.query<
-        Array<{ has_existing_catalogue: unknown }>
-      >(
-        `SELECT EXISTS(
-           SELECT 1 FROM imports
-           WHERE status = 'committed'
-             AND id <> UNHEX(REPLACE(?, '-', ''))
-           LIMIT 1
-         ) AS has_existing_catalogue`,
-        [record.id],
+      const existingRows = await connection.query<ExistingCatalogueRow[]>(
+        `SELECT HEX(s.id) AS sku_id_hex, s.row_version,
+                sb.row_version AS balance_row_version, s.created_at,
+                HEX(s.image_hash) AS image_hash_hex, s.archived_at,
+                HEX(si.id) AS identifier_id_hex, si.identifier_value,
+                si.created_at AS identifier_created_at
+         FROM skus s
+         LEFT JOIN sku_identifiers si ON si.sku_id = s.id
+         LEFT JOIN stock_balances sb ON sb.sku_id = s.id
+         ORDER BY s.created_at, s.id, si.created_at, si.id
+         FOR UPDATE`,
       );
-      if (Number(existingRows[0]?.has_existing_catalogue) === 1) {
-        await removePreTransactionCatalogue(
-          connection,
-          record,
-          committedAt,
-        );
-      }
-
-      const prepared: PreparedCatalogueRow[] = workbook.rows.map(
-        (source) => ({
-          source,
-          skuId: this.uuid(),
-          primaryIdentifierId: this.uuid(),
-          productIdentifierId: this.uuid(),
-          imageJobId: source.imageSourceUrl ? this.uuid() : null,
-          priceHistoryId: this.uuid(),
-        }),
+      const reconciliation = reconcileCatalogue(
+        workbook.rows,
+        existingRows,
+        () => this.uuid(),
       );
       await insertCatalogue(
         connection,
         record,
-        prepared,
+        reconciliation.rows,
         committedAt,
       );
       const result: CatalogueCommitResult = {
@@ -201,6 +180,9 @@ export class MariaDbCatalogueRepository implements CatalogueRepository {
             workbookSha256: record.workbookSha256,
             rowCount: result.rowCount,
             imageJobCount: result.imageJobCount,
+            matchedExistingCount: reconciliation.matchedExistingCount,
+            createdSkuCount: reconciliation.createdSkuCount,
+            unmatchedArchivedCount: reconciliation.unmatchedArchivedCount,
           }),
         ],
       );

@@ -310,19 +310,22 @@ describe('v0.2.0 historical repository-local release preparation', () => {
       '| Windows terpasang | BLOCKED |',
       '| Android fisik | BLOCKED |',
       '| Cetak fisik | BLOCKED |',
-      '| Pilot copied-data empat hari | BLOCKED |',
     ]) {
       expect(currentSection).toContain(currentBlockedRow);
     }
+    expect(currentSection).toContain(
+      '| Pilot copied-data empat hari | REMOVED FROM CURRENT EXECUTION |',
+    );
 
     for (const lastMeasuredSamsungFact of [
       'Last measured Samsung state',
       'CH Ultimate mobile v0.2.0',
       'versionCode 7',
       'upgrade-required',
-      'old incompatible Core v1 bootstrap contract',
-      'device is now disconnected',
-      'no fresh ADB measurement',
+      'old incompatible Core v1',
+      'bootstrap contract',
+      'device is connected over USB',
+      'fresh ADB measurement',
     ]) {
       expect(acceptance).toContain(lastMeasuredSamsungFact);
     }

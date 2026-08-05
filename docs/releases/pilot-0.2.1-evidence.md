@@ -54,9 +54,10 @@ dijalankan, database yang diubah, atau klien yang dipasang pada tahap ini.
 | Klien Android sebelum cutover | PASS | Samsung SM-S901E terhubung melalui USB dan LAN bisnis; installed APK adalah `com.tokoch.chucompanion` v0.2.0, versionCode 7, SHA-256 `f55a55204a0c6b0169fc8376a096801b1d4556d57f94e686d4b370774b880c20`, signer permanen `57e0731ce3db068e6581980c53610764af05c612184ff50e18a9f4912ca59ba5`; belum di-upgrade atau dibersihkan |
 | Klien Windows/outbox/quiesce | BLOCKED | Windows v0.2.0 berasal dari laporan operator, belum diukur langsung; count outbox kedua klien dan active-write state belum direkam; aplikasi belum dipaksa berhenti |
 | Count database dan schema live | BLOCKED | Tidak ada sesi DSM/ops atau credential read-only yang tersedia untuk menghitung seluruh tabel dan mencocokkan baris `schema_migrations`; akses tidak diarahkan ke port MariaDB atau credential lain secara improvisasi |
-| Backup baru dan salinan independen | BLOCKED | Hyper Backup secara langsung melaporkan tidak ada backup task. Bundle logis baru belum dibuat. Mac administrator memakai FileVault dan dapat menjadi kandidat target off-NAS setelah persetujuan pemilik; Samsung SSD yang terpasang tidak terenkripsi dan tidak diterima sebagai target backup aman |
+| Backup baru NAS-only | BLOCKED / OWNER RISK ACCEPTED | Hyper Backup secara langsung melaporkan tidak ada backup task dan bundle logis baru belum dibuat. Pemilik pada 2026-08-05 memilih agar backup dan data tetap hanya di NAS serta melarang salinan ke Mac. Backup ini dapat melindungi dari kegagalan migrasi/logis, tetapi bukan kehilangan seluruh NAS/volume |
 | Clean scratch restore | BLOCKED | Schema/account scratch-only baru, restore, exact-old-artifact runtime, dan invariant comparison belum tersedia |
 | Credential exposure/rotation | BLOCKED | Pane `General` Container Manager menampilkan environment rahasia tanpa masking selama inspeksi. Nilainya tidak disalin ke receipt atau repository; credential database dan owner-bootstrap harus dirotasi melalui prosedur terkoordinasi sebelum rollout |
+| Helper preflight satu-kali | PREPARED / TIDAK DIJALANKAN | `scripts/ch-core-v021-preflight.sh` lulus shell syntax dan 4 focused test, gagal tertutup tanpa approval/quiesce/outbox nol, hanya mengizinkan count tabel + dump + verify, dan staged di NAS dengan SHA-256 `137f82f862468a43c1485907b45774b2bd6bbc226edd624421c50c901a664384` |
 | Deploy/migrasi 010 | BLOCKED / TIDAK DICOBA | Deployment dilarang sampai seluruh gate di atas PASS |
 
 Checksum repository yang harus cocok dengan `schema_migrations` sebelum write
@@ -93,6 +94,11 @@ Sebelum pemasangan, cocokkan Android dengan application ID
 `57e0731ce3db068e6581980c53610764af05c612184ff50e18a9f4912ca59ba5`.
 
 ## Receipt pilot empat hari WITA
+
+Bagian ini dipertahankan sebagai template historis release, tetapi **bukan gate
+eksekusi aktif**. Pada 2026-08-05 pemilik menghapus pilot empat hari dari scope
+dan memilih pemasangan Windows/Android secara manual dari GitHub. Jangan mengisi
+receipt ini atau menyatakan pilot berjalan pada eksekusi saat ini.
 
 Pilot hanya dimulai setelah kedua klien terpasang dan CH Core v2 diterima pada
 data salinan. Empat receipt berikut adalah empat hari kalender WITA berturut-

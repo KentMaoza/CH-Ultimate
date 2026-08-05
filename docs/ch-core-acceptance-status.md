@@ -3,8 +3,12 @@
 Updated 2026-08-05 WITA. This is an evidence ledger, not a production
 deployment receipt. A v0.1.3-compatible copied-data CH Core runtime is
 deployed on the NAS, but CH Core is not deployed as a production endpoint.
-The catalogue workbook has not been imported. The Windows owner is enrolled;
-Last measured Samsung state (direct receipt earlier in this task; no fresh ADB measurement because the device is now disconnected): CH Ultimate mobile v0.2.0 (`versionCode 7`) was encountering `upgrade-required` against the old incompatible Core v1 bootstrap contract.
+The catalogue workbook has not been imported. The Windows owner is enrolled.
+Last measured Samsung state: a fresh ADB measurement on 2026-08-05 WITA found
+the device is connected over USB and still has CH Ultimate mobile v0.2.0
+(`versionCode 7`); its process is paused/background on business Wi-Fi. The last
+UI receipt showed `upgrade-required` against the old incompatible Core v1
+bootstrap contract; the app was not reopened or modified for this measurement.
 
 Status meanings:
 
@@ -67,7 +71,7 @@ maintenance, clear data, migrasi, impor, pairing, atau publikasi.
 | Android fisik | BLOCKED | Package ID, `versionName 0.2.1`, `versionCode 8`, signer, dan Back belum diterima pada ponsel fisik |
 | Deploy CH Core v2 | BLOCKED | Migrasi/Core v2 belum diterapkan pada NAS dan bootstrap `apiSchemaVersion: 2`/`stockChecks` belum memiliki receipt pascadeploy |
 | Cetak fisik | BLOCKED | Dialog sistem, PDF, XLSX, dan printer belum diterima pada lingkungan target |
-| Pilot copied-data empat hari | BLOCKED | Empat hari kalender WITA belum dimulai; receipt Hari 1–4 dan keputusan lanjut/henti belum direkam |
+| Pilot copied-data empat hari | REMOVED FROM CURRENT EXECUTION | Pemilik pada 2026-08-05 menghapus pilot empat hari dari scope eksekusi aktif; template historis tetap dipertahankan dan tidak boleh disalahartikan sebagai pilot berjalan |
 
 v0.2.1 sudah terbit sebagai prerelease privat dan payload unduhan sudah
 diverifikasi. Jangan menyebutnya sudah terpasang, diterima secara fisik, atau
@@ -78,7 +82,7 @@ statusnya diubah melalui receipt yang ditinjau.
 
 | Requirement | Status | Current evidence |
 | --- | --- | --- |
-| Desktop application and gateway | PASS | v0.2.1 `npm run verify`: 90 files / 687 tests; GitHub source gate and local verification both pass at `2c569db25ada195e00ef220e99d6b05909a46768` |
+| Desktop application and gateway | PASS | v0.2.1 baseline at release commit `2c569db25ada195e00ef220e99d6b05909a46768` passed 90 files / 687 tests; current preflight-helper verification passes 91 files / 691 tests |
 | Mobile application | PASS | v0.2.1 `npm run test:mobile`: 12 files / 118 tests; production build passes |
 | CH Core unit and artifact tests | PASS | `npm run server:test`: 50 files / 338 tests plus one intentional acceptance skip; typecheck passes |
 | Approved workbook parser | PASS | `SKU_Gudang20260804080716145.xlsx` at SHA-256 `f1f4675327fac107ef9f78c114b8afe86389d5543b204540ed45e74f9b15e49c`: 3,144 SKU / 6,288 identifiers / 2,786 refs / 358 missing / 3 Modal selections / Rp276,285,615 / 3,988 PCS acceptance: 1/1 |
@@ -339,7 +343,8 @@ still open unless explicitly marked `PASS`:
 - UPS shutdown and restart pass.
 - Clean restore reproduces catalogue, ledger, Nota, omzet, audit, change,
   and image-reference invariants.
-- One Windows laptop and one Android phone pass a four-day copied-data pilot.
+- One Windows laptop and one Android phone pass the owner-run physical feature
+  checklist after manual installation; no four-day pilot is required.
 - Both Windows laptops and the remaining phones are then enrolled.
 - The one-hour seven-client soak has no restart or sustained swap; p95 reads
   stay below 500 ms and p95 writes below one second.
@@ -364,3 +369,10 @@ LAN computer; MariaDB and private files remain on the NAS.
    permanently signed Android release APK for v0.1.5. Pull-request debug APKs
    are verification-only and must never be published. This does not relax
    physical-client or production acceptance gates.
+7. Untuk eksekusi v0.2.1, pemilik memilih backup dan data tetap hanya di NAS;
+   tidak ada salinan ke Mac. Risiko kehilangan seluruh NAS/volume tetap terbuka.
+8. Pemilik memasang v0.2.1 secara manual dari private GitHub Release. Operator
+   tidak memasang, mencopot, atau membersihkan data aplikasi Windows/Android.
+9. Pilot empat hari dihapus dari scope eksekusi v0.2.1 saat ini. Penerimaan
+   fisik setelah instalasi manual tetap harus dilaporkan terpisah dan tidak
+   boleh diasumsikan lulus.

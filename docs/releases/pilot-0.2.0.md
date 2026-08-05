@@ -7,7 +7,7 @@ impor, instalasi, pencetakan, atau penerimaan perangkat fisik sudah selesai.
 ## Payload yang diharapkan
 
 Setelah seluruh gate repository, artefak, checksum, signer, dan persetujuan
-operasional lulus, prerelease privat `pilot-v0.2.0` hanya boleh memuat:
+operasional lulus, prerelease publik `pilot-v0.2.0` hanya boleh memuat:
 
 - Windows: `CH-Ultimate-0.2.0-Setup.exe`
 - Android: `CHU-Companion-Mobile-0.2.0-release.apk`
@@ -48,7 +48,7 @@ UPnP, atau API Internet publik.
 - Android wajib ditandatangani dengan identitas pilot permanen yang digest
   sertifikatnya dipin di workflow. Keempat secret signing wajib tersedia;
   build release gagal tertutup jika satu saja hilang.
-- Windows tetap merupakan pilot privat yang tidak ditandatangani Authenticode.
+- Windows tetap merupakan pilot publik yang tidak ditandatangani Authenticode.
   Jangan menyebut installer Windows sebagai production-signed.
 - Debug APK hanya untuk verifikasi workflow dan tidak boleh dipublikasikan.
 - Cocokkan kedua payload dengan `SHA256SUMS.txt`, lalu verifikasi kembali

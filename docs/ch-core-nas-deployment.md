@@ -297,8 +297,9 @@ For the business-LAN partial live receipt and remaining cutover gates, follow
 and network-only rollback boundary; it does not turn this copied-data pilot
 into a production endpoint.
 
-Enroll one Windows laptop and one physical Android phone for a
-**four-day copied-data pilot**. Only then enroll the remaining clients.
+There is no time-based pilot gate in the current execution. Enroll one Windows
+laptop and one physical Android phone, complete the physical acceptance list,
+and only then enroll the remaining clients.
 
 Acceptance must prove:
 

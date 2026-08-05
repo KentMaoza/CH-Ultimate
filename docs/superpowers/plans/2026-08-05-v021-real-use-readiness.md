@@ -188,15 +188,14 @@ write/replay, preserve data and use a test-first forward-fix.
 
 1. Give the owner the private GitHub release URL and exact SHA-256 values for
    the Windows installer, Android APK, and checksum manifest.
-2. **Windows owner action:** close the old app, verify the installer checksum,
-   perform an in-place upgrade, and confirm product version 0.2.1. Do not clear
-   local identity or outbox.
+2. **Windows owner action:** verify the installer checksum, perform a clean
+   installation, and confirm product version 0.2.2. The prior installation was
+   already removed by the owner, so no local identity or outbox is available.
 3. **Android owner action:** verify package ID `com.tokoch.chucompanion`,
-   versionName 0.2.1, versionCode 8, and the permanent signer; install as an
-   update without uninstalling or clearing application data.
-4. Reuse valid enrollment where possible. If pairing is required, Windows owner
-   explicitly approves the named Samsung device; never enter an owner bootstrap
-   credential on the phone.
+   versionName 0.2.2, versionCode 9, and the permanent signer; perform a clean
+   installation because the prior package was already removed by the owner.
+4. Pair both clean installations. The Windows owner explicitly approves the
+   named Samsung device; never enter an owner bootstrap credential on the phone.
 5. After the owner reports installation complete, verify both devices reach
    `online`, report the same Core revision and SKU count, and do not render a
    valid-looking empty state during failures. This verification does not

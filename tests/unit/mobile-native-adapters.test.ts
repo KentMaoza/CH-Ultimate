@@ -20,14 +20,15 @@ type BackButtonPlugin = {
 
 function createBackButtonPlugin() {
   let listener: (() => void | Promise<void>) | undefined;
+  const remove = vi.fn(async () => undefined);
   const plugin: BackButtonPlugin = {
     addListener: vi.fn(async (_eventName, nextListener) => {
       listener = nextListener;
-      return { remove: async () => undefined };
+      return { remove };
     }),
     exitApp: vi.fn(async () => undefined),
   };
-  return { plugin, press: async () => listener?.() };
+  return { plugin, press: async () => listener?.(), remove };
 }
 
 test('native App back port registers one platform backButton listener', async () => {
@@ -62,6 +63,46 @@ test('native App back port uses the latest handler and exits only when it report
   expect(earlierHandler).toHaveBeenCalledOnce();
   expect(latestHandler).toHaveBeenCalledOnce();
   expect(native.plugin.exitApp).toHaveBeenCalledOnce();
+});
+
+test('native App back port removes its listener once and makes disposal safe for a live handler', async () => {
+  const native = createBackButtonPlugin();
+  const factory = (nativeAdapters as typeof nativeAdapters & {
+    createNativeAppBackButton: (plugin: BackButtonPlugin) => {
+      dispose?: () => Promise<void>;
+      setHandler: (handler: () => boolean) => () => void;
+    };
+  }).createNativeAppBackButton;
+  const backButton = factory(native.plugin);
+  backButton.setHandler(() => false);
+
+  await backButton.dispose?.();
+  await native.press();
+  await backButton.dispose?.();
+
+  expect(native.remove).toHaveBeenCalledOnce();
+  expect(native.plugin.exitApp).not.toHaveBeenCalled();
+});
+
+test('native App back port removes a listener that resolves after disposal', async () => {
+  let resolveListener!: (handle: { remove: () => Promise<void> }) => void;
+  const remove = vi.fn(async () => undefined);
+  const plugin: BackButtonPlugin = {
+    addListener: vi.fn(() => new Promise<{ remove: () => Promise<void> }>((resolve) => {
+      resolveListener = resolve;
+    })),
+    exitApp: vi.fn(async () => undefined),
+  };
+  const factory = (nativeAdapters as typeof nativeAdapters & {
+    createNativeAppBackButton: (nextPlugin: BackButtonPlugin) => { dispose?: () => Promise<void> };
+  }).createNativeAppBackButton;
+  const backButton = factory(plugin);
+
+  const disposing = backButton.dispose?.();
+  resolveListener({ remove });
+  await disposing;
+
+  expect(remove).toHaveBeenCalledOnce();
 });
 
 function createNotificationPlugin(display: 'granted' | 'denied' | 'prompt' = 'granted') {

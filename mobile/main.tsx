@@ -6,7 +6,7 @@ import { MockOperationsGateway } from '../src/gateway/operations-gateway';
 import { ClientErrorBoundary } from '../src/renderer/ClientErrorBoundary';
 import { MobileApp } from './MobileApp';
 import { createNativeAppBackButton } from './native-adapters';
-import { browserAppBackButton } from './ports';
+import { browserAppBackButton, type AppBackButtonPort } from './ports';
 import { createMobileRuntime } from './bootstrap';
 import { CoreConnectionScreen } from './components/CoreConnectionScreen';
 import {
@@ -24,6 +24,7 @@ const logCoreDiagnostic = (diagnostic: unknown) => {
 };
 
 interface MobileRendererOptions {
+  backButton?: AppBackButtonPort;
   native: boolean;
   bridge?: MobileCoreBridge;
   ports: MobilePorts;
@@ -41,7 +42,8 @@ export function mountMobileRenderer(
 ): () => void {
   let current: MobileBootstrapResult | undefined;
   let generation = 0;
-  const backButton = options.native ? createNativeAppBackButton() : browserAppBackButton;
+  let disposed = false;
+  const backButton = options.backButton ?? (options.native ? createNativeAppBackButton() : browserAppBackButton);
   const render = (content: ReactNode) =>
     root.render(
       <StrictMode>
@@ -123,8 +125,11 @@ export function mountMobileRenderer(
 
   void retry();
   return () => {
+    if (disposed) return;
+    disposed = true;
     generation += 1;
     disposeGateway(current);
+    void backButton.dispose().catch(() => undefined);
     root.unmount();
   };
 }

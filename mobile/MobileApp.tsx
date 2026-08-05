@@ -46,6 +46,7 @@ export function MobileApp({ backButton = browserAppBackButton, gateway, scanner,
   const [focusSearch, setFocusSearch] = useState(false);
   const [selectedSkuId, setSelectedSkuId] = useState<string | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
+  const [scannerOriginSkuId, setScannerOriginSkuId] = useState<string | null>(null);
   const [scanCode, setScanCode] = useState('');
   const [scanError, setScanError] = useState('');
   const [priceMode, setPriceMode] = useState<PriceMode>('all');
@@ -112,8 +113,8 @@ export function MobileApp({ backButton = browserAppBackButton, gateway, scanner,
     void notifications.listenForPriceChangeActions((skuId) => {
       if (!gateway.getSnapshot().skus.some((sku) => sku.id === skuId)) return;
       scanRequestToken.current += 1;
-      setView('skus');
       setScanOpen(false);
+      setScannerOriginSkuId(null);
       setSelectedSkuId(skuId);
     }).then((remove) => {
       if (active) removeListener = remove;
@@ -129,6 +130,7 @@ export function MobileApp({ backButton = browserAppBackButton, gateway, scanner,
     scanRequestToken.current += 1;
     setSelectedSkuId(null);
     setScanOpen(false);
+    setScannerOriginSkuId(null);
     setFocusSearch(shouldFocusSearch);
     setEditingNotaId(null);
     if (next === 'prices' || next === 'recommendations' || next === 'dataExport') {
@@ -142,6 +144,7 @@ export function MobileApp({ backButton = browserAppBackButton, gateway, scanner,
     scanRequestToken.current += 1;
     setSelectedSkuId(null);
     setScanOpen(false);
+    setScannerOriginSkuId(null);
     setEditingNotaId(transactionId);
     setView('nota');
   }
@@ -150,6 +153,7 @@ export function MobileApp({ backButton = browserAppBackButton, gateway, scanner,
     scanRequestToken.current += 1;
     setSelectedSkuId(null);
     setScanOpen(false);
+    setScannerOriginSkuId(null);
     setSubordinateOrigin('home');
     setPriceMode('unread');
     setUnreadFeedIds(sortedChanges.filter((change) => !readChangeIds.has(change.id)).map((change) => change.id));
@@ -159,6 +163,7 @@ export function MobileApp({ backButton = browserAppBackButton, gateway, scanner,
   function openSku(sku: Sku) {
     scanRequestToken.current += 1;
     setScanOpen(false);
+    setScannerOriginSkuId(null);
     setSelectedSkuId(sku.id);
   }
 
@@ -201,10 +206,13 @@ export function MobileApp({ backButton = browserAppBackButton, gateway, scanner,
     setScanOpen(false);
     setScanCode('');
     setScanError('');
+    if (scannerOriginSkuId) setSelectedSkuId(scannerOriginSkuId);
+    setScannerOriginSkuId(null);
   }
 
   function openManualScan() {
     scanRequestToken.current += 1;
+    setScannerOriginSkuId(selectedSkuId);
     setSelectedSkuId(null);
     setScanOpen(true);
     setScanCode('');

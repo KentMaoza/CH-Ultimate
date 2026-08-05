@@ -14,7 +14,7 @@ function createPorts(): {
   share: RecommendationPdfSharePort;
 } {
   return {
-    backButton: { setHandler: () => () => undefined },
+    backButton: { dispose: async () => undefined, setHandler: () => () => undefined },
     scanner: { scan: async () => null },
     notifications: {
       ensurePermission: async () => 'denied',
@@ -28,6 +28,7 @@ function createPorts(): {
 function createBackButtonPort() {
   let handler: (() => boolean) | undefined;
   const port: AppBackButtonPort = {
+    dispose: async () => undefined,
     setHandler(nextHandler) {
       handler = nextHandler;
       return () => {
@@ -89,7 +90,7 @@ test.each([
   expect(screen.getByRole('heading', { name: 'CHU Companion Mobile' })).toBeInTheDocument();
 });
 
-test('native Back closes SKU detail and scanner to the SKU screen that opened them', async () => {
+test('native Back restores the SKU detail that opened scanner through manual retry', async () => {
   const backButton = createBackButtonPort();
   renderMobile({ backButton: backButton.port });
   fireEvent.click(screen.getByRole('button', { name: 'SKU' }));
@@ -102,8 +103,37 @@ test('native Back closes SKU detail and scanner to the SKU screen that opened th
   fireEvent.click(screen.getByRole('button', { name: /Beras Hitam Premium 1 kg/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Scan kode lain' }));
   expect(await screen.findByRole('heading', { name: 'Scan Barcode' })).toBeInTheDocument();
+  fireEvent.change(screen.getByRole('textbox', { name: 'Kode barcode atau SKU' }), { target: { value: 'TIDAK-ADA' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Cari kode' }));
+  expect(screen.getByRole('heading', { name: 'Scan Barcode' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Coba scan lagi' }));
+  expect(await screen.findByRole('heading', { name: 'Scan Barcode' })).toBeInTheDocument();
   act(() => expect(backButton.press()).toBe(true));
-  expect(screen.getByRole('heading', { name: 'SKU Gudang' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Beras Hitam Premium 1 kg' })).toBeInTheDocument();
+});
+
+test.each([
+  ['Beranda', undefined, 'CHU Companion Mobile'],
+  ['Lainnya', 'Lainnya', 'Lainnya'],
+])('notification-opened SKU detail returns to its current %s screen on native Back', async (_origin, navigationButton, originHeading) => {
+  let actionListener: ((skuId: string) => void) | undefined;
+  const notifications: LocalNotificationPort = {
+    ensurePermission: async () => 'granted',
+    notifyPriceChange: async () => undefined,
+    listenForPriceChangeActions: async (listener) => {
+      actionListener = listener;
+      return async () => undefined;
+    },
+  };
+  const backButton = createBackButtonPort();
+  renderMobile({ backButton: backButton.port, notifications });
+  if (navigationButton) fireEvent.click(screen.getByRole('button', { name: navigationButton }));
+  await waitFor(() => expect(actionListener).toBeTypeOf('function'));
+
+  act(() => actionListener!('sku-2'));
+  expect(screen.getByRole('heading', { name: 'Kemeja Linen Putih' })).toBeInTheDocument();
+  act(() => expect(backButton.press()).toBe(true));
+  expect(screen.getByRole('heading', { name: originHeading })).toBeInTheDocument();
 });
 
 test('native Back returns price, recommendation, and export flows to their recorded top-level origin', () => {

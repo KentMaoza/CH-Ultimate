@@ -12,6 +12,7 @@ export interface BarcodeScannerPort {
 export type AppBackButtonHandler = () => boolean;
 
 export interface AppBackButtonPort {
+  dispose(): Promise<void>;
   setHandler(handler: AppBackButtonHandler): () => void;
 }
 
@@ -37,6 +38,7 @@ export const browserBarcodeScanner: BarcodeScannerPort = {
 };
 
 export const browserAppBackButton: AppBackButtonPort = {
+  dispose: async () => undefined,
   setHandler: () => () => undefined,
 };
 

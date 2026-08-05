@@ -5,6 +5,7 @@ import {
   CapacitorBarcodeScannerTypeHint,
   type CapacitorBarcodeScannerPlugin,
 } from '@capacitor/barcode-scanner';
+import { type PluginListenerHandle } from '@capacitor/core';
 import { App, type AppPlugin } from '@capacitor/app';
 import { Haptics, ImpactStyle, type HapticsPlugin } from '@capacitor/haptics';
 import { LocalNotifications, type LocalNotificationsPlugin } from '@capacitor/local-notifications';
@@ -33,11 +34,28 @@ export function createNativeAppBackButton(
   plugin: NativeAppPlugin = App,
 ): AppBackButtonPort {
   let handler: AppBackButtonHandler = () => true;
-  void plugin.addListener('backButton', async () => {
-    if (!handler()) await plugin.exitApp();
+  let disposed = false;
+  let listener: PluginListenerHandle | undefined;
+  let removal: Promise<void> | undefined;
+  const removeOnce = (handle: PluginListenerHandle) => {
+    if (!removal) removal = handle.remove().catch(() => undefined);
+    return removal;
+  };
+  const registration = plugin.addListener('backButton', async () => {
+    if (!disposed && !handler()) await plugin.exitApp();
+  }).then(async (handle) => {
+    listener = handle;
+    if (disposed) await removeOnce(handle);
   }).catch(() => undefined);
   return {
+    async dispose() {
+      disposed = true;
+      handler = () => true;
+      await registration;
+      if (listener) await removeOnce(listener);
+    },
     setHandler(nextHandler) {
+      if (disposed) return () => undefined;
       handler = nextHandler;
       return () => {
         if (handler === nextHandler) handler = () => true;

@@ -39,6 +39,45 @@ tersebut sebagai data URL. Ini membuktikan asset tidak lagi bergantung pada
 path absolut `/brand/...` di bawah `file://`; tampilan aktual setelah instalasi
 tetap merupakan gate Windows fisik di bawah.
 
+## Preflight CH Core v2 — 2026-08-05 WITA
+
+Preflight read-only/staging dijalankan setelah artefak klien terbit. Status
+keseluruhan masih `BLOCKED`; tidak ada container yang dihentikan, migrasi yang
+dijalankan, database yang diubah, atau klien yang dipasang pada tahap ini.
+
+| Gate | Status | Receipt |
+| --- | --- | --- |
+| Health LAN dengan CA | PASS | 2026-08-05 16:04:15 WITA; `https://192.168.50.14:8443/health/live` HTTP 200 `{"status":"ok"}` dan `/health/ready` HTTP 200 `{"status":"ready"}` dengan `resources/ch-core-ca.pem`; leaf SHA-256 `22:08:62:71:10:7F:61:65:E6:34:B3:70:12:20:C3:16:BC:E1:B8:87:5A:20:E8:AA:21:26:59:DB:04:90:E5:88`, SAN `IP:192.168.50.14`, berlaku sampai 2027-09-02 |
+| Isolasi port | PASS | Raw Core `18080` dan MariaDB `3306` menolak koneksi dari administrator Mac; hanya reverse proxy `8443` yang dipakai klien |
+| Artifact Core lama | BLOCKED | Receipt historis terakhir menunjuk commit/project/image `4482af7ce1a4f20acfed49f31f037348c5586d8f` dengan source SHA-256 `18f446375e5ca340c1342362b4d32f3efc0a631193eabcae20eb0238e129e8c8` dan migrasi sampai 009, tetapi state live Container Manager belum diverifikasi ulang melalui sesi DSM terautentikasi |
+| Artifact Core v2 | PASS (staging saja) | Source commit yang ditinjau `2c569db25ada195e00ef220e99d6b05909a46768`; bundle baru `CH_Ultimate_Pilot/2c569db/ch-ultimate-2c569db.tar.gz` pada share NAS cocok dengan sumber lokal di SHA-256 `b7f4bf8ea44d56561228cea1859959e7dcab04bb2de8c866c9b600069a4dbded`; bundle memuat Dockerfile, Compose, package manifest, dan migrasi 010 |
+| Klien Android sebelum cutover | PASS | Samsung SM-S901E terhubung melalui USB dan LAN bisnis; installed APK adalah `com.tokoch.chucompanion` v0.2.0, versionCode 7, SHA-256 `f55a55204a0c6b0169fc8376a096801b1d4556d57f94e686d4b370774b880c20`, signer permanen `57e0731ce3db068e6581980c53610764af05c612184ff50e18a9f4912ca59ba5`; belum di-upgrade atau dibersihkan |
+| Klien Windows/outbox/quiesce | BLOCKED | Windows v0.2.0 berasal dari laporan operator, belum diukur langsung; count outbox kedua klien dan active-write state belum direkam; aplikasi belum dipaksa berhenti |
+| Count database dan schema live | BLOCKED | Tidak ada sesi DSM/ops atau credential read-only yang tersedia untuk menghitung seluruh tabel dan mencocokkan baris `schema_migrations`; akses tidak diarahkan ke port MariaDB atau credential lain secara improvisasi |
+| Backup baru dan salinan independen | BLOCKED | Bundle logis baru belum dibuat. Mac administrator memakai FileVault dan dapat menjadi kandidat target off-NAS setelah persetujuan pemilik; Samsung SSD yang terpasang tidak terenkripsi dan tidak diterima sebagai target backup aman |
+| Clean scratch restore | BLOCKED | Schema/account scratch-only baru, restore, exact-old-artifact runtime, dan invariant comparison belum tersedia |
+| Deploy/migrasi 010 | BLOCKED / TIDAK DICOBA | Deployment dilarang sampai seluruh gate di atas PASS |
+
+Checksum repository yang harus cocok dengan `schema_migrations` sebelum write
+dibuka kembali:
+
+| Version | Migration | SHA-256 |
+| ---: | --- | --- |
+| 1 | `001_initial.sql` | `e22cfbbf1af7b72e0091c9bf8a399ac2570fc6f971723330d085d0954cf68b69` |
+| 2 | `002_nota_line_page_ownership.sql` | `39fd3afbe56aef8fa4b5c317753622998f73877925f1eed24996686721f17923` |
+| 3 | `003_identity_sync_protocol.sql` | `cb1ab6f8382317cf9e3abfde5f9f4edf6883eea75f06cc0c6b1d4ac54dbde581` |
+| 4 | `004_replay_safe_protocol.sql` | `e82b21d3e86680432f270b51a1d61c79cd0c69105f9e9ab8212768dcc1387139` |
+| 5 | `005_catalogue_import.sql` | `b36063e077279b11997bed0cb4577053b7ff6f3ff7ef19e2c13d5678163209b0` |
+| 6 | `006_business_write_safety.sql` | `dbe0d11d5df5c3241c985afd2db37ce37cea24231397e62e5e8711ea84403cad` |
+| 7 | `007_active_template_kind.sql` | `b03215e308d94c374cc8e2d63da47599f85cf3338f788baf3add26a47ec1ae44` |
+| 8 | `008_nota_authority.sql` | `a75edec750744aa68b28be3e53b50ea001b7be0c8a50c8ea413a309adeef2cfc` |
+| 9 | `009_offline_operations.sql` | `e4a35e360a8e726dc0cbfa202b9f445b684a39172ce42c8944c3a975dce892c1` |
+| 10 | `010_stock_checks.sql` | `6aaa1aa921b939aad93bc1730dd46a3c1f3a0f4fa55484c5f55565b3317af105` |
+
+`git diff` membuktikan file migrasi 001–009 identik antara commit lama
+`4482af7` dan artifact v2 `2c569db`; migrasi 010 adalah penambahan yang harus
+diterapkan bersama binary v2.
+
 ## Penerimaan yang belum diverifikasi
 
 | Gate | Status | Receipt yang wajib dicatat |

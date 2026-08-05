@@ -3,9 +3,13 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 const workflowPath = '.github/workflows/pilot-release.yml';
-const pilotVersion = '0.2.0';
+const pilotVersion = '0.2.1';
 const androidSignerSha256 =
   '57e0731ce3db068e6581980c53610764af05c612184ff50e18a9f4912ca59ba5';
+
+async function optionalRepositoryText(path: string): Promise<string> {
+  return readFile(path, 'utf8').catch(() => '');
+}
 
 describe('GitHub pilot release workflow', () => {
   it('gates both platform builds and manual prerelease publication', async () => {
@@ -93,5 +97,96 @@ describe('GitHub pilot release workflow', () => {
     expect(workflow).not.toMatch(/rejectUnauthorized\s*:\s*false/i);
     expect(workflow).not.toMatch(/NODE_TLS_REJECT_UNAUTHORIZED/i);
     expect(workflow).toContain('BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY');
+  });
+
+  it('keeps the v0.2.1 Core v2 cutover release contract aligned', async () => {
+    const [
+      workflow,
+      packageManifest,
+      packageLock,
+      androidBuild,
+      settingsPage,
+      releaseCopy,
+      releaseNotes,
+      evidence,
+      runbook,
+    ] = await Promise.all([
+      readFile(workflowPath, 'utf8'),
+      readFile('package.json', 'utf8'),
+      readFile('package-lock.json', 'utf8'),
+      readFile('android/app/build.gradle', 'utf8'),
+      readFile('src/renderer/pages/SettingsPage.tsx', 'utf8'),
+      readFile('scripts/copy-android-release.mjs', 'utf8'),
+      optionalRepositoryText(`docs/releases/pilot-${pilotVersion}.md`),
+      optionalRepositoryText(`docs/releases/pilot-${pilotVersion}-evidence.md`),
+      readFile('docs/ch-core-v0.2-maintenance-rollback.md', 'utf8'),
+    ]);
+
+    expect(JSON.parse(packageManifest)).toMatchObject({ version: pilotVersion });
+    expect(JSON.parse(packageLock)).toMatchObject({
+      version: pilotVersion,
+      packages: { '': { version: pilotVersion } },
+    });
+    expect(androidBuild).toContain('applicationId "com.tokoch.chucompanion"');
+    expect(androidBuild).toContain(`versionName "${pilotVersion}"`);
+    expect(androidBuild).toContain('versionCode 8');
+    expect(settingsPage).toContain(`CH Ultimate ${pilotVersion}`);
+    expect(releaseCopy).toContain(
+      `CHU-Companion-Mobile-${pilotVersion}-release.apk`,
+    );
+
+    for (const artifact of [
+      `CH-Ultimate-${pilotVersion}-Setup.exe`,
+      `CHU-Companion-Mobile-${pilotVersion}-release.apk`,
+      `pilot-v${pilotVersion}`,
+      `CH Ultimate pilot v${pilotVersion}`,
+      `docs/releases/pilot-${pilotVersion}.md`,
+      androidSignerSha256,
+    ]) {
+      expect(workflow).toContain(artifact);
+    }
+    expect(workflow).not.toContain('pilot-v0.2.0');
+    expect(workflow).not.toContain('CH-Ultimate-0.2.0-Setup.exe');
+    expect(workflow).not.toContain('CHU-Companion-Mobile-0.2.0-release.apk');
+    expect(releaseCopy).not.toContain('CHU-Companion-Mobile-0.2.0-release.apk');
+
+    for (const releaseFact of [
+      'status sinkronisasi',
+      'pesan kompatibilitas',
+      'diagnostik teknis',
+      'Nama Barang',
+      'Tombol Kembali Android',
+      'logo sidebar Windows',
+      'apiSchemaVersion: 2',
+      'stockChecks: []',
+      'v0.1.5',
+      'gagal tertutup',
+      'copied-data',
+    ]) {
+      expect(releaseNotes.toLowerCase()).toContain(releaseFact.toLowerCase());
+    }
+    expect(releaseNotes).toMatch(/terbitkan.+0\.2\.1.+sebelum.+CH Core v2/is);
+    expect(releaseNotes).toMatch(/v0\.1\.5.+hanya.+sebelum.+Core v2/is);
+
+    expect(evidence).toMatch(/Automated.+PASS/is);
+    for (const unverifiedGate of [
+      'Windows terpasang',
+      'Android fisik',
+      'deploy CH Core',
+      'cetak',
+    ]) {
+      expect(evidence).toMatch(new RegExp(`${unverifiedGate}.+BELUM DIVERIFIKASI`, 'i'));
+    }
+    for (const pilotDay of ['Hari 1', 'Hari 2', 'Hari 3', 'Hari 4']) {
+      expect(evidence).toContain(pilotDay);
+    }
+    expect(evidence).toMatch(/bukan.+prioritas rekomendasi/is);
+
+    const supplement = runbook.slice(
+      runbook.indexOf('## Suplemen v0.2.1'),
+    );
+    expect(supplement).toContain('apiSchemaVersion: 2');
+    expect(supplement).toContain('stockChecks');
+    expect(supplement).toMatch(/tidak mencakup.+clear.+import workbook/is);
   });
 });

@@ -183,3 +183,25 @@ atas data v2. Incident owner memutuskan artifact forward-fix dan acceptance baru
 
 Status akhir maintenance harus `PASS`, `BLOCKED`, atau `ROLLED BACK` per gate.
 Satu baris kosong, `BELUM DIISI`, atau evidence tanpa checksum berarti belum lulus.
+
+## Suplemen v0.2.1: cutover klien dan CH Core v2
+
+Suplemen ini menambahkan urutan cutover v0.2.1, tanpa mengubah gate backup,
+restore, quiesce, atau rollback di atas. Terbitkan dan verifikasi artefak
+v0.2.1 terlebih dahulu; maintenance CH Core v2 tetap baru boleh dimulai setelah
+seluruh receipt sebelum maintenance terisi dan lulus.
+
+CH Core v2 wajib menjawab bootstrap terautentikasi dengan `apiSchemaVersion: 2`
+dan field `stockChecks`, termasuk array kosong bila tidak ada pemeriksaan.
+v0.2.1 harus gagal tertutup terhadap Core v1 atau bootstrap v2 malformed.
+v0.1.5 hanya boleh dipakai sebelum Core v2; setelah Core v2 live, klien lama
+harus gagal tertutup tanpa upaya write.
+
+Suplemen ini tidak mencakup clear data atau import workbook. Clear/import
+workbook tetap fase terpisah yang memerlukan persetujuan pemilik, receipt,
+allowlist, backup, dan restore yang sudah diwajibkan oleh runbook ini.
+
+Setelah health dan bootstrap v2 terukur, gunakan klien v0.2.1 terverifikasi
+untuk uji baca/tulis terbatas yang sudah didefinisikan. Status rollback penuh
+tetap hanya tersedia sebelum v2 write atau replay outbox; setelahnya quiesce
+dan forward-fix sebagaimana aturan rollback yang tidak dapat ditawar di atas.

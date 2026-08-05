@@ -44,6 +44,10 @@ describe('CH Core v0.2.2 NAS source preparation', () => {
       '55f193d8b483223c322e69312b86a12f90be6f7c42d1da39517ccdd366ca4798',
     );
     expect(script).toContain(
+      'f34cf3040757612346e1780a144a0f01ba50a89cdf34b153ace48437ae424b55',
+    );
+    expect(script).toContain('compare-scratch.sh');
+    expect(script).toContain(
       '/volume1/homes/kentmaoza/CH_Ultimate_Pilot/dc76d3c',
     );
     expect(script).toContain(
@@ -62,6 +66,7 @@ describe('CH Core v0.2.2 NAS source preparation', () => {
     expect(script).toContain('environment=not_created');
     expect(script).toContain('deployment=not_started');
     expect(script).toContain('database=not_accessed');
+    expect(script).toContain('ops_supplement=compare-scratch.sh');
     expect(script).toContain('chmod 0600');
     expect(script).not.toContain('server/.env"');
     expect(script).not.toContain('cp -p');

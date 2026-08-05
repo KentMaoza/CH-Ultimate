@@ -191,7 +191,8 @@ describe('GitHub pilot release workflow', () => {
       '/Volumes/home/CH_Ultimate_Pilot/dc76d3c',
       '55f193d8b483223c322e69312b86a12f90be6f7c42d1da39517ccdd366ca4798',
       'de55aec640e316fe9dd87c4b9e226cfa6a0d0db3f8b6a94f004b2ef5910d7a6b',
-      '4502396c8b83a5cfbdca81eb12a3027e38154fd5e96fbeddca52c6ff6f7c9b39',
+      '028d6cf8c1f6c6d4bec2bcfe35e3291234688500183e4a9e574fb92751e117c9',
+      'f34cf3040757612346e1780a144a0f01ba50a89cdf34b153ace48437ae424b55',
       'DO-NOT-RUN',
     ]) {
       expect(evidence).toContain(preparedReceipt);

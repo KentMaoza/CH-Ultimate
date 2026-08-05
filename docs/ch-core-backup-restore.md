@@ -11,6 +11,12 @@ target. A connected disk is not a backup until the job and restore are proven.
 Never back up the private CA signing key to the NAS. It stays off-NAS in its
 own encrypted recovery custody.
 
+For the current v0.2.2 controlled internal-use execution, the owner requires
+all backup and business data to remain on the NAS. A same-NAS logical bundle
+and scratch restore are therefore an accepted migration-recovery risk: they
+can prove logical restore before cutover, but they do not protect against loss
+of the NAS or volume and do not satisfy the independent-backup production gate.
+
 ## One runnable operations context
 
 Database operations run only in the dedicated Docker `ops` target through the
@@ -135,6 +141,18 @@ docker compose --profile ops run --rm ch-core-ops \
   /opt/ch-core-ops/restore-scratch.sh \
   /backup/chu-YYYYMMDD-HHMM.bundle
 ```
+
+After the import succeeds, compare canonical source and scratch dumps inside
+the bounded ops container. The command emits only database names, one SHA-256,
+and `MATCH=YES`; it does not emit business rows:
+
+```sh
+docker compose --profile ops run --rm ch-core-ops \
+  /opt/ch-core-ops/compare-scratch.sh
+```
+
+Any hash or byte mismatch blocks deployment. Preserve the scratch schema and
+receipts for diagnosis; do not retry into it or overwrite production.
 
 The restore command accepts no schema-name argument. The exact scratch name
 comes only from `CH_CORE_RESTORE_DATABASE_URL`, and production `/chu` is

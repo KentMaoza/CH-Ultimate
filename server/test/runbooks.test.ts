@@ -118,6 +118,8 @@ describe('CH Core guarded deployment documentation', () => {
     expect(restore).toContain('/opt/ch-core-ops/dump-database.sh');
     expect(restore).toContain('/opt/ch-core-ops/verify-dump.sh');
     expect(restore).toContain('/opt/ch-core-ops/restore-scratch.sh');
+    expect(restore).toContain('/opt/ch-core-ops/compare-scratch.sh');
+    expect(restore).toMatch(/same-NAS.+accepted.+risk/is);
     expect(restore).toContain('/backup/');
     expect(restore).not.toMatch(/^server\/scripts\//m);
     expect(restore).toMatch(/does not run by default|tidak berjalan.*default/i);

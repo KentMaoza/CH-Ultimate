@@ -119,8 +119,9 @@ new runtime configuration validates before any container is started.
    image assets and retained import evidence. Do not include the private CA
    signing key.
 5. Create a new empty scratch schema with scratch-only credentials, restore the
-   dump, and compare identity, catalogue, Nota, stock, omzet, audit, cursor, and
-   image-reference counts/invariants.
+   dump, run `/opt/ch-core-ops/compare-scratch.sh`, and require an identical
+   canonical-dump SHA-256 plus matching identity, catalogue, Nota, stock, omzet,
+   audit, cursor, and image-reference counts/invariants.
 6. Preserve the verified bundle and scratch-restore receipt on the NAS. Cleanup
    of scratch data is a separate reviewed action after cutover evidence is
    retained.

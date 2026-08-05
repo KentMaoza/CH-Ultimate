@@ -82,6 +82,7 @@ async function createScriptHarness(
     'dump-database.sh',
     'verify-dump.sh',
     'restore-scratch.sh',
+    'compare-scratch.sh',
   ]) {
     const source = await text(`scripts/${script}`);
     const harnessSource = source.replaceAll(
@@ -226,6 +227,7 @@ describe('local CH Core deployment artifacts', () => {
       'dump-database.sh',
       'verify-dump.sh',
       'restore-scratch.sh',
+      'compare-scratch.sh',
       'health-check.sh',
     ]) {
       await access(path.join(scriptsRoot, script), constants.X_OK);
@@ -455,6 +457,57 @@ cat >/dev/null
       stderr: expect.stringMatching(/partial.+NEW scratch/is),
     });
     await access(importSentinel);
+  });
+
+  it('compares production and restored scratch canonically without printing business data', async () => {
+    const directory = await realpath(
+      await mkdtemp(path.join(os.tmpdir(), 'ch-core-compare-scratch-')),
+    );
+    const harnessRoot = await createScriptHarness(directory, directory);
+    const fakeDump = await createExecutable(
+      directory,
+      'mariadb-dump',
+      `#!/bin/sh
+defaults=
+for argument in "$@"; do
+  case "$argument" in
+    --defaults-extra-file=*) defaults=\${argument#*=} ;;
+  esac
+done
+[ -n "$defaults" ]
+if grep -q 'backup_user' "$defaults"; then
+  printf '%s\\n' "$FAKE_SOURCE_CANONICAL"
+else
+  printf '%s\\n' "$FAKE_SCRATCH_CANONICAL"
+fi
+`,
+    );
+    const sentinel = 'CREATE TABLE private_business_row (id INT);';
+    const environment = {
+      ...backupEnvironment(),
+      CH_CORE_RESTORE_DATABASE_URL:
+        'mariadb://restore_user:password@127.0.0.1:3306/chu_restore_compare',
+      CH_CORE_MARIADB_DUMP_BIN: fakeDump,
+      FAKE_SOURCE_CANONICAL: sentinel,
+      FAKE_SCRATCH_CANONICAL: sentinel,
+    };
+
+    const matched = await run(
+      path.join(harnessRoot, 'compare-scratch.sh'),
+      [],
+      { env: environment },
+    );
+    expect(matched.stdout).toContain('MATCH=YES');
+    expect(matched.stdout).toMatch(/CANONICAL_SHA256=[0-9a-f]{64}/);
+    expect(matched.stdout).not.toContain(sentinel);
+
+    await expect(
+      run(path.join(harnessRoot, 'compare-scratch.sh'), [], {
+        env: { ...environment, FAKE_SCRATCH_CANONICAL: 'different' },
+      }),
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining('does not match'),
+    });
   });
 
   it('contains no replacement move or broad recursive cleanup in bundle scripts', async () => {

@@ -38,13 +38,17 @@ belum pernah dieksekusi sebagai deployment.
 | --- | ---: | --- | --- |
 | `ch-ultimate-dc76d3c0529233974f0d1ec18420a230d0c768a5.tar.gz` | 11171255 | `55f193d8b483223c322e69312b86a12f90be6f7c42d1da39517ccdd366ca4798` | `git archive` dari commit rilis; memuat `server/compose.yaml`, migrasi `010_stock_checks.sql`, helper v0.2.2, dan lockfile |
 | `ch-core-v022-preflight.sh` | 8710 | `de55aec640e316fe9dd87c4b9e226cfa6a0d0db3f8b6a94f004b2ef5910d7a6b` | Standalone helper aktif; checksum migrasi 006 dikoreksi dan seluruh manifest dicocokkan ke byte SQL aktual |
-| `ch-core-v022-prepare.sh` | 4862 | `4502396c8b83a5cfbdca81eb12a3027e38154fd5e96fbeddca52c6ff6f7c9b39` | Menyiapkan exact source dan memverifikasi migrasi 001-010; tidak membuat environment, mengakses database, atau menjalankan deployment |
+| `ch-core-v022-prepare.sh` | 5942 | `028d6cf8c1f6c6d4bec2bcfe35e3291234688500183e4a9e574fb92751e117c9` | Menyiapkan exact source, memverifikasi migrasi 001-010, dan memasang hanya supplement operasi yang hash-nya dikunci; tidak membuat environment, mengakses database, atau menjalankan deployment |
+| `compare-scratch.sh` | 2075 | `f34cf3040757612346e1780a144a0f01ba50a89cdf34b153ace48437ae424b55` | Supplement operasi untuk membandingkan dump canonical produksi dan scratch; hanya mengeluarkan hash dan hasil `MATCH`, tanpa baris bisnis |
 | `SKU_Gudang20260804080716145.xlsx` | 341193 | `f1f4675327fac107ef9f78c114b8afe86389d5543b204540ed45e74f9b15e49c` | Hash cocok dengan workbook yang disetujui |
 
 Helper preflight yang tertanam di archive rilis memiliki checksum migrasi 006
 yang salah satu karakter dan tidak boleh dijalankan. Salinan provenance-nya
 dipindahkan menjadi `ch-core-v022-preflight-release.DO-NOT-RUN`. Helper
 standalone aktif di atas adalah satu-satunya preflight yang diizinkan.
+Helper prepare sebelumnya dipertahankan hanya sebagai
+`ch-core-v022-prepare-without-compare.DO-NOT-RUN`; helper aktif adalah versi
+yang tercatat pada tabel di atas.
 
 Probe pramaintenance pada 2026-08-05 WITA lulus melalui CA: `/health/live`
 HTTP 200 `{"status":"ok"}` dan `/health/ready` HTTP 200

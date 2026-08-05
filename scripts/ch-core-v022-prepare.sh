@@ -17,6 +17,8 @@ archive_root="ch-ultimate-$release_commit"
 staging_root='/volume1/homes/kentmaoza/CH_Ultimate_Pilot/dc76d3c'
 source_archive="$staging_root/ch-ultimate-$release_commit.tar.gz"
 expected_archive_sha256='55f193d8b483223c322e69312b86a12f90be6f7c42d1da39517ccdd366ca4798'
+ops_supplement="$staging_root/compare-scratch.sh"
+expected_ops_supplement_sha256='f34cf3040757612346e1780a144a0f01ba50a89cdf34b153ace48437ae424b55'
 deployment_parent='/volume1/docker'
 target_root='/volume1/docker/ch-ultimate-dc76d3c0529233974f0d1ec18420a230d0c768a5'
 receipt="$staging_root/prepare-v022-receipt.txt"
@@ -28,6 +30,8 @@ receipt_draft="$staging_root/.prepare-v022-receipt.txt.tmp"
   die 'The exact deployment parent is unavailable or unsafe.'
 [ -f "$source_archive" ] && [ ! -L "$source_archive" ] ||
   die 'The exact release archive is unavailable or unsafe.'
+[ -f "$ops_supplement" ] && [ ! -L "$ops_supplement" ] ||
+  die 'The exact operations supplement is unavailable or unsafe.'
 [ ! -e "$target_root" ] && [ ! -L "$target_root" ] ||
   die 'The exact target deployment directory already exists or is unsafe.'
 [ ! -e "$receipt" ] && [ ! -L "$receipt" ] ||
@@ -38,6 +42,9 @@ receipt_draft="$staging_root/.prepare-v022-receipt.txt.tmp"
 actual_archive_sha256=$(sha256sum "$source_archive" | awk 'NR == 1 {print $1}')
 [ "$actual_archive_sha256" = "$expected_archive_sha256" ] ||
   die 'The staged release archive checksum does not match.'
+actual_ops_supplement_sha256=$(sha256sum "$ops_supplement" | awk 'NR == 1 {print $1}')
+[ "$actual_ops_supplement_sha256" = "$expected_ops_supplement_sha256" ] ||
+  die 'The staged operations supplement checksum does not match.'
 
 tar -tzf "$source_archive" |
   awk -v prefix="$archive_root/" '
@@ -58,6 +65,14 @@ for required in \
   [ -f "$required" ] && [ ! -L "$required" ] ||
     die "Prepared source is missing a required file: $required"
 done
+
+ops_supplement_target="$target_root/server/scripts/compare-scratch.sh"
+[ ! -e "$ops_supplement_target" ] && [ ! -L "$ops_supplement_target" ] ||
+  die 'The operations supplement target already exists or is unsafe.'
+cp "$ops_supplement" "$ops_supplement_target"
+chmod 0555 "$ops_supplement_target"
+[ "$(sha256sum "$ops_supplement_target" | awk 'NR == 1 {print $1}')" = "$expected_ops_supplement_sha256" ] ||
+  die 'The prepared operations supplement checksum does not match.'
 
 expected_migrations='1|001_initial.sql|e22cfbbf1af7b72e0091c9bf8a399ac2570fc6f971723330d085d0954cf68b69
 2|002_nota_line_page_ownership.sql|39fd3afbe56aef8fa4b5c317753622998f73877925f1eed24996686721f17923
@@ -93,6 +108,8 @@ printf '%s\n' "$expected_migrations" |
   printf 'SOURCE_ARCHIVE=%s\n' "$source_archive"
   printf 'SOURCE_SHA256=%s\n' "$actual_archive_sha256"
   printf 'TARGET_ROOT=%s\n' "$target_root"
+  printf 'OPS_SUPPLEMENT=compare-scratch.sh|%s|OPERATIONS_ONLY\n' \
+    "$actual_ops_supplement_sha256"
   printf '%s\n' "$expected_migrations" |
     while IFS='|' read -r version filename checksum; do
       printf 'MIGRATION=%s|%s|%s\n' "$version" "$filename" "$checksum"

@@ -173,9 +173,9 @@ describe('CH Core guarded deployment documentation', () => {
 
     expect(readme).toContain('CH Core acceptance status');
     for (const requiredEvidence of [
-      '92 files / 694 tests',
+      '93 files / 698 tests',
       '12 files / 118 tests',
-      '50 files / 338 tests',
+      '51 files / 347 tests',
       'Electron E2E 11/11',
       'Squirrel installer',
       'pilot-release.yml',

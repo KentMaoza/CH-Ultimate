@@ -57,7 +57,7 @@ langsung yang ditinjau mengubah statusnya.
 ### Pilot v0.2.1 — previous repository release contract
 
 Bagian ini mempertahankan kontrak dan receipt rilis v0.2.1 sebagai histori.
-v0.2.2 di bawah adalah kontrak aktif; bagian ini bukan izin menjalankan
+Bagian ini bukan izin menjalankan
 maintenance, clear data, migrasi, impor, pairing, atau publikasi.
 
 | Gate | Status | Bukti repository atau pekerjaan yang masih wajib |
@@ -78,7 +78,7 @@ diverifikasi. Jangan menyebutnya sudah terpasang, diterima secara fisik, atau
 siap produksi sampai setiap gate lingkungan memiliki bukti langsung dan
 statusnya diubah melalui receipt yang ditinjau.
 
-### Pilot v0.2.2 — current repository release contract
+### Pilot v0.2.2 — previous repository release contract
 
 v0.2.2 menggantikan v0.2.1 untuk cutover aktif karena audit runtime menemukan
 jsPDF lama pada jalur cetak/PDF. Klien lama telah dihapus oleh pemilik sebelum
@@ -100,16 +100,38 @@ outbox sempat diukur; status tersebut dicatat jujur, bukan diubah menjadi nol.
 | Cetak fisik | BLOCKED | Dialog sistem, PDF, XLSX, dan printer belum diterima pada Windows target |
 | Pilot copied-data empat hari | REMOVED FROM CURRENT EXECUTION | Pemilik menghapus pilot empat hari dari scope eksekusi aktif |
 
-Jangan deploy artifact Core dari commit v0.2.1. Source Core yang dipasang harus
-dibangun ulang dari commit rilis v0.2.2 yang sama dengan kedua klien.
+Jangan deploy artifact Core dari commit v0.2.1 atau tag v0.2.2. Tag v0.2.2
+mendahului perbaikan rekonsiliasi katalog dan telah digantikan oleh v0.2.3.
+
+### Pilot v0.2.3 — current repository release contract
+
+v0.2.3 mempertahankan klien v0.2.2 dan menambahkan rekonsiliasi katalog aman
+ke source CH Core. Release ini harus terbit dari satu commit yang sama untuk
+Windows, Android, dan Core sebelum maintenance NAS dimulai.
+
+| Gate | Status | Bukti repository atau pekerjaan yang masih wajib |
+| --- | --- | --- |
+| Metadata klien v0.2.3 | PASS | `package.json`, lockfile, Settings, Android `versionName 0.2.3`/`versionCode 10`, copy script, dan workflow memakai versi yang sama |
+| Runtime dependency gate | PASS DENGAN RESIDUAL | Audit produksi `0 critical`, `0 high`; 2 moderate ExcelJS/uuid tidak memanggil jalur UUID v3/v5/v6 dengan supplied buffer |
+| Rekonsiliasi katalog aman | PASS | SKU cocok mempertahankan ID/riwayat; konflik, identifier tambahan, dan SKU aktif yang tidak cocok memblokir sebelum write; tidak ada penghapusan katalog otomatis |
+| Kontrak release | READY | Workflow mengunci `pilot-v0.2.3`, kedua nama payload, `docs/releases/pilot-0.2.3.md`, empat secret Android, dan signer permanen |
+| Artifact signed v0.2.3 | READY | CI PR membangun installer Windows dan debug verification APK; release payload bertanda tangan, hash, metadata paket, dan fresh-download masih harus diterbitkan dan diverifikasi |
+| Publikasi GitHub | BLOCKED | Jalankan publisher manual hanya dari `main` setelah seluruh gate source/Windows/Android lulus; catat commit, workflow run, tiga aset, dan checksum |
+| Core source staging | BLOCKED | Setelah publikasi, buat archive exact commit rilis v0.2.3 dan helper prepare/preflight baru; staging v0.2.2 tidak boleh dideploy |
+| Disposisi klien lama | QUIESCED / DATA LOKAL TIDAK TERUKUR | Android uninstall diverifikasi langsung; Windows uninstall dikonfirmasi pemilik; keduanya `UNAVAILABLE_AFTER_OWNER_UNINSTALL`, bukan outbox nol |
+| Windows terpasang | BLOCKED | Pemilik memasang manual setelah Core v2 dan import terverifikasi; keberadaan credential owner di AppData masih harus dikonfirmasi |
+| Android fisik | BLOCKED | Pemilik memasang manual; version/signing/pairing/Back/barcode belum diterima |
+| Deploy CH Core v2 | BLOCKED | Backup NAS-only, scratch restore, rotasi credential, deployment exact commit rilis, dan bootstrap v2 belum lulus |
+| Cetak fisik | BLOCKED | Dialog sistem, PDF, XLSX, dan printer belum diterima pada Windows target |
+| Pilot copied-data empat hari | REMOVED FROM CURRENT EXECUTION | Pemilik menghapus pilot empat hari dari scope eksekusi aktif |
 
 ## Local implementation and regression
 
 | Requirement | Status | Current evidence |
 | --- | --- | --- |
-| Desktop application and gateway | PASS | v0.2.2 Node 24 verification passes 92 files / 694 tests; Electron package and E2E 11/11 pass |
-| Mobile application | PASS | v0.2.2 `npm run test:mobile`: 12 files / 118 tests; production build and Capacitor sync pass |
-| CH Core unit and artifact tests | PASS | `npm run server:test`: 50 files / 338 tests plus one intentional acceptance skip; typecheck passes |
+| Desktop application and gateway | PASS | v0.2.3 Node 24 verification passes 93 files / 698 tests; Electron package and E2E 11/11 pass |
+| Mobile application | PASS | v0.2.3 `npm run test:mobile`: 12 files / 118 tests; production build and Capacitor sync pass |
+| CH Core unit and artifact tests | PASS | `npm run server:test`: 51 files / 347 tests plus one intentional acceptance skip; typecheck passes |
 | Approved workbook parser | PASS | `SKU_Gudang20260804080716145.xlsx` at SHA-256 `f1f4675327fac107ef9f78c114b8afe86389d5543b204540ed45e74f9b15e49c`: 3,144 SKU / 6,288 identifiers / 2,786 refs / 358 missing / 3 Modal selections / Rp276,285,615 / 3,988 PCS acceptance: 1/1 |
 | Desktop mock isolation | PASS | Packaged startup fails closed; explicit unpackaged test marker only; Electron E2E 11/11 |
 | Mobile production bundle | PASS | 608-module Vite build and Capacitor Android sync |

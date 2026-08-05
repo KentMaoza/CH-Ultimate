@@ -1,9 +1,9 @@
-# CH Ultimate v0.2.2 Real-Use Readiness Plan
+# CH Ultimate v0.2.3 Real-Use Readiness Plan
 
 > **Execution:** Follow the Superpowers executing-plans workflow. Perform one
 > gate at a time, retain sanitized evidence, and stop on the first mismatch.
 
-**Goal:** Publish CH Ultimate v0.2.2 Windows and Android clients
+**Goal:** Publish CH Ultimate v0.2.3 Windows and Android clients
 usable against an authoritative CH Core v2 on the business LAN, load the
 approved catalogue, and hand off verified installers for owner-managed manual
 installation and physical workflow checks.
@@ -14,10 +14,10 @@ is the only write authority, reached through CA-validated LAN HTTPS at
 from client devices. Preserve `OperationsGateway`, server-generated revisions,
 idempotency, audit records, and the offline-outbox boundary.
 
-**Superseded release:** GitHub prerelease `pilot-v0.2.1`, client/server source
-commit `2c569db25ada195e00ef220e99d6b05909a46768`. It must not be deployed because
-the runtime audit found a critical jsPDF dependency. The live NAS still runs
-Core v1; publish and verify v0.2.2 before any Core deployment.
+**Superseded releases:** `pilot-v0.2.1` contains the retired jsPDF dependency.
+`pilot-v0.2.2` fixed that dependency but its tag predates safe catalogue
+reconciliation. The live NAS still runs Core v1; publish and verify v0.2.3
+before any Core deployment.
 
 ## Owner decisions and non-negotiable boundaries
 
@@ -36,7 +36,7 @@ Core v1; publish and verify v0.2.2 before any Core deployment.
 - Full database rollback is available only before the first Core v2 write or
   outbox replay. After that boundary, quiesce and forward-fix.
 - No four-day pilot is part of this execution; the owner explicitly removed it.
-- The owner installs both clients manually from the private GitHub release. The
+- The owner installs both clients manually from the GitHub release. The
   operator does not install, uninstall, or clear either client remotely.
 
 ## Definition of done
@@ -47,7 +47,7 @@ The release is ready for controlled real use only when all of these are true:
    present `stockChecks` array, and authoritative non-empty catalogue data.
 2. A fresh NAS logical dump and private-file manifest pass checksums, and a
    clean scratch restore on the NAS reproduces all required counts/invariants.
-3. Windows and Android both run v0.2.2, remain paired, show `online`, and drain
+3. Windows and Android both run v0.2.3, remain paired, show `online`, and drain
    their outboxes without duplicate writes.
 4. The approved workbook is imported with 3,144 SKU and 6,288 identifiers;
    import counts, selected prices, stock baseline, and image jobs match the
@@ -66,11 +66,11 @@ disaster-resilient production readiness.
 
 **Evidence files:**
 
-- Update: `docs/releases/pilot-0.2.2-evidence.md`
+- Create/update: `docs/releases/pilot-0.2.3-evidence.md`
 - Update: `docs/ch-core-acceptance-status.md`
 
 1. Publish, re-download, and verify the Windows installer, Android APK, and
-   `SHA256SUMS.txt` from `pilot-v0.2.2`; verify exact hashes, package/version
+   `SHA256SUMS.txt` from `pilot-v0.2.3`; verify exact hashes, package/version
    metadata, and the pinned Android signing certificate.
 2. Verify the staged Core v2 source archive is the reviewed commit and hash,
    includes migration `010_stock_checks.sql`, and leaves migrations 001-009
@@ -87,14 +87,14 @@ the exact old/new artifacts are frozen, and rollback is still available.
 
 ## Task 2: Rotate exposed credentials through an owner handoff
 
-1. The owner creates a separate random MariaDB application account for v0.2.2
+1. The owner creates a separate random MariaDB application account for v0.2.3
    using DSM's approved administration path and writes it only to the new
    untracked Compose environment. Keep the old account and live environment
    unchanged until cutover succeeds; retire the old account afterward.
 2. Confirm an owner already exists and determine whether the encrypted Windows
    owner credential survived package uninstall. Do not assume uninstall erased
    or preserved application data. If the credential is unavailable, stop:
-   v0.2.2 cannot accept a manually entered recovery credential and a new
+   v0.2.3 cannot accept a manually entered recovery credential and a new
    bootstrap cannot replace an existing owner.
 3. Keep the backup account read-only and the restore account scratch-only. Do
    not reuse the application account for either job.
@@ -190,14 +190,14 @@ write/replay, preserve data and use a test-first forward-fix.
 
 ## Task 7: Hand off manual installation and pairing
 
-1. Give the owner the private GitHub release URL and exact SHA-256 values for
+1. Give the owner the GitHub release URL and exact SHA-256 values for
    the Windows installer, Android APK, and checksum manifest.
 2. **Windows owner action:** verify the installer checksum, perform a clean
-   package installation, and confirm product version 0.2.2. Test whether the
+   package installation, and confirm product version 0.2.3. Test whether the
    encrypted owner identity retained in Windows application data reconnects;
    package uninstall alone is not evidence that this state was erased.
 3. **Android owner action:** verify package ID `com.tokoch.chucompanion`,
-   versionName 0.2.2, versionCode 9, and the permanent signer; perform a clean
+   versionName 0.2.3, versionCode 10, and the permanent signer; perform a clean
    installation because the prior package was already removed by the owner.
 4. If the Windows owner identity reconnects, use it to approve the named
    Samsung device. If it does not reconnect, stop and use the separately
@@ -209,7 +209,7 @@ write/replay, preserve data and use a test-first forward-fix.
    authorize the operator to install either client.
 
 The current Windows installer is suitable for a controlled internal pilot when
-downloaded from the private release and checksum-verified, but it is not
+downloaded from the GitHub release and checksum-verified, but it is not
 Authenticode-signed. Obtain Windows code signing before broad unattended or
 multi-user distribution; do not hide or bypass SmartScreen warnings.
 
@@ -243,10 +243,10 @@ High issue stops the rollout and is fixed test-first in a patch release.
 
 ## Task 9: Production handoff or stop
 
-1. Publish `pilot-v0.2.2` through the tested GitHub workflow and retain its
+1. Publish `pilot-v0.2.3` through the tested GitHub workflow and retain its
    exact checksums. There is no time-based pilot gate.
-2. Keep v0.2.1 as superseded history; do not replace its assets or deploy its
-   Core source bundle.
+2. Keep v0.2.1 and v0.2.2 as superseded history; do not replace their assets or
+   deploy their Core source bundles.
 3. Enroll additional Windows/Android devices only after physical acceptance passes and
    each device has a named owner approval and signer/version receipt.
 4. Preserve the NAS backup, migration receipt, physical acceptance receipt, and

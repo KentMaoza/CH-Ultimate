@@ -1,9 +1,9 @@
-# CH Ultimate v0.2.1 Real-Use Readiness Plan
+# CH Ultimate v0.2.2 Real-Use Readiness Plan
 
 > **Execution:** Follow the Superpowers executing-plans workflow. Perform one
 > gate at a time, retain sanitized evidence, and stop on the first mismatch.
 
-**Goal:** Make the published CH Ultimate v0.2.1 Windows and Android clients
+**Goal:** Publish CH Ultimate v0.2.2 Windows and Android clients
 usable against an authoritative CH Core v2 on the business LAN, load the
 approved catalogue, and hand off verified installers for owner-managed manual
 installation and physical workflow checks.
@@ -14,10 +14,10 @@ is the only write authority, reached through CA-validated LAN HTTPS at
 from client devices. Preserve `OperationsGateway`, server-generated revisions,
 idempotency, audit records, and the offline-outbox boundary.
 
-**Current release:** GitHub prerelease `pilot-v0.2.1`, client/server source
-commit `2c569db25ada195e00ef220e99d6b05909a46768`. The clients are published and
-automatically verified, but the live NAS still runs Core v1 and the clients have
-not passed physical acceptance.
+**Superseded release:** GitHub prerelease `pilot-v0.2.1`, client/server source
+commit `2c569db25ada195e00ef220e99d6b05909a46768`. It must not be deployed because
+the runtime audit found a critical jsPDF dependency. The live NAS still runs
+Core v1; publish and verify v0.2.2 before any Core deployment.
 
 ## Owner decisions and non-negotiable boundaries
 
@@ -26,8 +26,9 @@ not passed physical acceptance.
   bad migration or logical corruption, but not loss of the NAS/volume itself.
 - Do not expose CH Core through QuickConnect, Tailscale, WAN port forwarding,
   UPnP, guest Wi-Fi, or TLS bypass.
-- Do not uninstall either client or clear its application data before the
-  outbox has been measured and accepted.
+- The owner already uninstalled both clients. Android is directly verified;
+  Windows is owner-confirmed. Record both old outboxes as
+  `UNAVAILABLE_AFTER_OWNER_UNINSTALL`, never as zero.
 - Do not clear the live database. Import the workbook transactionally and
   reconcile existing rows; never overwrite established Nota/stock history.
 - Credentials are entered or rotated by the owner in DSM. They must never
@@ -46,7 +47,7 @@ The release is ready for controlled real use only when all of these are true:
    present `stockChecks` array, and authoritative non-empty catalogue data.
 2. A fresh NAS logical dump and private-file manifest pass checksums, and a
    clean scratch restore on the NAS reproduces all required counts/invariants.
-3. Windows and Android both run v0.2.1, remain paired, show `online`, and drain
+3. Windows and Android both run v0.2.2, remain paired, show `online`, and drain
    their outboxes without duplicate writes.
 4. The approved workbook is imported with 3,144 SKU and 6,288 identifiers;
    import counts, selected prices, stock baseline, and image jobs match the
@@ -65,21 +66,20 @@ disaster-resilient production readiness.
 
 **Evidence files:**
 
-- Update: `docs/releases/pilot-0.2.1-evidence.md`
+- Update: `docs/releases/pilot-0.2.2-evidence.md`
 - Update: `docs/ch-core-acceptance-status.md`
 
-1. Re-download the Windows installer, Android APK, and `SHA256SUMS.txt` from
-   `pilot-v0.2.1`; verify exact hashes, package/version metadata, and the pinned
-   Android signing certificate.
+1. Publish, re-download, and verify the Windows installer, Android APK, and
+   `SHA256SUMS.txt` from `pilot-v0.2.2`; verify exact hashes, package/version
+   metadata, and the pinned Android signing certificate.
 2. Verify the staged Core v2 source archive is the reviewed commit and hash,
    includes migration `010_stock_checks.sql`, and leaves migrations 001-009
    byte-identical to the live Core lineage.
 3. Reconfirm the current NAS project/image and retain its exact source archive,
    image identity, Compose configuration, and sanitized rollback receipt.
-4. On Windows and Android, record the installed version and exact outbox count.
-   If either outbox is nonzero, let the compatible Core v1 client drain it or
-   review each queued operation before proceeding; never discard it.
-5. Close CH Ultimate on all devices and prove no active client write remains.
+4. Record both clients as uninstalled and quiesced. Preserve the unavailable
+   outbox disposition; do not infer that deleted local queues were empty.
+5. Verify no installed CH Ultimate process/package remains before maintenance.
 6. Announce the maintenance window and record WITA start time and operator.
 
 **Gate:** Both outboxes have an accepted disposition, all clients are closed,
@@ -233,16 +233,15 @@ the second device's observed state:
    acknowledged transaction, identity, image, or outbox is lost.
 
 **Gate:** Every requested feature passes on physical hardware. Any Critical or
-High issue stops the pilot and is fixed test-first in a patch release.
+High issue stops the rollout and is fixed test-first in a patch release.
 
 ## Task 9: Production handoff or stop
 
-1. If no code changed and all backend plus owner-run physical checks pass,
-   promote `pilot-v0.2.1` to the approved stable/internal release status and
-   retain its exact checksums. There is no time-based pilot gate.
-2. If any code changed, publish v0.2.2 through the same tested GitHub workflow;
-   do not silently replace v0.2.1 assets.
-3. Enroll additional Windows/Android devices only after the pilot passes and
+1. Publish `pilot-v0.2.2` through the tested GitHub workflow and retain its
+   exact checksums. There is no time-based pilot gate.
+2. Keep v0.2.1 as superseded history; do not replace its assets or deploy its
+   Core source bundle.
+3. Enroll additional Windows/Android devices only after physical acceptance passes and
    each device has a named owner approval and signer/version receipt.
 4. Preserve the NAS backup, migration receipt, physical acceptance receipt, and
    final go/no-go decision. Never commit secrets or business-data dumps.

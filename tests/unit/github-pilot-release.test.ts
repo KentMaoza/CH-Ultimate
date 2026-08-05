@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 const workflowPath = '.github/workflows/pilot-release.yml';
-const pilotVersion = '0.2.1';
+const pilotVersion = '0.2.2';
 const androidSignerSha256 =
   '57e0731ce3db068e6581980c53610764af05c612184ff50e18a9f4912ca59ba5';
 
@@ -20,6 +20,7 @@ describe('GitHub pilot release workflow', () => {
     expect(workflow).not.toMatch(/^\s+push:/m);
     expect(workflow).toContain("node-version: '24'");
     expect(workflow).toContain("java-version: '21'");
+    expect(workflow).toContain('npm audit --omit=dev --audit-level=high');
     expect(workflow).not.toContain('actions/checkout@v4');
     expect(workflow).not.toContain('actions/setup-node@v4');
     expect(workflow).not.toContain('actions/setup-java@v4');
@@ -99,7 +100,7 @@ describe('GitHub pilot release workflow', () => {
     expect(workflow).toContain('BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY');
   });
 
-  it('keeps the v0.2.1 Core v2 cutover release contract aligned', async () => {
+  it('keeps the v0.2.2 Core v2 cutover release contract aligned', async () => {
     const [
       workflow,
       packageManifest,
@@ -129,7 +130,7 @@ describe('GitHub pilot release workflow', () => {
     });
     expect(androidBuild).toContain('applicationId "com.tokoch.chucompanion"');
     expect(androidBuild).toContain(`versionName "${pilotVersion}"`);
-    expect(androidBuild).toContain('versionCode 8');
+    expect(androidBuild).toContain('versionCode 9');
     expect(settingsPage).toContain(`CH Ultimate ${pilotVersion}`);
     expect(releaseCopy).toContain(
       `CHU-Companion-Mobile-${pilotVersion}-release.apk`,
@@ -145,10 +146,10 @@ describe('GitHub pilot release workflow', () => {
     ]) {
       expect(workflow).toContain(artifact);
     }
-    expect(workflow).not.toContain('pilot-v0.2.0');
-    expect(workflow).not.toContain('CH-Ultimate-0.2.0-Setup.exe');
-    expect(workflow).not.toContain('CHU-Companion-Mobile-0.2.0-release.apk');
-    expect(releaseCopy).not.toContain('CHU-Companion-Mobile-0.2.0-release.apk');
+    expect(workflow).not.toContain('pilot-v0.2.1');
+    expect(workflow).not.toContain('CH-Ultimate-0.2.1-Setup.exe');
+    expect(workflow).not.toContain('CHU-Companion-Mobile-0.2.1-release.apk');
+    expect(releaseCopy).not.toContain('CHU-Companion-Mobile-0.2.1-release.apk');
 
     for (const releaseFact of [
       'status sinkronisasi',
@@ -161,26 +162,26 @@ describe('GitHub pilot release workflow', () => {
       'stockChecks: []',
       'v0.1.5',
       'gagal tertutup',
-      'copied-data',
+      'jsPDF 4.2.1',
+      'tanpa critical/high',
     ]) {
       expect(releaseNotes.toLowerCase()).toContain(releaseFact.toLowerCase());
     }
-    expect(releaseNotes).toMatch(/terbitkan.+0\.2\.1.+sebelum.+CH Core v2/is);
+    expect(releaseNotes).toMatch(/terbitkan.+0\.2\.2.+sebelum.+CH Core v2/is);
     expect(releaseNotes).toMatch(/v0\.1\.5.+hanya.+sebelum.+Core v2/is);
 
-    expect(evidence).toMatch(/Automated.+PASS/is);
-    for (const publishedReceipt of [
-      '2c569db25ada195e00ef220e99d6b05909a46768',
-      '30986018170',
-      'CH-Ultimate-0.2.1-Setup.exe',
-      'd8835ff3f0a367ae277192c624c429c05e019041a42cab92c0d1b478c86913aa',
-      'CHU-Companion-Mobile-0.2.1-release.apk',
-      '91b7ff7b5be93b1f0c602c82662f8db802429dc72cbc098fd0283e1fe43b1be1',
+    expect(evidence).toMatch(/Kontrak dependensi.+PASS/is);
+    for (const preparedReceipt of [
+      'CH-Ultimate-0.2.2-Setup.exe',
+      'CHU-Companion-Mobile-0.2.2-release.apk',
       androidSignerSha256,
       'com.tokoch.chucompanion',
-      'versionCode `8`',
+      'versionCode `9`',
+      'UNAVAILABLE_AFTER_OWNER_UNINSTALL',
+      '0 critical',
+      '0 high',
     ]) {
-      expect(evidence).toContain(publishedReceipt);
+      expect(evidence).toContain(preparedReceipt);
     }
     expect(evidence).not.toMatch(
       /\|\s*[^|]+\s*\|\s*PASS\s*\|\s*`BELUM DIISI[^`]*`\s*\|/i,
@@ -193,13 +194,10 @@ describe('GitHub pilot release workflow', () => {
     ]) {
       expect(evidence).toMatch(new RegExp(`${unverifiedGate}.+BELUM DIVERIFIKASI`, 'i'));
     }
-    for (const pilotDay of ['Hari 1', 'Hari 2', 'Hari 3', 'Hari 4']) {
-      expect(evidence).toContain(pilotDay);
-    }
-    expect(evidence).toMatch(/bukan.+prioritas rekomendasi/is);
+    expect(evidence).toMatch(/pilot empat hari.+dihapus/is);
 
     const supplement = runbook.slice(
-      runbook.indexOf('## Suplemen v0.2.1'),
+      runbook.indexOf('## Suplemen v0.2.2'),
     );
     expect(supplement).toContain('apiSchemaVersion: 2');
     expect(supplement).toContain('stockChecks');

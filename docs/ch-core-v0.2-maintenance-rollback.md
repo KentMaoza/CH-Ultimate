@@ -205,3 +205,19 @@ Setelah health dan bootstrap v2 terukur, gunakan klien v0.2.1 terverifikasi
 untuk uji baca/tulis terbatas yang sudah didefinisikan. Status rollback penuh
 tetap hanya tersedia sebelum v2 write atau replay outbox; setelahnya quiesce
 dan forward-fix sebagaimana aturan rollback yang tidak dapat ditawar di atas.
+
+## Suplemen v0.2.2: release keamanan dan klien terhapus
+
+Suplemen ini menggantikan v0.2.1 untuk cutover aktif. Artifact Core dan klien
+wajib berasal dari commit rilis v0.2.2 yang sama. `apiSchemaVersion: 2`, field
+`stockChecks`, larangan clear/import implisit, serta batas rollback di atas
+tidak berubah.
+
+Suplemen ini tidak mencakup clear data atau import workbook tanpa gate
+terpisah, receipt, backup, dan persetujuan pemilik.
+
+Jika klien telah dihapus oleh pemilik sebelum outbox sempat diukur, jangan
+mencatat outbox sebagai nol. Gunakan state `UNINSTALLED` dengan
+`UNAVAILABLE_AFTER_OWNER_UNINSTALL` pada helper preflight. Keadaan ini berarti
+klien quiesced dan antrean lokal lama tidak tersedia; bukan bukti bahwa antrean
+lama kosong. Klien dipasang manual hanya setelah Core v2 dan impor terverifikasi.

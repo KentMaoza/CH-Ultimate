@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 const scriptPath = path.join(
   process.cwd(),
-  'scripts/ch-core-v021-preflight.sh',
+  'scripts/ch-core-v022-preflight.sh',
 );
 const execFile = promisify(execFileCallback);
 
@@ -40,21 +40,60 @@ const requiredTables = [
   'business_write_lock',
 ] as const;
 
-describe('CH Core v0.2.1 one-time preflight task', () => {
-  it('fails closed until the operator supplies zero-outbox quiesce attestations', async () => {
+describe('CH Core v0.2.2 one-time preflight task', () => {
+  it('fails closed until each client is either measured empty or explicitly uninstalled', async () => {
     const script = await readFile(scriptPath, 'utf8');
 
     expect(script).toContain("CH_CORE_PREFLIGHT_APPROVED:-");
     expect(script).toContain("CH_CORE_PREFLIGHT_QUIESCED:-");
     expect(script).toContain("CH_CORE_PREFLIGHT_WINDOWS_OUTBOX:-");
     expect(script).toContain("CH_CORE_PREFLIGHT_ANDROID_OUTBOX:-");
-    expect(script).toMatch(/WINDOWS_OUTBOX[^\n]+0/);
-    expect(script).toMatch(/ANDROID_OUTBOX[^\n]+0/);
+    expect(script).toContain("CH_CORE_PREFLIGHT_WINDOWS_STATE:-");
+    expect(script).toContain("CH_CORE_PREFLIGHT_ANDROID_STATE:-");
+    expect(script).toContain('UNAVAILABLE_AFTER_OWNER_UNINSTALL');
+    expect(script).toContain('INSTALLED');
+    expect(script).toContain('UNINSTALLED');
 
     await expect(
       execFile(scriptPath, [], { env: { PATH: process.env.PATH } }),
     ).rejects.toMatchObject({
       stderr: expect.stringContaining('CH_CORE_PREFLIGHT_APPROVED=YES'),
+    });
+
+    const baseEnv = {
+      PATH: process.env.PATH,
+      CH_CORE_PREFLIGHT_APPROVED: 'YES',
+      CH_CORE_PREFLIGHT_QUIESCED: 'YES',
+      CH_CORE_PREFLIGHT_ANDROID_STATE: 'UNINSTALLED',
+      CH_CORE_PREFLIGHT_ANDROID_OUTBOX: 'UNAVAILABLE_AFTER_OWNER_UNINSTALL',
+    };
+    await expect(
+      execFile(scriptPath, [], {
+        env: {
+          ...baseEnv,
+          CH_CORE_PREFLIGHT_WINDOWS_STATE: 'UNINSTALLED',
+          CH_CORE_PREFLIGHT_WINDOWS_OUTBOX: '0',
+        },
+      }),
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining(
+        'UNINSTALLED with outbox UNAVAILABLE_AFTER_OWNER_UNINSTALL',
+      ),
+    });
+
+    await expect(
+      execFile(scriptPath, [], {
+        env: {
+          ...baseEnv,
+          CH_CORE_PREFLIGHT_WINDOWS_STATE: 'UNINSTALLED',
+          CH_CORE_PREFLIGHT_WINDOWS_OUTBOX:
+            'UNAVAILABLE_AFTER_OWNER_UNINSTALL',
+        },
+      }),
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining(
+        'Exact live project directory is unavailable or unsafe',
+      ),
     });
   });
 
@@ -77,15 +116,17 @@ describe('CH Core v0.2.1 one-time preflight task', () => {
   it('creates a unique NAS bundle, verifies it, and publishes only a sanitized receipt', async () => {
     const script = await readFile(scriptPath, 'utf8');
 
-    expect(script).toContain('chu-v021-${stamp}.bundle');
+    expect(script).toContain('chu-v022-${stamp}.bundle');
     expect(script).toContain('/opt/ch-core-ops/dump-database.sh');
     expect(script).toContain('/opt/ch-core-ops/verify-dump.sh');
     expect(script).toContain('dump.sql.sha256');
     expect(script).toContain('TABLE_COUNT');
     expect(script).toContain('TABLE_ABSENT');
     expect(script).toContain('SCHEMA_MIGRATION');
-    expect(script).toContain('OUTBOX_WINDOWS=0');
-    expect(script).toContain('OUTBOX_ANDROID=0');
+    expect(script).toContain('OUTBOX_WINDOWS=%s');
+    expect(script).toContain('OUTBOX_ANDROID=%s');
+    expect(script).toContain('CLIENT_STATE_WINDOWS=%s');
+    expect(script).toContain('CLIENT_STATE_ANDROID=%s');
     expect(script).toContain('EXPECTED_PRE_V2_STOCK_CHECKS=ABSENT');
     expect(script).toContain(
       '9|009_offline_operations.sql|e4a35e360a8e726dc0cbfa202b9f445b684a39172ce42c8944c3a975dce892c1',

@@ -58,8 +58,8 @@ the Core-backed runtime.
 After all source and guarded publication gates pass, its exact installable
 payload names are:
 
-- `CH-Ultimate-0.2.1-Setup.exe` for Windows x64
-- `CHU-Companion-Mobile-0.2.1-release.apk` for Android
+- `CH-Ultimate-0.2.2-Setup.exe` for Windows x64
+- `CHU-Companion-Mobile-0.2.2-release.apk` for Android
 
 Publication is manual. Until a GitHub Actions run and downloaded checksums are
 recorded in the acceptance ledger, the workflow is only a ready build path,
@@ -67,9 +67,9 @@ not evidence that the installers exist or work on physical devices. Android
 publication requires the permanent Android pilot signer and its pinned digest;
 the four signing secrets fail closed. A debug APK is verification-only and is
 never published. Windows remains an unsigned private pilot without
-Authenticode. Install only while connected to the `CH-Business` Wi-Fi and run a
-four-day copied-data pilot. See the
-[v0.2.1 pilot notes](docs/releases/pilot-0.2.1.md) and the
+Authenticode. Install only while connected to the `CH-Business` Wi-Fi. The
+owner removed the four-day copied-data pilot from this execution. See the
+[v0.2.2 pilot notes](docs/releases/pilot-0.2.2.md) and the
 [v0.2 maintenance runbook](docs/ch-core-v0.2-maintenance-rollback.md).
 
 ## Approved initial catalogue

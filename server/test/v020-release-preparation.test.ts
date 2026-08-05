@@ -182,7 +182,7 @@ describe('v0.2.0 historical repository-local release preparation', () => {
     const historicalSection = markdownSection(
       acceptance,
       '### Historical pilot v0.2.0 — persiapan repository lokal',
-      '### Pilot v0.2.1 — current repository release contract',
+      '### Pilot v0.2.1 — previous repository release contract',
     );
     const localEvidence = markdownSection(
       acceptance,
@@ -258,18 +258,18 @@ describe('v0.2.0 historical repository-local release preparation', () => {
     }
   });
 
-  it('points the repository guide and acceptance ledger at the current guarded v0.2.1 contract', async () => {
+  it('points the repository guide and acceptance ledger at the current guarded v0.2.2 contract', async () => {
     const [readme, acceptance] = await Promise.all([
       repositoryText('README.md'),
       repositoryText('docs/ch-core-acceptance-status.md'),
     ]);
 
     for (const currentPilotFact of [
-      'CH-Ultimate-0.2.1-Setup.exe',
-      'CHU-Companion-Mobile-0.2.1-release.apk',
-      'docs/releases/pilot-0.2.1.md',
+      'CH-Ultimate-0.2.2-Setup.exe',
+      'CHU-Companion-Mobile-0.2.2-release.apk',
+      'docs/releases/pilot-0.2.2.md',
       'docs/ch-core-v0.2-maintenance-rollback.md',
-      'four-day copied-data pilot',
+      'owner removed the four-day copied-data pilot',
       'permanent Android pilot signer',
     ]) {
       expect(readme).toContain(currentPilotFact);
@@ -284,26 +284,25 @@ describe('v0.2.0 historical repository-local release preparation', () => {
 
     const currentSection = markdownSection(
       acceptance,
-      '### Pilot v0.2.1 — current repository release contract',
+      '### Pilot v0.2.2 — current repository release contract',
       '## Local implementation and regression',
     );
     for (const currentReleaseFact of [
-      'versionName 0.2.1',
-      'versionCode 8',
-      'pilot-v0.2.1',
-      'docs/releases/pilot-0.2.1.md',
-      '2c569db25ada195e00ef220e99d6b05909a46768',
-      '30986018170',
-      'd8835ff3f0a367ae277192c624c429c05e019041a42cab92c0d1b478c86913aa',
-      '91b7ff7b5be93b1f0c602c82662f8db802429dc72cbc098fd0283e1fe43b1be1',
+      'versionName 0.2.2',
+      'versionCode 9',
+      'pilot-v0.2.2',
+      'docs/releases/pilot-0.2.2.md',
+      'UNAVAILABLE_AFTER_OWNER_UNINSTALL',
+      '0 critical',
+      '0 high',
     ]) {
       expect(currentSection).toContain(currentReleaseFact);
     }
-    for (const currentPassedRow of [
-      '| Artefak signed v0.2.1 | PASS |',
-      '| Publikasi GitHub | PASS |',
+    for (const currentPreparedRow of [
+      '| Artifact signed v0.2.2 | PREPARED |',
+      '| Publikasi GitHub | BLOCKED |',
     ]) {
-      expect(currentSection).toContain(currentPassedRow);
+      expect(currentSection).toContain(currentPreparedRow);
     }
     for (const currentBlockedRow of [
       '| Deploy CH Core v2 | BLOCKED |',

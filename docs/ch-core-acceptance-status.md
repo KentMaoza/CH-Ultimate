@@ -54,10 +54,10 @@ bukan deploy CH Core v2, impor workbook, penerimaan Windows/Android/cetak fisik,
 atau pilot empat hari. Semua baris tersebut tetap `BLOCKED` sampai receipt
 langsung yang ditinjau mengubah statusnya.
 
-### Pilot v0.2.1 — current repository release contract
+### Pilot v0.2.1 — previous repository release contract
 
-Bagian ini adalah kontrak release repository yang aktif untuk cutover CH Core
-v2. Ia tidak mengubah receipt historis v0.2.0 dan tidak menjadi izin menjalankan
+Bagian ini mempertahankan kontrak dan receipt rilis v0.2.1 sebagai histori.
+v0.2.2 di bawah adalah kontrak aktif; bagian ini bukan izin menjalankan
 maintenance, clear data, migrasi, impor, pairing, atau publikasi.
 
 | Gate | Status | Bukti repository atau pekerjaan yang masih wajib |
@@ -78,12 +78,36 @@ diverifikasi. Jangan menyebutnya sudah terpasang, diterima secara fisik, atau
 siap produksi sampai setiap gate lingkungan memiliki bukti langsung dan
 statusnya diubah melalui receipt yang ditinjau.
 
+### Pilot v0.2.2 — current repository release contract
+
+v0.2.2 menggantikan v0.2.1 untuk cutover aktif karena audit runtime menemukan
+jsPDF lama pada jalur cetak/PDF. Klien lama telah dihapus oleh pemilik sebelum
+outbox sempat diukur; status tersebut dicatat jujur, bukan diubah menjadi nol.
+
+| Gate | Status | Bukti repository atau pekerjaan yang masih wajib |
+| --- | --- | --- |
+| Metadata klien v0.2.2 | PASS | `package.json`, lockfile, Settings, Android `versionName 0.2.2`/`versionCode 9`, copy script, dan test alignment memakai versi yang sama |
+| Runtime dependency gate | PASS DENGAN RESIDUAL | jsPDF 4.2.1; audit produksi `0 critical`, `0 high`; 2 moderate ExcelJS/uuid diterima sebagai jalur transitif yang tidak dipanggil langsung |
+| Kontrak release privat | PASS | Workflow mengunci `pilot-v0.2.2`, kedua nama payload, notes v0.2.2, empat secret Android, dan signer permanen |
+| Notes, runbook, dan receipt | PASS | `docs/releases/pilot-0.2.2.md`, `docs/releases/pilot-0.2.2-evidence.md`, helper v0.2.2, dan suplemen runbook tersedia |
+| Artifact signed v0.2.2 | PREPARED | `CH-Ultimate-0.2.2-Setup.exe` dan `CHU-Companion-Mobile-0.2.2-release.apk`; hash fresh-download belum tersedia |
+| Publikasi GitHub | BLOCKED | `pilot-v0.2.2` belum diterbitkan; workflow manual hanya boleh dijalankan dari `main` setelah CI lulus |
+| Disposisi klien lama | QUIESCED / DATA LOKAL TIDAK TERUKUR | Android uninstall diverifikasi langsung; Windows uninstall dikonfirmasi pemilik; keduanya `UNAVAILABLE_AFTER_OWNER_UNINSTALL`, bukan outbox nol |
+| Windows terpasang | BLOCKED | Pemilik akan memasang manual setelah Core v2 dan import terverifikasi |
+| Android fisik | BLOCKED | Pemilik akan memasang manual; version/signing/Back/barcode belum diterima |
+| Deploy CH Core v2 | BLOCKED | Backup NAS-only, scratch restore, rotasi credential, deployment exact commit rilis, dan bootstrap v2 belum lulus |
+| Cetak fisik | BLOCKED | Dialog sistem, PDF, XLSX, dan printer belum diterima pada Windows target |
+| Pilot copied-data empat hari | REMOVED FROM CURRENT EXECUTION | Pemilik menghapus pilot empat hari dari scope eksekusi aktif |
+
+Jangan deploy artifact Core dari commit v0.2.1. Source Core yang dipasang harus
+dibangun ulang dari commit rilis v0.2.2 yang sama dengan kedua klien.
+
 ## Local implementation and regression
 
 | Requirement | Status | Current evidence |
 | --- | --- | --- |
-| Desktop application and gateway | PASS | v0.2.1 baseline at release commit `2c569db25ada195e00ef220e99d6b05909a46768` passed 90 files / 687 tests; current preflight-helper verification passes 91 files / 691 tests |
-| Mobile application | PASS | v0.2.1 `npm run test:mobile`: 12 files / 118 tests; production build passes |
+| Desktop application and gateway | PASS | v0.2.2 Node 24 verification passes 92 files / 694 tests; Electron package and E2E 11/11 pass |
+| Mobile application | PASS | v0.2.2 `npm run test:mobile`: 12 files / 118 tests; production build and Capacitor sync pass |
 | CH Core unit and artifact tests | PASS | `npm run server:test`: 50 files / 338 tests plus one intentional acceptance skip; typecheck passes |
 | Approved workbook parser | PASS | `SKU_Gudang20260804080716145.xlsx` at SHA-256 `f1f4675327fac107ef9f78c114b8afe86389d5543b204540ed45e74f9b15e49c`: 3,144 SKU / 6,288 identifiers / 2,786 refs / 358 missing / 3 Modal selections / Rp276,285,615 / 3,988 PCS acceptance: 1/1 |
 | Desktop mock isolation | PASS | Packaged startup fails closed; explicit unpackaged test marker only; Electron E2E 11/11 |

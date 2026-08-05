@@ -4,7 +4,7 @@ Updated 2026-08-05 WITA. This is an evidence ledger, not a production
 deployment receipt. A v0.1.3-compatible copied-data CH Core runtime is
 deployed on the NAS, but CH Core is not deployed as a production endpoint.
 The catalogue workbook has not been imported. The Windows owner is enrolled;
-Android v0.1.5 is installed and awaiting a fresh one-use pairing code.
+Last measured Samsung state (direct receipt earlier in this task; no fresh ADB measurement because the device is now disconnected): CH Ultimate mobile v0.2.0 (`versionCode 7`) was encountering `upgrade-required` against the old incompatible Core v1 bootstrap contract.
 
 Status meanings:
 
@@ -91,11 +91,12 @@ langsung dan statusnya diubah melalui receipt yang ditinjau.
 
 ## Client release artifacts
 
-### Client stabilization v0.1.5 — implementation in progress
+### Historical/superseded client stabilization v0.1.5
 
-This release is a client-only stabilization of the existing copied-data CH
-Core pilot. It does not migrate MariaDB, modify the NAS container, or import a
-new catalogue. Publication and physical acceptance remain open.
+This historical/superseded section preserves what the v0.1.5 client-only
+stabilization receipt proved at that time. It did not migrate MariaDB, modify
+the NAS container, or import a new catalogue, and it is not the current Samsung
+installation state.
 
 | Requirement | Status | Current evidence or missing action |
 | --- | --- | --- |
@@ -107,12 +108,13 @@ new catalogue. Publication and physical acceptance remain open.
 | Local signed v0.1.5 APK | PASS | `assembleRelease` produced a one-signer v2 APK of 43,077,815 bytes with SHA-256 `d01e9a4362dac8a7a8c1fe076bd6425371d624cc51192a4f623167ec3cf4eb8e`; `apksigner` matched the pinned permanent certificate |
 | Signed-only GitHub publication | READY | The manual main-branch publisher requires all four signing secrets, builds `assembleRelease`, rejects any signer other than the pinned certificate, and never publishes the debug verification APK |
 | v0.1.5 GitHub artifacts | BLOCKED | Source integration, repository-visibility decision, workflow publication, fresh download, checksum verification, and downloaded-signer verification remain outstanding |
-| Physical Android installation | READY | Samsung SM-S901E was moved from debug-signed v0.1.4 to permanently signed v0.1.5; the pairing form renders without React error 185. Fresh pairing, shared data rendering, Nota typing/synchronization, restart, and exact-once posting remain open |
+| Physical Android installation (historical/superseded) | READY | Historical receipt: Samsung SM-S901E was moved from debug-signed v0.1.4 to permanently signed v0.1.5; the pairing form rendered without React error 185. The later direct receipt found v0.2.0 (`versionCode 7`) at `upgrade-required`; ini bukan status instalasi Samsung saat ini. |
 | Physical Windows acceptance | BLOCKED | The Windows v0.1.5 installer has not yet been built by GitHub or installed over v0.1.4 on either laptop |
 | Exact MariaDB integration suite | BLOCKED | Unit/type gates pass, but this Mac has no local MariaDB/Docker service and no explicitly isolated `chu_test` URL; the suite correctly refused to use an unspecified database and was not pointed at the NAS |
 
-Do not describe v0.1.5 as published, physically accepted, or production-ready
-until those missing actions have direct evidence below.
+This v0.1.5 receipt is historical/superseded. Do not use it to describe the
+current Samsung installation, publication, physical acceptance, or production
+readiness.
 
 ### Owner-pairing release v0.1.3
 

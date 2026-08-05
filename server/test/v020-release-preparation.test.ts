@@ -249,7 +249,7 @@ describe('v0.2.0 historical repository-local release preparation', () => {
     }
 
     for (const historicalReleaseHeading of [
-      '### Client stabilization v0.1.5',
+      '### Historical/superseded client stabilization v0.1.5',
       '### Private pilot release receipt v0.1.3',
       '### Private pilot release receipt v0.1.2',
       '### Historical private pilot release receipt v0.1.1',
@@ -305,6 +305,36 @@ describe('v0.2.0 historical repository-local release preparation', () => {
       '| Pilot copied-data empat hari | BLOCKED |',
     ]) {
       expect(currentSection).toContain(currentBlockedRow);
+    }
+
+    for (const lastMeasuredSamsungFact of [
+      'Last measured Samsung state',
+      'CH Ultimate mobile v0.2.0',
+      'versionCode 7',
+      'upgrade-required',
+      'old incompatible Core v1 bootstrap contract',
+      'device is now disconnected',
+      'no fresh ADB measurement',
+    ]) {
+      expect(acceptance).toContain(lastMeasuredSamsungFact);
+    }
+
+    const v015Section = markdownSection(
+      acceptance,
+      '### Historical/superseded client stabilization v0.1.5',
+      '### Owner-pairing release v0.1.3',
+    );
+    expect(v015Section).toContain(
+      '| Physical Android installation (historical/superseded) | READY |',
+    );
+    for (const historicalReceiptFact of [
+      'Samsung SM-S901E was moved from debug-signed v0.1.4 to permanently signed v0.1.5',
+      'v0.2.0',
+      'versionCode 7',
+      'upgrade-required',
+      'bukan status instalasi Samsung saat ini',
+    ]) {
+      expect(v015Section).toContain(historicalReceiptFact);
     }
   });
 });

@@ -304,12 +304,13 @@ describe('v0.2.0 historical repository-local release preparation', () => {
       expect(currentSection).toContain(currentReleaseFact);
     }
     for (const currentPublishedRow of [
-      '| Artifact signed v0.2.3 | READY |',
-      '| Publikasi GitHub | BLOCKED |',
+      '| Artifact signed v0.2.3 | PASS |',
+      '| Publikasi GitHub | PASS |',
     ]) {
       expect(currentSection).toContain(currentPublishedRow);
     }
-    expect(currentSection).toContain('| Core source staging | BLOCKED |');
+    expect(currentSection).toContain('| Core source staging | PASS |');
+    expect(currentSection).toContain('8a9ffcec972a358ce94270a70f0a1de026c85b84');
     expect(currentSection).toContain('rekonsiliasi katalog aman');
     for (const currentBlockedRow of [
       '| Deploy CH Core v2 | BLOCKED |',

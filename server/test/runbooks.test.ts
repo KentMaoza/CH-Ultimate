@@ -173,7 +173,7 @@ describe('CH Core guarded deployment documentation', () => {
 
     expect(readme).toContain('CH Core acceptance status');
     for (const requiredEvidence of [
-      '93 files / 698 tests',
+      '95 files / 706 tests',
       '12 files / 118 tests',
       '51 files / 347 tests',
       'Electron E2E 11/11',

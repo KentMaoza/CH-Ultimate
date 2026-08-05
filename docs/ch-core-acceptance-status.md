@@ -114,10 +114,10 @@ Windows, Android, dan Core sebelum maintenance NAS dimulai.
 | Metadata klien v0.2.3 | PASS | `package.json`, lockfile, Settings, Android `versionName 0.2.3`/`versionCode 10`, copy script, dan workflow memakai versi yang sama |
 | Runtime dependency gate | PASS DENGAN RESIDUAL | Audit produksi `0 critical`, `0 high`; 2 moderate ExcelJS/uuid tidak memanggil jalur UUID v3/v5/v6 dengan supplied buffer |
 | Rekonsiliasi katalog aman | PASS | SKU cocok mempertahankan ID/riwayat; konflik, identifier tambahan, dan SKU aktif yang tidak cocok memblokir sebelum write; tidak ada penghapusan katalog otomatis |
-| Kontrak release | READY | Workflow mengunci `pilot-v0.2.3`, kedua nama payload, `docs/releases/pilot-0.2.3.md`, empat secret Android, dan signer permanen |
-| Artifact signed v0.2.3 | READY | CI PR membangun installer Windows dan debug verification APK; release payload bertanda tangan, hash, metadata paket, dan fresh-download masih harus diterbitkan dan diverifikasi |
-| Publikasi GitHub | BLOCKED | Jalankan publisher manual hanya dari `main` setelah seluruh gate source/Windows/Android lulus; catat commit, workflow run, tiga aset, dan checksum |
-| Core source staging | BLOCKED | Setelah publikasi, buat archive exact commit rilis v0.2.3 dan helper prepare/preflight baru; staging v0.2.2 tidak boleh dideploy |
+| Kontrak release | PASS | Workflow mengunci `pilot-v0.2.3`, kedua nama payload, `docs/releases/pilot-0.2.3.md`, empat secret Android, dan signer permanen |
+| Artifact signed v0.2.3 | PASS | Fresh download Windows/APK/checksum lulus; Android `versionCode 10` dan signer permanen serta paket internal Windows `0.2.3` diverifikasi |
+| Publikasi GitHub | PASS | Prerelease publik `pilot-v0.2.3` menargetkan `8a9ffcec972a358ce94270a70f0a1de026c85b84`; workflow run `31002068557` lulus |
+| Core source staging | PASS | NAS `/Volumes/home/CH_Ultimate_Pilot/8a9ffce` memuat archive exact commit, helper v0.2.3, workbook, pembanding scratch, dan receipt dengan hash terverifikasi; belum dideploy |
 | Disposisi klien lama | QUIESCED / DATA LOKAL TIDAK TERUKUR | Android uninstall diverifikasi langsung; Windows uninstall dikonfirmasi pemilik; keduanya `UNAVAILABLE_AFTER_OWNER_UNINSTALL`, bukan outbox nol |
 | Windows terpasang | BLOCKED | Pemilik memasang manual setelah Core v2 dan import terverifikasi; keberadaan credential owner di AppData masih harus dikonfirmasi |
 | Android fisik | BLOCKED | Pemilik memasang manual; version/signing/pairing/Back/barcode belum diterima |
@@ -129,7 +129,7 @@ Windows, Android, dan Core sebelum maintenance NAS dimulai.
 
 | Requirement | Status | Current evidence |
 | --- | --- | --- |
-| Desktop application and gateway | PASS | v0.2.3 Node 24 verification passes 93 files / 698 tests; Electron package and E2E 11/11 pass |
+| Desktop application and gateway | PASS | v0.2.3 Node 24 verification passes 95 files / 706 tests setelah helper NAS v0.2.3; Electron package dan CI E2E lulus |
 | Mobile application | PASS | v0.2.3 `npm run test:mobile`: 12 files / 118 tests; production build and Capacitor sync pass |
 | CH Core unit and artifact tests | PASS | `npm run server:test`: 51 files / 347 tests plus one intentional acceptance skip; typecheck passes |
 | Approved workbook parser | PASS | `SKU_Gudang20260804080716145.xlsx` at SHA-256 `f1f4675327fac107ef9f78c114b8afe86389d5543b204540ed45e74f9b15e49c`: 3,144 SKU / 6,288 identifiers / 2,786 refs / 358 missing / 3 Modal selections / Rp276,285,615 / 3,988 PCS acceptance: 1/1 |

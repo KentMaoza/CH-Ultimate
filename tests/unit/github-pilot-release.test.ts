@@ -168,7 +168,20 @@ describe('GitHub pilot release workflow', () => {
     expect(releaseNotes).toMatch(/terbitkan.+0\.2\.1.+sebelum.+CH Core v2/is);
     expect(releaseNotes).toMatch(/v0\.1\.5.+hanya.+sebelum.+Core v2/is);
 
-    expect(evidence).toMatch(/Automated.+BELUM DIVERIFIKASI/is);
+    expect(evidence).toMatch(/Automated.+PASS/is);
+    for (const publishedReceipt of [
+      '2c569db25ada195e00ef220e99d6b05909a46768',
+      '30986018170',
+      'CH-Ultimate-0.2.1-Setup.exe',
+      'd8835ff3f0a367ae277192c624c429c05e019041a42cab92c0d1b478c86913aa',
+      'CHU-Companion-Mobile-0.2.1-release.apk',
+      '91b7ff7b5be93b1f0c602c82662f8db802429dc72cbc098fd0283e1fe43b1be1',
+      androidSignerSha256,
+      'com.tokoch.chucompanion',
+      'versionCode `8`',
+    ]) {
+      expect(evidence).toContain(publishedReceipt);
+    }
     expect(evidence).not.toMatch(
       /\|\s*[^|]+\s*\|\s*PASS\s*\|\s*`BELUM DIISI[^`]*`\s*\|/i,
     );

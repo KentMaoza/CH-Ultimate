@@ -60,29 +60,30 @@ maintenance, clear data, migrasi, impor, pairing, atau publikasi.
 | --- | --- | --- |
 | Metadata klien v0.2.1 | PASS | `package.json`, lockfile, Settings, Android `versionName 0.2.1`/`versionCode 8`, copy script, dan test alignment memakai versi yang sama |
 | Kontrak release privat | PASS | Workflow mengunci `pilot-v0.2.1`, kedua nama payload, notes v0.2.1, empat secret Android, dan digest signer permanen tanpa debug APK |
-| Notes, runbook, dan receipt template | READY | `docs/releases/pilot-0.2.1.md`, `docs/releases/pilot-0.2.1-evidence.md`, dan suplemen runbook tersedia; receipt otomatis tetap `BELUM DIVERIFIKASI` sampai Task 5 mengisi bukti aktual |
-| Artefak signed v0.2.1 | BLOCKED | Installer Windows dan APK release permanen belum dibuat atau diverifikasi checksum/signer-nya |
-| Publikasi GitHub | BLOCKED | Tag/prerelease `pilot-v0.2.1` belum diterbitkan dan belum ada fresh-download verification |
+| Notes, runbook, dan receipt | PASS | `docs/releases/pilot-0.2.1.md`, `docs/releases/pilot-0.2.1-evidence.md`, dan suplemen runbook tersedia; receipt otomatis dan fresh-download verification dicatat pada 2026-08-05 WITA |
+| Artefak signed v0.2.1 | PASS | `CH-Ultimate-0.2.1-Setup.exe`: 149267456 bytes, SHA-256 `d8835ff3f0a367ae277192c624c429c05e019041a42cab92c0d1b478c86913aa`; `CHU-Companion-Mobile-0.2.1-release.apk`: 43103217 bytes, SHA-256 `91b7ff7b5be93b1f0c602c82662f8db802429dc72cbc098fd0283e1fe43b1be1`; Android package/version/signer permanen dan manifest checksum lulus fresh-download verification |
+| Publikasi GitHub | PASS | `pilot-v0.2.1` diterbitkan 2026-08-05T07:58:23Z (15:58:23 WITA), target `2c569db25ada195e00ef220e99d6b05909a46768`; [workflow run 30986018170](https://github.com/KentMaoza/CH-Ultimate/actions/runs/30986018170) `success`; [GitHub prerelease](https://github.com/KentMaoza/CH-Ultimate/releases/tag/pilot-v0.2.1) |
 | Windows terpasang | BLOCKED | Installer belum diterima pada Windows fisik; versi produk dan sidebar `file://` belum diukur |
 | Android fisik | BLOCKED | Package ID, `versionName 0.2.1`, `versionCode 8`, signer, dan Back belum diterima pada ponsel fisik |
 | Deploy CH Core v2 | BLOCKED | Migrasi/Core v2 belum diterapkan pada NAS dan bootstrap `apiSchemaVersion: 2`/`stockChecks` belum memiliki receipt pascadeploy |
 | Cetak fisik | BLOCKED | Dialog sistem, PDF, XLSX, dan printer belum diterima pada lingkungan target |
 | Pilot copied-data empat hari | BLOCKED | Empat hari kalender WITA belum dimulai; receipt Hari 1–4 dan keputusan lanjut/henti belum direkam |
 
-Jangan menyebut v0.2.1 sebagai rilis yang sudah terbit, terpasang, diterima
-secara fisik, atau siap produksi sampai setiap gate lingkungan memiliki bukti
-langsung dan statusnya diubah melalui receipt yang ditinjau.
+v0.2.1 sudah terbit sebagai prerelease privat dan payload unduhan sudah
+diverifikasi. Jangan menyebutnya sudah terpasang, diterima secara fisik, atau
+siap produksi sampai setiap gate lingkungan memiliki bukti langsung dan
+statusnya diubah melalui receipt yang ditinjau.
 
 ## Local implementation and regression
 
 | Requirement | Status | Current evidence |
 | --- | --- | --- |
-| Desktop application and gateway | PASS | v0.1.5 `npm run verify`: 69 files / 497 tests |
-| Mobile application | PASS | v0.1.5 `npm run test:mobile`: 12 files / 92 tests |
-| CH Core unit and artifact tests | PASS | `npm run server:test`: 44 files / 308 tests plus one intentional workbook skip |
+| Desktop application and gateway | PASS | v0.2.1 `npm run verify`: 90 files / 687 tests; GitHub source gate and local verification both pass at `2c569db25ada195e00ef220e99d6b05909a46768` |
+| Mobile application | PASS | v0.2.1 `npm run test:mobile`: 12 files / 118 tests; production build passes |
+| CH Core unit and artifact tests | PASS | `npm run server:test`: 50 files / 338 tests plus one intentional acceptance skip; typecheck passes |
 | Approved workbook parser | PASS | `SKU_Gudang20260804080716145.xlsx` at SHA-256 `f1f4675327fac107ef9f78c114b8afe86389d5543b204540ed45e74f9b15e49c`: 3,144 SKU / 6,288 identifiers / 2,786 refs / 358 missing / 3 Modal selections / Rp276,285,615 / 3,988 PCS acceptance: 1/1 |
-| Desktop mock isolation | PASS | Packaged startup fails closed; explicit unpackaged test marker only; Playwright 8/8 |
-| Mobile production bundle | PASS | 591-module Vite build and Capacitor Android sync |
+| Desktop mock isolation | PASS | Packaged startup fails closed; explicit unpackaged test marker only; Electron E2E 11/11 |
+| Mobile production bundle | PASS | 608-module Vite build and Capacitor Android sync |
 | Android JVM and lint gates | PASS | Debug/release unit tests and lint pass with Android Studio JDK 21 |
 | Electron package | PASS | Reproducible darwin-arm64 package succeeds |
 | Source hygiene | PASS | `git diff --check`, shell syntax, and tracked-secret/private-artifact scans pass |

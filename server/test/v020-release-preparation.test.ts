@@ -292,12 +292,20 @@ describe('v0.2.0 historical repository-local release preparation', () => {
       'versionCode 8',
       'pilot-v0.2.1',
       'docs/releases/pilot-0.2.1.md',
-      'BELUM DIVERIFIKASI',
+      '2c569db25ada195e00ef220e99d6b05909a46768',
+      '30986018170',
+      'd8835ff3f0a367ae277192c624c429c05e019041a42cab92c0d1b478c86913aa',
+      '91b7ff7b5be93b1f0c602c82662f8db802429dc72cbc098fd0283e1fe43b1be1',
     ]) {
       expect(currentSection).toContain(currentReleaseFact);
     }
+    for (const currentPassedRow of [
+      '| Artefak signed v0.2.1 | PASS |',
+      '| Publikasi GitHub | PASS |',
+    ]) {
+      expect(currentSection).toContain(currentPassedRow);
+    }
     for (const currentBlockedRow of [
-      '| Publikasi GitHub | BLOCKED |',
       '| Deploy CH Core v2 | BLOCKED |',
       '| Windows terpasang | BLOCKED |',
       '| Android fisik | BLOCKED |',

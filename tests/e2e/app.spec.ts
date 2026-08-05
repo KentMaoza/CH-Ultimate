@@ -1,9 +1,9 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { extractFile, listPackage } from '@electron/asar';
 import ExcelJS from 'exceljs';
-import { _electron as electron, expect, test, type Page, type TestInfo } from '@playwright/test';
+import { _electron as electron, expect, test, type ElectronApplication, type Page, type TestInfo } from '@playwright/test';
 import { launchTestElectron } from './electron-launch';
 
 async function launch() {
@@ -13,8 +13,7 @@ async function launch() {
   return { application, window };
 }
 
-test('packaged renderer loads the Vite-managed sidebar mark under file protocol', async () => {
-  const userDataDirectory = await mkdtemp(join(tmpdir(), 'ch-ultimate-packaged-logo-'));
+test('packaged renderer emits a decodable Vite-managed sidebar mark', async () => {
   const packagedResourcesDirectory = join(
     'out',
     `CH Ultimate-${process.platform}-${process.arch}`,
@@ -22,50 +21,55 @@ test('packaged renderer loads the Vite-managed sidebar mark under file protocol'
       ? ['CH Ultimate.app', 'Contents', 'Resources']
       : ['resources']),
   );
-  const packagedRendererUrl = `${pathToFileURL(join(
-    packagedResourcesDirectory,
-    'app.asar',
-    '.vite',
-    'renderer',
-    'main_window',
-    'index.html',
-  )).href}?ch-ultimate-e2e-test-mock=1`;
-  const launcherPath = join(userDataDirectory, 'packaged-renderer-launch.cjs');
-  await writeFile(
-    launcherPath,
-    `const { app, BrowserWindow } = require('electron');\napp.whenReady().then(() => new BrowserWindow({ webPreferences: { contextIsolation: true } }).loadURL(${JSON.stringify(packagedRendererUrl)}));\n`,
+  const archivePath = join(packagedResourcesDirectory, 'app.asar');
+  const rendererFiles = listPackage(archivePath, { isPack: false });
+  const indexPath = rendererFiles.find(
+    (path) => path.endsWith('/renderer/main_window/index.html'),
   );
-  const application = await electron.launch({
-    args: [launcherPath, `--user-data-dir=${userDataDirectory}`],
-    env: {
-      ...process.env,
-      CH_ULTIMATE_E2E_TEST_MOCK: '1',
-    },
-  });
+  expect(indexPath).toBeDefined();
+  const index = extractFile(archivePath, indexPath!.slice(1)).toString('utf8');
+  const bundleName = index.match(/src="\.\/assets\/(index-[^"]+\.js)"/)?.[1];
+  expect(bundleName).toBeDefined();
+  const bundle = extractFile(
+    archivePath,
+    `.vite/renderer/main_window/assets/${bundleName}`,
+  ).toString('utf8');
+  const markDataUrl = bundle.match(/data:image\/svg\+xml,%3csvg[^"]+/)?.[0];
+
+  expect(bundle).not.toContain('/brand/ch-ultimate-mark.svg');
+  expect(markDataUrl).toBeDefined();
+
+  let temporaryDirectory: string | undefined;
+  let application: ElectronApplication | undefined;
 
   try {
-    const window = await application.firstWindow();
-    const mark = await window.getByRole('img', { name: 'CH Ultimate' }).evaluate(
-      (image) => {
-        const mark = image as HTMLImageElement;
-        return {
-          complete: mark.complete,
-          naturalWidth: mark.naturalWidth,
-          resolvedUrl: mark.currentSrc,
-        };
-      },
+    temporaryDirectory = await mkdtemp(join(tmpdir(), 'ch-ultimate-packaged-logo-'));
+    const launcherPath = join(temporaryDirectory, 'packaged-mark-launch.cjs');
+    const imagePage = `data:text/html,${encodeURIComponent('<!doctype html><img id="mark" alt="CH Ultimate">')}`;
+    await writeFile(
+      launcherPath,
+      `const { app, BrowserWindow } = require('electron');\napp.whenReady().then(() => new BrowserWindow({ webPreferences: { contextIsolation: true } }).loadURL(${JSON.stringify(imagePage)}));\n`,
     );
+    application = await electron.launch({ args: [launcherPath] });
+    const window = await application.firstWindow();
+    const mark = window.getByRole('img', { name: 'CH Ultimate' });
+    await mark.evaluate((image, source) => {
+      (image as HTMLImageElement).src = source;
+    }, markDataUrl!);
 
-    expect(mark.complete).toBe(true);
-    expect(mark.naturalWidth).toBeGreaterThan(0);
-    expect(mark.resolvedUrl).not.toMatch(/^file:\/\/(?:\/)?(?:brand|assets)\//);
-    expect(
-      mark.resolvedUrl.startsWith('data:image/svg+xml,') ||
-        mark.resolvedUrl.startsWith(pathToFileURL(packagedResourcesDirectory).href),
+    await expect.poll(
+      async () => mark.evaluate((image) => {
+        const rendered = image as HTMLImageElement;
+        return rendered.complete && rendered.naturalWidth > 0;
+      }),
     ).toBe(true);
+    await expect(mark).toHaveAttribute('src', markDataUrl!);
+    expect(await mark.evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   } finally {
-    await application.close();
-    await rm(userDataDirectory, { recursive: true, force: true });
+    await application?.close().catch(() => undefined);
+    if (temporaryDirectory) {
+      await rm(temporaryDirectory, { recursive: true, force: true });
+    }
   }
 });
 

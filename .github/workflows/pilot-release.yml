@@ -27,6 +27,7 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm run verify
       - run: npm run test:mobile
       - run: npm run mobile:build
@@ -70,8 +71,8 @@ jobs:
             throw "Expected exactly one Setup.exe, found $($setups.Count)."
           }
           New-Item -ItemType Directory -Path release -Force | Out-Null
-          Copy-Item $setups[0].FullName release/CH-Ultimate-0.2.1-Setup.exe
-          Get-FileHash -Algorithm SHA256 release/CH-Ultimate-0.2.1-Setup.exe
+          Copy-Item $setups[0].FullName release/CH-Ultimate-0.2.2-Setup.exe
+          Get-FileHash -Algorithm SHA256 release/CH-Ultimate-0.2.2-Setup.exe
 
   android-apk:
     needs: source-gates
@@ -191,11 +192,11 @@ jobs:
             throw "Expected exactly one release APK, found $($apks.Count)."
           }
           New-Item -ItemType Directory -Path release -Force | Out-Null
-          Copy-Item $setups[0].FullName release/CH-Ultimate-0.2.1-Setup.exe
-          Copy-Item $apks[0].FullName release/CHU-Companion-Mobile-0.2.1-release.apk
+          Copy-Item $setups[0].FullName release/CH-Ultimate-0.2.2-Setup.exe
+          Copy-Item $apks[0].FullName release/CHU-Companion-Mobile-0.2.2-release.apk
           $names = @(
-            'CH-Ultimate-0.2.1-Setup.exe',
-            'CHU-Companion-Mobile-0.2.1-release.apk'
+            'CH-Ultimate-0.2.2-Setup.exe',
+            'CHU-Companion-Mobile-0.2.2-release.apk'
           )
           $lines = foreach ($name in $names) {
             $hash = (Get-FileHash -Algorithm SHA256 (Join-Path release $name)).Hash.ToLowerInvariant()
@@ -209,14 +210,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          gh release create pilot-v0.2.1 `
-            release/CH-Ultimate-0.2.1-Setup.exe `
-            release/CHU-Companion-Mobile-0.2.1-release.apk `
+          gh release create pilot-v0.2.2 `
+            release/CH-Ultimate-0.2.2-Setup.exe `
+            release/CHU-Companion-Mobile-0.2.2-release.apk `
             release/SHA256SUMS.txt `
             --prerelease `
             --target "$env:GITHUB_SHA" `
-            --title 'CH Ultimate pilot v0.2.1' `
-            --notes-file docs/releases/pilot-0.2.1.md
+            --title 'CH Ultimate pilot v0.2.2' `
+            --notes-file docs/releases/pilot-0.2.2.md
       - name: Remove restored Android signing key
         if: always()
         shell: pwsh

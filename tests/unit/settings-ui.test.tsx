@@ -26,12 +26,12 @@ afterEach(() => {
 });
 
 describe('Settings owner pairing integration', () => {
-  it('shows the current v0.2.1 desktop release version', () => {
+  it('shows the current v0.2.2 desktop release version', () => {
     render(<App gateway={new MockOperationsGateway()} coreBacked />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
 
-    expect(screen.getByRole('heading', { name: 'CH Ultimate 0.2.1' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'CH Ultimate 0.2.2' })).toBeVisible();
     expect(screen.queryByText('CH Ultimate 0.2.0')).not.toBeInTheDocument();
   });
 

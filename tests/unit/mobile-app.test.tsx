@@ -48,6 +48,7 @@ function renderMobile(
   if (coreBacked) {
     gateway.getSyncSnapshot = () => ({
       phase: 'online',
+      trustedV2Bootstrap: true,
       serverRevision: '8',
       pendingCount: 0,
       conflictCount: 0,
@@ -189,6 +190,7 @@ function coreGatewayAt(
   const gateway = new MockOperationsGateway(seedFactory);
   gateway.getSyncSnapshot = () => ({
     phase,
+    trustedV2Bootstrap: true,
     serverRevision: '8',
     pendingCount: 0,
     conflictCount: 0,

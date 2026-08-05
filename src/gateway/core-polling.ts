@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 import {
   CORE_API_PATHS,
-  CoreApiSchemaError,
   CoreApiUpgradeRequiredError,
   parseCoreApiError,
   parseCoreBootstrap,
@@ -24,17 +23,15 @@ import { CoreEnvelopeCoordinator } from './core-envelope-coordinator';
 import { CoreGatewayState } from './core-gateway-state';
 import { CoreSyncScheduler } from './core-sync-scheduler';
 import type { CoreApiTransport } from './core-api-transport';
-import { CORE_UPGRADE_REQUIRED_MESSAGE } from './sync-presentation';
+import {
+  CoreSchemaIncompatibilityHandler,
+  type CoreSchemaIncompatibilitySource,
+} from './core-schema-incompatibility';
 
-export interface CorePollingDiagnostic {
-  event: 'bootstrap-schema-error';
-  errorName: string;
-  errorMessage: string;
-}
-
-export type CorePollingDiagnosticSink = (
-  diagnostic: CorePollingDiagnostic,
-) => void;
+export type {
+  CorePollingDiagnostic,
+  CorePollingDiagnosticSink,
+} from './core-schema-incompatibility';
 
 export class CorePollingCoordinator {
   private initialization?: Promise<void>;
@@ -48,10 +45,11 @@ export class CorePollingCoordinator {
     private readonly clock: CoreGatewayClock,
     private readonly state: CoreGatewayState,
     private readonly envelopes: CoreEnvelopeCoordinator,
+    private readonly schemaIncompatibility: CoreSchemaIncompatibilityHandler,
     private readonly onDeviceRole: (role: 'owner' | 'client') => void,
+    private readonly onTrustedBootstrap: () => void | Promise<void> = () => {},
     private readonly onAuthenticatedOnline: (authoritativeBootstrap: boolean) => void | Promise<void> = () => {},
     private readonly onAuthenticationRevoked: () => void | Promise<void> = () => {},
-    private readonly diagnosticSink: CorePollingDiagnosticSink = () => {},
   ) {
     this.scheduler = new CoreSyncScheduler(
       clock,
@@ -115,10 +113,7 @@ export class CorePollingCoordinator {
           return;
         }
         if (error.code === 'UPGRADE_REQUIRED') {
-          this.state.publishSync({
-            phase: 'upgrade-required',
-            message: 'Aplikasi perlu diperbarui.',
-          });
+          this.failSchema(new CoreApiUpgradeRequiredError(), 'bootstrap');
           return;
         }
         throw new Error(error.code);
@@ -133,6 +128,7 @@ export class CorePollingCoordinator {
       );
       if (committed === 'stale') return;
       this.state.replaceRowVersions(bootstrap);
+      await this.onTrustedBootstrap();
       this.bootstrapped = true;
       this.state.publishSync({
         phase: 'online',
@@ -141,21 +137,7 @@ export class CorePollingCoordinator {
       });
       await this.onAuthenticatedOnline(true);
     } catch (error) {
-      if (
-        error instanceof CoreApiUpgradeRequiredError ||
-        error instanceof CoreApiSchemaError
-      ) {
-        this.diagnosticSink({
-          event: 'bootstrap-schema-error',
-          errorName: error.name,
-          errorMessage: error.message,
-        });
-        this.state.publishSync({
-          phase: 'upgrade-required',
-          message: CORE_UPGRADE_REQUIRED_MESSAGE,
-        });
-        return;
-      }
+      if (this.failSchema(error, 'bootstrap')) return;
       this.state.publishSync({
         phase: 'offline',
         message:
@@ -195,13 +177,7 @@ export class CorePollingCoordinator {
     try {
       await this.poll();
     } catch (error) {
-      if (error instanceof CoreApiUpgradeRequiredError) {
-        this.state.publishSync({
-          phase: 'upgrade-required',
-          message: error.message,
-        });
-        return;
-      }
+      if (this.failSchema(error, 'poll')) return;
       this.state.publishSync({
         phase: 'offline',
         message:
@@ -229,10 +205,7 @@ export class CorePollingCoordinator {
         return;
       }
       if (error.code === 'UPGRADE_REQUIRED') {
-        this.state.publishSync({
-          phase: 'upgrade-required',
-          message: 'Aplikasi perlu diperbarui.',
-        });
+        this.failSchema(new CoreApiUpgradeRequiredError(), 'poll');
         return;
       }
       if (
@@ -251,11 +224,7 @@ export class CorePollingCoordinator {
     try {
       page = parseCoreChangePage(response.body);
     } catch (error) {
-      if (error instanceof CoreApiUpgradeRequiredError) throw error;
-      if (error instanceof CoreApiSchemaError) {
-        await this.bootstrap();
-        return;
-      }
+      if (this.failSchema(error, 'poll')) return;
       throw error;
     }
 
@@ -275,9 +244,9 @@ export class CorePollingCoordinator {
         );
       }
     } catch (error) {
+      if (this.failSchema(error, 'poll')) return;
       if (
         error instanceof CoreChangeRequiresBootstrapError ||
-        error instanceof CoreApiSchemaError ||
         error instanceof z.ZodError
       ) {
         await this.bootstrap();
@@ -304,5 +273,14 @@ export class CorePollingCoordinator {
       message: undefined,
     });
     await this.onAuthenticatedOnline(false);
+  }
+
+  private failSchema(
+    error: unknown,
+    source: CoreSchemaIncompatibilitySource,
+  ): boolean {
+    if (!this.schemaIncompatibility.handle(error, source)) return false;
+    this.bootstrapped = false;
+    return true;
   }
 }

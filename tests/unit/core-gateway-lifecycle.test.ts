@@ -47,11 +47,74 @@ describe('Core gateway lifecycle and Nota flush races', () => {
     expect(gateway.getSyncSnapshot().message).not.toContain('envelope');
     expect(diagnostics).toHaveBeenCalledWith(
       expect.objectContaining({
-        event: 'bootstrap-schema-error',
+        event: 'core-schema-incompatibility',
+        source: 'bootstrap',
         errorName: 'CoreApiSchemaError',
         errorMessage: 'Invalid CH Core bootstrap envelope',
       }),
     );
+  });
+
+  it.each([
+    {
+      label: 'malformed error envelope',
+      response: { status: 503, body: { message: 'maintenance' } },
+      errorName: 'CoreApiSchemaError',
+      detail: 'Invalid CH Core error envelope',
+    },
+    {
+      label: 'v1 change page',
+      response: {
+        status: 200,
+        body: {
+          apiSchemaVersion: 1,
+          serverRevision: '1',
+          nextAfter: '1',
+          changes: [],
+        },
+      },
+      errorName: 'CoreApiUpgradeRequiredError',
+      detail: 'CH Core API memerlukan versi aplikasi yang lebih baru.',
+    },
+  ])('makes a $label from polling terminal with safe diagnostics', async ({
+    response,
+    errorName,
+    detail,
+  }) => {
+    const transport = new ScriptedTransport();
+    const clock = new TestClock();
+    const diagnostics = vi.fn();
+    const gateway = createCoreOperationsGateway(
+      transport,
+      new MemoryStorage(),
+      clock,
+      diagnostics,
+    );
+    transport.enqueue({ status: 200, body: populatedBootstrap('1') });
+    await gateway.initialize();
+    transport.enqueue(response);
+
+    await clock.runNext();
+
+    expect(gateway.getSyncSnapshot()).toMatchObject({
+      phase: 'upgrade-required',
+      message:
+        'Versi CH Core tidak kompatibel. Perbarui CH Core, lalu coba hubungkan kembali.',
+    });
+    expect(gateway.getSyncSnapshot().message).not.toContain('envelope');
+    expect(diagnostics).toHaveBeenLastCalledWith({
+      event: 'core-schema-incompatibility',
+      source: 'poll',
+      errorName,
+      errorMessage: detail,
+    });
+    expect(clock.pendingDelays()).toEqual([]);
+    const requestsBeforeWrite = transport.requests.length;
+    await expect(gateway.adjustStock('missing', 1)).rejects.toMatchObject({
+      name: 'CoreGatewayNetworkBlockedError',
+      code: 'UPGRADE_REQUIRED',
+    });
+    expect(transport.requests).toHaveLength(requestsBeforeWrite);
   });
 
   it('keeps disposal terminal when initialize is called afterward', async () => {

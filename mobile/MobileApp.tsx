@@ -3,7 +3,10 @@ import type { OperationsGateway } from '../src/gateway/operations-gateway';
 import type { Sku } from '../src/domain/types';
 import { findSkuByScanCode } from '../src/domain/mobile-demo-state';
 import { useOperationsSnapshot, useOperationsSyncSnapshot } from '../src/renderer/use-operations-snapshot';
-import { presentSyncStatus } from '../src/gateway/sync-presentation';
+import {
+  presentCoreBlockingState,
+  presentSyncStatus,
+} from '../src/gateway/sync-presentation';
 import {
   browserAppBackButton,
   type AppBackButtonPort,
@@ -41,6 +44,9 @@ export function MobileApp({ backButton = browserAppBackButton, gateway, scanner,
   const snapshot = useOperationsSnapshot(gateway);
   const sync = useOperationsSyncSnapshot(gateway);
   const syncPresentation = presentSyncStatus(sync.phase);
+  const coreBlockingState = coreBacked
+    ? presentCoreBlockingState(sync)
+    : undefined;
   const [view, setView] = useState<MainView>('home');
   const [editingNotaId, setEditingNotaId] = useState<string | null>(null);
   const [focusSearch, setFocusSearch] = useState(false);
@@ -65,7 +71,7 @@ export function MobileApp({ backButton = browserAppBackButton, gateway, scanner,
     : sortedChanges.filter((change) => unreadFeedIds.includes(change.id));
 
   backHandlerRef.current = () => {
-    if (coreBacked && sync.phase === 'upgrade-required') return true;
+    if (coreBlockingState) return true;
     if (selectedSkuId) {
       closeSkuDetail();
       return true;
@@ -250,15 +256,15 @@ export function MobileApp({ backButton = browserAppBackButton, gateway, scanner,
     return result?.rawValue ?? null;
   }
 
-  if (coreBacked && sync.phase === 'upgrade-required') {
+  if (coreBlockingState) {
     return (
       <main className="mobile-core-connection">
         <section className="mobile-core-connection__card" role="alert">
           <span className="mobile-core-connection__eyebrow">
             CH ULTIMATE / CH CORE
           </span>
-          <h1>{syncPresentation.label}</h1>
-          <p>{syncPresentation.message}</p>
+          <h1>{coreBlockingState.label}</h1>
+          <p>{coreBlockingState.message}</p>
         </section>
       </main>
     );

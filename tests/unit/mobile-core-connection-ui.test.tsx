@@ -132,6 +132,7 @@ describe('mobile synchronization status', () => {
     const gateway = new MockOperationsGateway();
     gateway.getSyncSnapshot = () => ({
       phase,
+      trustedV2Bootstrap: true,
       serverRevision: '7',
       pendingCount: phase === 'syncing' ? 2 : 0,
       conflictCount: phase === 'conflict' ? 1 : 0,
@@ -159,6 +160,7 @@ describe('mobile synchronization status', () => {
     const gateway = new MockOperationsGateway();
     gateway.getSyncSnapshot = () => ({
       phase: 'revoked',
+      trustedV2Bootstrap: true,
       serverRevision: '7',
       pendingCount: 1,
       conflictCount: 0,

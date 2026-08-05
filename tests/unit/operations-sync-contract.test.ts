@@ -18,6 +18,7 @@ test('mock keeps a stable demo sync snapshot through initialization and listener
     serverRevision: '0',
     pendingCount: 0,
     conflictCount: 0,
+    trustedV2Bootstrap: true,
   });
 
   await gateway.initialize();

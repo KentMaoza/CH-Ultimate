@@ -12,6 +12,7 @@ export interface ImagePrefetchSnapshot {
 
 export interface SyncSnapshot {
   phase: SyncPhase;
+  trustedV2Bootstrap: boolean;
   serverRevision: string;
   pendingCount: number;
   conflictCount: number;

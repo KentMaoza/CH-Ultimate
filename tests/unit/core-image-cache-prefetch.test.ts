@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { CoreCacheEnvelope, CoreGatewayStorage } from '../../src/gateway/core-cache';
 import { createCoreOperationsGateway } from '../../src/gateway/core-operations-gateway';
@@ -104,6 +104,46 @@ function imageResponse(bytesBase64 = 'iVBORw==') {
 }
 
 describe('Core durable image cache and prefetch', () => {
+  it('makes a malformed prefetch image terminal and does not start the next queued image', async () => {
+    const storage = new ImageMemoryStorage();
+    const transport = new ScriptedTransport();
+    const diagnostics = vi.fn();
+    const gateway = createCoreOperationsGateway(
+      transport,
+      storage,
+      new TestClock(),
+      diagnostics,
+    );
+    const second = deferred<{ status: number; body: unknown }>();
+    transport.enqueue({
+      status: 200,
+      body: imageBootstrap([HASH_A, HASH_B, HASH_C]),
+    });
+    transport.enqueue({ status: 200, body: 'invalid-image' });
+    transport.enqueue(() => second.promise);
+
+    await gateway.initialize();
+    await vi.waitFor(() => expect(gateway.getSyncSnapshot().phase).toBe(
+      'upgrade-required',
+    ));
+    second.resolve(imageResponse());
+    await vi.waitFor(() => expect(
+      transport.requests.filter((request) =>
+        request.path.startsWith('/v1/images/'),
+      ),
+    ).toHaveLength(2));
+
+    expect(diagnostics).toHaveBeenCalledWith({
+      event: 'core-schema-incompatibility',
+      source: 'image-prefetch',
+      errorName: 'CoreApiSchemaError',
+      errorMessage: 'Invalid CH Core catalogue image envelope',
+    });
+    expect(
+      transport.requests.some((request) => request.path.endsWith(HASH_C)),
+    ).toBe(false);
+  });
+
   it('loads a cached hash without requesting the server', async () => {
     const storage = new ImageMemoryStorage();
     storage.images.set(HASH_A, new Blob(['cached'], { type: 'image/webp' }));

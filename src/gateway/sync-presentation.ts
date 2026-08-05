@@ -1,7 +1,12 @@
-import type { SyncPhase } from './operations-gateway-contract';
+import type {
+  SyncPhase,
+  SyncSnapshot,
+} from './operations-gateway-contract';
 
 export const CORE_UPGRADE_REQUIRED_MESSAGE =
   'Versi CH Core tidak kompatibel. Perbarui CH Core, lalu coba hubungkan kembali.';
+export const CORE_BOOTSTRAP_REQUIRED_MESSAGE =
+  'Data CH Core belum siap. Hubungkan ke jaringan CH Core, lalu coba lagi.';
 
 export interface SyncPresentation {
   label: string;
@@ -26,4 +31,19 @@ export function presentSyncStatus(phase: SyncPhase): SyncPresentation {
     message:
       phase === 'upgrade-required' ? CORE_UPGRADE_REQUIRED_MESSAGE : undefined,
   };
+}
+
+export function presentCoreBlockingState(
+  sync: Pick<SyncSnapshot, 'phase' | 'trustedV2Bootstrap'>,
+): SyncPresentation | undefined {
+  if (sync.phase === 'upgrade-required') {
+    return presentSyncStatus(sync.phase);
+  }
+  if (!sync.trustedV2Bootstrap) {
+    return {
+      label: 'Memuat CH Core',
+      message: CORE_BOOTSTRAP_REQUIRED_MESSAGE,
+    };
+  }
+  return undefined;
 }

@@ -33,6 +33,10 @@ import {
   CorePollingCoordinator,
   type CorePollingDiagnosticSink,
 } from './core-polling';
+import {
+  CoreSchemaIncompatibilityHandler,
+  type CoreSchemaIncompatibilitySource,
+} from './core-schema-incompatibility';
 import type {
   CatalogueCommitReceipt,
   CatalogueValidationResult,
@@ -44,6 +48,7 @@ import type {
 } from './operations-gateway-contract';
 import {
   CORE_API_PATHS,
+  CoreApiUpgradeRequiredError,
   parseCatalogueCommit,
   parseCatalogueImage,
   parseCatalogueValidation,
@@ -52,6 +57,7 @@ import {
   coreBalanceRowSchema,
   coreStockCheckRowSchema,
 } from './core-api-types';
+import { CORE_UPGRADE_REQUIRED_MESSAGE } from './sync-presentation';
 import { notaTransactionSchema } from './core-domain-schemas';
 import {
   integerFromDecimal,
@@ -82,7 +88,7 @@ export class CoreGatewayNetworkBlockedError extends Error {
   readonly code = 'UPGRADE_REQUIRED';
 
   constructor() {
-    super('Cache aplikasi tidak kompatibel. Jaringan CH Core dinonaktifkan.');
+    super(CORE_UPGRADE_REQUIRED_MESSAGE);
     this.name = 'CoreGatewayNetworkBlockedError';
   }
 }
@@ -126,6 +132,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   private readonly localStore: CoreLocalStore;
   private readonly deferred: CoreDeferredOutbox;
   private readonly images: CoreImageCacheCoordinator;
+  private readonly schemaIncompatibility: CoreSchemaIncompatibilityHandler;
   private readonly clock: CoreGatewayClock;
   private provisionalNotaIds = new Set<string>();
 
@@ -137,12 +144,17 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   ) {
     this.clock = clock;
     this.localStore = new CoreLocalStore(storage);
+    this.schemaIncompatibility = new CoreSchemaIncompatibilityHandler(
+      this.state,
+      diagnosticSink,
+    );
     this.images = new CoreImageCacheCoordinator(
       transport,
       storage,
       clock,
       this.state,
       () => this.state.getSnapshot().skus,
+      this.schemaIncompatibility,
     );
     this.deferred = new CoreDeferredOutbox(
       this.localStore,
@@ -151,6 +163,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
         now: () => clock.now(),
         acknowledge: acknowledgeOfflineCommand,
         onRevoked: () => this.onPersistedAuthenticationRevoked(),
+        schemaIncompatibility: this.schemaIncompatibility,
       },
     );
     const canonicalStorage = this.localStore.canonicalStorage();
@@ -165,10 +178,11 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
       clock,
       this.state,
       envelopes,
+      this.schemaIncompatibility,
       (role) => this.applyDeviceRole(role),
+      () => this.markTrustedBootstrap(),
       (authoritativeBootstrap) => this.onAuthenticatedOnline(authoritativeBootstrap),
       () => this.onAuthenticationRevoked(),
-      diagnosticSink,
     );
     this.mutations = new CoreMutationCoordinator(
       new CoreMutationQueue(
@@ -178,6 +192,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
         () => this.polling.refreshNow(),
         () => clock.now(),
         () => this.onAuthenticationRevoked(),
+        this.schemaIncompatibility,
       ),
       this.state,
     );
@@ -225,6 +240,9 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
       });
       return;
     }
+    this.state.publishSync({
+      trustedV2Bootstrap: envelope.trustedV2Bootstrap === true,
+    });
     this.applyOfflineProjection(envelope, !legacyCacheRestored);
     await this.polling.initialize(true);
   };
@@ -265,6 +283,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     await this.refreshOfflineProjection();
   };
   discardBlockedOperation = async (id: string): Promise<void> => {
+    this.requireNetworkAllowed();
     if (!(await this.deferred.discardBlocked(id))) return;
     await this.refreshOfflineProjection();
   };
@@ -272,6 +291,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     id: string,
     choice: 'mine' | 'server',
   ): Promise<void> => {
+    this.requireNetworkAllowed();
     if (
       this.state.getOutbox().some(
         (item) => item.conflict?.id === id,
@@ -336,30 +356,32 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
       mimeType: upload.mimeType,
       bytesBase64: upload.bytesBase64,
     });
-    const response = await this.transport.request({
-      method: 'POST',
-      path,
-      idempotencyKey: crypto.randomUUID(),
-      body,
+    await this.runSchemaGuard('sku-image', async () => {
+      const response = await this.transport.request({
+        method: 'POST',
+        path,
+        idempotencyKey: crypto.randomUUID(),
+        body,
+      });
+      this.throwForApiError(response.status, response.body);
+      const acknowledgement = parseCoreMutationAcknowledgement(response.body);
+      const hasAuthoritativeEntity = this.state.recordMutationAcknowledgement(
+        path,
+        acknowledgement,
+        body,
+      );
+      if (!hasAuthoritativeEntity) {
+        throw new Error('Respons gambar CH Core tidak valid.');
+      }
+      await this.envelopes.persistCurrent();
+      this.state.refreshCanonicalProjection();
+      const updated = this.state.getSnapshot().skus.find((sku) => sku.id === id);
+      if (!updated?.imageHash) {
+        throw new Error('Hash gambar CH Core tidak tersedia.');
+      }
+      await this.images.seed(updated.imageHash, upload.blob);
+      await this.polling.refreshNow();
     });
-    this.throwForApiError(response.status, response.body);
-    const acknowledgement = parseCoreMutationAcknowledgement(response.body);
-    const hasAuthoritativeEntity = this.state.recordMutationAcknowledgement(
-      path,
-      acknowledgement,
-      body,
-    );
-    if (!hasAuthoritativeEntity) {
-      throw new Error('Respons gambar CH Core tidak valid.');
-    }
-    await this.envelopes.persistCurrent();
-    this.state.refreshCanonicalProjection();
-    const updated = this.state.getSnapshot().skus.find((sku) => sku.id === id);
-    if (!updated?.imageHash) {
-      throw new Error('Hash gambar CH Core tidak tersedia.');
-    }
-    await this.images.seed(updated.imageHash, upload.blob);
-    await this.polling.refreshNow();
   };
   adjustStock = async (
     id: string,
@@ -473,27 +495,31 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     workbookBase64: string;
   }): Promise<CatalogueValidationResult> {
     if (this.isOffline()) return this.offlineBlocked();
-    const response = await this.transport.request({
-      method: 'POST',
-      path: CORE_API_PATHS.validateCatalogue,
-      body: input,
+    return this.runSchemaGuard('catalogue-validation', async () => {
+      const response = await this.transport.request({
+        method: 'POST',
+        path: CORE_API_PATHS.validateCatalogue,
+        body: input,
+      });
+      this.throwForApiError(response.status, response.body);
+      return parseCatalogueValidation(response.body);
     });
-    this.throwForApiError(response.status, response.body);
-    return parseCatalogueValidation(response.body);
   }
 
   async commitInitialCatalogue(
     importId: string,
   ): Promise<CatalogueCommitReceipt> {
     if (this.isOffline()) return this.offlineBlocked();
-    const response = await this.transport.request({
-      method: 'POST',
-      path: CORE_API_PATHS.commitCatalogue(importId),
+    return this.runSchemaGuard('catalogue-commit', async () => {
+      const response = await this.transport.request({
+        method: 'POST',
+        path: CORE_API_PATHS.commitCatalogue(importId),
+      });
+      this.throwForApiError(response.status, response.body);
+      const receipt = parseCatalogueCommit(response.body);
+      await this.polling.reloadCanonical();
+      return receipt;
     });
-    this.throwForApiError(response.status, response.body);
-    const receipt = parseCatalogueCommit(response.body);
-    await this.polling.reloadCanonical();
-    return receipt;
   }
 
   async loadSkuImage(sku: Sku): Promise<string> {
@@ -505,13 +531,15 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
       ));
     }
     this.requireNetworkAllowed();
-    const response = await this.transport.request({
-      method: 'GET',
-      path: CORE_API_PATHS.image(sku.imageHash),
+    return this.runSchemaGuard('catalogue-image', async () => {
+      const response = await this.transport.request({
+        method: 'GET',
+        path: CORE_API_PATHS.image(sku.imageHash!),
+      });
+      this.throwForApiError(response.status, response.body);
+      const image = parseCatalogueImage(response.body);
+      return `data:${image.mimeType};base64,${image.bytesBase64}`;
     });
-    this.throwForApiError(response.status, response.body);
-    const image = parseCatalogueImage(response.body);
-    return `data:${image.mimeType};base64,${image.bytesBase64}`;
   }
 
   pauseImagePrefetch = (): void => this.images.pause();
@@ -520,7 +548,24 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   private throwForApiError(status: number, body: unknown): void {
     if (status >= 200 && status < 300) return;
     const error = parseCoreApiError(status, body);
+    if (error.code === 'UPGRADE_REQUIRED') {
+      throw new CoreApiUpgradeRequiredError();
+    }
     throw new Error(error.code);
+  }
+
+  private async runSchemaGuard<T>(
+    source: CoreSchemaIncompatibilitySource,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      if (this.schemaIncompatibility.handle(error, source)) {
+        throw new CoreGatewayNetworkBlockedError();
+      }
+      throw error;
+    }
   }
 
   async reset(): Promise<void> {
@@ -866,21 +911,28 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
 
   private isOffline(): boolean {
     const phase = this.state.getSyncSnapshot().phase;
-    if (phase === 'offline') return true;
-    if (phase === 'online' || phase === 'syncing' || phase === 'conflict') {
-      return false;
-    }
     if (phase === 'revoked') {
       throw new Error(
         'Akses perangkat dicabut. Minta pemilik menyetujui perangkat ini kembali.',
       );
     }
+    this.requireNetworkAllowed();
+    if (phase === 'offline') return true;
+    if (phase === 'online' || phase === 'syncing' || phase === 'conflict') {
+      return false;
+    }
     throw new Error('Status sinkronisasi belum mengizinkan perubahan.');
   }
 
   private requireNetworkAllowed(): void {
-    if (this.state.getSyncSnapshot().phase === 'upgrade-required') {
+    const sync = this.state.getSyncSnapshot();
+    if (sync.phase === 'upgrade-required') {
       throw new CoreGatewayNetworkBlockedError();
+    }
+    if (!sync.trustedV2Bootstrap) {
+      throw new Error(
+        'Data CH Core belum siap. Hubungkan kembali untuk memuat data yang terverifikasi.',
+      );
     }
   }
 
@@ -1095,6 +1147,7 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     transaction: NotaTransaction,
     destination: NotaCompletionDestination = 'archive',
   ): Promise<void> {
+    this.requireNetworkAllowed();
     const skus = this.state.getSnapshot().skus;
     const skuSnapshots = [
       ...new Set(
@@ -1154,6 +1207,15 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
     await this.deferred.pump(true);
     await this.refreshOfflineProjection();
     void this.images.refresh(authoritativeBootstrap, true);
+  }
+
+  private async markTrustedBootstrap(): Promise<void> {
+    await this.localStore.update((current) =>
+      current.trustedV2Bootstrap
+        ? current
+        : { ...current, trustedV2Bootstrap: true },
+    );
+    this.state.publishSync({ trustedV2Bootstrap: true });
   }
 
   private async onAuthenticationRevoked(): Promise<void> {

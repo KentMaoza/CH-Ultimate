@@ -93,3 +93,38 @@ test('blocks the mobile business shell after a malformed Core bootstrap', async 
   expect(screen.queryByRole('navigation', { name: 'Navigasi utama' })).not.toBeInTheDocument();
   gateway.dispose();
 });
+
+test('blocks the mobile business shell when the first Core bootstrap cannot reach the network', async () => {
+  const transport = new ScriptedTransport();
+  transport.enqueue(new Error('wifi down'));
+  const gateway = createCoreOperationsGateway(
+    transport,
+    new MemoryStorage(),
+    new TestClock(),
+  );
+  await gateway.initialize();
+
+  render(
+    <MobileApp
+      coreBacked
+      gateway={gateway}
+      notifications={notifications}
+      scanner={scanner}
+      share={share}
+    />,
+  );
+
+  expect(
+    screen.getByRole('heading', { name: 'Memuat CH Core' }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      'Data CH Core belum siap. Hubungkan ke jaringan CH Core, lalu coba lagi.',
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByText('wifi down')).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'CHU Companion Mobile' })).not.toBeInTheDocument();
+  expect(screen.queryByTestId('active-sku-count')).not.toBeInTheDocument();
+  expect(screen.queryByRole('navigation', { name: 'Navigasi utama' })).not.toBeInTheDocument();
+  gateway.dispose();
+});

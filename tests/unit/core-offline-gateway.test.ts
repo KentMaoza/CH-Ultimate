@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   CoreLocalStore,
@@ -47,7 +47,17 @@ function pendingV1NotaCache() {
 }
 
 async function offlineGateway() {
-  const storage = new MemoryStorage(cachedState());
+  const storage = new MemoryStorage();
+  const prepared = new CoreLocalStore(
+    storage,
+    () => '10101010-1010-4010-8010-101010101010',
+  );
+  await prepared.update((envelope) => ({
+    ...envelope,
+    trustedV2Bootstrap: true,
+    state: cachedState().state,
+    serverRevision: '7',
+  }));
   const transport = new ScriptedTransport();
   transport.enqueue(new Error('wifi down'));
   const gateway = createCoreOperationsGateway(
@@ -69,6 +79,165 @@ async function settleUntil(predicate: () => boolean): Promise<void> {
 }
 
 describe('Core offline permission matrix', () => {
+  it('makes a malformed deferred acknowledgement terminal and stops persisted replay', async () => {
+    const storage = new MemoryStorage();
+    const transport = new ScriptedTransport();
+    const clock = new TestClock();
+    const diagnostics = vi.fn();
+    const gateway = createCoreOperationsGateway(
+      transport,
+      storage,
+      clock,
+      diagnostics,
+    );
+    transport.enqueue({ status: 200, body: populatedBootstrap('1') });
+    await gateway.initialize();
+    transport.enqueue(new Error('wifi down'));
+    await clock.runNext();
+    await gateway.adjustStock(SKU_ID, -1, 'Koreksi offline');
+    transport.enqueue({
+      status: 200,
+      body: { serverRevision: '1', nextAfter: '1', changes: [] },
+    });
+    transport.enqueue({ status: 200, body: 'invalid-deferred-ack' });
+
+    await gateway.retryPending();
+
+    expect(gateway.getSyncSnapshot()).toMatchObject({
+      phase: 'upgrade-required',
+      message:
+        'Versi CH Core tidak kompatibel. Perbarui CH Core, lalu coba hubungkan kembali.',
+    });
+    expect(diagnostics).toHaveBeenCalledWith({
+      event: 'core-schema-incompatibility',
+      source: 'deferred',
+      errorName: 'CoreApiSchemaError',
+      errorMessage: 'Invalid CH Core mutation acknowledgement envelope',
+    });
+    const terminal = storage.value as unknown as CoreLocalEnvelope;
+    expect(terminal.deferredOutbox).toEqual([
+      expect.objectContaining({
+        kind: 'stock-delta',
+        status: 'error',
+        lastError:
+          'Versi CH Core tidak kompatibel. Perbarui CH Core, lalu coba hubungkan kembali.',
+      }),
+    ]);
+    const requestsBeforeBlockedWrite = transport.requests.length;
+    const savesBeforeBlockedWrite = storage.saves.length;
+    await expect(
+      gateway.adjustStock(SKU_ID, -1, 'Tidak boleh dikirim'),
+    ).rejects.toMatchObject({
+      name: 'CoreGatewayNetworkBlockedError',
+      code: 'UPGRADE_REQUIRED',
+    });
+    expect(transport.requests).toHaveLength(requestsBeforeBlockedWrite);
+    expect(storage.saves).toHaveLength(savesBeforeBlockedWrite);
+  });
+
+  it('keeps an empty first-run install untrusted and rejects offline work after bootstrap loses the network', async () => {
+    const storage = new MemoryStorage();
+    const transport = new ScriptedTransport();
+    transport.enqueue(new Error('wifi down'));
+    const gateway = createCoreOperationsGateway(
+      transport,
+      storage,
+      new TestClock(),
+    );
+
+    await gateway.initialize();
+
+    expect(gateway.getSyncSnapshot()).toMatchObject({
+      phase: 'offline',
+      trustedV2Bootstrap: false,
+    });
+    expect(gateway.getSnapshot().skus).toEqual([]);
+    await expect(gateway.createNotaTransaction()).rejects.toThrow(
+      'Data CH Core belum siap',
+    );
+    await expect(
+      gateway.adjustStock(SKU_ID, -1, 'Tidak boleh tersimpan'),
+    ).rejects.toThrow('Data CH Core belum siap');
+    expect(storage.saves).toEqual([]);
+  });
+
+  it('does not infer trust from cached business data or rewrite it after an initial network failure', async () => {
+    const storage = new MemoryStorage();
+    const prepared = new CoreLocalStore(
+      storage,
+      () => '10101010-1010-4010-8010-101010101010',
+    );
+    await prepared.update((envelope) => ({
+      ...envelope,
+      state: cachedState().state,
+      serverRevision: '7',
+      provisionalNotas: [cachedState().state.notaTransactions[0]!],
+    }));
+    const before = structuredClone(storage.value);
+    const saveCount = storage.saves.length;
+    const transport = new ScriptedTransport();
+    transport.enqueue(new Error('wifi down'));
+    const gateway = createCoreOperationsGateway(
+      transport,
+      storage,
+      new TestClock(),
+    );
+
+    await gateway.initialize();
+
+    expect(gateway.getSyncSnapshot()).toMatchObject({
+      phase: 'offline',
+      trustedV2Bootstrap: false,
+    });
+    await expect(gateway.createNotaTransaction()).rejects.toThrow(
+      'Data CH Core belum siap',
+    );
+    await expect(
+      gateway.updateNotaTransaction(NOTA_ID, { customerName: 'Jangan ubah' }),
+    ).rejects.toThrow('Data CH Core belum siap');
+    expect(storage.value).toEqual(before);
+    expect(storage.saves).toHaveLength(saveCount);
+  });
+
+  it('persists a valid v2 bootstrap as trusted and keeps cached offline work available after restart', async () => {
+    const storage = new MemoryStorage();
+    const onlineTransport = new ScriptedTransport();
+    onlineTransport.enqueue({ status: 200, body: populatedBootstrap('7') });
+    const online = createCoreOperationsGateway(
+      onlineTransport,
+      storage,
+      new TestClock(),
+    );
+
+    await online.initialize();
+
+    expect(online.getSyncSnapshot()).toMatchObject({
+      phase: 'online',
+      trustedV2Bootstrap: true,
+    });
+    expect(storage.value).toMatchObject({ trustedV2Bootstrap: true });
+    online.dispose();
+
+    const offlineTransport = new ScriptedTransport();
+    offlineTransport.enqueue(new Error('wifi down'));
+    const restarted = createCoreOperationsGateway(
+      offlineTransport,
+      storage,
+      new TestClock(),
+    );
+    await restarted.initialize();
+
+    expect(restarted.getSyncSnapshot()).toMatchObject({
+      phase: 'offline',
+      trustedV2Bootstrap: true,
+    });
+    expect(restarted.getSnapshot().skus).toHaveLength(1);
+    const nota = await restarted.createNotaTransaction();
+    expect(
+      (storage.value as unknown as CoreLocalEnvelope).provisionalNotas,
+    ).toContainEqual(nota);
+  });
+
   it('fails closed visibly without rewriting or retrying a v1 cache that owns pending work', async () => {
     const storage = new MemoryStorage(pendingV1NotaCache());
     const before = JSON.stringify(storage.value);
@@ -367,7 +536,7 @@ describe('Core offline permission matrix', () => {
         openingStock: 0,
         tracked: true,
       }),
-    ).rejects.toThrow('Status sinkronisasi belum mengizinkan perubahan.');
+    ).rejects.toThrow('Data CH Core belum siap');
 
     const storage = new MemoryStorage(cachedState());
     const transport = new ScriptedTransport();

@@ -73,6 +73,7 @@ export class CoreGatewayState {
   private notaLineVersions = new Map<string, string>();
   private syncSnapshot: SyncSnapshot = {
     phase: 'connecting',
+    trustedV2Bootstrap: false,
     serverRevision: '0',
     pendingCount: 0,
     conflictCount: 0,

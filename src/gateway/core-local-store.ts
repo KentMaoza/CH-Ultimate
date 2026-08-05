@@ -150,6 +150,7 @@ export interface CoreOfflineConflict {
 export interface CoreLocalEnvelope {
   cacheVersion: 4;
   installationId: string;
+  trustedV2Bootstrap?: true;
   state: DemoState;
   serverRevision: string;
   balanceVersions: Record<string, string>;
@@ -351,6 +352,7 @@ const localEnvelopeSchema: z.ZodType<CoreLocalEnvelope> = z
   .object({
     cacheVersion: z.literal(CORE_CACHE_VERSION),
     installationId: uuid,
+    trustedV2Bootstrap: z.literal(true).optional(),
     state: demoStateSchema,
     serverRevision: decimalCursor,
     balanceVersions: z.record(uuid, z.string().regex(/^[1-9]\d*$/)),

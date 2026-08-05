@@ -153,7 +153,7 @@ test('rejects a non-integer counted quantity', () => {
 test('stale online rejection refreshes the observed stock and requires confirmation again', async () => {
   const gateway = new MockOperationsGateway(stockState);
   const onlineSync = {
-    phase: 'online' as const, serverRevision: '1', pendingCount: 0, conflictCount: 0,
+    phase: 'online' as const, trustedV2Bootstrap: true, serverRevision: '1', pendingCount: 0, conflictCount: 0,
   };
   gateway.getSyncSnapshot = () => onlineSync;
   const originalCheck = gateway.checkStock.bind(gateway);
@@ -182,7 +182,7 @@ test('stale online rejection refreshes the observed stock and requires confirmat
 test('stale refresh failure blocks reconfirmation until a later online refresh succeeds', async () => {
   const gateway = new MockOperationsGateway(stockState);
   let syncSnapshot = {
-    phase: 'offline' as 'offline' | 'online', serverRevision: '1', pendingCount: 0, conflictCount: 0,
+    phase: 'offline' as 'offline' | 'online', trustedV2Bootstrap: true, serverRevision: '1', pendingCount: 0, conflictCount: 0,
   };
   gateway.getSyncSnapshot = () => syncSnapshot;
   vi.spyOn(gateway, 'checkStock').mockRejectedValueOnce(
@@ -218,6 +218,7 @@ test('offline confirmation warns that reconnect overwrites central stock', async
   const gateway = new MockOperationsGateway(stockState);
   gateway.getSyncSnapshot = () => ({
     phase: 'offline',
+    trustedV2Bootstrap: true,
     serverRevision: '1',
     pendingCount: 0,
     conflictCount: 0,
@@ -266,7 +267,7 @@ test('unknown code registration is online-only and requires target then exact-co
 test('unknown barcode cannot be registered while offline', () => {
   const gateway = new MockOperationsGateway(stockState);
   gateway.getSyncSnapshot = () => ({
-    phase: 'offline', serverRevision: '1', pendingCount: 0, conflictCount: 0,
+    phase: 'offline', trustedV2Bootstrap: true, serverRevision: '1', pendingCount: 0, conflictCount: 0,
   });
   render(<StockCheckView gateway={gateway} mode="desktop" />);
   fireEvent.change(screen.getByRole('textbox', { name: 'Kode SKU atau barcode' }), {

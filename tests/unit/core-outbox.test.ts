@@ -854,10 +854,7 @@ describe('Core deferred outbox', () => {
     await expect(outbox.retryBlocked(OPERATION_ID)).resolves.toBe(true);
     transport.enqueue({
       status: 404,
-      body: {
-        code: 'NOTA_NOT_FOUND',
-        conflict: { id: 'not-a-valid-conflict' },
-      },
+      body: { code: 'NOTA_NOT_FOUND' },
     });
     await outbox.pump(true);
     expect((await store.load()).deferredOutbox[0]).toMatchObject({

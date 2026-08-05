@@ -11,6 +11,7 @@ function openNota(gateway: MockOperationsGateway, coreBacked = false) {
 class SyncedOfflineLifecycleGateway extends MockOperationsGateway {
   override getSyncSnapshot = () => ({
     phase: 'offline' as const,
+    trustedV2Bootstrap: true,
     serverRevision: '7',
     pendingCount: 0,
     conflictCount: 0,
@@ -60,6 +61,7 @@ test('offline desktop completion keeps central stock and omzet visibly pending',
   const gateway = new MockOperationsGateway();
   gateway.getSyncSnapshot = () => ({
     phase: 'offline',
+    trustedV2Bootstrap: true,
     serverRevision: '7',
     pendingCount: 1,
     conflictCount: 0,

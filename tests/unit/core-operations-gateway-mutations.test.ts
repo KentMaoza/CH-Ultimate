@@ -1,11 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   CORE_API_PATHS,
   type CoreConflict,
 } from '../../src/gateway/core-api-types';
 import type { CoreCacheEnvelope } from '../../src/gateway/core-operations-gateway';
-import { createCoreOperationsGateway } from '../../src/gateway/core-operations-gateway';
+import {
+  createCoreOperationsGateway,
+  type CoreOperationsGateway,
+} from '../../src/gateway/core-operations-gateway';
 import { mapCoreBootstrapToDemoState } from '../../src/gateway/core-bootstrap-mapping';
 import { CoreGatewayState } from '../../src/gateway/core-gateway-state';
 import { parseCoreBootstrap } from '../../src/gateway/core-api-types';
@@ -39,7 +42,164 @@ function emptyPoll(revision = '1') {
   };
 }
 
+interface DirectSchemaCase {
+  label: string;
+  source:
+    | 'catalogue-validation'
+    | 'catalogue-commit'
+    | 'catalogue-image'
+    | 'sku-image';
+  response: { status: number; body: unknown };
+  errorName: 'CoreApiSchemaError' | 'CoreApiUpgradeRequiredError';
+  detail: string;
+  invoke(gateway: CoreOperationsGateway): Promise<unknown>;
+}
+
+const directSchemaCases: DirectSchemaCase[] = [
+  {
+    label: 'catalogue validation',
+    source: 'catalogue-validation',
+    response: { status: 200, body: 'invalid-validation' },
+    errorName: 'CoreApiSchemaError',
+    detail: 'Invalid CH Core catalogue validation envelope',
+    invoke: (gateway) => gateway.validateInitialCatalogue({
+      fileName: 'catalogue.xlsx',
+      workbookBase64: 'eGxzeA==',
+    }),
+  },
+  {
+    label: 'catalogue commit',
+    source: 'catalogue-commit',
+    response: { status: 200, body: { apiSchemaVersion: 1 } },
+    errorName: 'CoreApiUpgradeRequiredError',
+    detail: 'CH Core API memerlukan versi aplikasi yang lebih baru.',
+    invoke: (gateway) => gateway.commitInitialCatalogue(
+      '88888888-8888-4888-8888-888888888888',
+    ),
+  },
+  {
+    label: 'catalogue image',
+    source: 'catalogue-image',
+    response: { status: 200, body: 'invalid-image' },
+    errorName: 'CoreApiSchemaError',
+    detail: 'Invalid CH Core catalogue image envelope',
+    invoke: (gateway) => gateway.loadSkuImage(gateway.getSnapshot().skus[0]!),
+  },
+  {
+    label: 'SKU image acknowledgement',
+    source: 'sku-image',
+    response: { status: 200, body: 'invalid-image-acknowledgement' },
+    errorName: 'CoreApiSchemaError',
+    detail: 'Invalid CH Core mutation acknowledgement envelope',
+    invoke: (gateway) => gateway.updateSku(SKU_ID, {
+      imageUrl: 'data:image/png;base64,iVBORw==',
+    }),
+  },
+];
+
 describe('Core operations gateway mutation coordination', () => {
+  it.each(directSchemaCases)(
+    'makes a malformed $label response terminal through the shared handler',
+    async ({ source, response, errorName, detail, invoke }) => {
+      const transport = new ScriptedTransport();
+      const diagnostics = vi.fn();
+      const gateway = createCoreOperationsGateway(
+        transport,
+        new MemoryStorage(),
+        new TestClock(),
+        diagnostics,
+      );
+      transport.enqueue({ status: 200, body: populatedBootstrap('1') });
+      await gateway.initialize();
+      transport.enqueue(response);
+
+      await expect(invoke(gateway)).rejects.toThrow(
+        'Versi CH Core tidak kompatibel',
+      );
+
+      expect(gateway.getSyncSnapshot()).toMatchObject({
+        phase: 'upgrade-required',
+        message:
+          'Versi CH Core tidak kompatibel. Perbarui CH Core, lalu coba hubungkan kembali.',
+      });
+      expect(diagnostics).toHaveBeenCalledWith({
+        event: 'core-schema-incompatibility',
+        source,
+        errorName,
+        errorMessage: detail,
+      });
+      const requestsBeforeBlockedWrite = transport.requests.length;
+      await expect(gateway.adjustStock(SKU_ID, 1)).rejects.toMatchObject({
+        name: 'CoreGatewayNetworkBlockedError',
+        code: 'UPGRADE_REQUIRED',
+      });
+      expect(transport.requests).toHaveLength(requestsBeforeBlockedWrite);
+    },
+  );
+
+  it('makes a malformed normal mutation acknowledgement terminal without leaking parser details', async () => {
+    const transport = new ScriptedTransport();
+    const storage = new MemoryStorage();
+    const diagnostics = vi.fn();
+    const gateway = createCoreOperationsGateway(
+      transport,
+      storage,
+      new TestClock(),
+      diagnostics,
+    );
+    transport.enqueue({ status: 200, body: populatedBootstrap('1') });
+    await gateway.initialize();
+    transport.enqueue({ status: 200, body: 'not-an-acknowledgement' });
+
+    await expect(gateway.adjustStock(SKU_ID, 1)).rejects.toThrow(
+      'Versi CH Core tidak kompatibel',
+    );
+
+    expect(gateway.getSyncSnapshot()).toMatchObject({
+      phase: 'upgrade-required',
+      message:
+        'Versi CH Core tidak kompatibel. Perbarui CH Core, lalu coba hubungkan kembali.',
+    });
+    expect(gateway.getSyncSnapshot().message).not.toContain('envelope');
+    expect(diagnostics).toHaveBeenCalledWith({
+      event: 'core-schema-incompatibility',
+      source: 'mutation',
+      errorName: 'CoreApiSchemaError',
+      errorMessage: 'Invalid CH Core mutation acknowledgement envelope',
+    });
+    const requestsBeforeBlockedWrite = transport.requests.length;
+    await expect(gateway.adjustStock(SKU_ID, 1)).rejects.toMatchObject({
+      name: 'CoreGatewayNetworkBlockedError',
+      code: 'UPGRADE_REQUIRED',
+    });
+    expect(transport.requests).toHaveLength(requestsBeforeBlockedWrite);
+    expect((storage.value as CoreCacheEnvelope).outbox).toHaveLength(1);
+  });
+
+  it('keeps an ordinary normal-mutation network failure offline and retryable', async () => {
+    const transport = new ScriptedTransport();
+    const diagnostics = vi.fn();
+    const gateway = createCoreOperationsGateway(
+      transport,
+      new MemoryStorage(),
+      new TestClock(),
+      diagnostics,
+    );
+    transport.enqueue({ status: 200, body: populatedBootstrap('1') });
+    await gateway.initialize();
+    transport.enqueue(new Error('socket closed'));
+
+    await expect(gateway.adjustStock(SKU_ID, 1)).rejects.toThrow(
+      'socket closed',
+    );
+
+    expect(gateway.getSyncSnapshot()).toMatchObject({
+      phase: 'offline',
+      message: 'socket closed',
+    });
+    expect(diagnostics).not.toHaveBeenCalled();
+  });
+
   it('sends an online stock check from the observed balance version and applies the exact acknowledgement', async () => {
     const { gateway, transport, clock } = readyGateway();
     await gateway.initialize();

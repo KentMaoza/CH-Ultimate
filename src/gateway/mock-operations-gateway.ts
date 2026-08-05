@@ -24,6 +24,7 @@ export class MockOperationsGateway implements OperationsGateway {
   };
   private readonly syncSnapshot: SyncSnapshot = {
     phase: 'demo',
+    trustedV2Bootstrap: true,
     serverRevision: '0',
     pendingCount: 0,
     conflictCount: 0,

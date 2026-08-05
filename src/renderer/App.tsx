@@ -20,7 +20,10 @@ import { StockCheckView } from './stock-check/StockCheckView';
 import { OutputProvider } from './output-context';
 import { OperationalExportPage } from './pages/OperationalExportPage';
 import { useOperationsSyncSnapshot } from './use-operations-snapshot';
-import { presentSyncStatus } from '../gateway/sync-presentation';
+import {
+  presentCoreBlockingState,
+  presentSyncStatus,
+} from '../gateway/sync-presentation';
 
 export type ModuleId = 'inventory' | 'stockCheck' | 'skuChanges' | 'shareRecommendations' | 'dataExport' | 'create' | 'label' | 'nota' | 'notaArchive' | 'revenue' | 'empty' | 'settings';
 type NavIconName = 'warehouse' | 'stock' | 'history' | 'share' | 'export' | 'add' | 'template' | 'nota' | 'archive' | 'revenue' | 'empty' | 'settings';
@@ -72,6 +75,9 @@ function AppLayout({
   const [notaReturnsToArchive, setNotaReturnsToArchive] = useState(false);
   const sync = useOperationsSyncSnapshot(gateway);
   const syncPresentation = presentSyncStatus(sync.phase);
+  const coreBlockingState = coreBacked
+    ? presentCoreBlockingState(sync)
+    : undefined;
   const current = modules.find((module) => module.id === active)!;
 
   const openCompletionDestination = (destination: NotaCompletionDestination) => {
@@ -79,13 +85,13 @@ function AppLayout({
     setActive('notaArchive');
   };
 
-  if (coreBacked && sync.phase === 'upgrade-required') {
+  if (coreBlockingState) {
     return (
       <main className="core-connection">
         <section className="core-connection__card" role="alert">
           <span className="eyebrow">CH ULTIMATE / CH CORE</span>
-          <h1>{syncPresentation.label}</h1>
-          <p>{syncPresentation.message}</p>
+          <h1>{coreBlockingState.label}</h1>
+          <p>{coreBlockingState.message}</p>
         </section>
       </main>
     );

@@ -307,12 +307,15 @@ export class ScriptedTransport implements CoreApiTransport {
       !Array.isArray(response.body) &&
       !request.path.startsWith('/v1/imports') &&
       !request.path.startsWith('/v1/images/');
+    const explicitSchemaVersion = versionedEnvelope
+      ? Reflect.get(response.body as object, 'apiSchemaVersion')
+      : undefined;
     return versionedEnvelope
       ? {
           ...response,
           body: {
             ...(response.body as Record<string, unknown>),
-            apiSchemaVersion: 2,
+            apiSchemaVersion: explicitSchemaVersion ?? 2,
           },
         }
       : response;

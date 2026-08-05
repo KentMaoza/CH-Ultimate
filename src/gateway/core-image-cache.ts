@@ -1,9 +1,19 @@
 import type { Sku } from '../domain/types';
 import type { CoreApiTransport } from './core-api-transport';
-import { CORE_API_PATHS, parseCatalogueImage } from './core-api-types';
+import {
+  CORE_API_PATHS,
+  CoreApiUpgradeRequiredError,
+  parseCatalogueImage,
+  parseCoreApiError,
+} from './core-api-types';
 import type { CoreGatewayClock, CoreGatewayStorage } from './core-cache';
 import type { CoreGatewayState } from './core-gateway-state';
 import type { ImagePrefetchSnapshot } from './operations-gateway-contract';
+import {
+  CoreSchemaIncompatibilityHandler,
+  type CoreSchemaIncompatibilitySource,
+} from './core-schema-incompatibility';
+import { CORE_UPGRADE_REQUIRED_MESSAGE } from './sync-presentation';
 
 const SHA256 = /^[0-9a-f]{64}$/;
 const CONCURRENCY = 2;
@@ -75,6 +85,7 @@ export class CoreImageCacheCoordinator {
     private readonly clock: CoreGatewayClock,
     private readonly state: CoreGatewayState,
     private readonly getSkus: () => Sku[],
+    private readonly schemaIncompatibility: CoreSchemaIncompatibilityHandler,
   ) {
     state.publishImagePrefetch(this.snapshot);
   }
@@ -94,7 +105,7 @@ export class CoreImageCacheCoordinator {
       if (cached) return cached;
     }
     beforeFetch?.();
-    return this.fetchAndStore(validated);
+    return this.fetchAndStore(validated, 'catalogue-image');
   }
 
   async seed(hash: string, image: Blob): Promise<void> {
@@ -188,7 +199,7 @@ export class CoreImageCacheCoordinator {
     while (this.active < CONCURRENCY && this.queue.length > 0) {
       const hash = this.queue.shift()!;
       this.active += 1;
-      void this.fetchAndStore(hash)
+      void this.fetchAndStore(hash, 'image-prefetch')
         .catch(() => {})
         .finally(() => {
           this.active -= 1;
@@ -199,7 +210,13 @@ export class CoreImageCacheCoordinator {
     this.publish();
   }
 
-  private fetchAndStore(hash: string): Promise<Blob> {
+  private fetchAndStore(
+    hash: string,
+    source: Extract<
+      CoreSchemaIncompatibilitySource,
+      'catalogue-image' | 'image-prefetch'
+    >,
+  ): Promise<Blob> {
     const existing = this.inFlight.get(hash);
     if (existing) return existing;
     this.queue = this.queue.filter((candidate) => candidate !== hash);
@@ -209,21 +226,30 @@ export class CoreImageCacheCoordinator {
         path: CORE_API_PATHS.image(hash),
       });
       if (response.status < 200 || response.status >= 300) {
+        const apiError = parseCoreApiError(response.status, response.body);
+        if (apiError.code === 'UPGRADE_REQUIRED') {
+          throw new CoreApiUpgradeRequiredError();
+        }
         throw new ImageRequestError(
           response.status >= 500 || response.status === 408 || response.status === 429
             ? 'transient'
             : 'source',
-          typeof response.body === 'object' && response.body &&
-          typeof Reflect.get(response.body, 'code') === 'string'
-            ? String(Reflect.get(response.body, 'code'))
-            : 'IMAGE_UNAVAILABLE',
+          apiError.code,
         );
       }
       const image = parseCatalogueImage(response.body);
       const blob = imageBlobFromBase64(image.mimeType, image.bytesBase64);
+      if (this.state.getSyncSnapshot().phase === 'upgrade-required') {
+        throw new ImageRequestError('transient', CORE_UPGRADE_REQUIRED_MESSAGE);
+      }
       await this.storeBlob(hash, blob);
       return blob;
     }).catch((error) => {
+      if (this.schemaIncompatibility.handle(error, source)) {
+        this.generation += 1;
+        this.queue = [];
+        throw new Error(CORE_UPGRADE_REQUIRED_MESSAGE);
+      }
       if (this.referencedHashes.has(hash)) this.recordFailure(hash, error);
       throw error;
     }).finally(() => this.inFlight.delete(hash));

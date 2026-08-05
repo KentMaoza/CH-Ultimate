@@ -59,6 +59,7 @@ class AsyncAddNotaPageGateway extends MockOperationsGateway {
 class SyncedOfflineLifecycleGateway extends MockOperationsGateway {
   override getSyncSnapshot = () => ({
     phase: 'offline' as const,
+    trustedV2Bootstrap: true,
     serverRevision: '7',
     pendingCount: 0,
     conflictCount: 0,
@@ -277,6 +278,7 @@ test('mobile completion labels central stock and omzet as pending while offline'
   const gateway = new MockOperationsGateway(createMobileDemoState);
   gateway.getSyncSnapshot = () => ({
     phase: 'offline',
+    trustedV2Bootstrap: true,
     serverRevision: '7',
     pendingCount: 1,
     conflictCount: 0,

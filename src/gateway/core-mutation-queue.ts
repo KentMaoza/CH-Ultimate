@@ -1,5 +1,6 @@
 import {
   CORE_API_PATHS,
+  CoreApiUpgradeRequiredError,
   parseCoreApiError,
   parseCoreMutationAcknowledgement,
   type CoreMutationAcknowledgement,
@@ -19,6 +20,8 @@ import {
   type MutationDeferred,
 } from './core-mutation-item';
 import { mergeQueuedMutation } from './core-optimistic-state';
+import { CoreSchemaIncompatibilityHandler } from './core-schema-incompatibility';
+import { CORE_UPGRADE_REQUIRED_MESSAGE } from './sync-presentation';
 
 export type { CoreMutationSpec } from './core-mutation-item';
 
@@ -36,6 +39,7 @@ export class CoreMutationQueue {
     private readonly refresh: () => Promise<void>,
     private readonly now: () => Date,
     private readonly onAuthenticationRevoked: () => Promise<void>,
+    private readonly schemaIncompatibility: CoreSchemaIncompatibilityHandler,
   ) {}
 
   enqueue(spec: CoreMutationSpec): Promise<CoreMutationAcknowledgement> {
@@ -142,6 +146,10 @@ export class CoreMutationQueue {
 
   private async runPump(): Promise<void> {
     while (true) {
+      if (this.state.getSyncSnapshot().phase === 'upgrade-required') {
+        this.failAllDeferred(new Error(CORE_UPGRADE_REQUIRED_MESSAGE));
+        return;
+      }
       if (this.state.getSyncSnapshot().phase === 'revoked') {
         this.failAllDeferred(
           new Error('Akses perangkat dicabut. Antrean lokal dikarantina.'),
@@ -193,6 +201,10 @@ export class CoreMutationQueue {
             apiError.code === 'UPGRADE_REQUIRED'
                 ? 'upgrade-required'
                 : 'offline';
+          if (apiError.code === 'UPGRADE_REQUIRED') {
+            await this.failSchema(new CoreApiUpgradeRequiredError());
+            return;
+          }
           await this.failCurrent(
             item.id,
             new Error(apiError.code),
@@ -203,6 +215,7 @@ export class CoreMutationQueue {
         const acknowledgement = parseCoreMutationAcknowledgement(response.body);
         await this.acknowledge(item, acknowledgement);
       } catch (error) {
+        if (await this.failSchema(error)) return;
         await this.failCurrent(item.id, error);
         return;
       } finally {
@@ -320,6 +333,14 @@ export class CoreMutationQueue {
         error instanceof Error ? error.message : 'CH Core tidak tersedia.',
     });
     if (id) this.failDeferred(id, error);
+  }
+
+  private async failSchema(error: unknown): Promise<boolean> {
+    if (!this.schemaIncompatibility.handle(error, 'mutation')) return false;
+    const safeError = new Error(CORE_UPGRADE_REQUIRED_MESSAGE);
+    await this.failCurrent(undefined, safeError, 'upgrade-required');
+    this.failAllDeferred(safeError);
+    return true;
   }
 
   private recordDurable(envelope: CoreCacheEnvelope): void {

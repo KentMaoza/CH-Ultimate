@@ -1,5 +1,9 @@
 import type { CoreApiResponse, CoreApiTransport } from './core-api-transport';
-import { CORE_API_PATHS } from './core-api-types';
+import {
+  CORE_API_PATHS,
+  CoreApiUpgradeRequiredError,
+  parseCoreApiError,
+} from './core-api-types';
 import { coreConflictSchema } from './core-cache';
 import type {
   CoreDeferredCommand,
@@ -11,6 +15,8 @@ import type {
 } from './core-local-store';
 import { CoreLocalStore } from './core-local-store';
 import type { NotaTransaction } from '../domain/types';
+import type { CoreSchemaIncompatibilityHandler } from './core-schema-incompatibility';
+import { CORE_UPGRADE_REQUIRED_MESSAGE } from './sync-presentation';
 
 interface DeferredOutboxDependencies {
   now(): Date;
@@ -21,6 +27,7 @@ interface DeferredOutboxDependencies {
     response: CoreApiResponse,
   ): CoreLocalEnvelope;
   onRevoked?(): void | Promise<void>;
+  schemaIncompatibility?: CoreSchemaIncompatibilityHandler;
 }
 
 const defaults: DeferredOutboxDependencies = {
@@ -445,45 +452,64 @@ export class CoreDeferredOutbox {
       }
       if (response.status < 200 || response.status >= 300) {
         const permanent = response.status >= 400 && response.status < 500;
+        let apiError;
+        try {
+          apiError = parseCoreApiError(response.status, response.body);
+        } catch (error) {
+          if (await this.markSchemaError(command.operationId, error)) return;
+          throw error;
+        }
+        if (apiError.code === 'UPGRADE_REQUIRED') {
+          await this.markSchemaError(
+            command.operationId,
+            new CoreApiUpgradeRequiredError(),
+          );
+          return;
+        }
         const parsedConflict = permanent
           ? parseServerConflict(response.body)
           : undefined;
         await this.markError(
           command.operationId,
-          responseError(response),
+          new Error(apiError.code),
           parsedConflict ? 'conflict' : permanent ? 'blocked' : 'error',
           parsedConflict,
         );
         if (permanent) continue;
         return;
       }
-      await this.store.update((current) => {
-        const acknowledged =
-          this.dependencies.acknowledge?.(
-            current,
-            command,
-            response,
-          ) ?? current;
-        return {
-          ...acknowledged,
-          deferredOutbox: acknowledged.deferredOutbox.filter((item) => {
-            if (item.operationId === command.operationId) return false;
-            return !(
-              command.kind === 'nota-mutation' &&
-              command.resolution?.choice === 'server' &&
-              command.payload.optimistic.kind === 'nota-page-add' &&
-              item.kind === 'nota-mutation' &&
-              item.payload.dependsOn.includes(command.operationId)
-            );
-          }),
-          offlineConflicts:
-            command.kind === 'nota-mutation' && command.resolution
-            ? acknowledged.offlineConflicts.filter(
-                (item) => item.operationId !== command.operationId,
-              )
-            : acknowledged.offlineConflicts,
-        };
-      });
+      try {
+        await this.store.update((current) => {
+          const acknowledged =
+            this.dependencies.acknowledge?.(
+              current,
+              command,
+              response,
+            ) ?? current;
+          return {
+            ...acknowledged,
+            deferredOutbox: acknowledged.deferredOutbox.filter((item) => {
+              if (item.operationId === command.operationId) return false;
+              return !(
+                command.kind === 'nota-mutation' &&
+                command.resolution?.choice === 'server' &&
+                command.payload.optimistic.kind === 'nota-page-add' &&
+                item.kind === 'nota-mutation' &&
+                item.payload.dependsOn.includes(command.operationId)
+              );
+            }),
+            offlineConflicts:
+              command.kind === 'nota-mutation' && command.resolution
+              ? acknowledged.offlineConflicts.filter(
+                  (item) => item.operationId !== command.operationId,
+                )
+              : acknowledged.offlineConflicts,
+          };
+        });
+      } catch (error) {
+        if (await this.markSchemaError(command.operationId, error)) return;
+        throw error;
+      }
     }
   }
 
@@ -535,6 +561,20 @@ export class CoreDeferredOutbox {
     });
   }
 
+  private async markSchemaError(
+    operationId: string,
+    error: unknown,
+  ): Promise<boolean> {
+    if (!this.dependencies.schemaIncompatibility?.handle(error, 'deferred')) {
+      return false;
+    }
+    await this.markError(
+      operationId,
+      new Error(CORE_UPGRADE_REQUIRED_MESSAGE),
+    );
+    return true;
+  }
+
   async quarantineRevoked(): Promise<void> {
     const now = this.dependencies.now().toISOString();
     await this.store.quarantineCurrentWork(now);
@@ -550,20 +590,6 @@ function deferredEntityKey(command: CoreDeferredCommand): string {
     return `nota:${command.payload.notaId}`;
   }
   return `stock:${command.payload.skuId}`;
-}
-
-function responseError(response: CoreApiResponse): Error {
-  const candidate =
-    response.body &&
-    typeof response.body === 'object' &&
-    !Array.isArray(response.body)
-      ? Reflect.get(response.body, 'code')
-      : undefined;
-  const code =
-    typeof candidate === 'string'
-      ? candidate
-      : `HTTP_${response.status}`;
-  return new Error(code);
 }
 
 function parseServerConflict(responseBody: unknown) {

@@ -7,6 +7,7 @@ function coreGatewayAt(phase: SyncPhase) {
   const gateway = new MockOperationsGateway();
   gateway.getSyncSnapshot = () => ({
     phase,
+    trustedV2Bootstrap: true,
     serverRevision: '8',
     pendingCount: 0,
     conflictCount: 0,

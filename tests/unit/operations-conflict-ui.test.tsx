@@ -8,6 +8,7 @@ import { OperationsSyncStatus as DesktopStatus } from '../../src/renderer/Operat
 class ConflictGateway extends MockOperationsGateway {
   override getSyncSnapshot = () => ({
     phase: 'conflict' as const,
+    trustedV2Bootstrap: true,
     serverRevision: '7',
     pendingCount: 2,
     conflictCount: 2,

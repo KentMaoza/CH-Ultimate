@@ -65,3 +65,30 @@ test('blocks the desktop business shell after a malformed Core bootstrap', async
   expect(screen.queryByRole('navigation', { name: 'Modul CH Ultimate' })).not.toBeInTheDocument();
   gateway.dispose();
 });
+
+test('blocks the desktop business shell when the first Core bootstrap cannot reach the network', async () => {
+  const transport = new ScriptedTransport();
+  transport.enqueue(new Error('wifi down'));
+  const gateway = createCoreOperationsGateway(
+    transport,
+    new MemoryStorage(),
+    new TestClock(),
+  );
+
+  await gateway.initialize();
+  render(<App gateway={gateway} coreBacked />);
+
+  expect(
+    screen.getByRole('heading', { name: 'Memuat CH Core' }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      'Data CH Core belum siap. Hubungkan ke jaringan CH Core, lalu coba lagi.',
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByText('wifi down')).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'SKU Gudang' })).not.toBeInTheDocument();
+  expect(screen.queryByText(/0 SKU aktif/i)).not.toBeInTheDocument();
+  expect(screen.queryByRole('navigation', { name: 'Modul CH Ultimate' })).not.toBeInTheDocument();
+  gateway.dispose();
+});

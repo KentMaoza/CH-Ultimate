@@ -32,8 +32,14 @@ receipt_draft="$staging_root/.prepare-v023-receipt.txt.tmp"
   die 'The exact release archive is unavailable or unsafe.'
 [ -f "$ops_supplement" ] && [ ! -L "$ops_supplement" ] ||
   die 'The exact operations supplement is unavailable or unsafe.'
-[ ! -e "$target_root" ] && [ ! -L "$target_root" ] ||
-  die 'The exact target deployment directory already exists or is unsafe.'
+[ ! -L "$target_root" ] ||
+  die 'The exact target deployment directory is a symlink and is unsafe.'
+prepare_mode='CREATED_NEW'
+if [ -e "$target_root" ]; then
+  [ -d "$target_root" ] && [ ! -L "$target_root" ] ||
+    die 'The existing target deployment path is not an ordinary directory.'
+  prepare_mode='RESUMED_EXISTING'
+fi
 [ ! -e "$receipt" ] && [ ! -L "$receipt" ] ||
   die 'The preparation receipt already exists or is unsafe.'
 [ ! -e "$receipt_draft" ] && [ ! -L "$receipt_draft" ] ||
@@ -53,8 +59,10 @@ tar -tzf "$source_archive" |
     END { exit bad }
   ' || die 'The staged release archive contains an unexpected path.'
 
-mkdir -m 0700 "$target_root"
-tar -xzf "$source_archive" -C "$deployment_parent"
+if [ "$prepare_mode" = 'CREATED_NEW' ]; then
+  mkdir -m 0700 "$target_root"
+  tar -xzf "$source_archive" -C "$deployment_parent"
+fi
 
 for required in \
   "$target_root/package.json" \
@@ -67,9 +75,14 @@ for required in \
 done
 
 ops_supplement_target="$target_root/server/scripts/compare-scratch.sh"
-[ ! -e "$ops_supplement_target" ] && [ ! -L "$ops_supplement_target" ] ||
-  die 'The operations supplement target already exists or is unsafe.'
-cp "$ops_supplement" "$ops_supplement_target"
+[ ! -L "$ops_supplement_target" ] ||
+  die 'The operations supplement target is a symlink and is unsafe.'
+if [ -e "$ops_supplement_target" ]; then
+  [ -f "$ops_supplement_target" ] && [ ! -L "$ops_supplement_target" ] ||
+    die 'The existing operations supplement target is not an ordinary file.'
+else
+  cp "$ops_supplement" "$ops_supplement_target"
+fi
 chmod 0555 "$ops_supplement_target"
 [ "$(sha256sum "$ops_supplement_target" | awk 'NR == 1 {print $1}')" = "$expected_ops_supplement_sha256" ] ||
   die 'The prepared operations supplement checksum does not match.'
@@ -108,6 +121,7 @@ printf '%s\n' "$expected_migrations" |
   printf 'SOURCE_ARCHIVE=%s\n' "$source_archive"
   printf 'SOURCE_SHA256=%s\n' "$actual_archive_sha256"
   printf 'TARGET_ROOT=%s\n' "$target_root"
+  printf 'PREPARE_MODE=%s\n' "$prepare_mode"
   printf 'OPS_SUPPLEMENT=compare-scratch.sh|%s|OPERATIONS_ONLY\n' \
     "$actual_ops_supplement_sha256"
   printf '%s\n' "$expected_migrations" |

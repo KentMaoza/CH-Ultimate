@@ -87,6 +87,25 @@ describe('CH Core v0.2.3 NAS source preparation', () => {
     }
   });
 
+  it('resumes only an ordinary existing target and records that recovery in the receipt', async () => {
+    const script = await readFile(scriptPath, 'utf8');
+
+    expect(script).toContain("prepare_mode='CREATED_NEW'");
+    expect(script).toContain('if [ -e "$target_root" ]; then');
+    expect(script).toContain(
+      '[ -d "$target_root" ] && [ ! -L "$target_root" ]',
+    );
+    expect(script).toContain("prepare_mode='RESUMED_EXISTING'");
+    expect(script).toContain('if [ -e "$ops_supplement_target" ]; then');
+    expect(script).toContain(
+      '[ -f "$ops_supplement_target" ] && [ ! -L "$ops_supplement_target" ]',
+    );
+    expect(script).toContain("printf 'PREPARE_MODE=%s\\n' \"$prepare_mode\"");
+    expect(script).not.toContain(
+      'The exact target deployment directory already exists or is unsafe.',
+    );
+  });
+
   it('matches every embedded migration checksum to the reviewed SQL bytes', async () => {
     for (const [relativeScript, expectedCount] of [
       ['scripts/ch-core-v023-preflight.sh', 9],

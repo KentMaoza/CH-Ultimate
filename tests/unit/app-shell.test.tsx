@@ -132,7 +132,7 @@ test('uses truthful CH Core copy across persisted desktop workflows', () => {
 
   fireEvent.click(screen.getByRole('button', { name: 'Barang Kosong' }));
   expect(screen.getByTestId('empty-report-preview')).toHaveTextContent(
-    'Data CH Core · Export PDF belum aktif',
+    'Data CH Core · PDF siap disimpan',
   );
   expect(screen.getByTestId('empty-report-preview')).not.toHaveTextContent(
     'Demo preview',

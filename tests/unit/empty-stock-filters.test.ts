@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { EmptyStockItem, Sku } from '../../src/domain/types';
-import { addFilteredSelection, filterEmptyStockItems, supplierCodeFromName } from '../../src/renderer/pages/empty-stock-utils';
+import { addFilteredSelection, buildEmptyStockPdfPlan, filterEmptyStockItems, supplierCodeFromName } from '../../src/renderer/pages/empty-stock-utils';
 
 const sku = (id: string, skuNumber: string, name: string): EmptyStockItem => ({
   selected: false,
@@ -15,6 +15,24 @@ const items = [
 ];
 
 describe('empty stock supplier filters', () => {
+  test('builds a printable PDF plan from the exact selected restock rows', () => {
+    const plan = buildEmptyStockPdfPlan(
+      [sku('1', 'SKU-RED', 'Kemeja Merah CH02')],
+      { '1': 12 },
+      '2026-08-08',
+    );
+
+    expect(plan).toMatchObject({
+      kind: 'operational-data',
+      dataset: 'sku-stock',
+      title: 'Laporan Barang Kosong',
+      fileName: 'CHU-Laporan-Barang-Kosong-2026-08-08.pdf',
+      totalMatched: 1,
+      totalIncluded: 1,
+      rows: [{ id: '1', skuId: '1', cells: ['SKU-RED', 'Kemeja Merah CH02', 0, 12] }],
+    });
+  });
+
   test('extracts only an exact supplier suffix and preserves zero padding', () => {
     expect(supplierCodeFromName('Kemeja Merah CH02')).toBe('CH02');
     expect(supplierCodeFromName('Kemeja Biru ch002 ')).toBe('CH002');

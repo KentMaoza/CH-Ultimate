@@ -12,10 +12,18 @@ Payload GitHub prerelease `pilot-v0.2.4` adalah:
 
 1. Impor workbook melakukan rekonsiliasi katalog aman lewat identifier yang
    dinormalisasi dan mempertahankan ID SKU serta histori yang sudah ada.
-2. SKU arsip yang cocok dipulihkan; SKU aktif yang tidak cocok, identifier
-   tambahan, atau kecocokan silang memblokir transaksi sebelum penulisan.
-3. Stok baseline memakai upsert dan audit. Tidak ada penghapusan katalog otomatis.
-4. Klien memerlukan `apiSchemaVersion: 2` dan `stockChecks: []`; bootstrap yang
+2. SKU arsip yang cocok dipulihkan. SKU lama yang tidak ada di workbook dan
+   identifier tambahan tetap dipertahankan; hanya kecocokan identifier silang
+   yang ambigu yang memblokir transaksi.
+3. Nota, pergerakan stok, cek stok, dan histori harga yang sudah ada tidak
+   dihapus atau dijadikan alasan untuk menolak impor.
+4. Stok SKU baru dibuat sebagai baseline. Selisih stok pada SKU yang cocok
+   dicatat sebagai movement `catalogue_reconciliation`, audit, dan change-log;
+   jumlah yang sama tidak membuat movement palsu.
+5. Receipt impor menyimpan jumlah SKU cocok, SKU baru, SKU lama yang tidak
+   disentuh, penyesuaian stok, dan kecocokan stok tanpa selisih agar replay dan
+   pemeriksaan pascadeploy dapat dibuktikan.
+6. Klien memerlukan `apiSchemaVersion: 2` dan `stockChecks: []`; bootstrap yang
    tidak kompatibel gagal tertutup dan tidak boleh terlihat tersinkronisasi.
 
 ## Prasyarat operasional

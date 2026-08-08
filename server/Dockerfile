@@ -10,6 +10,22 @@ COPY server server
 RUN npm --workspace @ch-ultimate/core run build \
     && npm prune --omit=dev --workspace @ch-ultimate/core --include-workspace-root=false
 
+FROM node:24-bookworm-slim AS integration
+
+ENV NODE_ENV=test
+ENV NODE_OPTIONS=--max-old-space-size=256
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY server/package.json server/package.json
+RUN npm ci --workspace @ch-ultimate/core --include-workspace-root=false
+
+COPY server server
+
+USER node
+CMD ["npm", "--workspace", "@ch-ultimate/core", "run", "test:integration", "--", "--run", "test/catalogue-live-reconciliation.integration.test.ts"]
+
 FROM node:24-bookworm-slim AS runtime
 
 ENV NODE_ENV=production

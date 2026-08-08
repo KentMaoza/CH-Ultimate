@@ -13,6 +13,7 @@ import {
   CORE_INVOICE_TEMPLATE_DEFAULT,
   CORE_LABEL_TEMPLATE_DEFAULT,
 } from './core-presentation-defaults';
+import { safeRemoteImageUrl } from './safe-image-url';
 
 export function integerFromDecimal(value: string, field: string): number {
   const result = Number(BigInt(value));
@@ -223,7 +224,7 @@ export function mapCoreBootstrapToDemoState(
       : 0,
     tracked: balances.has(row.id),
     note: row.sourceNote ?? '',
-    imageUrl: '',
+    imageUrl: row.imageHash ? '' : safeRemoteImageUrl(row.sourceImageUrl),
     ...(row.imageHash ? { imageHash: row.imageHash } : {}),
     sourceImageUrl: row.sourceImageUrl ?? null,
     ...(row.sourceCreatedAt

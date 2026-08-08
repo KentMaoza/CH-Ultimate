@@ -104,6 +104,55 @@ function imageResponse(bytesBase64 = 'iVBORw==') {
 }
 
 describe('Core durable image cache and prefetch', () => {
+  it('keeps a safe source URL visible across bootstrap when no hash exists', async () => {
+    const storage = new ImageMemoryStorage();
+    const transport = new ScriptedTransport();
+    const gateway = createCoreOperationsGateway(transport, storage, new TestClock());
+    const bootstrap = imageBootstrap([null]);
+    bootstrap.skus[0]!.sourceImageUrl = 'https://res.bigseller.pro/manual.jpg';
+    transport.enqueue({ status: 200, body: bootstrap });
+
+    await gateway.initialize();
+
+    const sku = gateway.getSnapshot().skus[0]!;
+    expect(sku.imageUrl).toBe('https://res.bigseller.pro/manual.jpg');
+    await expect(gateway.loadSkuImage(sku)).resolves.toBe(
+      'https://res.bigseller.pro/manual.jpg',
+    );
+  });
+
+  it('prefers an authoritative hash but falls back to its safe source URL when bytes are unavailable', async () => {
+    const storage = new ImageMemoryStorage();
+    const transport = new ScriptedTransport();
+    const gateway = createCoreOperationsGateway(transport, storage, new TestClock());
+    gateway.pauseImagePrefetch();
+    transport.enqueue({ status: 200, body: imageBootstrap([HASH_A]) });
+    transport.enqueue({ status: 404, body: { code: 'IMAGE_NOT_FOUND' } });
+
+    await gateway.initialize();
+
+    const sku = gateway.getSnapshot().skus[0]!;
+    expect(sku.imageUrl).toBe('');
+    await expect(gateway.loadSkuImage(sku)).resolves.toBe(
+      `https://example.test/${HASH_A}.jpg`,
+    );
+  });
+
+  it('never exposes a non-HTTP source URL as an image fallback', async () => {
+    const storage = new ImageMemoryStorage();
+    const transport = new ScriptedTransport();
+    const gateway = createCoreOperationsGateway(transport, storage, new TestClock());
+    const bootstrap = imageBootstrap([null]);
+    bootstrap.skus[0]!.sourceImageUrl = 'javascript:alert(1)';
+    transport.enqueue({ status: 200, body: bootstrap });
+
+    await gateway.initialize();
+
+    const sku = gateway.getSnapshot().skus[0]!;
+    expect(sku.imageUrl).toBe('');
+    await expect(gateway.loadSkuImage(sku)).resolves.toBe('');
+  });
+
   it('makes a malformed prefetch image terminal and does not start the next queued image', async () => {
     const storage = new ImageMemoryStorage();
     const transport = new ScriptedTransport();

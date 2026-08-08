@@ -18,6 +18,7 @@ const primaryIdentifierId = '44444444-4444-4444-8444-444444444444';
 const productIdentifierId = '55555555-5555-4555-8555-555555555555';
 const imageJobId = '66666666-6666-4666-8666-666666666666';
 const priceHistoryId = '77777777-7777-4777-8777-777777777777';
+const stockMovementId = '88888888-8888-4888-8888-888888888888';
 
 const record: CatalogueImportRecord = {
   id: importId,
@@ -73,14 +74,12 @@ type QueryResult = unknown;
 function commitHarness(
   options: {
     lockedStatus?: 'staged' | 'committed';
-    liveTransactions?: boolean;
-    stockCheckActivity?: boolean;
-    existingCatalogue?: boolean;
     existingSkuRows?: Array<{
       sku_id_hex: string;
       primary_identifier: string;
       row_version: string;
       balance_row_version: string | null;
+      quantity_pcs: string | null;
       created_at: Date;
       image_hash_hex: string | null;
       archived_at: Date | null;
@@ -136,23 +135,6 @@ function commitHarness(
           },
         ] as T;
       }
-      if (compact.includes('AS has_live_transactions')) {
-        return [
-          {
-            has_live_transactions:
-              options.liveTransactions ||
-              (options.stockCheckActivity &&
-                compact.includes('FROM stock_checks'))
-                ? 1
-                : 0,
-          },
-        ] as T;
-      }
-      if (compact.includes('AS has_existing_catalogue')) {
-        return [
-          { has_existing_catalogue: options.existingCatalogue ? 1 : 0 },
-        ] as T;
-      }
       if (compact.includes('FROM skus s') && compact.includes('sku_id_hex')) {
         const rows = options.existingSkuRows ?? [];
         return (
@@ -176,6 +158,7 @@ function commitHarness(
     productIdentifierId,
     imageJobId,
     priceHistoryId,
+    stockMovementId,
   ];
   const repository = new MariaDbCatalogueRepository(pool, {
     randomUuid: () => uuids.shift()!,
@@ -275,9 +258,10 @@ describe('MariaDB catalogue repository', () => {
       ]),
     );
     expect(insert('stock_balances')?.values).toContain(12);
-    expect(insert('stock_balances')?.sql).toMatch(
-      /\?\) ON DUPLICATE KEY UPDATE/,
+    expect(insert('stock_balances')?.sql).not.toContain(
+      'ON DUPLICATE KEY UPDATE',
     );
+    expect(insert('stock_movements')).toBeUndefined();
     expect(insert('price_history')?.values).toContain('catalogue_import');
     expect(insert('image_jobs')?.values).toEqual(
       expect.arrayContaining([
@@ -295,15 +279,14 @@ describe('MariaDB catalogue repository', () => {
     const lockIndex = queries.findIndex(({ sql }) =>
       sql.includes('FROM business_write_lock'),
     );
-    const liveCheckIndex = queries.findIndex(({ sql }) =>
-      sql.includes('AS has_live_transactions'),
-    );
     const firstWriteIndex = queries.findIndex(({ sql }) =>
       sql.startsWith('INSERT INTO skus'),
     );
     expect(lockIndex).toBeGreaterThanOrEqual(0);
-    expect(lockIndex).toBeLessThan(liveCheckIndex);
     expect(lockIndex).toBeLessThan(firstWriteIndex);
+    expect(
+      queries.some(({ sql }) => sql.includes('AS has_live_transactions')),
+    ).toBe(false);
   });
 
   it('returns a locked committed result as an idempotent replay', async () => {
@@ -321,41 +304,17 @@ describe('MariaDB catalogue repository', () => {
     );
   });
 
-  it('blocks a different full import after live transactions and rolls back', async () => {
-    const { events, queries, repository } = commitHarness({
-      liveTransactions: true,
-    });
+  it('does not query or delete live history before a safe reconciliation', async () => {
+    const { events, queries, repository } = commitHarness();
 
     await expect(
       repository.commit(record, workbook, new Date('2026-07-30T02:00:00.000Z')),
-    ).rejects.toMatchObject({
-      code: 'LIVE_TRANSACTIONS_EXIST',
-      statusCode: 409,
-    });
+    ).resolves.toMatchObject({ replayed: false });
 
-    expect(events).toEqual(['begin', 'rollback', 'release']);
-    expect(queries.some(({ sql }) => sql.startsWith('INSERT INTO skus'))).toBe(
-      false,
-    );
-  });
-
-  it('blocks catalogue replacement after an unchanged stock check before deleting rows', async () => {
-    const { events, queries, repository } = commitHarness({
-      stockCheckActivity: true,
-      existingCatalogue: true,
-    });
-
-    await expect(
-      repository.commit(record, workbook, new Date('2026-07-30T02:00:00.000Z')),
-    ).rejects.toMatchObject({
-      code: 'LIVE_TRANSACTIONS_EXIST',
-      statusCode: 409,
-    });
-
-    expect(events).toEqual(['begin', 'rollback', 'release']);
-    expect(queries.some(({ sql }) => sql.includes('FROM stock_checks'))).toBe(
-      true,
-    );
+    expect(events).toEqual(['begin', 'commit', 'release']);
+    expect(
+      queries.some(({ sql }) => sql.includes('AS has_live_transactions')),
+    ).toBe(false);
     expect(queries.some(({ sql }) => sql.startsWith('DELETE FROM'))).toBe(
       false,
     );
@@ -372,10 +331,36 @@ describe('MariaDB catalogue repository', () => {
     expect(events).toEqual(['begin', 'rollback', 'release']);
   });
 
-  it('adds a new baseline beside retained catalogue rows without clearing history', async () => {
-    const { queries, repository } = commitHarness({
-      existingCatalogue: true,
+  it('rolls back catalogue metadata when a reconciliation movement fails', async () => {
+    const existingSkuId = '89898989-8989-4989-8989-898989898989';
+    const { events, repository } = commitHarness({
+      existingSkuRows: [
+        {
+          sku_id_hex: existingSkuId.replaceAll('-', '').toUpperCase(),
+          primary_identifier: 'SKU-A',
+          row_version: '1',
+          balance_row_version: '7',
+          quantity_pcs: '7',
+          created_at: new Date('2026-07-29T02:00:00.000Z'),
+          image_hash_hex: null,
+          archived_at: null,
+          identifier_id_hex: '90909090909040908090909090909090',
+          identifier_value: 'SKU-A',
+          identifier_kind: 'primary',
+          identifier_created_at: new Date('2026-07-29T02:01:00.000Z'),
+        },
+      ],
+      failOn: /^INSERT INTO stock_movements/,
     });
+
+    await expect(
+      repository.commit(record, workbook, new Date('2026-07-30T02:00:00.000Z')),
+    ).rejects.toThrow('database failed');
+    expect(events).toEqual(['begin', 'rollback', 'release']);
+  });
+
+  it('adds a new baseline beside retained catalogue rows without clearing history', async () => {
+    const { queries, repository } = commitHarness();
 
     await repository.commit(
       record,
@@ -401,13 +386,13 @@ describe('MariaDB catalogue repository', () => {
   it('reconciles a matching imported SKU without replacing its identity', async () => {
     const existingSkuId = '88888888-8888-4888-8888-888888888888';
     const { queries, repository } = commitHarness({
-      existingCatalogue: true,
       existingSkuRows: [
         {
           sku_id_hex: existingSkuId.replaceAll('-', '').toUpperCase(),
           primary_identifier: 'SKU-A',
           row_version: '1',
           balance_row_version: '7',
+          quantity_pcs: '7',
           created_at: new Date('2026-07-29T02:00:00.000Z'),
           image_hash_hex: null,
           archived_at: null,
@@ -421,6 +406,7 @@ describe('MariaDB catalogue repository', () => {
           primary_identifier: 'SKU-A',
           row_version: '1',
           balance_row_version: '7',
+          quantity_pcs: '7',
           created_at: new Date('2026-07-29T02:00:00.000Z'),
           image_hash_hex: null,
           archived_at: null,
@@ -453,6 +439,21 @@ describe('MariaDB catalogue repository', () => {
           sql.startsWith('INSERT INTO skus') && values.includes(existingSkuId),
       ),
     ).toBe(false);
+    expect(
+      queries.some(
+        ({ sql, values }) =>
+          sql.startsWith('UPDATE stock_balances') &&
+          values.includes(12) &&
+          values.includes(existingSkuId),
+      ),
+    ).toBe(true);
+    const movementInsert = queries.find(({ sql }) =>
+      sql.startsWith('INSERT INTO stock_movements'),
+    );
+    expect(movementInsert?.sql).toContain('catalogue_reconciliation');
+    expect(movementInsert?.values).toEqual(
+      expect.arrayContaining([existingSkuId, '5', deviceId, importId]),
+    );
     const changePayloads = queries
       .filter(({ sql }) => sql.startsWith('INSERT INTO change_log'))
       .flatMap(({ values }) => values)
@@ -468,13 +469,42 @@ describe('MariaDB catalogue repository', () => {
         rowVersion: '8',
       }),
     );
-    const auditInsert = queries.find(({ sql }) =>
-      sql.startsWith('INSERT INTO audit_events'),
+    expect(changePayloads).toContainEqual(
+      expect.objectContaining({
+        skuId: existingSkuId,
+        deltaPcs: '5',
+        reason: 'catalogue_reconciliation',
+        beforeQuantityPcs: '7',
+        afterQuantityPcs: '12',
+      }),
     );
-    expect(JSON.parse(String(auditInsert?.values.at(-1)))).toMatchObject({
+    const stockAudit = queries.find(
+      ({ sql }) =>
+        sql.startsWith('INSERT INTO audit_events') &&
+        sql.includes('catalogue.stock_reconciled'),
+    );
+    const stockAuditDetail = stockAudit?.values.find(
+      (value): value is string =>
+        typeof value === 'string' && value.startsWith('{'),
+    );
+    expect(JSON.parse(String(stockAuditDetail))).toMatchObject({
+      beforeQuantityPcs: '7',
+      afterQuantityPcs: '12',
+      deltaPcs: '5',
+      importId,
+      workbookSha256: record.workbookSha256,
+    });
+    const importAudit = queries.find(
+      ({ sql }) =>
+        sql.startsWith('INSERT INTO audit_events') &&
+        sql.includes('catalogue.import_committed'),
+    );
+    expect(JSON.parse(String(importAudit?.values.at(-1)))).toMatchObject({
       matchedExistingCount: 1,
       createdSkuCount: 0,
-      unmatchedArchivedCount: 0,
+      untouchedExistingCount: 0,
+      stockAdjustedCount: 1,
+      zeroDeltaMatchedCount: 0,
     });
     expect(changePayloads).toContainEqual(
       expect.objectContaining({
@@ -485,16 +515,71 @@ describe('MariaDB catalogue repository', () => {
     );
   });
 
-  it('blocks unmatched active SKU rows before changing catalogue data', async () => {
+  it('does not create stock movement or balance change for a zero-delta match', async () => {
+    const existingSkuId = '91919191-9191-4191-8191-919191919191';
+    const { queries, repository } = commitHarness({
+      existingSkuRows: [
+        {
+          sku_id_hex: existingSkuId.replaceAll('-', '').toUpperCase(),
+          primary_identifier: 'SKU-A',
+          row_version: '1',
+          balance_row_version: '7',
+          quantity_pcs: '12',
+          created_at: new Date('2026-07-29T02:00:00.000Z'),
+          image_hash_hex: null,
+          archived_at: null,
+          identifier_id_hex: '92929292929242928292929292929292',
+          identifier_value: 'SKU-A',
+          identifier_kind: 'primary',
+          identifier_created_at: new Date('2026-07-29T02:01:00.000Z'),
+        },
+      ],
+    });
+
+    await repository.commit(
+      record,
+      workbook,
+      new Date('2026-07-30T02:00:00.000Z'),
+    );
+
+    expect(
+      queries.some(({ sql }) => sql.startsWith('UPDATE stock_balances')),
+    ).toBe(false);
+    expect(
+      queries.some(({ sql }) => sql.startsWith('INSERT INTO stock_movements')),
+    ).toBe(false);
+    const balanceChanges = queries
+      .filter(({ sql }) => sql.startsWith('INSERT INTO change_log'))
+      .flatMap(({ values }) => values)
+      .filter(
+        (value): value is string =>
+          typeof value === 'string' && value.startsWith('{'),
+      )
+      .map((value) => JSON.parse(value) as Record<string, unknown>)
+      .filter((payload) => payload.skuId === existingSkuId)
+      .filter((payload) => 'quantityPcs' in payload || 'deltaPcs' in payload);
+    expect(balanceChanges).toEqual([]);
+    const importAudit = queries.find(
+      ({ sql }) =>
+        sql.startsWith('INSERT INTO audit_events') &&
+        sql.includes('catalogue.import_committed'),
+    );
+    expect(JSON.parse(String(importAudit?.values.at(-1)))).toMatchObject({
+      stockAdjustedCount: 0,
+      zeroDeltaMatchedCount: 1,
+    });
+  });
+
+  it('retains unmatched active SKU rows while adding workbook rows', async () => {
     const unmatchedSkuId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
     const { events, queries, repository } = commitHarness({
-      existingCatalogue: true,
       existingSkuRows: [
         {
           sku_id_hex: unmatchedSkuId.replaceAll('-', '').toUpperCase(),
           primary_identifier: 'SKU-Z',
           row_version: '3',
           balance_row_version: '1',
+          quantity_pcs: '3',
           created_at: new Date('2026-07-28T02:00:00.000Z'),
           image_hash_hex: null,
           archived_at: null,
@@ -508,30 +593,41 @@ describe('MariaDB catalogue repository', () => {
 
     await expect(
       repository.commit(record, workbook, new Date('2026-07-30T02:00:00.000Z')),
-    ).rejects.toMatchObject({
-      code: 'UNMATCHED_EXISTING_SKUS',
-      statusCode: 409,
-    });
+    ).resolves.toMatchObject({ replayed: false });
 
-    expect(events).toEqual(['begin', 'rollback', 'release']);
+    expect(events).toEqual(['begin', 'commit', 'release']);
     expect(
       queries.some(
-        ({ sql }) =>
-          sql.startsWith('INSERT INTO skus') || sql.startsWith('UPDATE skus'),
+        ({ sql, values }) =>
+          sql.startsWith('INSERT INTO skus') && values.includes(skuId),
       ),
+    ).toBe(true);
+    expect(
+      queries.some(({ values }) => values.includes(unmatchedSkuId)),
     ).toBe(false);
+    expect(queries.some(({ sql }) => sql.startsWith('DELETE FROM'))).toBe(
+      false,
+    );
+    const importAudit = queries.find(
+      ({ sql }) =>
+        sql.startsWith('INSERT INTO audit_events') &&
+        sql.includes('catalogue.import_committed'),
+    );
+    expect(JSON.parse(String(importAudit?.values.at(-1)))).toMatchObject({
+      untouchedExistingCount: 1,
+    });
   });
 
   it('restores a matching archived SKU instead of creating a duplicate identity', async () => {
     const archivedSkuId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
     const { queries, repository } = commitHarness({
-      existingCatalogue: true,
       existingSkuRows: [
         {
           sku_id_hex: archivedSkuId.replaceAll('-', '').toUpperCase(),
           primary_identifier: 'SKU-A',
           row_version: '4',
           balance_row_version: '2',
+          quantity_pcs: '2',
           created_at: new Date('2026-07-27T02:00:00.000Z'),
           image_hash_hex: null,
           archived_at: new Date('2026-07-29T02:00:00.000Z'),
@@ -545,6 +641,7 @@ describe('MariaDB catalogue repository', () => {
           primary_identifier: 'SKU-A',
           row_version: '4',
           balance_row_version: '2',
+          quantity_pcs: '2',
           created_at: new Date('2026-07-27T02:00:00.000Z'),
           image_hash_hex: null,
           archived_at: new Date('2026-07-29T02:00:00.000Z'),
@@ -573,13 +670,14 @@ describe('MariaDB catalogue repository', () => {
     );
   });
 
-  it('blocks a matched SKU with an extra identifier before import writes', async () => {
+  it('preserves an extra existing identifier while reconciling its SKU', async () => {
     const existingSkuId = '12121212-1212-4212-8212-121212121212';
     const base = {
       sku_id_hex: existingSkuId.replaceAll('-', '').toUpperCase(),
       primary_identifier: 'SKU-A',
       row_version: '2',
       balance_row_version: '1',
+      quantity_pcs: '7',
       created_at: new Date('2026-07-26T02:00:00.000Z'),
       image_hash_hex: null,
       archived_at: null,
@@ -612,16 +710,21 @@ describe('MariaDB catalogue repository', () => {
 
     await expect(
       repository.commit(record, workbook, new Date('2026-07-30T02:00:00.000Z')),
-    ).rejects.toMatchObject({
-      code: 'UNEXPECTED_EXISTING_IDENTIFIERS',
-      statusCode: 409,
-    });
+    ).resolves.toMatchObject({ replayed: false });
 
-    expect(events).toEqual(['begin', 'rollback', 'release']);
+    expect(events).toEqual(['begin', 'commit', 'release']);
     expect(
       queries.some(
-        ({ sql }) =>
-          sql.startsWith('INSERT INTO skus') || sql.startsWith('UPDATE skus'),
+        ({ sql, values }) =>
+          sql.startsWith('UPDATE skus') && values.includes(existingSkuId),
+      ),
+    ).toBe(true);
+    expect(
+      queries.some(
+        ({ sql, values }) =>
+          (sql.startsWith('UPDATE sku_identifiers') ||
+            sql.startsWith('DELETE FROM sku_identifiers')) &&
+          values.includes('15151515-1515-4515-8515-151515151515'),
       ),
     ).toBe(false);
   });

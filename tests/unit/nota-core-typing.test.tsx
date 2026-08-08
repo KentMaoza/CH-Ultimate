@@ -171,7 +171,7 @@ describe('Core-backed Nota typing', () => {
     transport.enqueue(emptyPoll('3'));
 
     const description = screen.getByLabelText('Nama barang baris 1');
-    description.focus();
+    act(() => description.focus());
     await act(async () => {
       fireEvent.change(description, { target: { value: 'produk core b' } });
       await firstStarted.promise;

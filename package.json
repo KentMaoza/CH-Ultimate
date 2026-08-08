@@ -67,5 +67,8 @@
     "typescript": "5.9.3",
     "vite": "5.4.21",
     "vitest": "2.1.9"
+  },
+  "overrides": {
+    "dompurify": "3.4.13"
   }
 }

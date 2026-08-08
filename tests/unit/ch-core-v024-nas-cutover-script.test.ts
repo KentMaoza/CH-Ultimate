@@ -10,6 +10,10 @@ const passwordGeneratorPath = path.join(
   process.cwd(),
   'scripts/ch-core-v024-database-password.sh',
 );
+const countValidatorPath = path.join(
+  process.cwd(),
+  'server/scripts/ch-core-v024-count-validator.sh',
+);
 const execFile = promisify(execFileCallback);
 
 describe('CH Core v0.2.4 NAS cutover helper', () => {
@@ -26,6 +30,22 @@ describe('CH Core v0.2.4 NAS cutover helper', () => {
       expect(password).toMatch(/^[A-Za-z0-9!]+$/);
     }
     expect(first).not.toBe(second);
+  });
+
+  it('accepts every non-negative table count and rejects malformed values', async () => {
+    if (process.platform === 'win32') return;
+    await expect(execFile(countValidatorPath, ['0'])).resolves.toMatchObject({
+      stdout: '',
+    });
+    await expect(execFile(countValidatorPath, ['5'])).resolves.toMatchObject({
+      stdout: '',
+    });
+    await expect(execFile(countValidatorPath, ['10'])).resolves.toMatchObject({
+      stdout: '',
+    });
+    await expect(execFile(countValidatorPath, ['5x'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('Invalid non-negative integer'),
+    });
   });
 
   it('fails closed before touching the NAS without explicit approval', async () => {

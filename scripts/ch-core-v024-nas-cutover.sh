@@ -118,7 +118,7 @@ expected_migrations='1|001_initial.sql|e22cfbbf1af7b72e0091c9bf8a399ac2570fc6f97
 
 verify_prepared_source() {
   require_regular_directory "$project_root" 'Prepared CH Core project'
-  for required in package.json package-lock.json server/Dockerfile server/compose.yaml; do
+  for required in package.json package-lock.json server/Dockerfile server/compose.yaml server/scripts/ch-core-v024-count-validator.sh; do
     require_regular_file "$target_root/$required" "Prepared source $required"
   done
   migration_count=$(find "$project_root/migrations" -type f -name '*.sql' | wc -l | tr -d ' ')
@@ -268,7 +268,7 @@ capture_predeploy_counts() {
           0:stock_checks) printf "TABLE_ABSENT=stock_checks\\n" ;;
           1:*)
             count=$("$mariadb_bin" --defaults-extra-file="$defaults" --batch --skip-column-names "$database" -e "SELECT COUNT(*) FROM \`$table\`")
-            case "$count" in 0|[1-9][0-9]*) ;; *) die "Invalid table count." ;; esac
+            /opt/ch-core-ops/ch-core-v024-count-validator.sh "$count"
             [ "$table" != business_write_lock ] || [ "$count" = 1 ] || die "business_write_lock must have one row."
             printf "TABLE_COUNT=%s|%s\\n" "$table" "$count"
             ;;
@@ -284,7 +284,7 @@ capture_predeploy_counts() {
       business_stock_checks=0
       business_non_import_price_history=$("$mariadb_bin" --defaults-extra-file="$defaults" --batch --skip-column-names "$database" -e "SELECT COUNT(*) FROM price_history WHERE source <> '\''catalogue_import'\''")
       for business_count in "$business_notas" "$business_stock_movements" "$business_stock_checks" "$business_non_import_price_history"; do
-        case "$business_count" in 0|[1-9][0-9]*) ;; *) die "Invalid business-history count." ;; esac
+        /opt/ch-core-ops/ch-core-v024-count-validator.sh "$business_count"
       done
       printf "BUSINESS_COUNT=notas|%s\\n" "$business_notas"
       printf "BUSINESS_COUNT=stock_movements|%s\\n" "$business_stock_movements"

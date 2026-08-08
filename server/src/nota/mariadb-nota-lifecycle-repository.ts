@@ -17,6 +17,7 @@ import { writeOperationAudit, writeOperationChange } from '../catalogue/mariadb-
 import {
   completionPosting,
   PostingArithmeticError,
+  PostingPriceError,
   restorePosting,
   reversalPosting,
   shouldReapplyPostingOnRestore,
@@ -460,6 +461,13 @@ export class MariaDbNotaLifecycleRepository {
   }
 
   private rethrowPostingArithmetic(error: unknown): never {
+    if (error instanceof PostingPriceError) {
+      throw new NotaOperationError(
+        'NOTA_PRICE_REQUIRED',
+        422,
+        error.message,
+      );
+    }
     if (error instanceof PostingArithmeticError) {
       throw new NotaOperationError(
         'NOTA_ARITHMETIC_OUT_OF_RANGE',

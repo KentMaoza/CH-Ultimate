@@ -80,6 +80,29 @@ test('mobile disables synced Nota completion offline', async () => {
   ).toBeDisabled();
 });
 
+test('mobile blocks completion when a populated row still has a zero selling price', async () => {
+  const gateway = new MockOperationsGateway(createMobileDemoState);
+  const transaction = await gateway.createNotaTransaction();
+  const page = transaction.pages.find((candidate) => candidate.status === 'active')!;
+  const line = page.lines[0]!;
+  await gateway.updateNotaLine(transaction.id, page.id, line.id, {
+    description: 'SKU tanpa harga referensi',
+    quantity: 1,
+    unit: 'pcs',
+    pcsPrice: 0,
+    lsnPrice: 0,
+  });
+  renderNota(undefined, createMobileDemoState, gateway);
+  await screen.findByRole('heading', { name: 'Nota Barang' });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
+
+  expect(screen.queryByRole('dialog', { name: 'Selesaikan nota mobile?' })).not.toBeInTheDocument();
+  expect(screen.getByRole('alert')).toHaveTextContent(
+    'Harga jual setiap barang harus lebih dari Rp0.',
+  );
+});
+
 async function addManual(name: string) {
   fireEvent.click(screen.getByRole('button', { name: 'Tambah barang tanpa barcode' }));
   fireEvent.change(screen.getByLabelText('Nama barang manual'), { target: { value: name } });

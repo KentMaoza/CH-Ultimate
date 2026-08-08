@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { lineTotal, noteSuffixFromIndex } from '../../src/domain/nota';
+import { firstUnpricedNotaLine, lineTotal, noteSuffixFromIndex } from '../../src/domain/nota';
 import { createNotaPdfBlob } from '../../src/domain/nota-pdf';
 import { buildNotaDocumentPlan, type NotaPageScope } from '../../src/domain/output-documents';
 import { findSkuByScanCode, searchMobileSkus } from '../../src/domain/mobile-demo-state';
@@ -298,6 +298,18 @@ export function MobileNotaView({ coreBacked = false, gateway, scanner, share = b
     }
   }
 
+  function requestCompletion() {
+    if (!transaction) return;
+    const unpriced = firstUnpricedNotaLine(transaction);
+    if (unpriced) {
+      setSelectedPageId(unpriced.pageId);
+      setNoticeKind('alert');
+      setNotice('Harga jual setiap barang harus lebih dari Rp0.');
+      return;
+    }
+    setCompletionOpen(true);
+  }
+
   async function shareNotaPdf() {
     if (!transaction || !selectedPage || busy) return;
     setBusy(true);
@@ -432,7 +444,7 @@ export function MobileNotaView({ coreBacked = false, gateway, scanner, share = b
         })}{!selectedPage.lines.some(populated) && <p className="mobile-nota-empty">Belum ada barang di Bagian {selectedPage.suffix}.</p>}</div>
       </section>
       <section className="mobile-nota-output" aria-label="Output PDF Nota"><label><span>Ruang PDF</span><select aria-label="Ruang PDF Nota" value={pdfScope} onChange={(event) => setPdfScope(event.target.value as NotaPageScope)}><option value="current">Bagian aktif saat ini</option><option value="all">Semua bagian aktif</option></select></label><button className="secondary-action" disabled={busy} onClick={() => void shareNotaPdf()}>Bagikan PDF Nota</button></section>
-      <footer className="mobile-nota-finish"><div><span>Total transaksi</span><strong>{formatRupiah(transactionTotal)}</strong></div><button className="primary-action" disabled={busy || lifecycleBlocked} title={lifecycleBlocked ? 'Hubungkan CH Core untuk menyelesaikan transaksi.' : undefined} onClick={() => setCompletionOpen(true)}>Selesaikan nota</button></footer>
+      <footer className="mobile-nota-finish"><div><span>Total transaksi</span><strong>{formatRupiah(transactionTotal)}</strong></div><button className="primary-action" disabled={busy || lifecycleBlocked} title={lifecycleBlocked ? 'Hubungkan CH Core untuk menyelesaikan transaksi.' : undefined} onClick={requestCompletion}>Selesaikan nota</button></footer>
     </> : !notice && <p className="mobile-nota-empty">Menyiapkan nota baru…</p>}
     {completionOpen && <div className="mobile-nota-dialog-backdrop"><section role="dialog" aria-modal="true" aria-label="Selesaikan nota mobile?" className="mobile-nota-dialog"><h2>Selesaikan nota mobile?</h2><p>{coreBacked ? 'Nota disimpan ke Arsip dan tersedia di semua perangkat setelah sinkronisasi.' : 'Nota disimpan ke Arsip pada sesi demo lokal ini.'}</p><button className="primary-action" disabled={busy} onClick={() => void complete()}>Simpan ke Arsip</button><button disabled={busy} onClick={() => setCompletionOpen(false)}>Batal</button></section></div>}
   </section>;

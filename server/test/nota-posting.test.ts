@@ -10,6 +10,18 @@ import {
 } from '../src/nota/posting.js';
 
 describe('Nota posting effects', () => {
+  it('rejects completion when any populated line has a zero selling price', () => {
+    expect(() =>
+      completionPosting(
+        [
+          { skuId: 'sku-a', quantityPcs: 1n, lineTotalRupiah: 10_000n },
+          { skuId: 'sku-zero', quantityPcs: 1n, lineTotalRupiah: 0n },
+        ],
+        null,
+      ),
+    ).toThrow('Nota line price must be positive');
+  });
+
   it('aggregates tracked SKU quantities and revenue for first completion', () => {
     const posting = completionPosting(
       [
@@ -88,9 +100,9 @@ describe('Nota posting effects', () => {
           {
             skuId: 'sku-a',
             quantityPcs: BigInt(Number.MAX_SAFE_INTEGER),
-            lineTotalRupiah: 0n,
+            lineTotalRupiah: 1n,
           },
-          { skuId: 'sku-a', quantityPcs: 1n, lineTotalRupiah: 0n },
+          { skuId: 'sku-a', quantityPcs: 1n, lineTotalRupiah: 1n },
         ],
         null,
       ),

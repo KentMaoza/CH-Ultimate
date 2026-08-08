@@ -26,6 +26,13 @@ export class PostingArithmeticError extends RangeError {
   }
 }
 
+export class PostingPriceError extends RangeError {
+  constructor() {
+    super('Nota line price must be positive');
+    this.name = 'PostingPriceError';
+  }
+}
+
 export function assertSafePostingInteger(
   value: bigint,
   label: string,
@@ -56,6 +63,7 @@ export function completionPosting(
   const amountRupiah = lines.reduce(
     (sum, line) => {
       assertSafePostingInteger(line.lineTotalRupiah, 'line total');
+      if (line.lineTotalRupiah <= 0n) throw new PostingPriceError();
       return checkedPostingAdd(sum, line.lineTotalRupiah, 'Nota amount');
     },
     0n,

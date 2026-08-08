@@ -31,11 +31,14 @@ function existing(
   identifierId: string,
   identifierValue: string,
   archived = false,
+  quantityPcs: unknown = '7',
+  balanceRowVersion: unknown = '3',
 ): ExistingCatalogueRow {
   return {
     sku_id_hex: skuId.replaceAll('-', '').toUpperCase(),
     row_version: '2',
-    balance_row_version: '3',
+    balance_row_version: balanceRowVersion,
+    quantity_pcs: quantityPcs,
     created_at: new Date('2026-07-29T02:00:00.000Z'),
     image_hash_hex: null,
     archived_at: archived ? new Date('2026-07-30T02:00:00.000Z') : null,
@@ -94,13 +97,14 @@ describe('catalogue reconciliation', () => {
     expect(result).toMatchObject({
       matchedExistingCount: 1,
       createdSkuCount: 0,
-      unmatchedArchivedCount: 0,
+      untouchedExistingCount: 0,
     });
     expect(result.rows[0]).toMatchObject({
       skuId: skuA,
       primaryIdentifierId: identifierA,
       existingPrimaryIdentifier: true,
       existingProductIdentifier: false,
+      existingSku: expect.objectContaining({ quantityPcs: '7' }),
     });
     expect(result.rows[0]?.productIdentifierId).not.toBe(identifierA);
   });
@@ -115,7 +119,38 @@ describe('catalogue reconciliation', () => {
     expect(result).toMatchObject({
       matchedExistingCount: 0,
       createdSkuCount: 1,
-      unmatchedArchivedCount: 1,
+      untouchedExistingCount: 1,
     });
+  });
+
+  it('retains extra identifiers and unmatched active SKUs', () => {
+    const legacyIdentifier = '66666666-6666-4666-8666-666666666666';
+    const unmatchedIdentifier = '77777777-7777-4777-8777-777777777777';
+    const result = reconcileCatalogue(
+      [source()],
+      [
+        existing(skuA, identifierA, 'SKU-A', false, '7'),
+        existing(skuA, legacyIdentifier, 'LEGACY-A', false, '7'),
+        existing(skuB, unmatchedIdentifier, 'SKU-B', false, '3'),
+      ],
+      uuidSequence(),
+    );
+
+    expect(result).toMatchObject({
+      matchedExistingCount: 1,
+      createdSkuCount: 0,
+      untouchedExistingCount: 1,
+    });
+    expect(result.rows[0]?.existingSku).toMatchObject({ quantityPcs: '7' });
+  });
+
+  it('fails closed when a matched SKU has no tracked balance', () => {
+    expect(() =>
+      reconcileCatalogue(
+        [source()],
+        [existing(skuA, identifierA, 'SKU-A', false, null, null)],
+        uuidSequence(),
+      ),
+    ).toThrowError('Database returned an invalid matched SKU balance');
   });
 });

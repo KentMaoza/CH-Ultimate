@@ -13,9 +13,11 @@ export interface PreparedCatalogueRow {
   productIdentifierId: string;
   imageJobId: string | null;
   priceHistoryId: string;
+  stockMovementId: string;
   existingSku: {
     rowVersion: string;
     balanceRowVersion: string | null;
+    quantityPcs: string | null;
     createdAt: string;
     imageHash: string | null;
   } | null;

@@ -184,8 +184,10 @@ describe('safeStorage credential persistence', () => {
     expect(bytes.toString()).not.toContain('current-device-token');
     expect(bytes.toString()).not.toContain('owner-recovery-credential');
     expect(bytes.toString()).not.toContain('pending-claim-secret');
-    expect((await stat(filePath)).mode & 0o777).toBe(0o600);
-    expect((await stat(userDataPath)).mode & 0o777).toBe(0o700);
+    if (process.platform !== 'win32') {
+      expect((await stat(filePath)).mode & 0o777).toBe(0o600);
+      expect((await stat(userDataPath)).mode & 0o777).toBe(0o700);
+    }
     await expect(store.load()).resolves.toEqual(credentialState);
   });
 

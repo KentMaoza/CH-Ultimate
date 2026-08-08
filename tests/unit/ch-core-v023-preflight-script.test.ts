@@ -54,6 +54,8 @@ describe('CH Core v0.2.3 one-time preflight task', () => {
     expect(script).toContain('INSTALLED');
     expect(script).toContain('UNINSTALLED');
 
+    if (process.platform === 'win32') return;
+
     await expect(
       execFile(scriptPath, [], { env: { PATH: process.env.PATH } }),
     ).rejects.toMatchObject({
@@ -108,7 +110,7 @@ describe('CH Core v0.2.3 one-time preflight task', () => {
     }
 
     const tableBlock = script.match(
-      /required_tables='\n([\s\S]*?)\n'/,
+      /required_tables='\r?\n([\s\S]*?)\r?\n'/,
     )?.[1];
     expect(tableBlock?.trim().split(/\s+/)).toEqual(requiredTables);
   });

@@ -27,6 +27,8 @@ const migrationHashes = [
 
 describe('CH Core v0.2.3 NAS source preparation', () => {
   it('fails closed before touching the NAS without explicit owner approval', async () => {
+    if (process.platform === 'win32') return;
+
     await expect(
       execFile(scriptPath, [], { env: { PATH: process.env.PATH } }),
     ).rejects.toMatchObject({

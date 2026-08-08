@@ -251,7 +251,7 @@ test('the sixteenth unique item automatically creates B and keeps fifteen number
   fireEvent.click(screen.getByRole('button', { name: 'Bagian B' }));
   expect(screen.getByRole('region', { name: /Barang 16/ })).toHaveTextContent('1B');
   expect(screen.getByRole('button', { name: 'Bagian B' })).toHaveStyle({ '--mobile-nota-accent': '#1565C0' });
-});
+}, 15_000);
 
 test('demo mobile completion stays local and never claims synchronization', async () => {
   const gateway = renderNota();

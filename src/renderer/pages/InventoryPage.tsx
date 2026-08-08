@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { parseSkuWorkbook } from '../../domain/workbook';
 import { buildBarcodeDocumentPlan } from '../../domain/output-documents';
@@ -14,6 +14,7 @@ import { useOutput } from '../output-context';
 
 const MAX_CATALOGUE_BYTES = 5 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const INVENTORY_PAGE_SIZE = 50;
 const ALLOWED_IMAGE_TYPES = new Set([
   'image/png',
   'image/jpeg',
@@ -60,6 +61,7 @@ export function InventoryPage() {
   const [query, setQuery] = useState('');
   const [stockFilter, setStockFilter] = useState('all');
   const [showArchived, setShowArchived] = useState(false);
+  const [pageIndex, setPageIndex] = useState(0);
   const [adjusting, setAdjusting] = useState<{ sku: Sku; direction: 1 | -1 } | null>(null);
   const [editing, setEditing] = useState<Sku | null>(null);
   const [printing, setPrinting] = useState<Sku | null>(null);
@@ -87,6 +89,18 @@ export function InventoryPage() {
       return !needle || [sku.name, sku.skuNumber, ...sku.aliases].some((value) => value.toLocaleLowerCase('id-ID').includes(needle));
     });
   }, [query, showArchived, state.skus, stockFilter]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / INVENTORY_PAGE_SIZE));
+  const activePageIndex = Math.min(pageIndex, pageCount - 1);
+  const firstVisible = activePageIndex * INVENTORY_PAGE_SIZE;
+  const visible = filtered.slice(firstVisible, firstVisible + INVENTORY_PAGE_SIZE);
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [query, showArchived, stockFilter]);
+
+  useEffect(() => {
+    if (pageIndex >= pageCount) setPageIndex(pageCount - 1);
+  }, [pageCount, pageIndex]);
 
   async function importFile(file?: File) {
     if (!file) return;
@@ -232,7 +246,7 @@ export function InventoryPage() {
       </div>
       <div className="table-frame">
         <table><thead><tr><th>Gambar</th><th>Nomor SKU</th><th>Nama SKU</th><th>Harga Referensi</th><th>Stok</th><th>Catatan</th><th>Dibuat</th><th>Aksi</th></tr></thead>
-        <tbody>{filtered.slice(0, 50).map((sku) => (
+        <tbody>{visible.map((sku) => (
           <tr key={sku.id}>
             <td><SkuImage gateway={gateway} sku={sku} onSelect={() => openImagePicker(sku)} /></td><td className="sku-number" title={sku.skuNumber}>{sku.skuNumber}</td><td>{sku.name}<small>{sku.tracked ? 'Stok dilacak' : 'Tanpa stok'}</small></td>
             <td>{formatRupiah(sku.referencePrice)}</td><td data-testid={`sku-stock-${sku.id}`} className={`stock-value ${sku.stock < 0 ? 'negative' : ''}`}>{sku.tracked ? sku.stock : '—'}</td><td>{sku.note || '—'}</td><td>{formatDate(sku.sourceCreatedAt || sku.createdAt)}</td>
@@ -241,7 +255,9 @@ export function InventoryPage() {
         ))}</tbody></table>
         {!filtered.length && <div className="empty-state">Tidak ada SKU yang cocok.</div>}
       </div>
-      <div className="table-footer">Menampilkan {Math.min(filtered.length, 50)} dari {filtered.length.toLocaleString('id-ID')}</div>
+      <div className="table-footer"><span>{filtered.length > 0
+        ? `Menampilkan ${(firstVisible + 1).toLocaleString('id-ID')}–${Math.min(firstVisible + INVENTORY_PAGE_SIZE, filtered.length).toLocaleString('id-ID')} dari ${filtered.length.toLocaleString('id-ID')}`
+        : 'Menampilkan 0 dari 0'}</span><div><button type="button" aria-label="Halaman SKU sebelumnya" disabled={activePageIndex === 0} onClick={() => setPageIndex((current) => Math.max(0, current - 1))}>Sebelumnya</button><span>Halaman {activePageIndex + 1} / {pageCount}</span><button type="button" aria-label="Halaman SKU berikutnya" disabled={activePageIndex >= pageCount - 1} onClick={() => setPageIndex((current) => Math.min(pageCount - 1, current + 1))}>Berikutnya</button></div></div>
       {cataloguePreview && <div className="dialog-backdrop"><section className="dialog catalogue-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="catalogue-preview-title"><h2 id="catalogue-preview-title">Tinjau import katalog</h2><p><strong>{cataloguePreview.sourceFileName}</strong> sudah lolos validasi server. Periksa ringkasan sebelum data aktif diganti.</p><dl className="catalogue-preview-metrics"><div><dt>SKU</dt><dd>{cataloguePreview.preview.rowCount.toLocaleString('id-ID')}</dd></div><div><dt>Gambar antre</dt><dd>{cataloguePreview.preview.imageJobCount.toLocaleString('id-ID')}</dd></div><div><dt>Tanpa gambar</dt><dd>{cataloguePreview.preview.missingImageCount.toLocaleString('id-ID')}</dd></div><div><dt>Selisih harga</dt><dd>{cataloguePreview.preview.priceMismatchCount.toLocaleString('id-ID')}</dd></div><div><dt>Total harga terpilih</dt><dd>{formatRupiah(cataloguePreview.preview.selectedPriceTotal)}</dd></div><div><dt>Total stok</dt><dd>{cataloguePreview.preview.stockTotal.toLocaleString('id-ID')}</dd></div></dl>{cataloguePreview.preview.warnings.map((warning) => <div className="notice" key={warning}>{warning}</div>)}{cataloguePreview.preview.priceMismatches.length > 0 && <div className="catalogue-preview-table"><table><thead><tr><th>Baris</th><th>SKU</th><th>Modal</th><th>Jual</th><th>Terpilih</th></tr></thead><tbody>{cataloguePreview.preview.priceMismatches.map((mismatch) => <tr key={`${mismatch.rowNumber}-${mismatch.primarySku}`}><td>{mismatch.rowNumber}</td><td>{mismatch.primarySku}</td><td>{formatRupiah(mismatch.modalPrice)}</td><td>{formatRupiah(mismatch.salePrice)}</td><td>{formatRupiah(mismatch.selectedPrice)}</td></tr>)}</tbody></table></div>}<div className="dialog-actions"><button className="button secondary" disabled={committingCatalogue} onClick={() => setCataloguePreview(null)}>Batal</button><button className="button primary" disabled={committingCatalogue} onClick={() => void commitCatalogue()}>{committingCatalogue ? 'Mengomit…' : 'Komit katalog'}</button></div></section></div>}
       {adjusting && <div className="dialog-backdrop"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="adjust-title"><h2 id="adjust-title">{adjusting.direction === 1 ? 'Tambah stok' : 'Kurangi stok'}</h2><p><strong>{adjusting.sku.skuNumber}</strong> · stok saat ini {adjusting.sku.stock}</p><label><span>{adjusting.direction === 1 ? 'Jumlah stok ditambah' : 'Jumlah stok dikurangi'}</span><input autoFocus min="1" step="1" type="number" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></label>{gateway.getSyncSnapshot().phase === 'offline' && <label><span>Alasan perubahan stok offline</span><textarea maxLength={512} value={adjustmentReason} onChange={(event) => setAdjustmentReason(event.target.value)} /></label>}<div className="dialog-actions"><button className="button secondary" onClick={() => setAdjusting(null)}>Batal</button><button className="button primary" disabled={!quantity || !Number.isInteger(Number(quantity)) || Number(quantity) <= 0 || (gateway.getSyncSnapshot().phase === 'offline' && !adjustmentReason.trim())} onClick={() => void applyAdjustment()}>{adjusting.direction === 1 ? 'Tambah stok' : 'Kurangi stok'}</button></div></section></div>}
       {printing && <div className="dialog-backdrop barcode-print-dialog"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="barcode-print-title"><h2 id="barcode-print-title">Print barcode produk</h2><p><strong>{printing.skuNumber}</strong> · {printing.name}</p><label><span>Jumlah barcode</span><input autoFocus min="1" max="10000" step="1" type="number" value={printQuantity} onChange={(event) => setPrintQuantity(event.target.value)} /></label><div className="barcode-print-sheet" aria-label="Preview barcode produk">{Array.from({ length: barcodeCount }, (_, index) => <div className="barcode-print-item" data-testid="barcode-print-item" key={index}><QRCodeSVG data-testid="barcode-product-qr" data-value={printing.skuNumber} value={printing.skuNumber} size={88} marginSize={0} /><strong>{printing.name}</strong><span>Kode Produk: {printing.skuNumber}</span></div>)}</div><div className="dialog-actions"><button className="button secondary" aria-label="Tutup print barcode" onClick={() => setPrinting(null)}>Batal</button><button className="button secondary" disabled={!validPrintQuantity || output.busy} aria-label="Simpan PDF barcode" onClick={() => void requestBarcodeOutput('pdf')}>Simpan PDF</button><button className="button primary" disabled={!validPrintQuantity || output.busy} onClick={() => void requestBarcodeOutput('print')}>Print barcode sekarang</button></div></section></div>}

@@ -369,3 +369,40 @@ test('hides the entire import flow when the authenticated device is not an owner
     screen.queryByRole('button', { name: 'Import XLSX' }),
   ).not.toBeInTheDocument();
 });
+
+test('desktop inventory pages through the full large catalogue instead of truncating at fifty', async () => {
+  const gateway = new MockOperationsGateway();
+  const skus = Array.from({ length: 120 }, (_, index) => ({
+    id: `bulk-${index + 1}`,
+    skuNumber: `BULK-${String(index + 1).padStart(3, '0')}`,
+    name: `Barang Bulk ${index + 1}`,
+    aliases: [],
+    identifiers: [],
+    referencePrice: 1_000,
+    stock: 0,
+    tracked: true,
+    note: '',
+    imageUrl: '',
+    createdAt: '2026-08-08T00:00:00.000Z',
+    archived: false,
+  }));
+  await gateway.replaceFromWorkbook(
+    { skus, loaded: skus.length, skipped: 0, warnings: [] },
+    'Fixture katalog besar',
+  );
+  render(<App gateway={gateway} />);
+
+  expect(screen.getByText('BULK-001')).toBeInTheDocument();
+  expect(screen.queryByText('BULK-051')).not.toBeInTheDocument();
+  expect(screen.getByText('Menampilkan 1–50 dari 120')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Halaman SKU berikutnya' }));
+  expect(screen.queryByText('BULK-001')).not.toBeInTheDocument();
+  expect(screen.getByText('BULK-051')).toBeInTheDocument();
+  expect(screen.getByText('Menampilkan 51–100 dari 120')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Halaman SKU berikutnya' }));
+  expect(screen.getByText('BULK-120')).toBeInTheDocument();
+  expect(screen.getByText('Menampilkan 101–120 dari 120')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Halaman SKU berikutnya' })).toBeDisabled();
+});

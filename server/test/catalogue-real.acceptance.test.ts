@@ -17,7 +17,7 @@ acceptance('approved catalogue workbook acceptance', () => {
   it('matches the independently inspected source identity and totals', async () => {
     const bytes = await readFile(workbookPath!);
     expect(createHash('sha256').update(bytes).digest('hex')).toBe(
-      'f1f4675327fac107ef9f78c114b8afe86389d5543b204540ed45e74f9b15e49c',
+      'f18d41b93197a59be3b3b93c5b68ce841716f9eb91b5f0912a81c50470b07d78',
     );
 
     assertSafeXlsxArchive(bytes);
@@ -27,19 +27,19 @@ acceptance('approved catalogue workbook acceptance', () => {
     const workbook = await parseCatalogueWorkbook(bytes);
 
     expect(workbook.preview).toMatchObject({
-      rowCount: 3_144,
-      imageJobCount: 2_786,
-      missingImageCount: 358,
+      rowCount: 3_172,
+      imageJobCount: 2_788,
+      missingImageCount: 384,
       priceMismatchCount: 3,
-      selectedPriceTotal: 276_285_615,
-      stockTotal: 3_988,
+      selectedPriceTotal: 277_389_272,
+      stockTotal: 4_411,
       maximumCellTextLength: 168,
     });
-    expect(workbook.rows).toHaveLength(3_144);
+    expect(workbook.rows).toHaveLength(3_172);
     expect(workbook.rows.flatMap((row) => [row.primarySku, row.productCode]))
-      .toHaveLength(6_288);
+      .toHaveLength(6_344);
     expect(workbook.preview.priceMismatches.map((mismatch) => mismatch.rowNumber))
-      .toEqual([1_018, 1_088, 1_180]);
+      .toEqual([1_126, 1_196, 1_288]);
     expect(workbook.preview.priceMismatches.map((mismatch) => mismatch.selectedPrice))
       .toEqual(workbook.preview.priceMismatches.map((mismatch) => mismatch.modalPrice));
     expect(

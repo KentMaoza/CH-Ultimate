@@ -1,7 +1,7 @@
 {
   "name": "ch-ultimate",
   "productName": "CH Ultimate",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Frontend-only operational demo for Toko CH",
   "author": "Toko CH",
   "main": ".vite/build/main.js",

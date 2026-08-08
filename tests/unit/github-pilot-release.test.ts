@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 const workflowPath = '.github/workflows/pilot-release.yml';
-const pilotVersion = '0.2.3';
+const pilotVersion = '0.2.4';
 const androidSignerSha256 =
   '57e0731ce3db068e6581980c53610764af05c612184ff50e18a9f4912ca59ba5';
 
@@ -100,7 +100,7 @@ describe('GitHub pilot release workflow', () => {
     expect(workflow).toContain('BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY');
   });
 
-  it('keeps the v0.2.3 Core v2 cutover release contract aligned', async () => {
+  it('keeps the v0.2.4 real-use release contract aligned', async () => {
     const [
       workflow,
       packageManifest,
@@ -128,7 +128,7 @@ describe('GitHub pilot release workflow', () => {
     });
     expect(androidBuild).toContain('applicationId "com.tokoch.chucompanion"');
     expect(androidBuild).toContain(`versionName "${pilotVersion}"`);
-    expect(androidBuild).toContain('versionCode 10');
+    expect(androidBuild).toContain('versionCode 11');
     expect(settingsPage).toContain(`CH Ultimate ${pilotVersion}`);
     expect(releaseCopy).toContain(
       `CHU-Companion-Mobile-${pilotVersion}-release.apk`,
@@ -163,7 +163,7 @@ describe('GitHub pilot release workflow', () => {
     ]) {
       expect(releaseNotes.toLowerCase()).toContain(releaseFact.toLowerCase());
     }
-    expect(releaseNotes).toMatch(/deploy Core.+commit rilis v0\.2\.3/is);
+    expect(releaseNotes).toMatch(/deploy Core.+commit rilis v0\.2\.4/is);
 
     const supplement = runbook.slice(
       runbook.indexOf('## Suplemen v0.2.2'),

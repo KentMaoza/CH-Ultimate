@@ -20,7 +20,7 @@ describe('loadServerConfig', () => {
       dbPoolMax: 4,
       privateStorageRoot: '/var/lib/ch-core/private',
       initialCatalogueSha256:
-        'f1f4675327fac107ef9f78c114b8afe86389d5543b204540ed45e74f9b15e49c',
+        'f18d41b93197a59be3b3b93c5b68ce841716f9eb91b5f0912a81c50470b07d78',
     });
   });
 

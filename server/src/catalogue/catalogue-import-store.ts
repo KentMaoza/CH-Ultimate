@@ -30,6 +30,10 @@ function json(value: unknown): unknown {
   return value;
 }
 
+function nonNegativeSafeInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && Number(value) >= 0;
+}
+
 export function parseCatalogueCommitResult(
   value: unknown,
 ): CatalogueCommitResult | null {
@@ -42,6 +46,11 @@ export function parseCatalogueCommitResult(
     typeof Reflect.get(candidate, 'workbookSha256') !== 'string' ||
     typeof Reflect.get(candidate, 'rowCount') !== 'number' ||
     typeof Reflect.get(candidate, 'imageJobCount') !== 'number' ||
+    !nonNegativeSafeInteger(Reflect.get(candidate, 'matchedExistingCount')) ||
+    !nonNegativeSafeInteger(Reflect.get(candidate, 'createdSkuCount')) ||
+    !nonNegativeSafeInteger(Reflect.get(candidate, 'untouchedExistingCount')) ||
+    !nonNegativeSafeInteger(Reflect.get(candidate, 'stockAdjustedCount')) ||
+    !nonNegativeSafeInteger(Reflect.get(candidate, 'zeroDeltaMatchedCount')) ||
     typeof Reflect.get(candidate, 'committedAt') !== 'string'
   ) {
     throw new Error('Database returned an invalid catalogue result');
@@ -51,6 +60,11 @@ export function parseCatalogueCommitResult(
     workbookSha256: Reflect.get(candidate, 'workbookSha256'),
     rowCount: Reflect.get(candidate, 'rowCount'),
     imageJobCount: Reflect.get(candidate, 'imageJobCount'),
+    matchedExistingCount: Reflect.get(candidate, 'matchedExistingCount'),
+    createdSkuCount: Reflect.get(candidate, 'createdSkuCount'),
+    untouchedExistingCount: Reflect.get(candidate, 'untouchedExistingCount'),
+    stockAdjustedCount: Reflect.get(candidate, 'stockAdjustedCount'),
+    zeroDeltaMatchedCount: Reflect.get(candidate, 'zeroDeltaMatchedCount'),
     committedAt: Reflect.get(candidate, 'committedAt'),
     replayed: Reflect.get(candidate, 'replayed') === true,
   };

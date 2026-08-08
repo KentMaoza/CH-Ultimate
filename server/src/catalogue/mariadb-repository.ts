@@ -135,6 +135,11 @@ export class MariaDbCatalogueRepository implements CatalogueRepository {
         workbookSha256: record.workbookSha256,
         rowCount: workbook.preview.rowCount,
         imageJobCount: workbook.preview.imageJobCount,
+        matchedExistingCount: reconciliation.matchedExistingCount,
+        createdSkuCount: reconciliation.createdSkuCount,
+        untouchedExistingCount: reconciliation.untouchedExistingCount,
+        stockAdjustedCount: writeSummary.stockAdjustedCount,
+        zeroDeltaMatchedCount: writeSummary.zeroDeltaMatchedCount,
         committedAt: committedAt.toISOString(),
         replayed: false,
       };

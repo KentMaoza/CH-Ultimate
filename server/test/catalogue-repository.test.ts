@@ -98,6 +98,11 @@ function commitHarness(
     workbookSha256: record.workbookSha256,
     rowCount: 1,
     imageJobCount: 1,
+    matchedExistingCount: 0,
+    createdSkuCount: 1,
+    untouchedExistingCount: 0,
+    stockAdjustedCount: 0,
+    zeroDeltaMatchedCount: 0,
     committedAt: '2026-07-30T02:00:00.000Z',
     replayed: false,
   };
@@ -229,6 +234,11 @@ describe('MariaDB catalogue repository', () => {
       workbookSha256: record.workbookSha256,
       rowCount: 1,
       imageJobCount: 1,
+      matchedExistingCount: 0,
+      createdSkuCount: 1,
+      untouchedExistingCount: 0,
+      stockAdjustedCount: 0,
+      zeroDeltaMatchedCount: 0,
       committedAt: '2026-07-30T02:00:00.000Z',
       replayed: false,
     });

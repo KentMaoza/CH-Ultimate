@@ -449,6 +449,11 @@ describe('Core operations gateway mutation coordination', () => {
       workbookSha256: validation.workbookSha256,
       rowCount: 3_144,
       imageJobCount: 2_786,
+      matchedExistingCount: 1,
+      createdSkuCount: 3_143,
+      untouchedExistingCount: 4,
+      stockAdjustedCount: 1,
+      zeroDeltaMatchedCount: 0,
       committedAt: '2026-07-30T02:00:00.000Z',
       replayed: false,
     };

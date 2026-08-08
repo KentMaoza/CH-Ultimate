@@ -29,6 +29,11 @@ export interface CatalogueCommitResult {
   workbookSha256: string;
   rowCount: number;
   imageJobCount: number;
+  matchedExistingCount: number;
+  createdSkuCount: number;
+  untouchedExistingCount: number;
+  stockAdjustedCount: number;
+  zeroDeltaMatchedCount: number;
   committedAt: string;
   replayed: boolean;
 }

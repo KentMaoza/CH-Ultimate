@@ -6,9 +6,28 @@ import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 
 const scriptPath = path.join(process.cwd(), 'scripts/ch-core-v024-nas-cutover.sh');
+const passwordGeneratorPath = path.join(
+  process.cwd(),
+  'scripts/ch-core-v024-database-password.sh',
+);
 const execFile = promisify(execFileCallback);
 
 describe('CH Core v0.2.4 NAS cutover helper', () => {
+  it('generates distinct database passwords that satisfy the NAS policy', async () => {
+    if (process.platform === 'win32') return;
+    const first = (await execFile(passwordGeneratorPath)).stdout.trim();
+    const second = (await execFile(passwordGeneratorPath)).stdout.trim();
+
+    for (const password of [first, second]) {
+      expect(password.length).toBeGreaterThanOrEqual(40);
+      expect(password).toMatch(/[a-z]/);
+      expect(password).toMatch(/[A-Z]/);
+      expect(password).toMatch(/[^A-Za-z0-9]/);
+      expect(password).toMatch(/^[A-Za-z0-9!]+$/);
+    }
+    expect(first).not.toBe(second);
+  });
+
   it('fails closed before touching the NAS without explicit approval', async () => {
     if (process.platform === 'win32') return;
     await expect(execFile(scriptPath, ['prepare'])).rejects.toMatchObject({

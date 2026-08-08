@@ -24,6 +24,17 @@ require_hex() {
   esac
 }
 
+require_database_password() {
+  value=$1
+  label=$2
+  case "$value" in
+    Aa!*) ;;
+    *) die "$label does not satisfy the required character classes." ;;
+  esac
+  random_part=${value#Aa!}
+  require_hex "$random_part" 48 "$label random component"
+}
+
 sha256_file() {
   sha256sum "$1" | awk 'NR == 1 { print $1 }'
 }
@@ -198,10 +209,13 @@ configure_ops_credentials() {
   )
   [ "$existing" = '0' ] || die 'Dedicated v0.2.4 ops accounts or scratch schema already exist.'
 
-  backup_password=$(openssl rand -hex 24)
-  restore_password=$(openssl rand -hex 24)
-  require_hex "$backup_password" 48 'Generated backup password'
-  require_hex "$restore_password" 48 'Generated restore password'
+  password_generator="$target_root/scripts/ch-core-v024-database-password.sh"
+  require_regular_file "$password_generator" 'Database password generator'
+  [ -x "$password_generator" ] || die 'Database password generator is not executable.'
+  backup_password=$("$password_generator")
+  restore_password=$("$password_generator")
+  require_database_password "$backup_password" 'Generated backup password'
+  require_database_password "$restore_password" 'Generated restore password'
   "$mariadb_admin" --defaults-extra-file="$admin_defaults" <<SQL
 CREATE USER 'chu_backup_v024'@'localhost' IDENTIFIED BY '$backup_password';
 GRANT SELECT, SHOW VIEW, TRIGGER, EVENT, LOCK TABLES ON chu.* TO 'chu_backup_v024'@'localhost';

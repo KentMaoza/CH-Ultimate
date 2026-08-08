@@ -33,7 +33,8 @@ function backupEnvironment(
   return {
     ...process.env,
     CH_CORE_BACKUP_DATABASE_URL:
-      'mariadb://backup_user:encoded%23password@127.0.0.1:3306/chu',
+      'mariadb://backup_user:encoded%23password@localhost/chu',
+    CH_CORE_MARIADB_SOCKET: '/run/mysqld/mysqld10.sock',
     ...overrides,
   };
 }
@@ -172,8 +173,59 @@ describe('local CH Core deployment artifacts', () => {
     expect(compose).toContain('profiles:');
     expect(compose).toContain('- ops');
     expect(compose).toContain('target: /backup');
+    const opsBlock = compose.slice(compose.indexOf('  ch-core-ops:'));
+    expect(opsBlock).toContain(
+      'CH_CORE_MARIADB_SOCKET: "${CH_CORE_MARIADB_SOCKET:-/run/mysqld/mysqld10.sock}"',
+    );
+    expect(opsBlock).toContain('source: /run/mysqld');
+    expect(opsBlock).toContain('target: /run/mysqld');
+    expect(opsBlock).toMatch(
+      /source: \/run\/mysqld[\s\S]*?target: \/run\/mysqld[\s\S]*?read_only: true/,
+    );
     expect(compose).not.toMatch(/ch-core-ops:[\s\S]*?ports:/);
-    expect(compose.match(/type: bind/g)).toHaveLength(3);
+    expect(compose.match(/type: bind/g)).toHaveLength(4);
+  });
+
+  it('writes socket-only MariaDB client defaults and rejects TCP targets', async () => {
+    const directory = await realpath(
+      await mkdtemp(path.join(os.tmpdir(), 'ch-core-socket-defaults-')),
+    );
+    const defaultsPath = path.join(directory, 'client.cnf');
+    const writeDefaults = (environment: NodeJS.ProcessEnv) =>
+      run('sh', [
+        '-c',
+        '. "$1"; write_client_defaults "$2" CH_CORE_BACKUP_DATABASE_URL',
+        'write-client-defaults',
+        path.join(scriptsRoot, 'database-common.sh'),
+        defaultsPath,
+      ], { env: environment });
+
+    await writeDefaults(backupEnvironment());
+    const defaults = await readFile(defaultsPath, 'utf8');
+    expect(defaults).toContain('protocol="socket"');
+    expect(defaults).toContain('socket="/run/mysqld/mysqld10.sock"');
+    expect(defaults).toContain('user="backup_user"');
+    expect(defaults).toContain('password="encoded#password"');
+    expect(defaults).not.toMatch(/^host=/m);
+    expect(defaults).not.toMatch(/^port=/m);
+
+    await expect(
+      writeDefaults(
+        backupEnvironment({
+          CH_CORE_BACKUP_DATABASE_URL:
+            'mariadb://backup_user:password@127.0.0.1:3306/chu',
+        }),
+      ),
+    ).rejects.toMatchObject({
+      stderr: expect.stringMatching(/socket-only|TCP/i),
+    });
+    await expect(
+      writeDefaults(
+        backupEnvironment({ CH_CORE_MARIADB_SOCKET: 'mysqld10.sock' }),
+      ),
+    ).rejects.toMatchObject({
+      stderr: expect.stringMatching(/absolute socket/i),
+    });
   });
 
   it('keeps both services bounded and runs Node 24 as non-root', async () => {
@@ -186,7 +238,7 @@ describe('local CH Core deployment artifacts', () => {
     expect(dockerfile).not.toContain('COPY --chmod');
     expect(dockerfile).toContain('RUN chmod 0555');
     expect(dockerfile).not.toMatch(/\bcurl\b/);
-    expect(compose.match(/read_only: true/g)).toHaveLength(3);
+    expect(compose.match(/read_only: true/g)).toHaveLength(4);
     expect(compose.match(/no-new-privileges:true/g)).toHaveLength(2);
     expect(compose.match(/mem_limit:/g)).toHaveLength(2);
     expect(compose.match(/cpu_shares:/g)).toHaveLength(2);
@@ -392,7 +444,8 @@ describe('local CH Core deployment artifacts', () => {
         env: {
           ...process.env,
           CH_CORE_RESTORE_DATABASE_URL:
-            'mariadb://restore_user:password@127.0.0.1:3306/chu',
+            'mariadb://restore_user:password@localhost/chu',
+          CH_CORE_MARIADB_SOCKET: '/run/mysqld/mysqld10.sock',
         },
       }),
     ).rejects.toMatchObject({
@@ -426,7 +479,8 @@ cat >/dev/null
     const baseEnvironment = {
       ...process.env,
       CH_CORE_RESTORE_DATABASE_URL:
-        'mariadb://restore_user:password@127.0.0.1:3306/chu_restore_test',
+        'mariadb://restore_user:password@localhost/chu_restore_test',
+      CH_CORE_MARIADB_SOCKET: '/run/mysqld/mysqld10.sock',
       CH_CORE_MARIADB_BIN: fakeMaria,
       FAKE_IMPORT_SENTINEL: importSentinel,
     };
@@ -486,7 +540,7 @@ fi
     const environment = {
       ...backupEnvironment(),
       CH_CORE_RESTORE_DATABASE_URL:
-        'mariadb://restore_user:password@127.0.0.1:3306/chu_restore_compare',
+        'mariadb://restore_user:password@localhost/chu_restore_compare',
       CH_CORE_MARIADB_DUMP_BIN: fakeDump,
       FAKE_SOURCE_CANONICAL: sentinel,
       FAKE_SCRATCH_CANONICAL: sentinel,

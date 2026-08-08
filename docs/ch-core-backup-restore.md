@@ -11,7 +11,7 @@ target. A connected disk is not a backup until the job and restore are proven.
 Never back up the private CA signing key to the NAS. It stays off-NAS in its
 own encrypted recovery custody.
 
-For the current v0.2.3 controlled internal-use execution, the owner requires
+For the current v0.2.4 controlled internal-use execution, the owner requires
 all backup and business data to remain on the NAS. A same-NAS logical bundle
 and scratch restore are therefore an accepted migration-recovery risk: they
 can prove logical restore before cutover, but they do not protect against loss
@@ -29,6 +29,8 @@ published ports, a read-only root, dropped capabilities, no-new-privileges,
 bounded CPU/RAM/PIDs/tmpfs/logs, and the same explicit
 `CH_CORE_RUNTIME_UID:CH_CORE_RUNTIME_GID` as the normal service. Its only
 writable bind is `/backup`, sourced from `CH_CORE_BACKUP_HOST_PATH`.
+The MariaDB runtime directory is mounted read-only at `/run/mysqld`; no
+MariaDB TCP port is enabled or published.
 
 Run the commands below from the directory containing `server/compose.yaml`
 through an authenticated Container Manager project action or a bounded DSM
@@ -45,10 +47,16 @@ runbook defines the service-user UID/GID and ACL receipt.
 The untracked `.env` has two different URLs:
 
 - `CH_CORE_BACKUP_DATABASE_URL` uses a read-only account and must target exact
-  `/chu` on `127.0.0.1:3306`. Grant only privileges required to read and dump
-  that schema; it must not create or modify business data.
+  `/chu` with hostname `localhost` and no port. Grant only privileges required
+  to read and dump that schema; it must not create or modify business data.
 - `CH_CORE_RESTORE_DATABASE_URL` uses a scratch-only account and its URL path
-  must match exact `chu_restore_[a-z0-9_]+` on `127.0.0.1:3306`.
+  must match exact `chu_restore_[a-z0-9_]+`, also with hostname `localhost`
+  and no port.
+
+Set `CH_CORE_MARIADB_SOCKET=/run/mysqld/mysqld10.sock`. The ops scripts reject
+TCP hosts/ports and write mode-0600 client defaults containing only the Unix
+socket, account, and password. Do not re-enable MariaDB TCP to make backup or
+restore work.
 
 Before a rehearsal, an administrator uses the approved authenticated DSM
 database-administration workflow to create a NEW empty scratch schema and a

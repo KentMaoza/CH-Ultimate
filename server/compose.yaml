@@ -51,6 +51,7 @@ services:
     environment:
       CH_CORE_BACKUP_DATABASE_URL: "${CH_CORE_BACKUP_DATABASE_URL:-}"
       CH_CORE_RESTORE_DATABASE_URL: "${CH_CORE_RESTORE_DATABASE_URL:-}"
+      CH_CORE_MARIADB_SOCKET: "${CH_CORE_MARIADB_SOCKET:-/run/mysqld/mysqld10.sock}"
       CH_CORE_RUNTIME_UID: ${CH_CORE_RUNTIME_UID:?set a nonzero numeric CH_CORE_RUNTIME_UID}
       CH_CORE_RUNTIME_GID: ${CH_CORE_RUNTIME_GID:?set a nonzero numeric CH_CORE_RUNTIME_GID}
       CH_CORE_MARIADB_BIN: /usr/bin/mariadb
@@ -71,6 +72,10 @@ services:
       - type: bind
         source: ${CH_CORE_BACKUP_HOST_PATH:?set CH_CORE_BACKUP_HOST_PATH}
         target: /backup
+      - type: bind
+        source: /run/mysqld
+        target: /run/mysqld
+        read_only: true
     logging:
       driver: json-file
       options:

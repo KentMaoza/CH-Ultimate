@@ -71,7 +71,8 @@ export function OperationalExportPage() {
       const hydrated = await hydrateOperationalPdfImages(plan, state.skus, gateway);
       const result = await output.savePdf(hydrated);
       setNotice(result.status === 'saved' ? 'PDF data operasional berhasil disimpan.' : 'Penyimpanan PDF dibatalkan.');
-    } catch {
+    } catch (error) {
+      console.error('[CH Ultimate] Ekspor PDF data operasional gagal.', error);
       setNotice('PDF data operasional belum dapat disimpan.');
     } finally {
       setBusy('');

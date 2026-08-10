@@ -52,6 +52,31 @@ test('desktop Ekspor Data applies filters, downloads five-sheet XLSX, and saves 
   expect(hostText[0]).toContain('BRS-108-BLK');
 });
 
+test('desktop keeps operational PDF failures generic while recording diagnostics', async () => {
+  const failure = new Error('internal PDF detail');
+  const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  const output: ChOutputBridge = {
+    printDocument: vi.fn(async () => ({ status: 'printed' as const })),
+    savePdf: vi.fn(async () => { throw failure; }),
+    saveSpreadsheet: vi.fn(async () => ({ status: 'saved' as const })),
+  };
+  render(<App gateway={new MockOperationsGateway()} outputBridge={output} />);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Ekspor Data' }));
+  fireEvent.change(screen.getByLabelText('Cari data operasional'), { target: { value: 'BRS-108' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Simpan PDF data operasional' }));
+
+  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(
+    'PDF data operasional belum dapat disimpan.',
+  ));
+  expect(screen.getByRole('status')).not.toHaveTextContent('internal PDF detail');
+  expect(consoleError).toHaveBeenCalledWith(
+    '[CH Ultimate] Ekspor PDF data operasional gagal.',
+    failure,
+  );
+  consoleError.mockRestore();
+});
+
 test('mobile exposes operational PDF only from Lainnya and shares one selected dataset', async () => {
   const sharePdf = vi.fn(async () => undefined);
   const ports = mobilePorts(sharePdf);

@@ -109,4 +109,5 @@ test('print CSS exposes only the trusted output host, not the interactive barcod
   const css = readFileSync(resolve(process.cwd(), 'src/renderer/styles.css'), 'utf8');
   expect(css).not.toContain('.barcode-print-sheet, .barcode-print-sheet * { visibility: visible !important; }');
   expect(css).toContain('.print-document-host, .print-document-host * { visibility: visible !important; }');
+  expect(css).toContain('.output-document__page:last-child { break-after: auto; }');
 });

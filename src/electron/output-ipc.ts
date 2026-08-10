@@ -53,6 +53,7 @@ interface OutputIpcOptions {
     properties: ['createDirectory', 'showOverwriteConfirmation'];
   }): Promise<SaveDialogResult>;
   writeFile(path: string, data: Uint8Array): Promise<void>;
+  waitForPrintSpool?: () => Promise<void>;
 }
 
 const DOCUMENT_KINDS = new Set<OutputDocumentKind>([
@@ -66,6 +67,11 @@ const MIN_PAGE_MM = 15;
 const MAX_PAGE_MM = 420;
 const MAX_PDF_BYTES = 100 * 1024 * 1024;
 const MAX_SPREADSHEET_BYTES = 100 * 1024 * 1024;
+const PRINT_SPOOL_GRACE_MS = 3_000;
+
+function waitForWindowsPrintSpool(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, PRINT_SPOOL_GRACE_MS));
+}
 
 const invalidRequest = (): never => {
   throw new Error('Permintaan output tidak valid.');
@@ -200,6 +206,7 @@ export function registerOutputIpcHandlers({
   expectedRendererUrl,
   showSaveDialog,
   writeFile,
+  waitForPrintSpool = waitForWindowsPrintSpool,
 }: OutputIpcOptions): () => void {
   let outputActive = false;
   const authorized = <T>(handler: (input: unknown) => Promise<T>) =>
@@ -233,6 +240,9 @@ export function registerOutputIpcHandlers({
         else reject(new Error(reason || 'Dokumen tidak dapat dicetak.'));
       });
     });
+    // Electron can report success before Windows has consumed the rendered
+    // document. Keep the operation and its renderer host alive briefly.
+    await waitForPrintSpool();
     return { status: 'printed' as const };
   }));
 

@@ -6,7 +6,7 @@ import {
 } from '../../src/electron/output-contract';
 import { registerOutputIpcHandlers } from '../../src/electron/output-ipc';
 
-function harness() {
+function harness(options: { waitForPrintSpool?: () => Promise<void> } = {}) {
   const handlers = new Map<string, (...args: unknown[]) => unknown>();
   const ipcMain = {
     handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
@@ -20,15 +20,28 @@ function harness() {
   const webContents = { mainFrame, print, printToPDF };
   const showSaveDialog = vi.fn().mockResolvedValue({ canceled: false, filePath: '/chosen/Nota-A.pdf' });
   const writeFile = vi.fn().mockResolvedValue(undefined);
+  const waitForPrintSpool = options.waitForPrintSpool ?? vi.fn().mockResolvedValue(undefined);
   const unregister = registerOutputIpcHandlers({
     ipcMain,
     webContents,
     expectedRendererUrl: mainFrame.url,
     showSaveDialog,
     writeFile,
+    waitForPrintSpool,
   });
   const event = { sender: webContents, senderFrame: mainFrame };
-  return { event, handlers, ipcMain, print, printToPDF, showSaveDialog, unregister, webContents, writeFile };
+  return {
+    event,
+    handlers,
+    ipcMain,
+    print,
+    printToPDF,
+    showSaveDialog,
+    unregister,
+    waitForPrintSpool,
+    webContents,
+    writeFile,
+  };
 }
 
 describe('CH output preload contract', () => {
@@ -71,7 +84,7 @@ describe('CH output preload contract', () => {
 
 describe('CH output main boundary', () => {
   it('prints the trusted current contents through the visible system dialog', async () => {
-    const { event, handlers, print } = harness();
+    const { event, handlers, print, waitForPrintSpool } = harness();
 
     await expect(handlers.get(CH_OUTPUT_IPC_CHANNELS.print)!(event, {
       kind: 'invoice', widthMm: 190, heightMm: 120,
@@ -82,6 +95,7 @@ describe('CH output main boundary', () => {
       printBackground: true,
       pageSize: { width: 190_000, height: 120_000 },
     }, expect.any(Function));
+    expect(waitForPrintSpool).toHaveBeenCalledTimes(1);
   });
 
   it('rejects another frame and every renderer-controlled output escape hatch', async () => {
@@ -120,6 +134,34 @@ describe('CH output main boundary', () => {
     })).rejects.toThrow('Output lain masih diproses.');
     finish(true);
     await expect(first).resolves.toEqual({ status: 'printed' });
+  });
+
+  it('keeps native output locked while Windows consumes a successful print job', async () => {
+    let releaseSpool!: () => void;
+    const waitForPrintSpool = vi.fn(() => new Promise<void>((resolve) => {
+      releaseSpool = resolve;
+    }));
+    const { event, handlers } = harness({ waitForPrintSpool });
+    const printHandler = handlers.get(CH_OUTPUT_IPC_CHANNELS.print)!;
+    const first = printHandler(event, { kind: 'nota', widthMm: 210, heightMm: 148 });
+
+    await vi.waitFor(() => expect(waitForPrintSpool).toHaveBeenCalledTimes(1));
+    await expect(printHandler(event, {
+      kind: 'barcode', widthMm: 50, heightMm: 30,
+    })).rejects.toThrow('Output lain masih diproses.');
+
+    releaseSpool();
+    await expect(first).resolves.toEqual({ status: 'printed' });
+  });
+
+  it('does not wait for the spooler when native printing fails', async () => {
+    const { event, handlers, print, waitForPrintSpool } = harness();
+    print.mockImplementation((_options, callback) => callback(false, 'Printer tidak tersedia'));
+
+    await expect(handlers.get(CH_OUTPUT_IPC_CHANNELS.print)!(event, {
+      kind: 'nota', widthMm: 210, heightMm: 148,
+    })).rejects.toThrow('Printer tidak tersedia');
+    expect(waitForPrintSpool).not.toHaveBeenCalled();
   });
 
   it('writes validated Electron PDF bytes only to the native dialog choice', async () => {

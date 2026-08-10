@@ -70,6 +70,15 @@ describe('CH Core v0.2.4 NAS cutover helper', () => {
     expect(script).toContain('MATCH=YES');
   });
 
+  it('accepts a previous deployment rooted at the exact 40-character release commit', async () => {
+    const script = await readFile(scriptPath, 'utf8');
+
+    expect(script).toContain(
+      'previous_project_commit=${previous_project_root#/volume1/docker/ch-ultimate-}',
+    );
+    expect(script).toContain('7|40) ;;');
+  });
+
   it('requires both uninstalled clients to be explicitly quiesced', async () => {
     const script = await readFile(scriptPath, 'utf8');
 

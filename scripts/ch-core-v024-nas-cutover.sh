@@ -93,7 +93,17 @@ load_release_context() {
     *) die 'CH_CORE_STAGING_ROOT is outside the approved staging boundary.' ;;
   esac
   case "$previous_project_root" in
-    /volume1/docker/ch-ultimate-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]/server) ;;
+    /volume1/docker/ch-ultimate-*/server)
+      previous_project_commit=${previous_project_root#/volume1/docker/ch-ultimate-}
+      previous_project_commit=${previous_project_commit%/server}
+      case "${#previous_project_commit}" in
+        7|40) ;;
+        *) die 'CH_CORE_PREVIOUS_PROJECT_ROOT has an invalid commit length.' ;;
+      esac
+      case "$previous_project_commit" in
+        *[!0-9a-f]*) die 'CH_CORE_PREVIOUS_PROJECT_ROOT commit must be lowercase hexadecimal.' ;;
+      esac
+      ;;
     *) die 'CH_CORE_PREVIOUS_PROJECT_ROOT is outside the approved deployment boundary.' ;;
   esac
   case "$previous_project_name" in

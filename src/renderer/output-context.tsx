@@ -27,9 +27,13 @@ interface OutputContextValue {
 
 const OutputContext = createContext<OutputContextValue | null>(null);
 
-async function waitForHostReady(): Promise<void> {
-  await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
-  const host = document.querySelector<HTMLElement>('[data-testid="print-document-host"]');
+export async function waitForHostReady(): Promise<void> {
+  const deadline = Date.now() + 2_000;
+  let host = document.querySelector<HTMLElement>('[data-testid="print-document-host"]');
+  while (!host && Date.now() < deadline) {
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 16));
+    host = document.querySelector<HTMLElement>('[data-testid="print-document-host"]');
+  }
   if (!host) throw new Error('Dokumen output belum siap.');
   await document.fonts?.ready;
   await Promise.all([...host.querySelectorAll('img')].map((image) => {

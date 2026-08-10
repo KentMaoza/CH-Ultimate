@@ -10,7 +10,11 @@ import {
 } from '../../src/domain/output-documents';
 import { createInitialState } from '../../src/domain/operations';
 import type { ChOutputBridge } from '../../src/electron/output-contract';
-import { OutputProvider, useOutput } from '../../src/renderer/output-context';
+import {
+  OutputProvider,
+  useOutput,
+  waitForHostReady,
+} from '../../src/renderer/output-context';
 import { PrintDocumentHost } from '../../src/renderer/output/PrintDocumentHost';
 
 function notaPlan(status: 'draft' | 'completed' = 'draft') {
@@ -103,6 +107,16 @@ test('output provider mounts trusted content before print and reuses it for PDF 
     kind: 'nota', widthMm: plan.widthMm, heightMm: plan.heightMm,
     fileName: plan.fileName,
   }));
+});
+
+test('output readiness waits for a concurrently rendered trusted host', async () => {
+  const waiting = waitForHostReady();
+  const host = document.createElement('div');
+  host.dataset.testid = 'print-document-host';
+  window.setTimeout(() => document.body.append(host), 25);
+
+  await expect(waiting).resolves.toBeUndefined();
+  host.remove();
 });
 
 test('print CSS exposes only the trusted output host, not the interactive barcode preview', () => {

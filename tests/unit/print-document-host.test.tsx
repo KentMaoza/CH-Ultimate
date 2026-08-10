@@ -87,7 +87,11 @@ test('output provider mounts trusted content before print and reuses it for PDF 
     expect(screen.getByTestId('print-document-host')).toHaveTextContent('Beras Hitam');
     return { status: 'saved' as const };
   });
-  const bridge: ChOutputBridge = { printDocument, savePdf };
+  const bridge: ChOutputBridge = {
+    printDocument,
+    savePdf,
+    saveSpreadsheet: vi.fn(async () => ({ status: 'saved' as const })),
+  };
   render(<OutputProvider bridge={bridge}><OutputHarness plan={plan} /></OutputProvider>);
 
   fireEvent.click(screen.getByRole('button', { name: 'Print' }));

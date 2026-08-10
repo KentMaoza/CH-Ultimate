@@ -15,8 +15,9 @@ function outputBridge() {
     rendered.push(screen.getByTestId('print-document-host').textContent ?? '');
     return { status: 'saved' as const };
   });
+  const saveSpreadsheet = vi.fn(async () => ({ status: 'saved' as const }));
   return {
-    bridge: { printDocument, savePdf } satisfies ChOutputBridge,
+    bridge: { printDocument, savePdf, saveSpreadsheet } satisfies ChOutputBridge,
     printDocument,
     rendered,
     savePdf,

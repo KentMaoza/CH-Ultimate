@@ -90,7 +90,11 @@ function renderCoreNota() {
   return gateway.initialize().then(() => {
     render(
       <OperationsProvider gateway={gateway}>
-        <OutputProvider bridge={{ printDocument: async () => ({ status: 'printed' }), savePdf: async () => ({ status: 'saved' }) }}>
+        <OutputProvider bridge={{
+          printDocument: async () => ({ status: 'printed' }),
+          savePdf: async () => ({ status: 'saved' }),
+          saveSpreadsheet: async () => ({ status: 'saved' }),
+        }}>
           <NotaWorkspace coreBacked onBack={() => undefined} />
         </OutputProvider>
       </OperationsProvider>,

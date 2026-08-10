@@ -50,16 +50,13 @@ export function OperationalExportPage() {
     try {
       const { createOperationalWorkbookBuffer } = await import('../../domain/operational-workbook');
       const buffer = await createOperationalWorkbookBuffer(state, filters, generatedDate);
-      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `CHU-Ekspor-Data-${generatedDate}.xlsx`;
-      document.body.append(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 100);
-      setNotice('XLSX seluruh data cocok berhasil dibuat.');
+      const result = await output.saveSpreadsheet({
+        fileName: `CHU-Ekspor-Data-${generatedDate}.xlsx`,
+        bytes: new Uint8Array(buffer),
+      });
+      setNotice(result.status === 'saved'
+        ? 'XLSX seluruh data cocok berhasil disimpan.'
+        : 'Penyimpanan XLSX dibatalkan.');
     } catch {
       setNotice('XLSX belum dapat dibuat.');
     } finally {

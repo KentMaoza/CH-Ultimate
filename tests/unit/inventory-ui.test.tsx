@@ -133,7 +133,11 @@ test('lists filtered price and quantity changes and exposes price export', async
 test('prints a chosen quantity of warehouse SKU barcodes through the output bridge', async () => {
   const print = vi.spyOn(window, 'print').mockImplementation(() => {});
   const printDocument = vi.fn(async () => ({ status: 'printed' as const }));
-  render(<App gateway={new MockOperationsGateway()} outputBridge={{ printDocument, savePdf: async () => ({ status: 'saved' }) }} />);
+  render(<App gateway={new MockOperationsGateway()} outputBridge={{
+    printDocument,
+    savePdf: async () => ({ status: 'saved' }),
+    saveSpreadsheet: async () => ({ status: 'saved' }),
+  }} />);
   const row = screen.getByRole('row', { name: /BRS-108-BLK/ });
   fireEvent.click(within(row).getByRole('button', { name: 'Print barcode BRS-108-BLK' }));
   const dialog = screen.getByRole('dialog', { name: 'Print barcode produk' });

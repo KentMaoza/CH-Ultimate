@@ -14,6 +14,7 @@ test('empty-stock report saves the selected restock plan as a real PDF', async (
   const output: ChOutputBridge = {
     printDocument: vi.fn(async () => ({ status: 'printed' as const })),
     savePdf,
+    saveSpreadsheet: vi.fn(async () => ({ status: 'saved' as const })),
   };
   render(<App gateway={new MockOperationsGateway()} outputBridge={output} />);
   fireEvent.click(screen.getByRole('button', { name: 'Barang Kosong' }));

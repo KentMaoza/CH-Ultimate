@@ -13,6 +13,8 @@ import type {
   ChOutputBridge,
   PrintDocumentResult,
   SavePdfResult,
+  SaveSpreadsheetRequest,
+  SaveSpreadsheetResult,
 } from '../electron/output-contract';
 import { PrintDocumentHost } from './output/PrintDocumentHost';
 
@@ -20,6 +22,7 @@ interface OutputContextValue {
   busy: boolean;
   print(plan: OutputDocumentPlan): Promise<PrintDocumentResult>;
   savePdf(plan: OutputDocumentPlan): Promise<SavePdfResult>;
+  saveSpreadsheet(input: SaveSpreadsheetRequest): Promise<SaveSpreadsheetResult>;
 }
 
 const OutputContext = createContext<OutputContextValue | null>(null);
@@ -73,6 +76,21 @@ export function OutputProvider({
     }
   }, [bridge]);
 
+  const saveSpreadsheet = useCallback(async (
+    input: SaveSpreadsheetRequest,
+  ): Promise<SaveSpreadsheetResult> => {
+    if (!bridge) throw new Error('Output desktop tidak tersedia.');
+    if (busyRef.current) throw new Error('Output lain masih diproses.');
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      return await bridge.saveSpreadsheet(input);
+    } finally {
+      setBusy(false);
+      busyRef.current = false;
+    }
+  }, [bridge]);
+
   const value = useMemo<OutputContextValue>(() => ({
     busy,
     print: (nextPlan) => run(nextPlan, (activeBridge) => activeBridge.printDocument({
@@ -86,7 +104,8 @@ export function OutputProvider({
       heightMm: nextPlan.heightMm,
       fileName: nextPlan.fileName,
     })),
-  }), [busy, run]);
+    saveSpreadsheet,
+  }), [busy, run, saveSpreadsheet]);
 
   return <OutputContext.Provider value={value}>
     {children}

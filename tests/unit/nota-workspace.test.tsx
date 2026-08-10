@@ -7,6 +7,7 @@ function openNota(gateway = new MockOperationsGateway()) {
   const outputBridge = {
     printDocument: vi.fn(async () => ({ status: 'printed' as const })),
     savePdf: vi.fn(async () => ({ status: 'saved' as const })),
+    saveSpreadsheet: vi.fn(async () => ({ status: 'saved' as const })),
   };
   render(<App gateway={gateway} outputBridge={outputBridge} />);
   fireEvent.click(screen.getByRole('button', { name: 'Nota' }));

@@ -26,12 +26,8 @@ test('desktop Ekspor Data applies filters, downloads five-sheet XLSX, and saves 
     hostText.push(screen.getByTestId('print-document-host').textContent ?? '');
     return { status: 'saved' as const };
   });
-  const output: ChOutputBridge = { printDocument, savePdf };
-  const createObjectURL = vi.fn(() => 'blob:operational-xlsx');
-  const revokeObjectURL = vi.fn();
-  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
-  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
-  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+  const saveSpreadsheet = vi.fn(async () => ({ status: 'saved' as const }));
+  const output: ChOutputBridge = { printDocument, savePdf, saveSpreadsheet };
   render(<App gateway={new MockOperationsGateway()} outputBridge={output} />);
 
   fireEvent.click(screen.getByRole('button', { name: 'Ekspor Data' }));
@@ -42,8 +38,11 @@ test('desktop Ekspor Data applies filters, downloads five-sheet XLSX, and saves 
   fireEvent.change(screen.getByLabelText('Cari data operasional'), { target: { value: 'BRS-108' } });
   expect(screen.getByText('1 cocok · 1 masuk PDF')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Ekspor XLSX data operasional' }));
-  await waitFor(() => expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob)));
-  expect(click).toHaveBeenCalledOnce();
+  await waitFor(() => expect(saveSpreadsheet).toHaveBeenCalledWith({
+    fileName: expect.stringMatching(/^CHU-Ekspor-Data-\d{4}-\d{2}-\d{2}\.xlsx$/),
+    bytes: expect.any(Uint8Array),
+  }));
+  expect(screen.getByRole('status')).toHaveTextContent('XLSX seluruh data cocok berhasil disimpan.');
 
   fireEvent.click(screen.getByRole('button', { name: 'Simpan PDF data operasional' }));
   await waitFor(() => expect(savePdf).toHaveBeenCalledWith(expect.objectContaining({
@@ -51,7 +50,6 @@ test('desktop Ekspor Data applies filters, downloads five-sheet XLSX, and saves 
   })));
   expect(hostText[0]).toContain('1 dari 1 baris');
   expect(hostText[0]).toContain('BRS-108-BLK');
-  click.mockRestore();
 });
 
 test('mobile exposes operational PDF only from Lainnya and shares one selected dataset', async () => {

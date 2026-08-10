@@ -46,6 +46,7 @@ describe('CH Core preload surface', () => {
     )!;
     expect(Object.keys(outputBridge).sort()).toEqual([
       'printDocument',
+      'saveGeneratedPdf',
       'savePdf',
       'saveSpreadsheet',
     ]);
@@ -71,6 +72,10 @@ describe('CH Core preload surface', () => {
       )!;
       await expect(outputBridge.printDocument({ kind: 'nota', widthMm: 210, heightMm: 148 })).resolves.toEqual({ status: 'printed' });
       await expect(outputBridge.savePdf({ kind: 'nota', widthMm: 210, heightMm: 148, fileName: 'Nota.pdf' })).resolves.toEqual({ status: 'saved' });
+      await expect(outputBridge.saveGeneratedPdf({
+        fileName: 'CHU-Ekspor.pdf',
+        bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]),
+      })).resolves.toEqual({ status: 'saved' });
       await expect(outputBridge.saveSpreadsheet({
         fileName: 'CHU-Ekspor.xlsx',
         bytes: new Uint8Array([0x50, 0x4b, 0x03, 0x04]),

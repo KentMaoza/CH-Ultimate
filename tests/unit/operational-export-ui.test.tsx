@@ -21,13 +21,14 @@ function mobilePorts(sharePdf = vi.fn(async () => undefined)) {
 
 test('desktop Ekspor Data applies filters, downloads five-sheet XLSX, and saves selected PDF', async () => {
   const printDocument = vi.fn(async () => ({ status: 'printed' as const }));
-  const hostText: string[] = [];
-  const savePdf = vi.fn(async () => {
-    hostText.push(screen.getByTestId('print-document-host').textContent ?? '');
-    return { status: 'saved' as const };
-  });
+  const savePdf = vi.fn(async () => ({ status: 'saved' as const }));
+  const saveGeneratedPdf = vi.fn(async (_input: { fileName: string; bytes: Uint8Array }) => (
+    { status: 'saved' as const }
+  ));
   const saveSpreadsheet = vi.fn(async () => ({ status: 'saved' as const }));
-  const output: ChOutputBridge = { printDocument, savePdf, saveSpreadsheet };
+  const output: ChOutputBridge = {
+    printDocument, savePdf, saveGeneratedPdf, saveSpreadsheet,
+  };
   render(<App gateway={new MockOperationsGateway()} outputBridge={output} />);
 
   fireEvent.click(screen.getByRole('button', { name: 'Ekspor Data' }));
@@ -45,11 +46,13 @@ test('desktop Ekspor Data applies filters, downloads five-sheet XLSX, and saves 
   expect(screen.getByRole('status')).toHaveTextContent('XLSX seluruh data cocok berhasil disimpan.');
 
   fireEvent.click(screen.getByRole('button', { name: 'Simpan PDF data operasional' }));
-  await waitFor(() => expect(savePdf).toHaveBeenCalledWith(expect.objectContaining({
-    kind: 'operational-data', widthMm: 297, heightMm: 210,
-  })));
-  expect(hostText[0]).toContain('1 dari 1 baris');
-  expect(hostText[0]).toContain('BRS-108-BLK');
+  await waitFor(() => expect(saveGeneratedPdf).toHaveBeenCalledWith({
+    fileName: expect.stringMatching(/^CHU-Ekspor-SKU-Stok-\d{4}-\d{2}-\d{2}\.pdf$/),
+    bytes: expect.any(Uint8Array),
+  }));
+  const bytes = saveGeneratedPdf.mock.calls[0]![0].bytes;
+  expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe('%PDF-');
+  expect(savePdf).not.toHaveBeenCalled();
 });
 
 test('desktop keeps operational PDF failures generic while recording diagnostics', async () => {
@@ -57,7 +60,8 @@ test('desktop keeps operational PDF failures generic while recording diagnostics
   const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
   const output: ChOutputBridge = {
     printDocument: vi.fn(async () => ({ status: 'printed' as const })),
-    savePdf: vi.fn(async () => { throw failure; }),
+    savePdf: vi.fn(async () => ({ status: 'saved' as const })),
+    saveGeneratedPdf: vi.fn(async () => { throw failure; }),
     saveSpreadsheet: vi.fn(async () => ({ status: 'saved' as const })),
   };
   render(<App gateway={new MockOperationsGateway()} outputBridge={output} />);

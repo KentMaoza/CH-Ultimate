@@ -1,6 +1,7 @@
 import type {
   OutputDocumentKind,
   PrintDocumentRequest,
+  SaveGeneratedPdfRequest,
   SavePdfRequest,
   SaveSpreadsheetRequest,
 } from './output-contract';
@@ -123,6 +124,21 @@ function parseSavePdfRequest(input: unknown): SavePdfRequest {
   return { ...print, fileName };
 }
 
+function parseSaveGeneratedPdfRequest(input: unknown): SaveGeneratedPdfRequest {
+  if (
+    typeof input !== 'object' ||
+    input === null ||
+    Array.isArray(input) ||
+    !exactKeys(input, ['fileName', 'bytes'])
+  ) return invalidRequest();
+  const fileName = Reflect.get(input, 'fileName');
+  const bytes = Reflect.get(input, 'bytes');
+  if (!validPdfFileName(fileName) || !(bytes instanceof Uint8Array)) {
+    return invalidRequest();
+  }
+  return { fileName, bytes };
+}
+
 function validSpreadsheetFileName(value: unknown): value is string {
   return typeof value === 'string' &&
     value.length > 5 && value.length <= 120 &&
@@ -234,6 +250,20 @@ export function registerOutputIpcHandlers({
       pageSize: pdfPageSize(request),
       margins: { top: 0, bottom: 0, left: 0, right: 0 },
     }));
+    await writeFile(result.filePath, bytes);
+    return { status: 'saved' as const };
+  }));
+
+  ipcMain.handle(CH_OUTPUT_IPC_CHANNELS.saveGeneratedPdf, authorized(async (input) => {
+    const request = parseSaveGeneratedPdfRequest(input);
+    const bytes = requirePdfBytes(request.bytes);
+    const result = await showSaveDialog({
+      title: 'Simpan PDF',
+      defaultPath: request.fileName,
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+      properties: ['createDirectory', 'showOverwriteConfirmation'],
+    });
+    if (result.canceled || !result.filePath) return { status: 'cancelled' as const };
     await writeFile(result.filePath, bytes);
     return { status: 'saved' as const };
   }));

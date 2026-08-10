@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 
 import {
   buildOperationalPdfPlan,
+  createOperationalPdfBlob,
   type OperationalDataset,
   type OperationalFilters,
 } from '../../domain/operational-exports';
@@ -69,7 +70,11 @@ export function OperationalExportPage() {
     setNotice('');
     try {
       const hydrated = await hydrateOperationalPdfImages(plan, state.skus, gateway);
-      const result = await output.savePdf(hydrated);
+      const blob = await createOperationalPdfBlob(hydrated);
+      const result = await output.saveGeneratedPdf({
+        fileName: hydrated.fileName,
+        bytes: new Uint8Array(await blob.arrayBuffer()),
+      });
       setNotice(result.status === 'saved' ? 'PDF data operasional berhasil disimpan.' : 'Penyimpanan PDF dibatalkan.');
     } catch (error) {
       console.error('[CH Ultimate] Ekspor PDF data operasional gagal.', error);

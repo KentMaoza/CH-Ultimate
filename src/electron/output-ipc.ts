@@ -27,6 +27,7 @@ interface TrustedWebContents {
   printToPDF(options: {
     printBackground: true;
     pageSize: { width: number; height: number };
+    margins: { top: 0; bottom: 0; left: 0; right: 0 };
   }): Promise<Uint8Array>;
 }
 
@@ -231,6 +232,7 @@ export function registerOutputIpcHandlers({
     const bytes = requirePdfBytes(await webContents.printToPDF({
       printBackground: true,
       pageSize: pdfPageSize(request),
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
     }));
     await writeFile(result.filePath, bytes);
     return { status: 'saved' as const };

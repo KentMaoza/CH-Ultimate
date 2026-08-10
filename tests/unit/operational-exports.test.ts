@@ -127,6 +127,39 @@ it('creates a five-sheet XLSX with unlimited native integers and metadata-only i
   expect(workbookText).toContain('Biner dihilangkan');
 });
 
+it('formats every XLSX sheet for readable warehouse use', async () => {
+  const bytes = await createOperationalWorkbookBuffer(largeState(), {
+    query: '', from: '', to: '', status: 'active',
+  }, '2026-08-04');
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(bytes);
+
+  const summary = workbook.getWorksheet('Ringkasan')!;
+  expect(summary.getColumn('A').width).toBeGreaterThanOrEqual(30);
+  expect(summary.getColumn('B').width).toBeGreaterThanOrEqual(22);
+  expect(summary.getCell('A1').font.bold).toBe(true);
+  expect(summary.getCell('A7').font.bold).toBe(true);
+
+  const expectedWidths: Record<string, number[]> = {
+    SKU_Stok: [28, 42, 14, 18, 12, 15, 48, 34, 18, 24],
+    Riwayat_Stok: [24, 28, 42, 18, 14, 16, 14],
+    Riwayat_Harga: [24, 28, 42, 18, 18, 18],
+    Cek_Stok: [24, 24, 28, 42, 14, 14, 16, 14, 16, 24, 48],
+  };
+
+  for (const [sheetName, widths] of Object.entries(expectedWidths)) {
+    const sheet = workbook.getWorksheet(sheetName)!;
+    expect(sheet.columns.map((column) => column.width)).toEqual(widths);
+    expect(sheet.getRow(1).font.bold).toBe(true);
+    expect(sheet.getRow(1).height).toBeGreaterThanOrEqual(24);
+    if (sheet.rowCount > 1) {
+      expect(sheet.getRow(2).getCell(1).alignment).toMatchObject({ vertical: 'top', wrapText: true });
+    }
+  }
+  expect(workbook.getWorksheet('SKU_Stok')!.getColumn('D').numFmt).toBe('#,##0');
+  expect(workbook.getWorksheet('SKU_Stok')!.getColumn('E').numFmt).toBe('#,##0');
+});
+
 it('creates a readable operational PDF blob with included-versus-matched metadata', async () => {
   const blob = await createOperationalPdfBlob(buildOperationalPdfPlan(
     createInitialState(),

@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { createDraftNotaTransaction } from '../../src/domain/nota';
 import {
   buildBarcodeDocumentPlan,
+  buildLabelDocumentPlan,
   buildNotaDocumentPlan,
 } from '../../src/domain/output-documents';
 import { createInitialState } from '../../src/domain/operations';
@@ -61,16 +62,81 @@ test('trusted barcode host renders every QR with a human-readable Kode Produk', 
   render(<PrintDocumentHost plan={plan} />);
 
   expect(screen.getAllByText('Kode Produk: BRS-108-BLK')).toHaveLength(2);
-  expect(screen.getAllByTestId('output-product-qr')).toHaveLength(2);
+  const qrCodes = screen.getAllByTestId('output-product-qr');
+  expect(qrCodes).toHaveLength(2);
+  expect(qrCodes[0]).toHaveStyle({
+    width: '18mm',
+    height: '18mm',
+    flexShrink: '0',
+  });
   const pages = screen.getAllByTestId('output-label-page');
   expect(pages).toHaveLength(2);
   for (const page of pages) {
     expect(page).toHaveStyle({ width: '54mm', minHeight: '34mm', padding: '2mm' });
-    expect(page.querySelector('.output-document__product-card')).toHaveStyle({
+    const card = page.querySelector('.output-document__product-card');
+    expect(card).toHaveClass('output-document__product-card--with-qr');
+    expect(card).toHaveStyle({
       width: '50mm',
-      minHeight: '30mm',
+      height: '30mm',
     });
   }
+});
+
+test('printed product label keeps its QR at a scannable physical size', () => {
+  const state = createInitialState();
+  const plan = buildLabelDocumentPlan(state.skus[0]!, state.labelTemplate, 1);
+  render(<PrintDocumentHost plan={plan} />);
+
+  expect(screen.getByTestId('output-product-qr')).toHaveStyle({
+    width: '15mm',
+    height: '15mm',
+    flexShrink: '0',
+  });
+});
+
+test('minimum product label uses a fixed card and fitted copy without shrinking its QR', () => {
+  const state = createInitialState();
+  const plan = buildLabelDocumentPlan(state.skus[0]!, {
+    ...state.labelTemplate,
+    widthMm: 20,
+    heightMm: 15,
+    fontSize: 24,
+    fields: ['qr', 'chu', 'name', 'sku', 'price'],
+  }, 1);
+  render(<PrintDocumentHost plan={plan} />);
+
+  expect(screen.getByTestId('output-product-card')).toHaveStyle({
+    width: '20mm',
+    height: '15mm',
+    fontSize: '9px',
+  });
+  expect(screen.getByTestId('output-product-qr')).toHaveStyle({
+    width: '8mm',
+    height: '8mm',
+    flexShrink: '0',
+  });
+  expect(screen.getByTestId('output-product-copy')).toHaveClass('output-document__product-copy');
+});
+
+test('minimum barcode uses a fixed card without shrinking its QR', () => {
+  const state = createInitialState();
+  const plan = buildBarcodeDocumentPlan(state.skus[0]!, {
+    ...state.labelTemplate,
+    widthMm: 20,
+    heightMm: 15,
+    fontSize: 24,
+  }, 1);
+  render(<PrintDocumentHost plan={plan} />);
+
+  expect(screen.getByTestId('output-product-card')).toHaveStyle({
+    width: '20mm',
+    height: '15mm',
+  });
+  expect(screen.getByTestId('output-product-qr')).toHaveStyle({
+    width: '8mm',
+    height: '8mm',
+    flexShrink: '0',
+  });
 });
 
 function OutputHarness({ plan }: { plan: ReturnType<typeof notaPlan> }) {
@@ -200,4 +266,5 @@ test('print CSS exposes only the trusted output host, not the interactive barcod
   expect(css).toContain('.output-document__page:last-child { break-after: auto; }');
   expect(css).toContain('#root > :not(.print-document-host) { display: none !important; }');
   expect(css).toContain('body { min-width: 0; min-height: 0; }');
+  expect(css).toContain('white-space: nowrap;');
 });

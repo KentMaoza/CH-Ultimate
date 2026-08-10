@@ -408,6 +408,119 @@ test('Template Label and Invoice configures a movable session-only invoice previ
   }
 });
 
+test('minimum thermal and A4 label cards contain fixed QR and copy bounds', async () => {
+  const { application, window } = await launch();
+  try {
+    await window.getByRole('button', { name: 'Template Label & Invoice' }).click();
+    await window.getByLabel('Lebar (mm)').fill('20');
+    await window.getByLabel('Tinggi (mm)').fill('15');
+    await window.getByLabel('Ukuran font').fill('24');
+    await window.getByLabel('CHU').check();
+
+    const captureLayout = async (buttonName: 'Print label' | 'Print barcode sekarang') => {
+      await window.evaluate(() => {
+        const testWindow = globalThis as typeof globalThis & {
+          __chuOriginalAnimationFrame?: typeof globalThis.requestAnimationFrame;
+        };
+        testWindow.__chuOriginalAnimationFrame = globalThis.requestAnimationFrame;
+        globalThis.requestAnimationFrame = (callback) => Number(globalThis.setTimeout(
+          () => callback(globalThis.performance.now()),
+          250,
+        ));
+      });
+      try {
+        await window.getByRole('button', { name: buttonName, exact: true }).click();
+        const host = window.getByTestId('print-document-host');
+        await host.waitFor({ state: 'attached' });
+        return await host.evaluate((element) => {
+          const tolerance = 0.75;
+          const millimetre = 96 / 25.4;
+          const pages = [...element.querySelectorAll<HTMLElement>('[data-testid="output-label-page"]')];
+          const cards = [...element.querySelectorAll<HTMLElement>('[data-testid="output-product-card"]')];
+          const measurements = cards.map((card) => {
+            const page = card.closest<HTMLElement>('[data-testid="output-label-page"]')!;
+            const qr = card.querySelector<SVGElement>('[data-testid="output-product-qr"]')!;
+            const copy = card.querySelector<HTMLElement>('[data-testid="output-product-copy"]')!;
+            const cardRect = card.getBoundingClientRect();
+            const pageRect = page.getBoundingClientRect();
+            const qrRect = qr.getBoundingClientRect();
+            const copyRect = copy.getBoundingClientRect();
+            return {
+              cardWidth: cardRect.width,
+              cardHeight: cardRect.height,
+              qrWidth: qrRect.width,
+              contained:
+                cardRect.left >= pageRect.left - tolerance &&
+                cardRect.top >= pageRect.top - tolerance &&
+                cardRect.right <= pageRect.right + tolerance &&
+                cardRect.bottom <= pageRect.bottom + tolerance &&
+                qrRect.left >= cardRect.left - tolerance &&
+                qrRect.top >= cardRect.top - tolerance &&
+                qrRect.right <= cardRect.right + tolerance &&
+                qrRect.bottom <= cardRect.bottom + tolerance &&
+                copyRect.left >= cardRect.left - tolerance &&
+                copyRect.top >= cardRect.top - tolerance &&
+                copyRect.right <= cardRect.right + tolerance &&
+                copyRect.bottom <= cardRect.bottom + tolerance,
+            };
+          });
+          return {
+            pageCount: pages.length,
+            cardCount: cards.length,
+            allContained: measurements.every((row) => row.contained),
+            allCardsExact:
+              measurements.every((row) => Math.abs(row.cardWidth - (20 * millimetre)) <= tolerance) &&
+              measurements.every((row) => Math.abs(row.cardHeight - (15 * millimetre)) <= tolerance),
+            minimumQrWidth: Math.min(...measurements.map((row) => row.qrWidth)),
+            expectedQrWidth: 8 * millimetre,
+          };
+        });
+      } finally {
+        await window.evaluate(() => {
+          const testWindow = globalThis as typeof globalThis & {
+            __chuOriginalAnimationFrame?: typeof globalThis.requestAnimationFrame;
+          };
+          if (testWindow.__chuOriginalAnimationFrame) {
+            globalThis.requestAnimationFrame = testWindow.__chuOriginalAnimationFrame;
+            delete testWindow.__chuOriginalAnimationFrame;
+          }
+        });
+      }
+    };
+
+    await window.getByLabel('Media label').selectOption('thermal');
+    await window.getByLabel('Jumlah print').fill('1');
+    const thermal = await captureLayout('Print label');
+    expect(thermal).toMatchObject({ pageCount: 1, cardCount: 1, allContained: true, allCardsExact: true });
+    expect(thermal.minimumQrWidth).toBeGreaterThanOrEqual(thermal.expectedQrWidth - 0.75);
+    await expect(window.getByTestId('print-document-host')).toHaveCount(0);
+
+    await window.getByRole('button', { name: 'SKU Gudang' }).click();
+    await window.getByRole('row', { name: /BRS-108-BLK/ }).getByRole('button', { name: 'Print barcode BRS-108-BLK' }).click();
+    await window.getByLabel('Jumlah barcode').fill('1');
+    const thermalBarcode = await captureLayout('Print barcode sekarang');
+    expect(thermalBarcode).toMatchObject({ pageCount: 1, cardCount: 1, allContained: true, allCardsExact: true });
+    expect(thermalBarcode.minimumQrWidth).toBeGreaterThanOrEqual(thermalBarcode.expectedQrWidth - 0.75);
+    await window.getByRole('button', { name: 'Tutup print barcode' }).click();
+
+    await window.getByRole('button', { name: 'Template Label & Invoice' }).click();
+    await window.getByLabel('Media label').selectOption('a4');
+    await window.getByLabel('Jumlah print').fill('51');
+    const a4 = await captureLayout('Print label');
+    expect(a4).toMatchObject({ pageCount: 1, cardCount: 51, allContained: true, allCardsExact: true });
+    expect(a4.minimumQrWidth).toBeGreaterThanOrEqual(a4.expectedQrWidth - 0.75);
+
+    await window.getByRole('button', { name: 'SKU Gudang' }).click();
+    await window.getByRole('row', { name: /BRS-108-BLK/ }).getByRole('button', { name: 'Print barcode BRS-108-BLK' }).click();
+    await window.getByLabel('Jumlah barcode').fill('51');
+    const a4Barcode = await captureLayout('Print barcode sekarang');
+    expect(a4Barcode).toMatchObject({ pageCount: 1, cardCount: 51, allContained: true, allCardsExact: true });
+    expect(a4Barcode.minimumQrWidth).toBeGreaterThanOrEqual(a4Barcode.expectedQrWidth - 0.75);
+  } finally {
+    await application.close();
+  }
+});
+
 test('Ekspor Data uses deterministic filters and the fake PDF bridge without native dialogs', async () => {
   const { application, window } = await launch();
   try {

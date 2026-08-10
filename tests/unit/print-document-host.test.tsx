@@ -124,4 +124,6 @@ test('print CSS exposes only the trusted output host, not the interactive barcod
   expect(css).not.toContain('.barcode-print-sheet, .barcode-print-sheet * { visibility: visible !important; }');
   expect(css).toContain('.print-document-host, .print-document-host * { visibility: visible !important; }');
   expect(css).toContain('.output-document__page:last-child { break-after: auto; }');
+  expect(css).toContain('#root > :not(.print-document-host) { display: none !important; }');
+  expect(css).toContain('body { min-width: 0; min-height: 0; }');
 });

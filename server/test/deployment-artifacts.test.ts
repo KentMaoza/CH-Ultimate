@@ -182,6 +182,7 @@ describe('local CH Core deployment artifacts', () => {
     expect(opsBlock).toMatch(
       /source: \/run\/mysqld[\s\S]*?target: \/run\/mysqld[\s\S]*?read_only: true/,
     );
+    expect(opsBlock).toContain('/tmp:size=64m,mode=1777,noexec,nosuid,nodev');
     expect(compose).not.toMatch(/ch-core-ops:[\s\S]*?ports:/);
     expect(compose.match(/type: bind/g)).toHaveLength(4);
   });

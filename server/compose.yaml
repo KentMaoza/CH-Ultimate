@@ -67,7 +67,7 @@ services:
     cpu_shares: 256
     pids_limit: 64
     tmpfs:
-      - /tmp:size=8m,mode=1777,noexec,nosuid,nodev
+      - /tmp:size=64m,mode=1777,noexec,nosuid,nodev
     volumes:
       - type: bind
         source: ${CH_CORE_BACKUP_HOST_PATH:?set CH_CORE_BACKUP_HOST_PATH}

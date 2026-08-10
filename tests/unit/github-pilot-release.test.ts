@@ -47,8 +47,10 @@ describe('GitHub pilot release workflow', () => {
     expect(workflow).toContain('mariadb-integration:');
     expect(workflow).toContain('image: mariadb:10.11');
     expect(workflow).toContain('MARIADB_DATABASE: chu_test');
+    expect(workflow).toContain('MARIADB_USER: chu_test');
+    expect(workflow).toContain('MARIADB_PASSWORD: chu_test_ci_only');
     expect(workflow).toContain(
-      'CH_CORE_TEST_DATABASE_URL: mariadb://root@127.0.0.1:3306/chu_test',
+      'CH_CORE_TEST_DATABASE_URL: mariadb://chu_test:chu_test_ci_only@127.0.0.1:3306/chu_test',
     );
     expect(workflow).toContain('npm run server:test:integration');
     expect(workflow.match(/needs: source-gates/g)).toHaveLength(3);
@@ -107,7 +109,7 @@ describe('GitHub pilot release workflow', () => {
 
     expect(workflow.match(/CH_CORE_TEST_DATABASE_URL/g)).toHaveLength(1);
     expect(workflow).not.toMatch(/CH_CORE_TEST_DATABASE_URL:[^\n]*(192\.168\.|\/chu(?:\s|$))/i);
-    expect(workflow).not.toMatch(/^\s+MARIADB_(?:ROOT_)?PASSWORD:/im);
+    expect(workflow).not.toMatch(/^\s+MARIADB_ROOT_PASSWORD:/im);
     expect(workflow).not.toMatch(/curl\s+[^\n]*-[^\n]*k/i);
     expect(workflow).not.toMatch(/rejectUnauthorized\s*:\s*false/i);
     expect(workflow).not.toMatch(/NODE_TLS_REJECT_UNAUTHORIZED/i);

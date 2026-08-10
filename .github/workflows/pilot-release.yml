@@ -113,17 +113,19 @@ jobs:
       mariadb:
         image: mariadb:10.11
         env:
-          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: '1'
           MARIADB_DATABASE: chu_test
+          MARIADB_USER: chu_test
+          MARIADB_PASSWORD: chu_test_ci_only
+          MARIADB_RANDOM_ROOT_PASSWORD: '1'
         ports:
           - 3306:3306
         options: >-
-          --health-cmd "mariadb-admin ping --host=127.0.0.1 --user=root"
+          --health-cmd "mariadb-admin ping --host=127.0.0.1 --user=chu_test --password=chu_test_ci_only"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
     env:
-      CH_CORE_TEST_DATABASE_URL: mariadb://root@127.0.0.1:3306/chu_test
+      CH_CORE_TEST_DATABASE_URL: mariadb://chu_test:chu_test_ci_only@127.0.0.1:3306/chu_test
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

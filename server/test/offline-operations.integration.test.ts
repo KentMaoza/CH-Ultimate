@@ -147,7 +147,7 @@ integration('offline operations against exact isolated chu_test', () => {
         quantity_pcs: bigint;
         nota_count: bigint;
         posting_count: bigint;
-        revenue_rupiah: bigint;
+        revenue_rupiah: bigint | string;
         movement_count: bigint;
         warning_count: bigint;
       }>
@@ -172,7 +172,11 @@ integration('offline operations against exact isolated chu_test', () => {
       [skuId, deviceId, (first as { entityId: string }).entityId,
         (first as { entityId: string }).entityId, skuId, deviceId],
     );
-    expect(rows[0]).toMatchObject({
+    const invariant = rows[0]!;
+    expect({
+      ...invariant,
+      revenue_rupiah: BigInt(String(invariant.revenue_rupiah)),
+    }).toMatchObject({
       quantity_pcs: 103n,
       nota_count: 1n,
       posting_count: 1n,

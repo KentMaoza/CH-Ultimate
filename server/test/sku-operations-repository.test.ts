@@ -60,6 +60,15 @@ describe('MariaDB authoritative SKU repository', () => {
       referencePrice: 25_000,
       stock: -3,
       tracked: true,
+      identifiers: [
+        {
+          id: '00000003-0000-4000-8000-000000000000',
+          skuId: '00000002-0000-4000-8000-000000000000',
+          value: 'ＡBC-Long',
+          kind: 'primary',
+          createdAt: '2026-07-30T01:00:00.000Z',
+        },
+      ],
     });
     expect(
       queries.some(({ sql }) => sql.startsWith('INSERT INTO skus')),

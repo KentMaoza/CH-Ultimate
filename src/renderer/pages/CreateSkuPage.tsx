@@ -7,14 +7,15 @@ export function CreateSkuPage({ coreBacked = false }: { coreBacked?: boolean }) 
   const [message, setMessage] = useState('');
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     try {
       const sku = await gateway.createSku({
         skuNumber: String(form.get('skuNumber') ?? ''), name: String(form.get('name') ?? ''),
         referencePrice: Number(form.get('price')), openingStock: Number(form.get('stock')),
         tracked: form.get('tracked') === 'on', note: String(form.get('note') ?? ''), imageUrl: String(form.get('image') ?? ''),
       });
-      event.currentTarget.reset();
+      formElement.reset();
       setMessage(coreBacked ? `${sku.skuNumber} disimpan ke CH Core.` : `${sku.skuNumber} ditambahkan ke sesi demo.`);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'SKU gagal dibuat.'); }
   }

@@ -167,6 +167,31 @@ test('creates a SKU and shows it in the warehouse list', async () => {
   expect(screen.getByText('Produk Baru')).toBeInTheDocument();
 });
 
+test('confirms and resets the create form after the asynchronous SKU save completes', async () => {
+  render(<App gateway={new MockOperationsGateway()} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Buat SKU' }));
+  fireEvent.change(screen.getByLabelText('Nomor SKU'), {
+    target: { value: 'ASYNC-001' },
+  });
+  fireEvent.change(screen.getByLabelText('Nama SKU'), {
+    target: { value: 'Produk Async' },
+  });
+  fireEvent.change(screen.getByLabelText('Harga Referensi'), {
+    target: { value: '1250' },
+  });
+  fireEvent.change(screen.getByLabelText('Stok Awal'), {
+    target: { value: '2' },
+  });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Simpan SKU' }));
+
+  expect(await screen.findByRole('status')).toHaveTextContent(
+    'ASYNC-001 ditambahkan ke sesi demo.',
+  );
+  expect(screen.getByLabelText('Nomor SKU')).toHaveValue('');
+  expect(screen.getByLabelText('Stok Awal')).toHaveValue(0);
+});
+
 test('title-cases SKU names during create and edit without changing codes or notes', async () => {
   render(<App gateway={new MockOperationsGateway()} />);
   fireEvent.click(screen.getByRole('button', { name: 'Buat SKU' }));

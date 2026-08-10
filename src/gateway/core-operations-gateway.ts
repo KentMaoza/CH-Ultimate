@@ -69,6 +69,7 @@ import {
   imageBlobFromBase64,
   imageBlobToDataUrl,
 } from './core-image-cache';
+import { safeRemoteImageUrl } from './safe-image-url';
 
 export type {
   CoreCacheEnvelope,
@@ -523,23 +524,35 @@ class CoreOperationsGatewayImpl implements CoreOperationsGateway {
   }
 
   async loadSkuImage(sku: Sku): Promise<string> {
-    if (!sku.imageHash) return sku.imageUrl;
-    if (this.images.isEnabled()) {
-      return imageBlobToDataUrl(await this.images.load(
-        sku.imageHash,
-        () => this.requireNetworkAllowed(),
-      ));
-    }
-    this.requireNetworkAllowed();
-    return this.runSchemaGuard('catalogue-image', async () => {
-      const response = await this.transport.request({
-        method: 'GET',
-        path: CORE_API_PATHS.image(sku.imageHash!),
+    const fallback = safeRemoteImageUrl(sku.sourceImageUrl);
+    if (!sku.imageHash) return sku.imageUrl || fallback;
+    try {
+      if (this.images.isEnabled()) {
+        return imageBlobToDataUrl(await this.images.load(
+          sku.imageHash,
+          () => this.requireNetworkAllowed(),
+        ));
+      }
+      this.requireNetworkAllowed();
+      return await this.runSchemaGuard('catalogue-image', async () => {
+        const response = await this.transport.request({
+          method: 'GET',
+          path: CORE_API_PATHS.image(sku.imageHash!),
+        });
+        this.throwForApiError(response.status, response.body);
+        const image = parseCatalogueImage(response.body);
+        return `data:${image.mimeType};base64,${image.bytesBase64}`;
       });
-      this.throwForApiError(response.status, response.body);
-      const image = parseCatalogueImage(response.body);
-      return `data:${image.mimeType};base64,${image.bytesBase64}`;
-    });
+    } catch (error) {
+      if (
+        fallback &&
+        typeof error === 'object' &&
+        error !== null &&
+        'kind' in error &&
+        error.kind === 'source'
+      ) return fallback;
+      throw error;
+    }
   }
 
   pauseImagePrefetch = (): void => this.images.pause();

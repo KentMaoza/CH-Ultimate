@@ -21,6 +21,20 @@ function versionsFor(lock: PackageLock, packageName: string): string[] {
 }
 
 describe('runtime dependency security contract', () => {
+  it('overrides jsPDF optional DOMPurify past the known XSS advisory', async () => {
+    const [manifestText, lockText] = await Promise.all([
+      readFile('package.json', 'utf8'),
+      readFile('package-lock.json', 'utf8'),
+    ]);
+    const manifest = JSON.parse(manifestText) as {
+      overrides?: Record<string, string>;
+    };
+    const lock = JSON.parse(lockText) as PackageLock;
+
+    expect(manifest.overrides?.dompurify).toBe('3.4.13');
+    expect(versionsFor(lock, 'dompurify')).toEqual(['3.4.13']);
+  });
+
   it('pins jsPDF past all advisories known at the v0.2.2 release gate', async () => {
     const [manifestText, lockText] = await Promise.all([
       readFile('package.json', 'utf8'),
@@ -51,12 +65,20 @@ describe('runtime dependency security contract', () => {
     ]);
   });
 
-  it('does not expose uuid as an application dependency', async () => {
-    const manifest = JSON.parse(await readFile('package.json', 'utf8')) as {
+  it('keeps uuid transitive and overrides ExcelJS past its buffer advisory', async () => {
+    const [manifestText, lockText] = await Promise.all([
+      readFile('package.json', 'utf8'),
+      readFile('package-lock.json', 'utf8'),
+    ]);
+    const manifest = JSON.parse(manifestText) as {
       dependencies: Record<string, string>;
+      overrides?: Record<string, string>;
     };
+    const lock = JSON.parse(lockText) as PackageLock;
 
     expect(manifest.dependencies).not.toHaveProperty('uuid');
     expect(manifest.dependencies.exceljs).toBe('4.4.0');
+    expect(manifest.overrides?.uuid).toBe('11.1.1');
+    expect(versionsFor(lock, 'uuid')).toEqual(['11.1.1']);
   });
 });

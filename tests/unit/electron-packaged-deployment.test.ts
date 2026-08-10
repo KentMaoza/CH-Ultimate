@@ -94,7 +94,9 @@ describe('packaged CH Core deployment bootstrap', () => {
       endpoint: 'https://192.168.50.14:8443',
       caFile,
     });
-    expect((await stat(configPath)).mode & 0o777).toBe(0o600);
+    if (process.platform !== 'win32') {
+      expect((await stat(configPath)).mode & 0o777).toBe(0o600);
+    }
     expect(await readFile(caFile, 'utf8')).toBe('old-private-ca');
 
     await ensurePackagedCoreDeployment(fixture);

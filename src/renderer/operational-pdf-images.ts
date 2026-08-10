@@ -1,10 +1,23 @@
 import type { OperationalPdfPlan } from '../domain/operational-exports';
 import type { Sku } from '../domain/types';
 import type { OperationsGateway } from '../gateway/operations-gateway-contract';
-import { createRecommendationPdfThumbnail } from './recommendation-pdf-images';
+import {
+  createRecommendationPdfThumbnail,
+  type RecommendationThumbnailProcessor,
+} from './recommendation-pdf-images';
 
 interface OperationalImageDependencies {
   thumbnail(source: string): Promise<string>;
+}
+
+export function createOperationalPdfThumbnail(
+  source: string,
+  processor?: RecommendationThumbnailProcessor,
+): Promise<string> {
+  return createRecommendationPdfThumbnail(source, processor, {
+    maxEdge: 96,
+    maxBytes: 16 * 1024,
+  });
 }
 
 export async function hydrateOperationalPdfImages(
@@ -12,7 +25,7 @@ export async function hydrateOperationalPdfImages(
   skus: Sku[],
   gateway: OperationsGateway,
   dependencies: OperationalImageDependencies = {
-    thumbnail: createRecommendationPdfThumbnail,
+    thumbnail: createOperationalPdfThumbnail,
   },
 ): Promise<OperationalPdfPlan> {
   if (plan.dataset !== 'sku-stock') return plan;

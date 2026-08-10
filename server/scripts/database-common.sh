@@ -49,6 +49,7 @@ import fs from 'node:fs';
 
 const [target, environmentName] = process.argv.slice(2);
 const rawUrl = process.env[environmentName];
+const socketPath = process.env.CH_CORE_MARIADB_SOCKET;
 if (!rawUrl) {
   process.stderr.write(`${environmentName} is required.\n`);
   process.exit(1);
@@ -65,10 +66,23 @@ if (!['mariadb:', 'mysql:'].includes(databaseUrl.protocol)) {
   process.exit(1);
 }
 if (
-  databaseUrl.hostname !== '127.0.0.1' ||
-  (databaseUrl.port && databaseUrl.port !== '3306')
+  databaseUrl.hostname !== 'localhost' ||
+  databaseUrl.port
 ) {
-  process.stderr.write(`${environmentName} must use 127.0.0.1:3306.\n`);
+  process.stderr.write(
+    `${environmentName} must be socket-only (localhost with no TCP port).\n`,
+  );
+  process.exit(1);
+}
+if (
+  !socketPath ||
+  !socketPath.startsWith('/') ||
+  socketPath === '/' ||
+  /[\r\n\0]/.test(socketPath)
+) {
+  process.stderr.write(
+    'CH_CORE_MARIADB_SOCKET must be a safe absolute socket path.\n',
+  );
   process.exit(1);
 }
 let username;
@@ -81,10 +95,9 @@ try {
   process.exit(1);
 }
 const values = [
-  databaseUrl.hostname,
+  socketPath,
   username,
   password,
-  databaseUrl.port || '3306',
 ];
 if (values.some((value) => !value || /[\r\n\0]/.test(value))) {
   process.stderr.write(`${environmentName} contains an unsafe value.\n`);
@@ -94,8 +107,8 @@ const quoteValue = (value) =>
   `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
 const contents = [
   '[client]',
-  `host=${quoteValue(databaseUrl.hostname)}`,
-  `port=${quoteValue(databaseUrl.port || '3306')}`,
+  'protocol="socket"',
+  `socket=${quoteValue(socketPath)}`,
   `user=${quoteValue(username)}`,
   `password=${quoteValue(password)}`,
   '',

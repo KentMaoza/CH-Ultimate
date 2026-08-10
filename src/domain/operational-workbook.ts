@@ -14,6 +14,33 @@ const DATASETS: Array<{ dataset: OperationalDataset; sheet: string }> = [
   { dataset: 'stock-checks', sheet: 'Cek_Stok' },
 ];
 
+const COLUMN_WIDTHS: Record<OperationalDataset, number[]> = {
+  'sku-stock': [28, 42, 14, 18, 12, 15, 48, 34, 18, 24],
+  'stock-history': [24, 28, 42, 18, 14, 16, 14],
+  'price-history': [24, 28, 42, 18, 18, 18],
+  'stock-checks': [24, 24, 28, 42, 14, 14, 16, 14, 16, 24, 48],
+};
+
+const NUMBER_COLUMNS: Record<OperationalDataset, number[]> = {
+  'sku-stock': [4, 5],
+  'stock-history': [5, 6, 7],
+  'price-history': [5, 6],
+  'stock-checks': [5, 6, 7, 8],
+};
+
+const HEADER_FILL: ExcelJS.Fill = {
+  type: 'pattern',
+  pattern: 'solid',
+  fgColor: { argb: 'FF111111' },
+};
+
+function formatHeader(row: ExcelJS.Row): void {
+  row.height = 24;
+  row.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  row.alignment = { vertical: 'middle', wrapText: true };
+  row.eachCell((cell) => { cell.fill = HEADER_FILL; });
+}
+
 export async function createOperationalWorkbookBuffer(
   state: DemoState,
   filters: OperationalFilters,
@@ -36,6 +63,12 @@ export async function createOperationalWorkbookBuffer(
   summary.addRow([]);
   summary.addRow(['Dataset', 'Baris cocok']);
   for (const { plan } of plans) summary.addRow([plan.title, plan.totalMatched]);
+  summary.getColumn('A').width = 32;
+  summary.getColumn('B').width = 24;
+  summary.getCell('A1').font = { bold: true, size: 14 };
+  summary.getCell('B1').font = { bold: true, size: 14 };
+  summary.getRow(7).font = { bold: true };
+  summary.getColumn('B').numFmt = '#,##0';
 
   for (const { plan, sheet: sheetName } of plans) {
     const sheet = workbook.addWorksheet(sheetName);
@@ -43,7 +76,18 @@ export async function createOperationalWorkbookBuffer(
     for (const row of plan.rows) sheet.addRow(row.cells);
     sheet.views = [{ state: 'frozen', ySplit: 1 }];
     sheet.autoFilter = { from: 'A1', to: sheet.getRow(1).getCell(plan.headers.length).address };
-    sheet.columns.forEach((column) => { column.width = 18; });
+    COLUMN_WIDTHS[plan.dataset].forEach((width, index) => {
+      sheet.getColumn(index + 1).width = width;
+    });
+    NUMBER_COLUMNS[plan.dataset].forEach((column) => {
+      sheet.getColumn(column).numFmt = '#,##0';
+    });
+    formatHeader(sheet.getRow(1));
+    sheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1) row.eachCell((cell) => {
+        cell.alignment = { vertical: 'top', wrapText: true };
+      });
+    });
   }
   return workbook.xlsx.writeBuffer();
 }

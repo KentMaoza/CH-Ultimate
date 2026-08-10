@@ -90,7 +90,11 @@ function renderCoreNota() {
   return gateway.initialize().then(() => {
     render(
       <OperationsProvider gateway={gateway}>
-        <OutputProvider bridge={{ printDocument: async () => ({ status: 'printed' }), savePdf: async () => ({ status: 'saved' }) }}>
+        <OutputProvider bridge={{
+          printDocument: async () => ({ status: 'printed' }),
+          savePdf: async () => ({ status: 'saved' }),
+          saveSpreadsheet: async () => ({ status: 'saved' }),
+        }}>
           <NotaWorkspace coreBacked onBack={() => undefined} />
         </OutputProvider>
       </OperationsProvider>,
@@ -171,7 +175,7 @@ describe('Core-backed Nota typing', () => {
     transport.enqueue(emptyPoll('3'));
 
     const description = screen.getByLabelText('Nama barang baris 1');
-    description.focus();
+    act(() => description.focus());
     await act(async () => {
       fireEvent.change(description, { target: { value: 'produk core b' } });
       await firstStarted.promise;

@@ -1,7 +1,9 @@
 import type {
   OutputDocumentKind,
   PrintDocumentRequest,
+  SaveGeneratedPdfRequest,
   SavePdfRequest,
+  SaveSpreadsheetRequest,
 } from './output-contract';
 import { CH_OUTPUT_IPC_CHANNELS } from './output-contract';
 
@@ -26,6 +28,7 @@ interface TrustedWebContents {
   printToPDF(options: {
     printBackground: true;
     pageSize: { width: number; height: number };
+    margins: { top: 0; bottom: 0; left: 0; right: 0 };
   }): Promise<Uint8Array>;
 }
 
@@ -62,6 +65,7 @@ const DOCUMENT_KINDS = new Set<OutputDocumentKind>([
 const MIN_PAGE_MM = 15;
 const MAX_PAGE_MM = 420;
 const MAX_PDF_BYTES = 100 * 1024 * 1024;
+const MAX_SPREADSHEET_BYTES = 100 * 1024 * 1024;
 
 const invalidRequest = (): never => {
   throw new Error('Permintaan output tidak valid.');
@@ -120,6 +124,43 @@ function parseSavePdfRequest(input: unknown): SavePdfRequest {
   return { ...print, fileName };
 }
 
+function parseSaveGeneratedPdfRequest(input: unknown): SaveGeneratedPdfRequest {
+  if (
+    typeof input !== 'object' ||
+    input === null ||
+    Array.isArray(input) ||
+    !exactKeys(input, ['fileName', 'bytes'])
+  ) return invalidRequest();
+  const fileName = Reflect.get(input, 'fileName');
+  const bytes = Reflect.get(input, 'bytes');
+  if (!validPdfFileName(fileName) || !(bytes instanceof Uint8Array)) {
+    return invalidRequest();
+  }
+  return { fileName, bytes };
+}
+
+function validSpreadsheetFileName(value: unknown): value is string {
+  return typeof value === 'string' &&
+    value.length > 5 && value.length <= 120 &&
+    !value.startsWith('.') &&
+    /^[^\u0000-\u001f\\/:]+\.xlsx$/i.test(value);
+}
+
+function parseSaveSpreadsheetRequest(input: unknown): SaveSpreadsheetRequest {
+  if (
+    typeof input !== 'object' ||
+    input === null ||
+    Array.isArray(input) ||
+    !exactKeys(input, ['fileName', 'bytes'])
+  ) return invalidRequest();
+  const fileName = Reflect.get(input, 'fileName');
+  const bytes = Reflect.get(input, 'bytes');
+  if (!validSpreadsheetFileName(fileName) || !(bytes instanceof Uint8Array)) {
+    return invalidRequest();
+  }
+  return { fileName, bytes };
+}
+
 function printPageSize(input: PrintDocumentRequest) {
   return {
     width: Math.round(input.widthMm * 1_000),
@@ -140,6 +181,16 @@ function requirePdfBytes(value: Uint8Array): Uint8Array {
     value.byteLength > MAX_PDF_BYTES ||
     String.fromCharCode(...value.slice(0, 5)) !== '%PDF-'
   ) throw new Error('PDF tidak valid.');
+  return value;
+}
+
+function requireSpreadsheetBytes(value: Uint8Array): Uint8Array {
+  if (
+    value.byteLength < 4 ||
+    value.byteLength > MAX_SPREADSHEET_BYTES ||
+    value[0] !== 0x50 || value[1] !== 0x4b ||
+    value[2] !== 0x03 || value[3] !== 0x04
+  ) throw new Error('XLSX tidak valid.');
   return value;
 }
 
@@ -197,8 +248,36 @@ export function registerOutputIpcHandlers({
     const bytes = requirePdfBytes(await webContents.printToPDF({
       printBackground: true,
       pageSize: pdfPageSize(request),
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
     }));
     await writeFile(result.filePath, bytes);
+    return { status: 'saved' as const };
+  }));
+
+  ipcMain.handle(CH_OUTPUT_IPC_CHANNELS.saveGeneratedPdf, authorized(async (input) => {
+    const request = parseSaveGeneratedPdfRequest(input);
+    const bytes = requirePdfBytes(request.bytes);
+    const result = await showSaveDialog({
+      title: 'Simpan PDF',
+      defaultPath: request.fileName,
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+      properties: ['createDirectory', 'showOverwriteConfirmation'],
+    });
+    if (result.canceled || !result.filePath) return { status: 'cancelled' as const };
+    await writeFile(result.filePath, bytes);
+    return { status: 'saved' as const };
+  }));
+
+  ipcMain.handle(CH_OUTPUT_IPC_CHANNELS.saveSpreadsheet, authorized(async (input) => {
+    const request = parseSaveSpreadsheetRequest(input);
+    const result = await showSaveDialog({
+      title: 'Simpan XLSX',
+      defaultPath: request.fileName,
+      filters: [{ name: 'Excel', extensions: ['xlsx'] }],
+      properties: ['createDirectory', 'showOverwriteConfirmation'],
+    });
+    if (result.canceled || !result.filePath) return { status: 'cancelled' as const };
+    await writeFile(result.filePath, requireSpreadsheetBytes(request.bytes));
     return { status: 'saved' as const };
   }));
 

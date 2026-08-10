@@ -1,7 +1,7 @@
 {
   "name": "ch-ultimate",
   "productName": "CH Ultimate",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Frontend-only operational demo for Toko CH",
   "author": "Toko CH",
   "main": ".vite/build/main.js",
@@ -67,5 +67,9 @@
     "typescript": "5.9.3",
     "vite": "5.4.21",
     "vitest": "2.1.9"
+  },
+  "overrides": {
+    "dompurify": "3.4.13",
+    "uuid": "11.1.1"
   }
 }

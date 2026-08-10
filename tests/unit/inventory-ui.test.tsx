@@ -133,7 +133,11 @@ test('lists filtered price and quantity changes and exposes price export', async
 test('prints a chosen quantity of warehouse SKU barcodes through the output bridge', async () => {
   const print = vi.spyOn(window, 'print').mockImplementation(() => {});
   const printDocument = vi.fn(async () => ({ status: 'printed' as const }));
-  render(<App gateway={new MockOperationsGateway()} outputBridge={{ printDocument, savePdf: async () => ({ status: 'saved' }) }} />);
+  render(<App gateway={new MockOperationsGateway()} outputBridge={{
+    printDocument,
+    savePdf: async () => ({ status: 'saved' }),
+    saveSpreadsheet: async () => ({ status: 'saved' }),
+  }} />);
   const row = screen.getByRole('row', { name: /BRS-108-BLK/ });
   fireEvent.click(within(row).getByRole('button', { name: 'Print barcode BRS-108-BLK' }));
   const dialog = screen.getByRole('dialog', { name: 'Print barcode produk' });
@@ -165,6 +169,31 @@ test('creates a SKU and shows it in the warehouse list', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'SKU Gudang' }));
   expect(await screen.findByText('NEW-001')).toBeInTheDocument();
   expect(screen.getByText('Produk Baru')).toBeInTheDocument();
+});
+
+test('confirms and resets the create form after the asynchronous SKU save completes', async () => {
+  render(<App gateway={new MockOperationsGateway()} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Buat SKU' }));
+  fireEvent.change(screen.getByLabelText('Nomor SKU'), {
+    target: { value: 'ASYNC-001' },
+  });
+  fireEvent.change(screen.getByLabelText('Nama SKU'), {
+    target: { value: 'Produk Async' },
+  });
+  fireEvent.change(screen.getByLabelText('Harga Referensi'), {
+    target: { value: '1250' },
+  });
+  fireEvent.change(screen.getByLabelText('Stok Awal'), {
+    target: { value: '2' },
+  });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Simpan SKU' }));
+
+  expect(await screen.findByRole('status')).toHaveTextContent(
+    'ASYNC-001 ditambahkan ke sesi demo.',
+  );
+  expect(screen.getByLabelText('Nomor SKU')).toHaveValue('');
+  expect(screen.getByLabelText('Stok Awal')).toHaveValue(0);
 });
 
 test('title-cases SKU names during create and edit without changing codes or notes', async () => {
@@ -275,6 +304,11 @@ test('previews exact CH Core catalogue totals before an explicit commit', async 
       workbookSha256: validation.workbookSha256,
       rowCount: 3_144,
       imageJobCount: 2_786,
+      matchedExistingCount: 1,
+      createdSkuCount: 3_143,
+      untouchedExistingCount: 4,
+      stockAdjustedCount: 1,
+      zeroDeltaMatchedCount: 0,
       committedAt: '2026-07-30T02:00:00.000Z',
       replayed: false,
     });
@@ -368,4 +402,41 @@ test('hides the entire import flow when the authenticated device is not an owner
   expect(
     screen.queryByRole('button', { name: 'Import XLSX' }),
   ).not.toBeInTheDocument();
+});
+
+test('desktop inventory pages through the full large catalogue instead of truncating at fifty', async () => {
+  const gateway = new MockOperationsGateway();
+  const skus = Array.from({ length: 120 }, (_, index) => ({
+    id: `bulk-${index + 1}`,
+    skuNumber: `BULK-${String(index + 1).padStart(3, '0')}`,
+    name: `Barang Bulk ${index + 1}`,
+    aliases: [],
+    identifiers: [],
+    referencePrice: 1_000,
+    stock: 0,
+    tracked: true,
+    note: '',
+    imageUrl: '',
+    createdAt: '2026-08-08T00:00:00.000Z',
+    archived: false,
+  }));
+  await gateway.replaceFromWorkbook(
+    { skus, loaded: skus.length, skipped: 0, warnings: [] },
+    'Fixture katalog besar',
+  );
+  render(<App gateway={gateway} />);
+
+  expect(screen.getByText('BULK-001')).toBeInTheDocument();
+  expect(screen.queryByText('BULK-051')).not.toBeInTheDocument();
+  expect(screen.getByText('Menampilkan 1–50 dari 120')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Halaman SKU berikutnya' }));
+  expect(screen.queryByText('BULK-001')).not.toBeInTheDocument();
+  expect(screen.getByText('BULK-051')).toBeInTheDocument();
+  expect(screen.getByText('Menampilkan 51–100 dari 120')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Halaman SKU berikutnya' }));
+  expect(screen.getByText('BULK-120')).toBeInTheDocument();
+  expect(screen.getByText('Menampilkan 101–120 dari 120')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Halaman SKU berikutnya' })).toBeDisabled();
 });

@@ -7,6 +7,7 @@ function openNota(gateway = new MockOperationsGateway()) {
   const outputBridge = {
     printDocument: vi.fn(async () => ({ status: 'printed' as const })),
     savePdf: vi.fn(async () => ({ status: 'saved' as const })),
+    saveSpreadsheet: vi.fn(async () => ({ status: 'saved' as const })),
   };
   render(<App gateway={gateway} outputBridge={outputBridge} />);
   fireEvent.click(screen.getByRole('button', { name: 'Nota' }));
@@ -288,6 +289,8 @@ test('typing and pasting Indonesian price separators never leaves 5.2000 behind'
 test('completion finds an invalid raw number on another active page and preserves it until corrected', async () => {
   const gateway = new MockOperationsGateway();
   openNota(gateway);
+  fireEvent.change(screen.getByLabelText('Nama barang baris 3'), { target: { value: 'Kopi' } });
+  fireEvent.change(screen.getByLabelText('Harga PCS baris 3'), { target: { value: '12000' } });
   const quantityA = screen.getByLabelText('Jumlah baris 3');
   fireEvent.change(quantityA, { target: { value: '1.5' } });
   fireEvent.click(screen.getByRole('button', { name: 'Halaman B' }));
@@ -546,6 +549,25 @@ test('completion confirmation traps focus, closes with Escape, and restores the 
   fireEvent.keyDown(dialog, { key: 'Escape' });
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(trigger).toHaveFocus();
+});
+
+test('desktop blocks completion and focuses a selected SKU whose selling price is zero', async () => {
+  const gateway = new MockOperationsGateway();
+  const transaction = gateway.getSnapshot().notaTransactions[0]!;
+  const page = transaction.pages.find((candidate) => candidate.status === 'active')!;
+  const line = page.lines.find((candidate) => candidate.description.trim())!;
+  await gateway.updateNotaLine(transaction.id, page.id, line.id, {
+    unit: 'pcs',
+    pcsPrice: 0,
+    lsnPrice: 0,
+  });
+  openNota(gateway);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Selesaikan nota' }));
+
+  expect(screen.queryByRole('dialog', { name: 'Selesaikan nota?' })).not.toBeInTheDocument();
+  expect(screen.getByText('Harga jual setiap barang harus lebih dari Rp0.')).toBeInTheDocument();
+  expect(screen.getByLabelText('Harga PCS baris 1')).toHaveFocus();
 });
 
 test('Nota exposes active print/PDF controls and a current-page default', () => {

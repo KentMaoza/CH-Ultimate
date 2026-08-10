@@ -95,6 +95,11 @@ function harness(
         workbookSha256: record.workbookSha256,
         rowCount: workbook.preview.rowCount,
         imageJobCount: workbook.preview.imageJobCount,
+        matchedExistingCount: 0,
+        createdSkuCount: workbook.preview.rowCount,
+        untouchedExistingCount: 0,
+        stockAdjustedCount: 0,
+        zeroDeltaMatchedCount: 0,
         committedAt: committedAt.toISOString(),
         replayed: false,
       };
@@ -168,6 +173,11 @@ describe('staged catalogue service', () => {
       importId: stage.importId,
       rowCount: 1,
       imageJobCount: 1,
+      matchedExistingCount: 0,
+      createdSkuCount: 1,
+      untouchedExistingCount: 0,
+      stockAdjustedCount: 0,
+      zeroDeltaMatchedCount: 0,
       committedAt: '2026-07-30T01:30:00.000Z',
       replayed: false,
     });

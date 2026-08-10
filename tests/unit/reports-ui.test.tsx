@@ -1,7 +1,44 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { vi } from 'vitest';
 import { App } from '../../src/renderer/App';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 import type { Sku } from '../../src/domain/types';
+import type { ChOutputBridge } from '../../src/electron/output-contract';
+
+test('empty-stock report saves the selected restock plan as a real PDF', async () => {
+  const hostText: string[] = [];
+  const savePdf = vi.fn(async () => {
+    hostText.push(screen.getByTestId('print-document-host').textContent ?? '');
+    return { status: 'saved' as const };
+  });
+  const output: ChOutputBridge = {
+    printDocument: vi.fn(async () => ({ status: 'printed' as const })),
+    savePdf,
+    saveSpreadsheet: vi.fn(async () => ({ status: 'saved' as const })),
+  };
+  render(<App gateway={new MockOperationsGateway()} outputBridge={output} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Barang Kosong' }));
+  expect(screen.getByRole('button', { name: 'Simpan PDF barang kosong' })).toBeDisabled();
+
+  fireEvent.click(screen.getByLabelText('Pilih ACC-204-SLV'));
+  fireEvent.change(screen.getByLabelText('Jumlah restock ACC-204-SLV'), {
+    target: { value: '24' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Simpan PDF barang kosong' }));
+
+  await waitFor(() => expect(savePdf).toHaveBeenCalledWith(expect.objectContaining({
+    kind: 'operational-data',
+    widthMm: 297,
+    heightMm: 210,
+    fileName: expect.stringMatching(/^CHU-Laporan-Barang-Kosong-.*\.pdf$/),
+  })));
+  expect(hostText[0]).toContain('Laporan Barang Kosong');
+  expect(hostText[0]).toContain('ACC-204-SLV');
+  expect(hostText[0]).toContain('24');
+  expect(await screen.findByRole('status')).toHaveTextContent(
+    'PDF barang kosong berhasil disimpan.',
+  );
+});
 
 test('shows revenue cards and tracked empty-stock report preview', () => {
   render(<App gateway={new MockOperationsGateway()} />);

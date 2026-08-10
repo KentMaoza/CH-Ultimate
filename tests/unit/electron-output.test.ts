@@ -32,21 +32,39 @@ function harness() {
 }
 
 describe('CH output preload contract', () => {
-  it('exposes only typed print and save-PDF methods', async () => {
+  it('exposes only typed print and native-save methods', async () => {
     const invoke = vi.fn().mockResolvedValue({ status: 'printed' });
     const bridge = createChOutputBridge(invoke);
 
-    expect(Object.keys(bridge).sort()).toEqual(['printDocument', 'savePdf']);
+    expect(Object.keys(bridge).sort()).toEqual([
+      'printDocument', 'saveGeneratedPdf', 'savePdf', 'saveSpreadsheet',
+    ]);
     expect(bridge).not.toHaveProperty('invoke');
     expect(bridge).not.toHaveProperty('print');
     expect(bridge).not.toHaveProperty('ipcRenderer');
 
     await bridge.printDocument({ kind: 'nota', widthMm: 210, heightMm: 148 });
     await bridge.savePdf({ kind: 'label', widthMm: 50, heightMm: 30, fileName: 'Label-BRS-108.pdf' });
+    await bridge.saveGeneratedPdf!({
+      fileName: 'CHU-Ekspor.pdf',
+      bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]),
+    });
+    await bridge.saveSpreadsheet({
+      fileName: 'CHU-Ekspor.xlsx',
+      bytes: new Uint8Array([0x50, 0x4b, 0x03, 0x04]),
+    });
 
     expect(invoke.mock.calls).toEqual([
       [CH_OUTPUT_IPC_CHANNELS.print, { kind: 'nota', widthMm: 210, heightMm: 148 }],
       [CH_OUTPUT_IPC_CHANNELS.savePdf, { kind: 'label', widthMm: 50, heightMm: 30, fileName: 'Label-BRS-108.pdf' }],
+      [CH_OUTPUT_IPC_CHANNELS.saveGeneratedPdf, {
+        fileName: 'CHU-Ekspor.pdf',
+        bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]),
+      }],
+      [CH_OUTPUT_IPC_CHANNELS.saveSpreadsheet, {
+        fileName: 'CHU-Ekspor.xlsx',
+        bytes: new Uint8Array([0x50, 0x4b, 0x03, 0x04]),
+      }],
     ]);
   });
 });
@@ -114,12 +132,72 @@ describe('CH output main boundary', () => {
     expect(printToPDF).toHaveBeenCalledWith({
       printBackground: true,
       pageSize: { width: 210 / 25.4, height: 297 / 25.4 },
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
     });
     expect(showSaveDialog).toHaveBeenCalledWith(expect.objectContaining({
       defaultPath: 'CHU-SKU-Stok-2026-08-04.pdf',
       filters: [{ name: 'PDF', extensions: ['pdf'] }],
     }));
     expect(writeFile).toHaveBeenCalledWith('/chosen/Nota-A.pdf', Buffer.from('%PDF-1.7\ntrusted'));
+  });
+
+  it('writes validated XLSX bytes only to the native dialog choice', async () => {
+    const { event, handlers, showSaveDialog, writeFile } = harness();
+    const bytes = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]);
+    showSaveDialog.mockResolvedValue({
+      canceled: false,
+      filePath: '/chosen/CHU-Ekspor-Data.xlsx',
+    });
+
+    await expect(handlers.get(CH_OUTPUT_IPC_CHANNELS.saveSpreadsheet)!(event, {
+      fileName: 'CHU-Ekspor-Data.xlsx',
+      bytes,
+    })).resolves.toEqual({ status: 'saved' });
+
+    expect(showSaveDialog).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Simpan XLSX',
+      defaultPath: 'CHU-Ekspor-Data.xlsx',
+      filters: [{ name: 'Excel', extensions: ['xlsx'] }],
+    }));
+    expect(writeFile).toHaveBeenCalledWith('/chosen/CHU-Ekspor-Data.xlsx', bytes);
+  });
+
+  it('writes validated generated PDF bytes only to the native dialog choice', async () => {
+    const { event, handlers, showSaveDialog, writeFile } = harness();
+    const bytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31]);
+    showSaveDialog.mockResolvedValue({
+      canceled: false,
+      filePath: '/chosen/CHU-Ekspor.pdf',
+    });
+
+    await expect(handlers.get(CH_OUTPUT_IPC_CHANNELS.saveGeneratedPdf)!(event, {
+      fileName: 'CHU-Ekspor.pdf',
+      bytes,
+    })).resolves.toEqual({ status: 'saved' });
+
+    expect(showSaveDialog).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Simpan PDF',
+      defaultPath: 'CHU-Ekspor.pdf',
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+    }));
+    expect(writeFile).toHaveBeenCalledWith('/chosen/CHU-Ekspor.pdf', bytes);
+  });
+
+  it('rejects unsafe generated PDF names and invalid generated PDF bytes', async () => {
+    const unsafe = harness();
+    const handler = unsafe.handlers.get(CH_OUTPUT_IPC_CHANNELS.saveGeneratedPdf)!;
+
+    await expect(handler(unsafe.event, {
+      fileName: '../CHU-Ekspor.pdf',
+      bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]),
+    })).rejects.toThrow('Permintaan output tidak valid.');
+    await expect(handler(unsafe.event, {
+      fileName: 'CHU-Ekspor.pdf',
+      bytes: new Uint8Array([0x00, 0x01, 0x02, 0x03, 0x04]),
+    })).rejects.toThrow('PDF tidak valid.');
+
+    expect(unsafe.showSaveDialog).not.toHaveBeenCalled();
+    expect(unsafe.writeFile).not.toHaveBeenCalled();
   });
 
   it('does not write on cancel and rejects unsafe names or non-PDF output', async () => {
@@ -141,7 +219,28 @@ describe('CH output main boundary', () => {
     expect(unsafe.writeFile).not.toHaveBeenCalled();
   });
 
-  it('removes only its two fixed handlers on close', () => {
+  it('does not write cancelled, unsafe, or non-XLSX spreadsheet output', async () => {
+    const cancel = harness();
+    cancel.showSaveDialog.mockResolvedValue({ canceled: true });
+    await expect(cancel.handlers.get(CH_OUTPUT_IPC_CHANNELS.saveSpreadsheet)!(cancel.event, {
+      fileName: 'CHU-Ekspor.xlsx',
+      bytes: new Uint8Array([0x50, 0x4b, 0x03, 0x04]),
+    })).resolves.toEqual({ status: 'cancelled' });
+    expect(cancel.writeFile).not.toHaveBeenCalled();
+
+    const unsafe = harness();
+    await expect(unsafe.handlers.get(CH_OUTPUT_IPC_CHANNELS.saveSpreadsheet)!(unsafe.event, {
+      fileName: '../CHU-Ekspor.xlsx',
+      bytes: new Uint8Array([0x50, 0x4b, 0x03, 0x04]),
+    })).rejects.toThrow('Permintaan output tidak valid.');
+    await expect(unsafe.handlers.get(CH_OUTPUT_IPC_CHANNELS.saveSpreadsheet)!(unsafe.event, {
+      fileName: 'CHU-Ekspor.xlsx',
+      bytes: new Uint8Array([0x00, 0x01, 0x02, 0x03]),
+    })).rejects.toThrow('XLSX tidak valid.');
+    expect(unsafe.writeFile).not.toHaveBeenCalled();
+  });
+
+  it('removes only its four fixed handlers on close', () => {
     const { ipcMain, unregister } = harness();
     unregister();
     expect(ipcMain.removeHandler.mock.calls.map(([channel]) => channel).sort()).toEqual(

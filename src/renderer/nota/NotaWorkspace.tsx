@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { lineTotal, noteSuffixFromIndex } from '../../domain/nota';
+import { firstUnpricedNotaLine, lineTotal, noteSuffixFromIndex } from '../../domain/nota';
 import { buildNotaDocumentPlan, type NotaPageScope } from '../../domain/output-documents';
 import type { NotaCompletionDestination, NotaLine, NotaTransaction, PaymentKind } from '../../domain/types';
 import { formatRupiah, formatTitleCaseInput } from '../format';
@@ -222,6 +222,19 @@ export function NotaWorkspace({ coreBacked = false, syncLabel, onBack, initialSe
       setMessage('Perbaiki nilai angka: jumlah harus bilangan bulat positif dan harga harus bilangan bulat nol atau lebih.');
       setSelected({ transactionId: invalid.transactionId, pageId: invalid.pageId });
       setInvalidFocus(invalid);
+      return;
+    }
+    const unpriced = firstUnpricedNotaLine(selectedTransaction);
+    if (unpriced) {
+      setMessage('Harga jual setiap barang harus lebih dari Rp0.');
+      setSelected({ transactionId: selectedTransaction.id, pageId: unpriced.pageId });
+      setInvalidFocus({
+        transactionId: selectedTransaction.id,
+        pageId: unpriced.pageId,
+        lineId: unpriced.lineId,
+        field: unpriced.field,
+        rawValue: '0',
+      });
       return;
     }
     setCompletion({ transactionId: selectedTransaction.id, phase: 'choice', restoreFocusTo: focusTarget(target) });

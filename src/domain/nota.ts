@@ -21,6 +21,23 @@ export function selectedPrice(line: NotaLine): number {
   if (line.unit === 'pcs') return line.pcsPrice;
   return line.lsnPrice > 0 ? line.lsnPrice : line.pcsPrice * 12;
 }
+export function firstUnpricedNotaLine(transaction: NotaTransaction): {
+  pageId: string;
+  lineId: string;
+  field: 'pcsPrice' | 'lsnPrice';
+} | undefined {
+  for (const page of transaction.pages) {
+    if (page.status !== 'active') continue;
+    for (const line of page.lines) {
+      if (!populated(line) || selectedPrice(line) > 0) continue;
+      return {
+        pageId: page.id,
+        lineId: line.id,
+        field: line.unit === 'pcs' ? 'pcsPrice' : 'lsnPrice',
+      };
+    }
+  }
+}
 export function lineTotal(line: NotaLine): number { return Math.max(0, line.quantity) * Math.max(0, selectedPrice(line)); }
 export function linePieces(line: NotaLine): number { return line.quantity * (line.unit === 'lsn' ? 12 : 1); }
 
@@ -116,6 +133,7 @@ function validateLines(lines: NotaLine[]): NotaLine[] {
     if (!line.description.trim()) throw new Error('Nama barang wajib diisi.');
     if (!Number.isInteger(line.quantity) || line.quantity <= 0) throw new Error('Jumlah harus bilangan bulat positif.');
     if (!Number.isInteger(line.pcsPrice) || line.pcsPrice < 0 || !Number.isInteger(line.lsnPrice) || line.lsnPrice < 0) throw new Error('Harga harus bilangan bulat nol atau lebih.');
+    if (selectedPrice(line) <= 0) throw new Error('Harga jual setiap barang harus lebih dari Rp0.');
   }
   return active;
 }

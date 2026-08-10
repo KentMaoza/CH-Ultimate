@@ -353,6 +353,7 @@ td small { display: block; margin-top: 3px; color: #777; font-size: 9px; }
 /* Trusted document host stays outside the interactive layout until native output. */
 .print-document-host { position: fixed; left: -100000px; top: 0; color: #111; background: #fff; }
 .output-document__page { position: relative; box-sizing: border-box; padding: 8mm; background: #fff; break-after: page; overflow: hidden; }
+.output-document__page:last-child { break-after: auto; }
 .output-document__draft { position: absolute; inset: 36% 10% auto; transform: rotate(-18deg); border: 2px solid #111; font-size: 42px; letter-spacing: .18em; text-align: center; opacity: .22; z-index: 2; }
 .output-document__identity { display: flex; gap: 12px; align-items: center; border-bottom: 2px solid #111; padding-bottom: 6px; }
 .output-document__identity p { margin: 2px 0; }
@@ -369,6 +370,7 @@ td small { display: block; margin-top: 3px; color: #777; font-size: 9px; }
 .output-document__totals { display: flex; justify-content: flex-end; gap: 14px; padding-top: 7px; }
 .output-document__totals span { display: grid; text-align: right; }
 .output-document__labels { display: grid; align-content: start; box-sizing: border-box; overflow: hidden; background: #fff; color: #111; break-after: page; }
+.output-document__labels:last-child { break-after: auto; }
 .output-document__product-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2mm; box-sizing: border-box; border: .3mm solid #111; padding: 2mm; overflow: hidden; break-inside: avoid; }
 .output-document__operational { font-size: 7px; }
 .output-document__operational > header { display: flex; justify-content: space-between; align-items: end; border-bottom: 2px solid #111; margin-bottom: 4mm; }
@@ -390,6 +392,8 @@ td small { display: block; margin-top: 3px; color: #777; font-size: 9px; }
 .archive-nota__preview-actions select { min-width: 140px; }
 
 @media print {
+  body { min-width: 0; min-height: 0; }
+  #root > :not(.print-document-host) { display: none !important; }
   body * { visibility: hidden !important; }
   .print-document-host, .print-document-host * { visibility: visible !important; }
   .print-document-host { position: absolute; left: 0; top: 0; }

@@ -51,3 +51,33 @@ test('six mobile nav labels stay contained at 360 px and 200 percent text', asyn
     expect(measurement.label!.scrollWidth).toBeLessThanOrEqual(measurement.label!.clientWidth);
   }
 });
+
+test('keeps selected stock controls close to a long mobile catalogue', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto(mobileUrl, { waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Cek Stok' }).click();
+  await page.getByRole('heading', { name: 'Cek Stok', level: 1 }).waitFor();
+  await page.locator('.stock-check__list li').first().getByRole('button').click();
+  await page.locator('.stock-check__list').evaluate((list) => {
+    const item = list.querySelector('li');
+    if (!item) throw new Error('Stock list fixture is empty.');
+    for (let index = 0; index < 160; index += 1) {
+      list.append(item.cloneNode(true));
+    }
+  });
+
+  const measurements = await page.locator('.stock-check__layout').evaluate((layout) => {
+    const list = layout.querySelector<HTMLElement>('.stock-check__list');
+    const workspace = layout.querySelector<HTMLElement>('.stock-check__workspace');
+    if (!list || !workspace) throw new Error('Stock-check layout is incomplete.');
+    return {
+      listHeight: list.clientHeight,
+      listScrollHeight: list.scrollHeight,
+      workspaceGap: workspace.getBoundingClientRect().top - list.getBoundingClientRect().top,
+    };
+  });
+
+  expect(measurements.listHeight).toBeLessThanOrEqual(400);
+  expect(measurements.listScrollHeight).toBeGreaterThan(measurements.listHeight);
+  expect(measurements.workspaceGap).toBeLessThanOrEqual(500);
+});

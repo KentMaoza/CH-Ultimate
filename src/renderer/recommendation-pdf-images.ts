@@ -28,6 +28,16 @@ interface RecommendationImageDependencies {
   thumbnail: (source: string) => Promise<string>;
 }
 
+export interface PdfThumbnailLimits {
+  maxEdge: number;
+  maxBytes: number;
+}
+
+const RECOMMENDATION_THUMBNAIL_LIMITS: PdfThumbnailLimits = {
+  maxEdge: MAX_THUMBNAIL_EDGE,
+  maxBytes: MAX_THUMBNAIL_BYTES,
+};
+
 const browserThumbnailProcessor: RecommendationThumbnailProcessor = {
   async decode(source) {
     const response = await fetch(source);
@@ -65,12 +75,13 @@ const browserThumbnailProcessor: RecommendationThumbnailProcessor = {
 export async function createRecommendationPdfThumbnail(
   source: string,
   processor: RecommendationThumbnailProcessor = browserThumbnailProcessor,
+  limits: PdfThumbnailLimits = RECOMMENDATION_THUMBNAIL_LIMITS,
 ): Promise<string> {
   const decoded = await processor.decode(source);
   try {
     const scale = Math.min(
       1,
-      MAX_THUMBNAIL_EDGE / Math.max(decoded.width, decoded.height),
+      limits.maxEdge / Math.max(decoded.width, decoded.height),
     );
     let width = Math.max(1, Math.round(decoded.width * scale));
     let height = Math.max(1, Math.round(decoded.height * scale));
@@ -82,7 +93,7 @@ export async function createRecommendationPdfThumbnail(
           height,
           quality,
         );
-        if (thumbnail.size <= MAX_THUMBNAIL_BYTES) {
+        if (thumbnail.size <= limits.maxBytes) {
           return imageBlobToDataUrl(thumbnail);
         }
       }

@@ -50,6 +50,11 @@ function harness() {
     workbookSha256: 'a'.repeat(64),
     rowCount: 1,
     imageJobCount: 1,
+    matchedExistingCount: 0,
+    createdSkuCount: 1,
+    untouchedExistingCount: 0,
+    stockAdjustedCount: 0,
+    zeroDeltaMatchedCount: 0,
     committedAt: '2026-07-30T00:00:00.000Z',
     replayed: false,
   }));

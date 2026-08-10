@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 const workflowPath = '.github/workflows/pilot-release.yml';
-const pilotVersion = '0.2.3';
+const pilotVersion = '0.2.4';
 const androidSignerSha256 =
   '57e0731ce3db068e6581980c53610764af05c612184ff50e18a9f4912ca59ba5';
 
@@ -12,7 +12,7 @@ async function optionalRepositoryText(path: string): Promise<string> {
 }
 
 describe('GitHub pilot release workflow', () => {
-  it('gates both platform builds and manual prerelease publication', async () => {
+  it('gates both platform builds and stages an unpublished release draft', async () => {
     const workflow = await readFile(workflowPath, 'utf8');
 
     expect(workflow).toMatch(/pull_request:/);
@@ -44,16 +44,28 @@ describe('GitHub pilot release workflow', () => {
     expect(
       workflow.indexOf('npx playwright install --with-deps chromium'),
     ).toBeLessThan(workflow.indexOf('npm run test:e2e'));
-    expect(workflow.match(/needs: source-gates/g)).toHaveLength(2);
-    expect(workflow).toContain('needs: [windows-installer, android-apk]');
+    expect(workflow).toContain('mariadb-integration:');
+    expect(workflow).toContain('image: mariadb:10.11');
+    expect(workflow).toContain('MARIADB_DATABASE: chu_test');
+    expect(workflow).toContain('MARIADB_USER: chu_test');
+    expect(workflow).toContain('MARIADB_PASSWORD: chu_test_ci_only');
+    expect(workflow).toContain(
+      'CH_CORE_TEST_DATABASE_URL: mariadb://chu_test:chu_test_ci_only@127.0.0.1:3306/chu_test',
+    );
+    expect(workflow).toContain('npm run server:test:integration');
+    expect(workflow.match(/needs: source-gates/g)).toHaveLength(3);
+    expect(workflow).toContain(
+      'needs: [windows-installer, android-apk, mariadb-integration]',
+    );
     expect(workflow).toContain('contents: write');
     expect(workflow.match(/contents: write/g)).toHaveLength(1);
     expect(workflow).toContain(
-      "github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'",
+      "github.event_name == 'workflow_dispatch' && inputs.stage_draft && github.ref == 'refs/heads/main'",
     );
+    expect(workflow).toContain('--draft');
     expect(workflow).toContain('--prerelease');
     const publisher = workflow.slice(
-      workflow.indexOf('publish-prerelease:'),
+      workflow.indexOf('stage-draft-release:'),
     );
     expect(publisher).toContain('runs-on: windows-latest');
     expect(publisher).toContain('npm run make:windows');
@@ -65,6 +77,8 @@ describe('GitHub pilot release workflow', () => {
     expect(publisher).toContain('CHU_COMPANION_KEY_PASSWORD');
     expect(publisher).toContain(androidSignerSha256);
     expect(publisher).toContain('apksigner.bat');
+    expect(publisher).toContain('Get-AuthenticodeSignature');
+    expect(publisher).toContain("'NotSigned'");
     expect(publisher).toContain('$digestMatch = [regex]::Match(');
     expect(publisher).toContain(
       "'certificate SHA-256 digest:\\s*([0-9A-Fa-f]{64})\\s*$'",
@@ -83,8 +97,9 @@ describe('GitHub pilot release workflow', () => {
     );
     expect(publisher).not.toContain('assembleDebug');
     expect(publisher).not.toContain('pilot-debug.apk');
-    expect(workflow.slice(0, workflow.indexOf('publish-prerelease:')))
+    expect(workflow.slice(0, workflow.indexOf('stage-draft-release:')))
       .not.toContain('CHU_COMPANION_KEYSTORE_B64');
+    expect(publisher).not.toContain('gh release edit');
     expect(workflow).toContain(`pilot-v${pilotVersion}`);
     expect(workflow).toContain(`docs/releases/pilot-${pilotVersion}.md`);
   });
@@ -92,15 +107,16 @@ describe('GitHub pilot release workflow', () => {
   it('does not introduce production credentials or TLS bypasses', async () => {
     const workflow = await readFile(workflowPath, 'utf8');
 
-    expect(workflow).not.toMatch(/CH_CORE_TEST_DATABASE_URL/i);
-    expect(workflow).not.toMatch(/mariadb.*password/i);
+    expect(workflow.match(/CH_CORE_TEST_DATABASE_URL/g)).toHaveLength(1);
+    expect(workflow).not.toMatch(/CH_CORE_TEST_DATABASE_URL:[^\n]*(192\.168\.|\/chu(?:\s|$))/i);
+    expect(workflow).not.toMatch(/^\s+MARIADB_ROOT_PASSWORD:/im);
     expect(workflow).not.toMatch(/curl\s+[^\n]*-[^\n]*k/i);
     expect(workflow).not.toMatch(/rejectUnauthorized\s*:\s*false/i);
     expect(workflow).not.toMatch(/NODE_TLS_REJECT_UNAUTHORIZED/i);
     expect(workflow).toContain('BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY');
   });
 
-  it('keeps the v0.2.3 Core v2 cutover release contract aligned', async () => {
+  it('keeps the v0.2.4 real-use release contract aligned', async () => {
     const [
       workflow,
       packageManifest,
@@ -128,7 +144,7 @@ describe('GitHub pilot release workflow', () => {
     });
     expect(androidBuild).toContain('applicationId "com.tokoch.chucompanion"');
     expect(androidBuild).toContain(`versionName "${pilotVersion}"`);
-    expect(androidBuild).toContain('versionCode 10');
+    expect(androidBuild).toContain('versionCode 11');
     expect(settingsPage).toContain(`CH Ultimate ${pilotVersion}`);
     expect(releaseCopy).toContain(
       `CHU-Companion-Mobile-${pilotVersion}-release.apk`,
@@ -152,18 +168,25 @@ describe('GitHub pilot release workflow', () => {
     for (const releaseFact of [
       'rekonsiliasi katalog aman',
       'mempertahankan ID SKU',
-      'SKU aktif yang tidak cocok',
-      'memblokir transaksi sebelum penulisan',
-      'tidak ada penghapusan katalog otomatis',
+      'SKU lama yang tidak ada di workbook',
+      'identifier tambahan tetap dipertahankan',
+      'histori harga yang sudah ada',
+      'dihapus atau dijadikan alasan',
+      'catalogue_reconciliation',
+      'tidak membuat movement palsu',
+      'receipt impor',
       'apiSchemaVersion: 2',
       'stockChecks: []',
       'gagal tertutup',
       'backup dan scratch',
       'empat hari tidak termasuk',
+      'tidak boleh dihapus',
+      'authenticode',
+      'draft',
     ]) {
       expect(releaseNotes.toLowerCase()).toContain(releaseFact.toLowerCase());
     }
-    expect(releaseNotes).toMatch(/deploy Core.+commit rilis v0\.2\.3/is);
+    expect(releaseNotes).toMatch(/deploy Core.+commit rilis v0\.2\.4/is);
 
     const supplement = runbook.slice(
       runbook.indexOf('## Suplemen v0.2.2'),

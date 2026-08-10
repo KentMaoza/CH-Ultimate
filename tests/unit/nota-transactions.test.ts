@@ -298,3 +298,25 @@ test('completion rejects fractional and negative inactive prices', () => {
     expect(() => completeNotaTransaction({ ...createInitialState(), notaTransactions: [transaction] }, transaction.id)).toThrow('Harga harus bilangan bulat nol atau lebih.');
   }
 });
+
+test('completion rejects a populated line whose selected unit price is zero', () => {
+  for (const unit of ['pcs', 'lsn'] as const) {
+    const transaction = createDraftNotaTransaction(1);
+    transaction.pages[0]!.lines = [
+      line('zero-price', {
+        description: 'SKU tanpa harga referensi',
+        quantity: 1,
+        unit,
+        pcsPrice: 0,
+        lsnPrice: 0,
+      }),
+    ];
+
+    expect(() =>
+      completeNotaTransaction(
+        { ...createInitialState(), notaTransactions: [transaction] },
+        transaction.id,
+      ),
+    ).toThrow('Harga jual setiap barang harus lebih dari Rp0.');
+  }
+});

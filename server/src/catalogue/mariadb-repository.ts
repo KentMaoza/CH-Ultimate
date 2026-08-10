@@ -106,34 +106,13 @@ export class MariaDbCatalogueRepository implements CatalogueRepository {
         return { ...replay, replayed: true };
       }
 
-      const liveRows = await connection.query<
-        Array<{ has_live_transactions: unknown }>
-      >(
-        `SELECT EXISTS(
-           SELECT 1 FROM notas
-           UNION ALL
-           SELECT 1 FROM stock_movements
-           UNION ALL
-           SELECT 1 FROM stock_checks
-           UNION ALL
-           SELECT 1 FROM price_history
-           WHERE source <> 'catalogue_import'
-           LIMIT 1
-         ) AS has_live_transactions`,
-      );
-      if (Number(liveRows[0]?.has_live_transactions) === 1) {
-        throw new CatalogueError(
-          'LIVE_TRANSACTIONS_EXIST',
-          409,
-          'Import penuh diblokir setelah transaksi berjalan.',
-        );
-      }
-
       const existingRows = await connection.query<ExistingCatalogueRow[]>(
-        `SELECT HEX(s.id) AS sku_id_hex, s.row_version,
-                sb.row_version AS balance_row_version, s.created_at,
+        `SELECT HEX(s.id) AS sku_id_hex, s.row_version, s.price_rupiah,
+                sb.row_version AS balance_row_version,
+                sb.quantity_pcs, s.created_at,
                 HEX(s.image_hash) AS image_hash_hex, s.archived_at,
                 HEX(si.id) AS identifier_id_hex, si.identifier_value,
+                si.identifier_kind,
                 si.created_at AS identifier_created_at
          FROM skus s
          LEFT JOIN sku_identifiers si ON si.sku_id = s.id
@@ -146,7 +125,7 @@ export class MariaDbCatalogueRepository implements CatalogueRepository {
         existingRows,
         () => this.uuid(),
       );
-      await insertCatalogue(
+      const writeSummary = await insertCatalogue(
         connection,
         record,
         reconciliation.rows,
@@ -157,6 +136,11 @@ export class MariaDbCatalogueRepository implements CatalogueRepository {
         workbookSha256: record.workbookSha256,
         rowCount: workbook.preview.rowCount,
         imageJobCount: workbook.preview.imageJobCount,
+        matchedExistingCount: reconciliation.matchedExistingCount,
+        createdSkuCount: reconciliation.createdSkuCount,
+        untouchedExistingCount: reconciliation.untouchedExistingCount,
+        stockAdjustedCount: writeSummary.stockAdjustedCount,
+        zeroDeltaMatchedCount: writeSummary.zeroDeltaMatchedCount,
         committedAt: committedAt.toISOString(),
         replayed: false,
       };
@@ -182,7 +166,9 @@ export class MariaDbCatalogueRepository implements CatalogueRepository {
             imageJobCount: result.imageJobCount,
             matchedExistingCount: reconciliation.matchedExistingCount,
             createdSkuCount: reconciliation.createdSkuCount,
-            unmatchedArchivedCount: reconciliation.unmatchedArchivedCount,
+            untouchedExistingCount: reconciliation.untouchedExistingCount,
+            stockAdjustedCount: writeSummary.stockAdjustedCount,
+            zeroDeltaMatchedCount: writeSummary.zeroDeltaMatchedCount,
           }),
         ],
       );

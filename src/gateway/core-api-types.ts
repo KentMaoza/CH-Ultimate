@@ -204,6 +204,11 @@ const catalogueCommitSchema: z.ZodType<CatalogueCommitReceipt> = z
     workbookSha256: z.string().regex(/^[0-9a-f]{64}$/),
     rowCount: z.number().int().min(0).max(10_000),
     imageJobCount: z.number().int().min(0).max(10_000),
+    matchedExistingCount: z.number().int().min(0).max(10_000),
+    createdSkuCount: z.number().int().min(0).max(10_000),
+    untouchedExistingCount: z.number().int().min(0).max(10_000),
+    stockAdjustedCount: z.number().int().min(0).max(10_000),
+    zeroDeltaMatchedCount: z.number().int().min(0).max(10_000),
     committedAt: z.string().datetime({ offset: true }),
     replayed: z.boolean(),
   })

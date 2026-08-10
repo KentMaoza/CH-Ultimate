@@ -10,7 +10,11 @@ import {
 } from '../../src/domain/output-documents';
 import { createInitialState } from '../../src/domain/operations';
 import type { ChOutputBridge } from '../../src/electron/output-contract';
-import { OutputProvider, useOutput } from '../../src/renderer/output-context';
+import {
+  OutputProvider,
+  useOutput,
+  waitForHostReady,
+} from '../../src/renderer/output-context';
 import { PrintDocumentHost } from '../../src/renderer/output/PrintDocumentHost';
 
 function notaPlan(status: 'draft' | 'completed' = 'draft') {
@@ -87,7 +91,11 @@ test('output provider mounts trusted content before print and reuses it for PDF 
     expect(screen.getByTestId('print-document-host')).toHaveTextContent('Beras Hitam');
     return { status: 'saved' as const };
   });
-  const bridge: ChOutputBridge = { printDocument, savePdf };
+  const bridge: ChOutputBridge = {
+    printDocument,
+    savePdf,
+    saveSpreadsheet: vi.fn(async () => ({ status: 'saved' as const })),
+  };
   render(<OutputProvider bridge={bridge}><OutputHarness plan={plan} /></OutputProvider>);
 
   fireEvent.click(screen.getByRole('button', { name: 'Print' }));
@@ -101,8 +109,21 @@ test('output provider mounts trusted content before print and reuses it for PDF 
   }));
 });
 
+test('output readiness waits for a concurrently rendered trusted host', async () => {
+  const waiting = waitForHostReady();
+  const host = document.createElement('div');
+  host.dataset.testid = 'print-document-host';
+  window.setTimeout(() => document.body.append(host), 25);
+
+  await expect(waiting).resolves.toBeUndefined();
+  host.remove();
+});
+
 test('print CSS exposes only the trusted output host, not the interactive barcode preview', () => {
   const css = readFileSync(resolve(process.cwd(), 'src/renderer/styles.css'), 'utf8');
   expect(css).not.toContain('.barcode-print-sheet, .barcode-print-sheet * { visibility: visible !important; }');
   expect(css).toContain('.print-document-host, .print-document-host * { visibility: visible !important; }');
+  expect(css).toContain('.output-document__page:last-child { break-after: auto; }');
+  expect(css).toContain('#root > :not(.print-document-host) { display: none !important; }');
+  expect(css).toContain('body { min-width: 0; min-height: 0; }');
 });

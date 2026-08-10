@@ -148,6 +148,15 @@ export async function createSku(
         id: skuId,
         skuNumber: input.skuNumber,
         aliases: [],
+        identifiers: [
+          {
+            id: identifierId,
+            skuId,
+            value: input.skuNumber,
+            kind: 'primary',
+            createdAt: now.toISOString(),
+          },
+        ],
         name: input.name,
         referencePrice: input.referencePrice,
         stock: input.openingStock,

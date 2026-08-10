@@ -9,30 +9,37 @@ import type { CatalogueRow } from './workbook.js';
 export interface ExistingCatalogueRow {
   sku_id_hex: unknown;
   row_version: unknown;
+  price_rupiah: unknown;
   balance_row_version: unknown;
+  quantity_pcs: unknown;
   created_at: unknown;
   image_hash_hex: unknown;
   archived_at: unknown;
   identifier_id_hex: unknown;
   identifier_value: unknown;
+  identifier_kind: unknown;
   identifier_created_at: unknown;
 }
 
 interface ExistingSku {
   id: string;
   rowVersion: string;
+  priceRupiah: string;
   balanceRowVersion: string | null;
+  quantityPcs: string | null;
   createdAt: string;
   imageHash: string | null;
-  active: boolean;
-  identifiers: Map<string, { id: string; createdAt: string }>;
+  identifiers: Map<
+    string,
+    { id: string; value: string; kind: string; createdAt: string }
+  >;
 }
 
 export interface CatalogueReconciliation {
   rows: PreparedCatalogueRow[];
   matchedExistingCount: number;
   createdSkuCount: number;
-  unmatchedArchivedCount: number;
+  untouchedExistingCount: number;
 }
 
 function positiveVersion(value: unknown, label: string): string {
@@ -41,6 +48,14 @@ function positiveVersion(value: unknown, label: string): string {
     throw new Error(`Database returned an invalid ${label} row version`);
   }
   return version;
+}
+
+function integerQuantity(value: unknown): string {
+  const quantity = String(value);
+  if (!/^-?(0|[1-9][0-9]*)$/.test(quantity)) {
+    throw new Error('Database returned an invalid stock quantity');
+  }
+  return quantity;
 }
 
 function hydrateExistingSkus(
@@ -61,13 +76,15 @@ function hydrateExistingSkus(
       sku = {
         id: skuId,
         rowVersion: positiveVersion(row.row_version, 'SKU'),
+        priceRupiah: integerQuantity(row.price_rupiah),
         balanceRowVersion:
           row.balance_row_version === null
             ? null
             : positiveVersion(row.balance_row_version, 'balance'),
+        quantityPcs:
+          row.quantity_pcs === null ? null : integerQuantity(row.quantity_pcs),
         createdAt: databaseDate(row.created_at).toISOString(),
         imageHash,
-        active: row.archived_at === null,
         identifiers: new Map(),
       };
       skus.set(skuId, sku);
@@ -76,6 +93,8 @@ function hydrateExistingSkus(
     const identifier = normalizeIdentifier(String(row.identifier_value));
     sku.identifiers.set(identifier, {
       id: hexToUuid(row.identifier_id_hex),
+      value: String(row.identifier_value),
+      kind: String(row.identifier_kind),
       createdAt: databaseDate(row.identifier_created_at).toISOString(),
     });
   }
@@ -126,15 +145,9 @@ export function reconcileCatalogue(
     }
     if (
       existing &&
-      [...existing.identifiers.keys()].some(
-        (identifier) => identifier !== primaryKey && identifier !== productKey,
-      )
+      (existing.balanceRowVersion === null || existing.quantityPcs === null)
     ) {
-      throw new CatalogueError(
-        'UNEXPECTED_EXISTING_IDENTIFIERS',
-        409,
-        'SKU yang cocok memiliki identifier tambahan yang harus ditinjau.',
-      );
+      throw new Error('Database returned an invalid matched SKU balance');
     }
     if (existing) assignedExisting.add(existing.id);
     return {
@@ -144,10 +157,13 @@ export function reconcileCatalogue(
       productIdentifierId: existing?.identifiers.get(productKey)?.id ?? uuid(),
       imageJobId: source.imageSourceUrl ? uuid() : null,
       priceHistoryId: uuid(),
+      stockMovementId: uuid(),
       existingSku: existing
         ? {
             rowVersion: existing.rowVersion,
+            priceRupiah: existing.priceRupiah,
             balanceRowVersion: existing.balanceRowVersion,
+            quantityPcs: existing.quantityPcs,
             createdAt: existing.createdAt,
             imageHash: existing.imageHash,
           }
@@ -158,27 +174,22 @@ export function reconcileCatalogue(
         existing?.identifiers.get(primaryKey)?.createdAt ?? null,
       productIdentifierCreatedAt:
         existing?.identifiers.get(productKey)?.createdAt ?? null,
+      demotedPrimaryIdentifiers: existing
+        ? [...existing.identifiers.values()].filter(
+            (identifier) =>
+              identifier.kind === 'primary' &&
+              normalizeIdentifier(identifier.value) !== primaryKey,
+          )
+        : [],
     };
   });
-
-  if (
-    [...existingSkus.values()].some(
-      (sku) => sku.active && !assignedExisting.has(sku.id),
-    )
-  ) {
-    throw new CatalogueError(
-      'UNMATCHED_EXISTING_SKUS',
-      409,
-      'SKU aktif yang tidak cocok dengan workbook harus ditinjau.',
-    );
-  }
 
   return {
     rows,
     matchedExistingCount: assignedExisting.size,
     createdSkuCount: rows.length - assignedExisting.size,
-    unmatchedArchivedCount: [...existingSkus.values()].filter(
-      (sku) => !sku.active && !assignedExisting.has(sku.id),
+    untouchedExistingCount: [...existingSkus.values()].filter(
+      (sku) => !assignedExisting.has(sku.id),
     ).length,
   };
 }

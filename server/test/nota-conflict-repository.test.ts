@@ -15,6 +15,77 @@ const LINE_IDS = Array.from(
 );
 
 describe('MariaDB Nota conflict resolution', () => {
+  it('reads the server revision from the change-log sequence on a replay', async () => {
+    const now = new Date('2026-08-04T12:00:00.000Z');
+    const nota = {
+      id_hex: NOTA_ID.replaceAll('-', ''),
+      nota_number: 'CHU-20260804-0001',
+      business_date: '2026-08-04',
+      status: 'draft',
+      completion_destination: null,
+      cancelled_from_status: null,
+      header_json: '{}',
+      field_versions: '{}',
+      structure_version: 1n,
+      lifecycle_version: 1n,
+      subtotal_rupiah: 0n,
+      total_rupiah: 0n,
+      created_by_device_id_hex: DEVICE_ID.replaceAll('-', ''),
+      completed_at: null,
+      cancelled_at: null,
+      created_at: now,
+      updated_at: now,
+    };
+    const queries: string[] = [];
+    const connection = {
+      query: vi.fn(async <T>(sql: string): Promise<T> => {
+        const compact = sql.replace(/\s+/g, ' ').trim();
+        queries.push(compact);
+        if (compact.includes('FROM nota_conflicts')) {
+          return [{
+            nota_id_hex: NOTA_ID.replaceAll('-', ''),
+            resolved_choice: 'server',
+          }] as T;
+        }
+        if (compact.includes('FROM notas')) return [nota] as T;
+        if (compact.includes('FROM nota_pages')) return [] as T;
+        if (compact.includes('FROM nota_lines')) return [] as T;
+        if (compact.includes('FROM nota_postings')) return [] as T;
+        if (compact.includes('FROM change_log')) return [{ revision: 17n }] as T;
+        throw new Error(`Unexpected SQL: ${compact}`);
+      }),
+    } as unknown as ProtocolConnection;
+    const unavailable = vi.fn(async () => {
+      throw new Error('Resolved conflict must not replay an operation');
+    });
+    const repository = new MariaDbNotaConflictRepository({
+      updateHeader: unavailable,
+      updateLine: unavailable,
+      deleteLine: unavailable,
+      addPage: unavailable,
+      restorePage: unavailable,
+      cancelPage: unavailable,
+      complete: unavailable,
+      reopen: unavailable,
+      cancel: unavailable,
+      restore: unavailable,
+    });
+
+    const result = await repository.resolveConflict(
+      connection,
+      DEVICE_ID,
+      OPERATION_ID,
+      CONFLICT_ID,
+      { choice: 'server' },
+    );
+
+    expect(result.body.serverRevision).toBe('17');
+    expect(queries).toContain(
+      'SELECT COALESCE(MAX(sequence), 0) AS revision FROM change_log',
+    );
+    expect(unavailable).not.toHaveBeenCalled();
+  });
+
   it('replays the complete validated add-page intent with stable client IDs', async () => {
     const now = new Date('2026-08-04T12:00:00.000Z');
     const nota = {

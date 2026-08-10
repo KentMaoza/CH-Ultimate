@@ -1,11 +1,22 @@
 import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 const workflowPath = '.github/workflows/pilot-release.yml';
 const pilotVersion = '0.2.4';
 const androidSignerSha256 =
   '57e0731ce3db068e6581980c53610764af05c612184ff50e18a9f4912ca59ba5';
+const require = createRequire(import.meta.url);
+const { stagePilotDraft } = require('../../scripts/stage-pilot-draft.cjs') as {
+  stagePilotDraft(input: {
+    runGh(args: string[]): string;
+    repository: string;
+    commitSha: string;
+    releaseTag: string;
+    fileExists(path: string): boolean;
+  }): void;
+};
 
 async function optionalRepositoryText(path: string): Promise<string> {
   return readFile(path, 'utf8').catch(() => '');
@@ -13,10 +24,15 @@ async function optionalRepositoryText(path: string): Promise<string> {
 
 describe('GitHub pilot release workflow', () => {
   it('gates both platform builds and stages an unpublished release draft', async () => {
-    const workflow = await readFile(workflowPath, 'utf8');
+    const [workflow, releaseScript] = await Promise.all([
+      readFile(workflowPath, 'utf8'),
+      readFile('scripts/stage-pilot-draft.cjs', 'utf8'),
+    ]);
 
     expect(workflow).toMatch(/pull_request:/);
     expect(workflow).toMatch(/workflow_dispatch:/);
+    expect(workflow).toContain('candidate_tag:');
+    expect(workflow).toContain('default: pilot-v0.2.4-r2');
     expect(workflow).not.toMatch(/^\s+push:/m);
     expect(workflow).toContain("node-version: '24'");
     expect(workflow).toContain("java-version: '21'");
@@ -62,8 +78,8 @@ describe('GitHub pilot release workflow', () => {
     expect(workflow).toContain(
       "github.event_name == 'workflow_dispatch' && inputs.stage_draft && github.ref == 'refs/heads/main'",
     );
-    expect(workflow).toContain('--draft');
-    expect(workflow).toContain('--prerelease');
+    expect(releaseScript).toContain("'--draft'");
+    expect(releaseScript).toContain("'--prerelease'");
     const publisher = workflow.slice(
       workflow.indexOf('stage-draft-release:'),
     );
@@ -99,9 +115,260 @@ describe('GitHub pilot release workflow', () => {
     expect(publisher).not.toContain('pilot-debug.apk');
     expect(workflow.slice(0, workflow.indexOf('stage-draft-release:')))
       .not.toContain('CHU_COMPANION_KEYSTORE_B64');
-    expect(publisher).not.toContain('gh release edit');
-    expect(workflow).toContain(`pilot-v${pilotVersion}`);
-    expect(workflow).toContain(`docs/releases/pilot-${pilotVersion}.md`);
+    expect(publisher).toContain('node scripts/stage-pilot-draft.cjs');
+    const releaseControl = `${workflow}\n${releaseScript}`;
+    expect(releaseControl).not.toContain('release upload');
+    expect(releaseControl).not.toContain('release delete');
+    expect(releaseControl).not.toContain('--clobber');
+    expect(releaseControl).not.toContain('release edit');
+    expect(releaseScript).not.toContain("'--method'");
+    expect(releaseControl).toContain(`pilot-v${pilotVersion}`);
+    expect(releaseControl).toContain(`docs/releases/pilot-${pilotVersion}.md`);
+  });
+
+  it('creates r2 only after exhaustive release and exact Git-tag checks pass', () => {
+    const calls: string[][] = [];
+    const commitSha = '141961c4a2ef58cecd6525c88903f76d929367b5';
+    stagePilotDraft({
+      repository: 'KentMaoza/CH-Ultimate',
+      commitSha,
+      releaseTag: 'pilot-v0.2.4-r2',
+      fileExists: () => true,
+      runGh: (args) => {
+        calls.push(args);
+        if (args.includes('--slurp')) {
+          return JSON.stringify([[{ tag_name: 'pilot-v0.2.4' }], []]);
+        }
+        if (args.some((arg) => arg.includes('matching-refs'))) return '[]';
+        return '';
+      },
+    });
+
+    expect(calls[0]).toEqual([
+      'api', '--paginate', '--slurp',
+      'repos/KentMaoza/CH-Ultimate/releases?per_page=100',
+    ]);
+    expect(calls[1]).toEqual([
+      'api',
+      'repos/KentMaoza/CH-Ultimate/git/matching-refs/tags/pilot-v0.2.4-r2',
+    ]);
+    expect(calls).toHaveLength(3);
+    expect(calls[2]).toEqual([
+      'release',
+      'create',
+      'pilot-v0.2.4-r2',
+      'release/CH-Ultimate-0.2.4-Setup.exe',
+      'release/CHU-Companion-Mobile-0.2.4-release.apk',
+      'release/SHA256SUMS.txt',
+      '--repo',
+      'KentMaoza/CH-Ultimate',
+      '--draft',
+      '--prerelease',
+      '--target',
+      commitSha,
+      '--title',
+      'CH Ultimate pilot v0.2.4 r2',
+      '--notes-file',
+      'docs/releases/pilot-0.2.4.md',
+    ]);
+  });
+
+  it('refuses an r2 release found on a later API page before mutation', () => {
+    const calls: string[][] = [];
+    expect(() => stagePilotDraft({
+      repository: 'KentMaoza/CH-Ultimate',
+      commitSha: '141961c4a2ef58cecd6525c88903f76d929367b5',
+      releaseTag: 'pilot-v0.2.4-r2',
+      fileExists: () => true,
+      runGh: (args) => {
+        calls.push(args);
+        if (args.includes('--slurp')) {
+          return JSON.stringify([
+            [{ tag_name: 'pilot-v0.2.4' }],
+            [{ tag_name: 'pilot-v0.2.4-r2' }],
+          ]);
+        }
+        if (args.some((arg) => arg.includes('matching-refs'))) return '[]';
+        return '';
+      },
+    })).toThrow('Release pilot-v0.2.4-r2 already exists.');
+    expect(calls).toEqual([
+      [
+        'api', '--paginate', '--slurp',
+        'repos/KentMaoza/CH-Ultimate/releases?per_page=100',
+      ],
+      [
+        'api',
+        'repos/KentMaoza/CH-Ultimate/git/matching-refs/tags/pilot-v0.2.4-r2',
+      ],
+    ]);
+  });
+
+  it('refuses an r2 Git tag that points at another commit before mutation', () => {
+    const calls: string[][] = [];
+    expect(() => stagePilotDraft({
+      repository: 'KentMaoza/CH-Ultimate',
+      commitSha: '141961c4a2ef58cecd6525c88903f76d929367b5',
+      releaseTag: 'pilot-v0.2.4-r2',
+      fileExists: () => true,
+      runGh: (args) => {
+        calls.push(args);
+        if (args.includes('--slurp')) return JSON.stringify([[]]);
+        if (args.some((arg) => arg.includes('matching-refs'))) {
+          return JSON.stringify([{
+            ref: 'refs/tags/pilot-v0.2.4-r2',
+            object: { sha: '23dea103864a47925c2d7da06dfc69ef380ceba6' },
+          }]);
+        }
+        return '';
+      },
+    })).toThrow('Tag pilot-v0.2.4-r2 already exists.');
+    expect(calls).toEqual([
+      [
+        'api', '--paginate', '--slurp',
+        'repos/KentMaoza/CH-Ultimate/releases?per_page=100',
+      ],
+      [
+        'api',
+        'repos/KentMaoza/CH-Ultimate/git/matching-refs/tags/pilot-v0.2.4-r2',
+      ],
+    ]);
+  });
+
+  it('fails closed when GitHub release discovery cannot complete', () => {
+    const calls: string[][] = [];
+    expect(() => stagePilotDraft({
+      repository: 'KentMaoza/CH-Ultimate',
+      commitSha: '141961c4a2ef58cecd6525c88903f76d929367b5',
+      releaseTag: 'pilot-v0.2.4-r2',
+      fileExists: () => true,
+      runGh: (args) => {
+        calls.push(args);
+        throw new Error('GitHub API tidak tersedia');
+      },
+    })).toThrow('GitHub API tidak tersedia');
+    expect(calls).toHaveLength(1);
+    expect(calls.some((args) => args[0] === 'release')).toBe(false);
+  });
+
+  it('can recover from an incomplete r2 only by creating a fresh r3 candidate', () => {
+    const calls: string[][] = [];
+    stagePilotDraft({
+      repository: 'KentMaoza/CH-Ultimate',
+      commitSha: '141961c4a2ef58cecd6525c88903f76d929367b5',
+      releaseTag: 'pilot-v0.2.4-r3',
+      fileExists: () => true,
+      runGh: (args) => {
+        calls.push(args);
+        if (args.includes('--slurp')) {
+          return JSON.stringify([[{
+            tag_name: 'pilot-v0.2.4-r2',
+            draft: true,
+            prerelease: true,
+            target_commitish: '141961c4a2ef58cecd6525c88903f76d929367b5',
+            assets: [{ name: 'CH-Ultimate-0.2.4-Setup.exe', size: 149_000_000 }],
+          }]]);
+        }
+        if (args.some((arg) => arg.includes('matching-refs'))) return '[]';
+        return '';
+      },
+    });
+
+    expect(calls).toHaveLength(3);
+    expect(calls[1]).toContain(
+      'repos/KentMaoza/CH-Ultimate/git/matching-refs/tags/pilot-v0.2.4-r3',
+    );
+    expect(calls[2]?.slice(0, 3)).toEqual(['release', 'create', 'pilot-v0.2.4-r3']);
+    expect(calls.flat()).not.toContain('delete');
+  });
+
+  it('refuses recovery when the immediately previous candidate is already complete', () => {
+    const calls: string[][] = [];
+    expect(() => stagePilotDraft({
+      repository: 'KentMaoza/CH-Ultimate',
+      commitSha: '141961c4a2ef58cecd6525c88903f76d929367b5',
+      releaseTag: 'pilot-v0.2.4-r3',
+      fileExists: () => true,
+      runGh: (args) => {
+        calls.push(args);
+        if (args.includes('--slurp')) {
+          return JSON.stringify([[{
+            tag_name: 'pilot-v0.2.4-r2',
+            draft: true,
+            prerelease: true,
+            target_commitish: '141961c4a2ef58cecd6525c88903f76d929367b5',
+            assets: [
+              { name: 'CH-Ultimate-0.2.4-Setup.exe', size: 149_000_000 },
+              { name: 'CHU-Companion-Mobile-0.2.4-release.apk', size: 43_000_000 },
+              { name: 'SHA256SUMS.txt', size: 199 },
+            ],
+          }]]);
+        }
+        if (args.some((arg) => arg.includes('matching-refs'))) return '[]';
+        return '';
+      },
+    })).toThrow('Previous candidate pilot-v0.2.4-r2 is not an eligible incomplete draft.');
+    expect(calls).toHaveLength(2);
+    expect(calls.some((args) => args[0] === 'release')).toBe(false);
+  });
+
+  it.each([
+    ['duplicate', [
+      {
+        tag_name: 'pilot-v0.2.4-r2', draft: true, prerelease: true,
+        target_commitish: '141961c4a2ef58cecd6525c88903f76d929367b5', assets: [],
+      },
+      {
+        tag_name: 'pilot-v0.2.4-r2', draft: true, prerelease: true,
+        target_commitish: '141961c4a2ef58cecd6525c88903f76d929367b5', assets: [],
+      },
+    ]],
+    ['missing or gapped', []],
+    ['published', [{
+      tag_name: 'pilot-v0.2.4-r2', draft: false, prerelease: true,
+      target_commitish: '141961c4a2ef58cecd6525c88903f76d929367b5', assets: [],
+    }]],
+    ['not prerelease', [{
+      tag_name: 'pilot-v0.2.4-r2', draft: true, prerelease: false,
+      target_commitish: '141961c4a2ef58cecd6525c88903f76d929367b5', assets: [],
+    }]],
+    ['wrong target', [{
+      tag_name: 'pilot-v0.2.4-r2', draft: true, prerelease: true,
+      target_commitish: '23dea103864a47925c2d7da06dfc69ef380ceba6', assets: [],
+    }]],
+    ['malformed assets', [{
+      tag_name: 'pilot-v0.2.4-r2', draft: true, prerelease: true,
+      target_commitish: '141961c4a2ef58cecd6525c88903f76d929367b5',
+      assets: [{ name: 'CH-Ultimate-0.2.4-Setup.exe', size: 'large' }],
+    }]],
+  ])('refuses %s predecessor recovery state after exactly two reads', (_label, releases) => {
+    const calls: string[][] = [];
+    expect(() => stagePilotDraft({
+      repository: 'KentMaoza/CH-Ultimate',
+      commitSha: '141961c4a2ef58cecd6525c88903f76d929367b5',
+      releaseTag: 'pilot-v0.2.4-r3',
+      fileExists: () => true,
+      runGh: (args) => {
+        calls.push(args);
+        if (args.includes('--slurp')) return JSON.stringify([releases]);
+        if (args.some((arg) => arg.includes('matching-refs'))) return '[]';
+        return '';
+      },
+    })).toThrow('Previous candidate pilot-v0.2.4-r2 is not an eligible incomplete draft.');
+    expect(calls).toHaveLength(2);
+    expect(calls.some((args) => args[0] === 'release')).toBe(false);
+  });
+
+  it('rejects an unbounded candidate revision before any GitHub call', () => {
+    const runGh = vi.fn(() => '');
+    expect(() => stagePilotDraft({
+      repository: 'KentMaoza/CH-Ultimate',
+      commitSha: '141961c4a2ef58cecd6525c88903f76d929367b5',
+      releaseTag: 'pilot-v0.2.4-r100',
+      fileExists: () => true,
+      runGh,
+    })).toThrow('CHU_PILOT_RELEASE_TAG is invalid.');
+    expect(runGh).not.toHaveBeenCalled();
   });
 
   it('does not introduce production credentials or TLS bypasses', async () => {
@@ -126,6 +393,7 @@ describe('GitHub pilot release workflow', () => {
       releaseCopy,
       releaseNotes,
       runbook,
+      releaseScript,
     ] = await Promise.all([
       readFile(workflowPath, 'utf8'),
       readFile('package.json', 'utf8'),
@@ -135,7 +403,9 @@ describe('GitHub pilot release workflow', () => {
       readFile('scripts/copy-android-release.mjs', 'utf8'),
       optionalRepositoryText(`docs/releases/pilot-${pilotVersion}.md`),
       readFile('docs/ch-core-v0.2-maintenance-rollback.md', 'utf8'),
+      readFile('scripts/stage-pilot-draft.cjs', 'utf8'),
     ]);
+    const releaseContract = `${workflow}\n${releaseScript}`;
 
     expect(JSON.parse(packageManifest)).toMatchObject({ version: pilotVersion });
     expect(JSON.parse(packageLock)).toMatchObject({
@@ -149,6 +419,11 @@ describe('GitHub pilot release workflow', () => {
     expect(releaseCopy).toContain(
       `CHU-Companion-Mobile-${pilotVersion}-release.apk`,
     );
+    expect(releaseNotes).toContain(`pilot-v${pilotVersion}-r2`);
+    expect(releaseNotes).toContain('candidate_tag');
+    expect(releaseNotes).toContain(`pilot-v${pilotVersion}-r3`);
+    expect(releaseNotes).toContain(`# CH Ultimate pilot v${pilotVersion} candidate`);
+    expect(releaseNotes).not.toContain(`Payload GitHub prerelease \`pilot-v${pilotVersion}-r2\` adalah:`);
 
     for (const artifact of [
       `CH-Ultimate-${pilotVersion}-Setup.exe`,
@@ -158,9 +433,9 @@ describe('GitHub pilot release workflow', () => {
       `docs/releases/pilot-${pilotVersion}.md`,
       androidSignerSha256,
     ]) {
-      expect(workflow).toContain(artifact);
+      expect(releaseContract).toContain(artifact);
     }
-    expect(workflow).not.toContain('pilot-v0.2.1');
+    expect(releaseContract).not.toContain('pilot-v0.2.1');
     expect(workflow).not.toContain('CH-Ultimate-0.2.1-Setup.exe');
     expect(workflow).not.toContain('CHU-Companion-Mobile-0.2.1-release.apk');
     expect(releaseCopy).not.toContain('CHU-Companion-Mobile-0.2.1-release.apk');

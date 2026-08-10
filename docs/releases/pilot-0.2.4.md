@@ -1,8 +1,9 @@
-# CH Ultimate pilot v0.2.4
+# CH Ultimate pilot v0.2.4 candidate
 
 Rilis internal ini mempertahankan kontrak CH Core v2 dan menyiapkan workbook
 `SKU_Gudang20260808075120732.xlsx` sebagai baseline katalog serta stok awal.
-Payload GitHub prerelease `pilot-v0.2.4` adalah:
+Tag kandidat ditentukan oleh input workflow `candidate_tag`; kandidat pertama
+memakai `pilot-v0.2.4-r2`. Payload setiap kandidat adalah:
 
 - Windows: `CH-Ultimate-0.2.4-Setup.exe`
 - Android: `CHU-Companion-Mobile-0.2.4-release.apk`
@@ -43,6 +44,11 @@ yang persis sama harus diverifikasi checksum dan signer-nya, dipasang pada
 Windows serta Android, lalu lulus uji fisik dan technical soak 60 menit. Hanya
 setelah semua gate tersebut lulus, draft yang sama boleh diubah menjadi
 prerelease publik; aset tidak boleh dibangun ulang di antara kedua tahap.
+
+Jika pembuatan draft berhenti di tengah upload, draft yang tidak lengkap tidak
+boleh diedit, ditimpa, dihapus, atau dipublikasikan. Jalankan ulang workflow
+dengan `candidate_tag` baru berikutnya, misalnya `pilot-v0.2.4-r3`; pemeriksaan
+fail-closed akan memastikan tag baru belum pernah dipakai sebelum membuatnya.
 
 Klien hanya terhubung ke `https://192.168.50.14:8443` pada LAN bisnis. Pilot
 empat hari tidak termasuk; penerimaan menggunakan uji fisik dan technical soak

@@ -60,17 +60,32 @@ function NotaHost({ plan }: { plan: NotaDocumentPlan }) {
 }
 
 function ProductLabel({ item, plan }: { item: ProductLabelItem; plan: LabelDocumentPlan }) {
-  return <article className="output-document__product-card" style={{
+  const hasQr = plan.fields.includes('qr');
+  const qrSizeMm = Math.max(8, Math.min(18, plan.cardHeightMm * 0.5, plan.cardWidthMm * 0.33));
+  const copyFieldCount = plan.fields.filter((field) => field !== 'qr').length;
+  const fittedFontSize = Math.min(
+    plan.fontSize,
+    Math.max(6, Math.floor((((plan.cardHeightMm - 4) * 96) / 25.4) / Math.max(1, copyFieldCount) / 1.1)),
+  );
+  return <article className={`output-document__product-card${hasQr ? ' output-document__product-card--with-qr' : ''}`} style={{
     width: `${plan.cardWidthMm}mm`,
-    minHeight: `${plan.cardHeightMm}mm`,
-    fontSize: `${plan.fontSize}px`,
+    height: `${plan.cardHeightMm}mm`,
+    fontSize: `${fittedFontSize}px`,
     textAlign: plan.alignment,
-  }}>
-    {plan.fields.includes('qr') ? <QRCodeSVG data-testid="output-product-qr" value={item.qrValue} size={72} marginSize={0} /> : null}
-    {plan.fields.includes('chu') ? <b>CHU</b> : null}
-    {plan.fields.includes('name') ? <strong>{item.name}</strong> : null}
-    {plan.fields.includes('sku') ? <span>Kode Produk: {item.productCode}</span> : null}
-    {plan.fields.includes('price') ? <span>{formatRupiah(item.referencePrice)}</span> : null}
+  }} data-testid="output-product-card">
+    {hasQr ? <QRCodeSVG
+      data-testid="output-product-qr"
+      value={item.qrValue}
+      size={Math.round(qrSizeMm * 96 / 25.4)}
+      marginSize={0}
+      style={{ width: `${qrSizeMm}mm`, height: `${qrSizeMm}mm`, flexShrink: 0 }}
+    /> : null}
+    <div className="output-document__product-copy" data-testid="output-product-copy">
+      {plan.fields.includes('chu') ? <b>CHU</b> : null}
+      {plan.fields.includes('name') ? <strong>{item.name}</strong> : null}
+      {plan.fields.includes('sku') ? <span>Kode Produk: {item.productCode}</span> : null}
+      {plan.fields.includes('price') ? <span>{formatRupiah(item.referencePrice)}</span> : null}
+    </div>
   </article>;
 }
 
@@ -102,6 +117,7 @@ function LabelHost({ plan }: { plan: LabelDocumentPlan }) {
 }
 
 function BarcodeHost({ plan }: { plan: BarcodeDocumentPlan }) {
+  const qrSizeMm = Math.max(8, Math.min(18, plan.cardHeightMm - 8, plan.cardWidthMm - 8));
   const pages = Array.from(
     { length: plan.pageCount },
     (_, pageIndex) => plan.items.slice(
@@ -121,13 +137,19 @@ function BarcodeHost({ plan }: { plan: BarcodeDocumentPlan }) {
       gap: `${plan.gapMm}mm`,
       gridTemplateColumns: `repeat(${plan.columns}, ${plan.cardWidthMm}mm)`,
     }}
-  >{items.map((item, itemIndex) => <article className="output-document__product-card" style={{
+  >{items.map((item, itemIndex) => <article className="output-document__product-card output-document__product-card--with-qr" style={{
     width: `${plan.cardWidthMm}mm`,
-    minHeight: `${plan.cardHeightMm}mm`,
+    height: `${plan.cardHeightMm}mm`,
     fontSize: `${plan.fontSize}px`,
-  }} key={(pageIndex * plan.cardsPerPage) + itemIndex}>
-    <QRCodeSVG data-testid="output-product-qr" value={item.qrValue} size={72} marginSize={0} />
-    <strong>Kode Produk: {item.productCode}</strong>
+  }} data-testid="output-product-card" key={(pageIndex * plan.cardsPerPage) + itemIndex}>
+    <QRCodeSVG
+      data-testid="output-product-qr"
+      value={item.qrValue}
+      size={Math.round(qrSizeMm * 96 / 25.4)}
+      marginSize={0}
+      style={{ width: `${qrSizeMm}mm`, height: `${qrSizeMm}mm`, flexShrink: 0 }}
+    />
+    <strong className="output-document__product-copy" data-testid="output-product-copy">Kode Produk: {item.productCode}</strong>
   </article>)}</section>)}</>;
 }
 

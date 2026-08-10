@@ -9,6 +9,11 @@ on:
         required: true
         type: boolean
         default: false
+      candidate_tag:
+        description: Fresh unpublished candidate tag; increment r2 to r3 only after a failed partial draft
+        required: true
+        type: string
+        default: pilot-v0.2.4-r2
 
 permissions:
   contents: read
@@ -249,17 +254,9 @@ jobs:
       - name: Stage unpublished GitHub draft
         env:
           GH_TOKEN: ${{ github.token }}
+          CHU_PILOT_RELEASE_TAG: ${{ inputs.candidate_tag }}
         shell: pwsh
-        run: |
-          gh release create pilot-v0.2.4 `
-            release/CH-Ultimate-0.2.4-Setup.exe `
-            release/CHU-Companion-Mobile-0.2.4-release.apk `
-            release/SHA256SUMS.txt `
-            --draft `
-            --prerelease `
-            --target "$env:GITHUB_SHA" `
-            --title 'CH Ultimate pilot v0.2.4' `
-            --notes-file docs/releases/pilot-0.2.4.md
+        run: node scripts/stage-pilot-draft.cjs
       - name: Remove restored Android signing key
         if: always()
         shell: pwsh

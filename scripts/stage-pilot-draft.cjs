@@ -86,15 +86,22 @@ function stagePilotDraft({
       const name = path.slice(path.lastIndexOf('/') + 1);
       return previousAssets.some((asset) => asset?.name === name && asset?.size > 0);
     });
+    const previousTarget = typeof previous[0]?.target_commitish === 'string' &&
+      /^[0-9a-f]{40}$/i.test(previous[0].target_commitish)
+      ? previous[0].target_commitish.toLowerCase()
+      : null;
+    const normalizedCommitSha = commitSha.toLowerCase();
+    const recoversIncompleteCandidate = previousTarget === normalizedCommitSha && !complete;
+    const supersedesCompleteCandidate = previousTarget !== null &&
+      previousTarget !== normalizedCommitSha && complete;
     if (
       previous.length !== 1 ||
       previous[0]?.draft !== true ||
       previous[0]?.prerelease !== true ||
-      previous[0]?.target_commitish !== commitSha ||
       !previousAssetsValid ||
-      complete
+      (!recoversIncompleteCandidate && !supersedesCompleteCandidate)
     ) {
-      throw new Error(`Previous candidate ${previousTag} is not an eligible incomplete draft.`);
+      throw new Error(`Previous candidate ${previousTag} is not an eligible predecessor draft.`);
     }
   }
 

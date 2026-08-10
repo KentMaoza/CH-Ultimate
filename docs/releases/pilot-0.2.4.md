@@ -49,6 +49,9 @@ Jika pembuatan draft berhenti di tengah upload, draft yang tidak lengkap tidak
 boleh diedit, ditimpa, dihapus, atau dipublikasikan. Jalankan ulang workflow
 dengan `candidate_tag` baru berikutnya, misalnya `pilot-v0.2.4-r3`; pemeriksaan
 fail-closed akan memastikan tag baru belum pernah dipakai sebelum membuatnya.
+Kandidat lengkap yang menemukan bug saat uji fisik juga harus dipertahankan;
+perbaikan diterbitkan sebagai nomor kandidat berikutnya dari commit baru, bukan
+dengan mengganti aset draft kandidat lama.
 
 Klien hanya terhubung ke `https://192.168.50.14:8443` pada LAN bisnis. Pilot
 empat hari tidak termasuk; penerimaan menggunakan uji fisik dan technical soak

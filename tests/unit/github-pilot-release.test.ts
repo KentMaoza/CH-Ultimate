@@ -282,6 +282,39 @@ describe('GitHub pilot release workflow', () => {
     expect(calls.flat()).not.toContain('delete');
   });
 
+  it('can supersede a complete draft on an older commit with a fresh candidate', () => {
+    const calls: string[][] = [];
+    stagePilotDraft({
+      repository: 'KentMaoza/CH-Ultimate',
+      commitSha: '141961c4a2ef58cecd6525c88903f76d929367b5',
+      releaseTag: 'pilot-v0.2.4-r3',
+      fileExists: () => true,
+      runGh: (args) => {
+        calls.push(args);
+        if (args.includes('--slurp')) {
+          return JSON.stringify([[{
+            tag_name: 'pilot-v0.2.4-r2',
+            draft: true,
+            prerelease: true,
+            target_commitish: '23dea103864a47925c2d7da06dfc69ef380ceba6',
+            assets: [
+              { name: 'CH-Ultimate-0.2.4-Setup.exe', size: 149_000_000 },
+              { name: 'CHU-Companion-Mobile-0.2.4-release.apk', size: 43_000_000 },
+              { name: 'SHA256SUMS.txt', size: 199 },
+            ],
+          }]]);
+        }
+        if (args.some((arg) => arg.includes('matching-refs'))) return '[]';
+        return '';
+      },
+    });
+
+    expect(calls).toHaveLength(3);
+    expect(calls[2]?.slice(0, 3)).toEqual(['release', 'create', 'pilot-v0.2.4-r3']);
+    expect(calls[2]).toContain('141961c4a2ef58cecd6525c88903f76d929367b5');
+    expect(calls.flat()).not.toContain('delete');
+  });
+
   it('refuses recovery when the immediately previous candidate is already complete', () => {
     const calls: string[][] = [];
     expect(() => stagePilotDraft({
@@ -307,10 +340,43 @@ describe('GitHub pilot release workflow', () => {
         if (args.some((arg) => arg.includes('matching-refs'))) return '[]';
         return '';
       },
-    })).toThrow('Previous candidate pilot-v0.2.4-r2 is not an eligible incomplete draft.');
+    })).toThrow('Previous candidate pilot-v0.2.4-r2 is not an eligible predecessor draft.');
     expect(calls).toHaveLength(2);
     expect(calls.some((args) => args[0] === 'release')).toBe(false);
   });
+
+  it.each(['main', '', null])(
+    'refuses a complete predecessor with ambiguous target %s',
+    (targetCommitish) => {
+      const calls: string[][] = [];
+      expect(() => stagePilotDraft({
+        repository: 'KentMaoza/CH-Ultimate',
+        commitSha: '141961c4a2ef58cecd6525c88903f76d929367b5',
+        releaseTag: 'pilot-v0.2.4-r3',
+        fileExists: () => true,
+        runGh: (args) => {
+          calls.push(args);
+          if (args.includes('--slurp')) {
+            return JSON.stringify([[{
+              tag_name: 'pilot-v0.2.4-r2',
+              draft: true,
+              prerelease: true,
+              target_commitish: targetCommitish,
+              assets: [
+                { name: 'CH-Ultimate-0.2.4-Setup.exe', size: 149_000_000 },
+                { name: 'CHU-Companion-Mobile-0.2.4-release.apk', size: 43_000_000 },
+                { name: 'SHA256SUMS.txt', size: 199 },
+              ],
+            }]]);
+          }
+          if (args.some((arg) => arg.includes('matching-refs'))) return '[]';
+          return '';
+        },
+      })).toThrow('Previous candidate pilot-v0.2.4-r2 is not an eligible predecessor draft.');
+      expect(calls).toHaveLength(2);
+      expect(calls.some((args) => args[0] === 'release')).toBe(false);
+    },
+  );
 
   it.each([
     ['duplicate', [
@@ -354,7 +420,7 @@ describe('GitHub pilot release workflow', () => {
         if (args.some((arg) => arg.includes('matching-refs'))) return '[]';
         return '';
       },
-    })).toThrow('Previous candidate pilot-v0.2.4-r2 is not an eligible incomplete draft.');
+    })).toThrow('Previous candidate pilot-v0.2.4-r2 is not an eligible predecessor draft.');
     expect(calls).toHaveLength(2);
     expect(calls.some((args) => args[0] === 'release')).toBe(false);
   });

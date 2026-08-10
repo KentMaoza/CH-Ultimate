@@ -63,7 +63,7 @@ describe('live catalogue reconciliation against isolated chu_test', () => {
          (id, role, installation_id, display_name, platform, token_hash,
           token_expires_at, approved_at)
        VALUES
-         (UNHEX(?), 'owner', UNHEX(?), 'Catalogue reconciliation probe',
+         (UNHEX(?), 'client', UNHEX(?), 'Catalogue reconciliation probe',
           'test', ?, DATE_ADD(UTC_TIMESTAMP(6), INTERVAL 1 DAY),
           UTC_TIMESTAMP(6))`,
       [uuidHex(deviceId), uuidHex(randomUUID()), randomBytes(32)],

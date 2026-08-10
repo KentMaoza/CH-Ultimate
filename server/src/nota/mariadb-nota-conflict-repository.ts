@@ -118,7 +118,7 @@ export class MariaDbNotaConflictRepository {
     connection: Pick<ProtocolConnection, 'query'>,
   ): Promise<string> {
     const rows = await connection.query<Array<{ revision: unknown }>>(
-      'SELECT COALESCE(MAX(revision), 0) AS revision FROM change_log',
+      'SELECT COALESCE(MAX(sequence), 0) AS revision FROM change_log',
     );
     return String(rows[0]?.revision ?? '0');
   }

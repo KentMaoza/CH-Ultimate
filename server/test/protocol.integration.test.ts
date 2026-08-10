@@ -32,7 +32,7 @@ async function insertDevice(deviceId: string, installationId: string) {
        (id, role, installation_id, display_name, platform, token_hash,
         token_expires_at, approved_at)
      VALUES
-       (UNHEX(?), 'owner', UNHEX(?), 'Protocol probe', 'test', ?,
+       (UNHEX(?), 'client', UNHEX(?), 'Protocol probe', 'test', ?,
         DATE_ADD(UTC_TIMESTAMP(6), INTERVAL 1 DAY), UTC_TIMESTAMP(6))`,
     [uuidHex(deviceId), uuidHex(installationId), randomBytes(32)],
   );

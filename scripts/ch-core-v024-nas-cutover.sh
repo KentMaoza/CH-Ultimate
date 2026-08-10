@@ -440,7 +440,6 @@ validate_release() {
     ''|*[!A-Za-z0-9_-]*) die 'Validation bearer has an invalid format.' ;;
   esac
   [ "${#validation_token}" -ge 32 ] || die 'Validation bearer is too short.'
-  unset validation_token
 
   cd "$project_root"
   schema_evidence=$(docker compose --project-name "$new_project_name-ops" --profile ops run --rm ch-core-ops \
@@ -470,24 +469,62 @@ validate_release() {
   [ "$live_body" = '{"status":"ok"}' ] || die 'Public CA-validated live health failed.'
   [ "$ready_body" = '{"status":"ready"}' ] || die 'Public CA-validated ready health failed.'
 
+  umask 077
+  bootstrap_curl_config=$(mktemp "${TMPDIR:-/tmp}/ch-core-bootstrap-curl.XXXXXX")
+  bootstrap_body_file=$(mktemp "${TMPDIR:-/tmp}/ch-core-bootstrap-body.XXXXXX")
+  cleanup_validation_temps() {
+    [ -z "${bootstrap_curl_config:-}" ] || rm -f -- "$bootstrap_curl_config"
+    [ -z "${bootstrap_body_file:-}" ] || rm -f -- "$bootstrap_body_file"
+  }
+  trap cleanup_validation_temps EXIT HUP INT TERM
+  printf 'header = "Authorization: Bearer %s"\n' "$validation_token" >"$bootstrap_curl_config"
+  unset validation_token
+  curl --fail --silent --show-error --cacert "$ca_cert" \
+    --config "$bootstrap_curl_config" --output "$bootstrap_body_file" \
+    "${public_base_url}/v1/bootstrap"
+  rm -f -- "$bootstrap_curl_config"
+  bootstrap_curl_config=''
+
   bootstrap_evidence=$(docker compose --project-name "$new_project_name" exec -T ch-core \
-    node -e '
-      let token = "";
+    node --input-type=module -e '
+      import { z } from "zod";
+      let json = "";
       process.stdin.setEncoding("utf8");
-      process.stdin.on("data", (chunk) => { token += chunk; });
-      process.stdin.on("end", async () => {
-        token = token.trim();
-        const response = await fetch("http://127.0.0.1:18080/v1/bootstrap", {
-          headers: { authorization: `Bearer ${token}` },
-          signal: AbortSignal.timeout(5000),
-        });
-        if (!response.ok) process.exit(1);
-        const body = await response.json();
-        if (body.apiSchemaVersion !== 2 || !Array.isArray(body.stockChecks)) process.exit(1);
+      process.stdin.on("data", (chunk) => { json += chunk; });
+      process.stdin.on("end", () => {
+        const canonicalDecimal = z.string().regex(/^(0|[1-9]\d*)$/);
+        const signedDecimal = z.string().regex(/^(0|-?[1-9]\d*)$/);
+        const timestamp = z.string().datetime({ offset: true });
+        const uuid = z.string().uuid();
+        const stockCheckSchema = z.object({
+          id: uuid,
+          skuId: uuid,
+          observedQuantityPcs: signedDecimal,
+          countedQuantityPcs: signedDecimal,
+          serverQuantityBeforePcs: signedDecimal,
+          appliedDeltaPcs: signedDecimal,
+          baseBalanceVersion: canonicalDecimal.optional(),
+          forcedOffline: z.boolean(),
+          countedAt: timestamp,
+          appliedAt: timestamp,
+          deviceId: uuid,
+          deviceDisplayName: z.string().min(1).max(160),
+          note: z.string().trim().max(512).optional(),
+        }).strict();
+        const validStockCheck = (row) => stockCheckSchema.safeParse(row).success;
+        const body = JSON.parse(json);
+        if (
+          body.apiSchemaVersion !== 2 ||
+          !Array.isArray(body.stockChecks) ||
+          !body.stockChecks.every(validStockCheck)
+        ) process.exit(1);
         console.log("AUTHENTICATED_BOOTSTRAP_V2=YES");
         console.log(`STOCK_CHECKS_COUNT=${body.stockChecks.length}`);
       });
-    ' <"$validation_token_file")
+    ' <"$bootstrap_body_file")
+  rm -f -- "$bootstrap_body_file"
+  bootstrap_body_file=''
+  trap - EXIT HUP INT TERM
   printf '%s\n' "$bootstrap_evidence" | grep -qx 'AUTHENTICATED_BOOTSTRAP_V2=YES' ||
     die 'Authenticated bootstrap v2 marker is missing.'
   stock_checks_count=$(printf '%s\n' "$bootstrap_evidence" | awk -F= '/^STOCK_CHECKS_COUNT=/{ print $2 }')

@@ -132,6 +132,14 @@ describe('CH Core v0.2.4 NAS cutover helper', () => {
     expect(validate).toContain('LATEST_SCHEMA_VERSION=10');
     expect(validate).toContain("apiSchemaVersion !== 2");
     expect(validate).toContain('Array.isArray(body.stockChecks)');
+    expect(validate).toContain('body.stockChecks.every(validStockCheck)');
+    expect(validate).toContain('const stockCheckSchema = z.object({');
+    expect(validate).toContain('forcedOffline: z.boolean()');
+    expect(validate).toContain('deviceDisplayName: z.string().min(1).max(160)');
+    expect(validate).toContain('note: z.string().trim().max(512).optional()');
+    expect(validate).toContain('}).strict()');
+    expect(validate).toContain('"${public_base_url}/v1/bootstrap"');
+    expect(validate).not.toContain('http://127.0.0.1:18080/v1/bootstrap');
     expect(validate).toContain('PUBLIC_HEALTH_LIVE=YES');
     expect(validate).toContain('PUBLIC_HEALTH_READY=YES');
     expect(validate).toContain('AUTHENTICATED_BOOTSTRAP_V2=YES');

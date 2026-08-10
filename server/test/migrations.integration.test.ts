@@ -214,11 +214,11 @@ describe('MariaDB migrations against isolated chu_test', () => {
       await connection.beginTransaction();
       await connection.query(
         `INSERT INTO devices
-           (id, installation_id, display_name, platform, token_hash,
-            token_expires_at)
+           (id, role, installation_id, display_name, platform, token_hash,
+            token_expires_at, approved_at)
          VALUES
-           (UNHEX(?), UNHEX(?), ?, ?, UNHEX(SHA2(?, 256)),
-            UTC_TIMESTAMP(6))`,
+           (UNHEX(?), 'client', UNHEX(?), ?, ?, UNHEX(SHA2(?, 256)),
+            UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))`,
         [deviceId, deviceId, 'Rollback probe', 'test', 'temporary-token'],
       );
       insertedBeforeFailure = true;
@@ -292,11 +292,12 @@ describe('MariaDB migrations against isolated chu_test', () => {
 
     await pool.query(
       `INSERT INTO devices
-         (id, installation_id, display_name, platform, token_hash,
-          token_expires_at)
+         (id, role, installation_id, display_name, platform, token_hash,
+          token_expires_at, approved_at)
        VALUES
-         (UNHEX(?), UNHEX(?), 'Constraint probe', 'test',
-          UNHEX(SHA2(?, 256)), DATE_ADD(UTC_TIMESTAMP(6), INTERVAL 1 DAY))`,
+         (UNHEX(?), 'client', UNHEX(?), 'Constraint probe', 'test',
+          UNHEX(SHA2(?, 256)), DATE_ADD(UTC_TIMESTAMP(6), INTERVAL 1 DAY),
+          UTC_TIMESTAMP(6))`,
       [deviceId, deviceId, randomUUID()],
     );
     await pool.query(

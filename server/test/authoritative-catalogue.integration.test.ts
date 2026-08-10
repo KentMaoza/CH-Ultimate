@@ -40,7 +40,7 @@ async function insertDevice(deviceId: string): Promise<void> {
        (id, role, installation_id, display_name, platform, token_hash,
         token_expires_at, approved_at)
      VALUES
-       (UNHEX(?), 'owner', UNHEX(?), 'Catalogue probe', 'test', ?,
+       (UNHEX(?), 'client', UNHEX(?), 'Catalogue probe', 'test', ?,
         DATE_ADD(UTC_TIMESTAMP(6), INTERVAL 1 DAY), UTC_TIMESTAMP(6))`,
     [uuidHex(deviceId), uuidHex(randomUUID()), randomBytes(32)],
   );

@@ -79,7 +79,7 @@
 .stock-check--mobile .stock-check__scan form { grid-template-columns: minmax(0, 1fr); }
 .stock-check--mobile .stock-check__scan form label { grid-column: auto; }
 .stock-check--mobile .stock-check__scan input, .stock-check--mobile .stock-check__scan button, .stock-check--mobile .stock-check__registration input, .stock-check--mobile .stock-check__registration select, .stock-check--mobile .stock-check__registration button, .stock-check--mobile .stock-check__form input, .stock-check--mobile .stock-check__form textarea, .stock-check--mobile .stock-check__form button, .stock-check--mobile .stock-check__actions button { min-height: 48px; }
-.stock-check--mobile .stock-check__list { max-height: none; }
+.stock-check--mobile .stock-check__list { max-height: 360px; }
 .stock-check--mobile .stock-check__list li > button { grid-template-columns: minmax(0, 1fr); }
 .stock-check--mobile .stock-check__list li > button > span:last-child { text-align: left; }
 .stock-check--mobile .stock-check__workspace { padding: 15px; }

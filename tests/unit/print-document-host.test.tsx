@@ -81,6 +81,21 @@ function OutputHarness({ plan }: { plan: ReturnType<typeof notaPlan> }) {
   </>;
 }
 
+function OutputLifecycleHarness({
+  first,
+  second,
+}: {
+  first: ReturnType<typeof notaPlan>;
+  second: ReturnType<typeof notaPlan>;
+}) {
+  const output = useOutput();
+  return <>
+    <button disabled={output.busy} onClick={() => void output.print(first)}>Print A</button>
+    <button disabled={output.busy} onClick={() => void output.print(second)}>Print B</button>
+    <button disabled={output.busy} onClick={() => void output.savePdf(first)}>PDF A</button>
+  </>;
+}
+
 test('output provider mounts trusted content before print and reuses it for PDF parity', async () => {
   const plan = notaPlan();
   const printDocument = vi.fn(async () => {
@@ -96,17 +111,76 @@ test('output provider mounts trusted content before print and reuses it for PDF 
     savePdf,
     saveSpreadsheet: vi.fn(async () => ({ status: 'saved' as const })),
   };
-  render(<OutputProvider bridge={bridge}><OutputHarness plan={plan} /></OutputProvider>);
+  render(<OutputProvider bridge={bridge}>
+    <OutputHarness plan={plan} />
+  </OutputProvider>);
 
   fireEvent.click(screen.getByRole('button', { name: 'Print' }));
   await waitFor(() => expect(printDocument).toHaveBeenCalledWith({
     kind: 'nota', widthMm: plan.widthMm, heightMm: plan.heightMm,
   }));
+  await waitFor(() => expect(screen.queryByTestId('print-document-host')).not.toBeInTheDocument());
   fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
   await waitFor(() => expect(savePdf).toHaveBeenCalledWith({
     kind: 'nota', widthMm: plan.widthMm, heightMm: plan.heightMm,
     fileName: plan.fileName,
   }));
+});
+
+test('native print keeps its host and output lock until the Electron bridge resolves', async () => {
+  const first = notaPlan();
+  const second = {
+    ...notaPlan(),
+    customerName: 'Budi',
+    pages: notaPlan().pages.map((page) => ({
+      ...page,
+      rows: page.rows.map((row) => ({
+        ...row,
+        line: { ...row.line, description: 'Kopi Arabika' },
+      })),
+    })),
+  };
+  let releasePrint!: () => void;
+  const printDocument = vi.fn()
+    .mockImplementationOnce(() => new Promise<{ status: 'printed' }>((resolve) => {
+      releasePrint = () => resolve({ status: 'printed' });
+    }))
+    .mockResolvedValue({ status: 'printed' as const });
+  const bridge: ChOutputBridge = {
+    printDocument,
+    savePdf: vi.fn().mockResolvedValue({ status: 'saved' as const }),
+    saveSpreadsheet: vi.fn().mockResolvedValue({ status: 'saved' as const }),
+  };
+  render(<OutputProvider bridge={bridge}>
+    <OutputLifecycleHarness first={first} second={second} />
+  </OutputProvider>);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Print A' }));
+  await waitFor(() => expect(printDocument).toHaveBeenCalledTimes(1));
+  expect(screen.getByTestId('print-document-host')).toHaveTextContent('Beras Hitam');
+  expect(screen.getByRole('button', { name: 'Print B' })).toBeDisabled();
+
+  releasePrint();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Print B' })).toBeEnabled());
+  expect(screen.queryByTestId('print-document-host')).not.toBeInTheDocument();
+});
+
+test('save PDF removes its trusted host immediately instead of retaining a large document tree', async () => {
+  const plan = notaPlan();
+  const savePdf = vi.fn().mockResolvedValue({ status: 'saved' as const });
+  const bridge: ChOutputBridge = {
+    printDocument: vi.fn().mockResolvedValue({ status: 'printed' as const }),
+    savePdf,
+    saveSpreadsheet: vi.fn().mockResolvedValue({ status: 'saved' as const }),
+  };
+  render(<OutputProvider bridge={bridge}>
+    <OutputLifecycleHarness first={plan} second={plan} />
+  </OutputProvider>);
+
+  fireEvent.click(screen.getByRole('button', { name: 'PDF A' }));
+
+  await waitFor(() => expect(savePdf).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(screen.queryByTestId('print-document-host')).not.toBeInTheDocument());
 });
 
 test('output readiness waits for a concurrently rendered trusted host', async () => {

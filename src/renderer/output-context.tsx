@@ -29,6 +29,16 @@ interface OutputContextValue {
 
 const OutputContext = createContext<OutputContextValue | null>(null);
 
+async function waitForPaint(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    if (typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(() => resolve());
+    } else {
+      window.setTimeout(resolve, 16);
+    }
+  });
+}
+
 export async function waitForHostReady(): Promise<void> {
   const deadline = Date.now() + 2_000;
   let host = document.querySelector<HTMLElement>('[data-testid="print-document-host"]');
@@ -50,6 +60,9 @@ export async function waitForHostReady(): Promise<void> {
       image.addEventListener('error', done, { once: true });
     });
   }));
+  // Let React layout and the print media snapshot observe the completed host.
+  await waitForPaint();
+  await waitForPaint();
 }
 
 export function OutputProvider({

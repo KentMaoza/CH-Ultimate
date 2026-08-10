@@ -4,8 +4,8 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
-      publish:
-        description: Publish the verified installers as a GitHub prerelease
+      stage_draft:
+        description: Stage verified installers as an unpublished GitHub draft
         required: true
         type: boolean
         default: false
@@ -106,9 +106,36 @@ jobs:
           fi
           sha256sum "${apks[0]}"
 
-  publish-prerelease:
-    needs: [windows-installer, android-apk]
-    if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
+  mariadb-integration:
+    needs: source-gates
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: '1'
+          MARIADB_DATABASE: chu_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mariadb-admin ping --host=127.0.0.1 --user=root"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      CH_CORE_TEST_DATABASE_URL: mariadb://root@127.0.0.1:3306/chu_test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run server:test:integration
+
+  stage-draft-release:
+    needs: [windows-installer, android-apk, mariadb-integration]
+    if: github.event_name == 'workflow_dispatch' && inputs.stage_draft && github.ref == 'refs/heads/main'
     runs-on: windows-latest
     permissions:
       contents: write
@@ -127,6 +154,18 @@ jobs:
       - run: npm ci
       - name: Rebuild Windows release payload
         run: npm run make:windows
+      - name: Verify the documented unsigned Windows boundary
+        shell: pwsh
+        run: |
+          $setups = @(Get-ChildItem -Path out/make -Recurse -Filter '*Setup.exe')
+          if ($setups.Count -ne 1) {
+            throw "Expected exactly one Setup.exe, found $($setups.Count)."
+          }
+          $signature = Get-AuthenticodeSignature -LiteralPath $setups[0].FullName
+          if ([string]$signature.Status -ne 'NotSigned') {
+            throw "Expected the documented NotSigned boundary, found $($signature.Status)."
+          }
+          Write-Output 'WINDOWS_AUTHENTICODE=NotSigned'
       - run: npm run android:sync
       - name: Restore Android signing key
         shell: pwsh
@@ -205,7 +244,7 @@ jobs:
           $checksumPath = Join-Path (Resolve-Path release) 'SHA256SUMS.txt'
           $portableManifest = ($lines -join "`n") + "`n"
           [System.IO.File]::WriteAllText($checksumPath, $portableManifest, [System.Text.Encoding]::ASCII)
-      - name: Publish GitHub prerelease
+      - name: Stage unpublished GitHub draft
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
@@ -214,6 +253,7 @@ jobs:
             release/CH-Ultimate-0.2.4-Setup.exe `
             release/CHU-Companion-Mobile-0.2.4-release.apk `
             release/SHA256SUMS.txt `
+            --draft `
             --prerelease `
             --target "$env:GITHUB_SHA" `
             --title 'CH Ultimate pilot v0.2.4' `

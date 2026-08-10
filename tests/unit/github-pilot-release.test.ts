@@ -12,7 +12,7 @@ async function optionalRepositoryText(path: string): Promise<string> {
 }
 
 describe('GitHub pilot release workflow', () => {
-  it('gates both platform builds and manual prerelease publication', async () => {
+  it('gates both platform builds and stages an unpublished release draft', async () => {
     const workflow = await readFile(workflowPath, 'utf8');
 
     expect(workflow).toMatch(/pull_request:/);
@@ -44,16 +44,26 @@ describe('GitHub pilot release workflow', () => {
     expect(
       workflow.indexOf('npx playwright install --with-deps chromium'),
     ).toBeLessThan(workflow.indexOf('npm run test:e2e'));
-    expect(workflow.match(/needs: source-gates/g)).toHaveLength(2);
-    expect(workflow).toContain('needs: [windows-installer, android-apk]');
+    expect(workflow).toContain('mariadb-integration:');
+    expect(workflow).toContain('image: mariadb:10.11');
+    expect(workflow).toContain('MARIADB_DATABASE: chu_test');
+    expect(workflow).toContain(
+      'CH_CORE_TEST_DATABASE_URL: mariadb://root@127.0.0.1:3306/chu_test',
+    );
+    expect(workflow).toContain('npm run server:test:integration');
+    expect(workflow.match(/needs: source-gates/g)).toHaveLength(3);
+    expect(workflow).toContain(
+      'needs: [windows-installer, android-apk, mariadb-integration]',
+    );
     expect(workflow).toContain('contents: write');
     expect(workflow.match(/contents: write/g)).toHaveLength(1);
     expect(workflow).toContain(
-      "github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'",
+      "github.event_name == 'workflow_dispatch' && inputs.stage_draft && github.ref == 'refs/heads/main'",
     );
+    expect(workflow).toContain('--draft');
     expect(workflow).toContain('--prerelease');
     const publisher = workflow.slice(
-      workflow.indexOf('publish-prerelease:'),
+      workflow.indexOf('stage-draft-release:'),
     );
     expect(publisher).toContain('runs-on: windows-latest');
     expect(publisher).toContain('npm run make:windows');
@@ -65,6 +75,8 @@ describe('GitHub pilot release workflow', () => {
     expect(publisher).toContain('CHU_COMPANION_KEY_PASSWORD');
     expect(publisher).toContain(androidSignerSha256);
     expect(publisher).toContain('apksigner.bat');
+    expect(publisher).toContain('Get-AuthenticodeSignature');
+    expect(publisher).toContain("'NotSigned'");
     expect(publisher).toContain('$digestMatch = [regex]::Match(');
     expect(publisher).toContain(
       "'certificate SHA-256 digest:\\s*([0-9A-Fa-f]{64})\\s*$'",
@@ -83,8 +95,9 @@ describe('GitHub pilot release workflow', () => {
     );
     expect(publisher).not.toContain('assembleDebug');
     expect(publisher).not.toContain('pilot-debug.apk');
-    expect(workflow.slice(0, workflow.indexOf('publish-prerelease:')))
+    expect(workflow.slice(0, workflow.indexOf('stage-draft-release:')))
       .not.toContain('CHU_COMPANION_KEYSTORE_B64');
+    expect(publisher).not.toContain('gh release edit');
     expect(workflow).toContain(`pilot-v${pilotVersion}`);
     expect(workflow).toContain(`docs/releases/pilot-${pilotVersion}.md`);
   });
@@ -92,8 +105,9 @@ describe('GitHub pilot release workflow', () => {
   it('does not introduce production credentials or TLS bypasses', async () => {
     const workflow = await readFile(workflowPath, 'utf8');
 
-    expect(workflow).not.toMatch(/CH_CORE_TEST_DATABASE_URL/i);
-    expect(workflow).not.toMatch(/mariadb.*password/i);
+    expect(workflow.match(/CH_CORE_TEST_DATABASE_URL/g)).toHaveLength(1);
+    expect(workflow).not.toMatch(/CH_CORE_TEST_DATABASE_URL:[^\n]*(192\.168\.|\/chu(?:\s|$))/i);
+    expect(workflow).not.toMatch(/^\s+MARIADB_(?:ROOT_)?PASSWORD:/im);
     expect(workflow).not.toMatch(/curl\s+[^\n]*-[^\n]*k/i);
     expect(workflow).not.toMatch(/rejectUnauthorized\s*:\s*false/i);
     expect(workflow).not.toMatch(/NODE_TLS_REJECT_UNAUTHORIZED/i);
@@ -164,6 +178,9 @@ describe('GitHub pilot release workflow', () => {
       'gagal tertutup',
       'backup dan scratch',
       'empat hari tidak termasuk',
+      'tidak boleh dihapus',
+      'authenticode',
+      'draft',
     ]) {
       expect(releaseNotes.toLowerCase()).toContain(releaseFact.toLowerCase());
     }

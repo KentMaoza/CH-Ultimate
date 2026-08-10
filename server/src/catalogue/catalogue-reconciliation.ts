@@ -9,6 +9,7 @@ import type { CatalogueRow } from './workbook.js';
 export interface ExistingCatalogueRow {
   sku_id_hex: unknown;
   row_version: unknown;
+  price_rupiah: unknown;
   balance_row_version: unknown;
   quantity_pcs: unknown;
   created_at: unknown;
@@ -16,17 +17,22 @@ export interface ExistingCatalogueRow {
   archived_at: unknown;
   identifier_id_hex: unknown;
   identifier_value: unknown;
+  identifier_kind: unknown;
   identifier_created_at: unknown;
 }
 
 interface ExistingSku {
   id: string;
   rowVersion: string;
+  priceRupiah: string;
   balanceRowVersion: string | null;
   quantityPcs: string | null;
   createdAt: string;
   imageHash: string | null;
-  identifiers: Map<string, { id: string; createdAt: string }>;
+  identifiers: Map<
+    string,
+    { id: string; value: string; kind: string; createdAt: string }
+  >;
 }
 
 export interface CatalogueReconciliation {
@@ -70,6 +76,7 @@ function hydrateExistingSkus(
       sku = {
         id: skuId,
         rowVersion: positiveVersion(row.row_version, 'SKU'),
+        priceRupiah: integerQuantity(row.price_rupiah),
         balanceRowVersion:
           row.balance_row_version === null
             ? null
@@ -86,6 +93,8 @@ function hydrateExistingSkus(
     const identifier = normalizeIdentifier(String(row.identifier_value));
     sku.identifiers.set(identifier, {
       id: hexToUuid(row.identifier_id_hex),
+      value: String(row.identifier_value),
+      kind: String(row.identifier_kind),
       createdAt: databaseDate(row.identifier_created_at).toISOString(),
     });
   }
@@ -152,6 +161,7 @@ export function reconcileCatalogue(
       existingSku: existing
         ? {
             rowVersion: existing.rowVersion,
+            priceRupiah: existing.priceRupiah,
             balanceRowVersion: existing.balanceRowVersion,
             quantityPcs: existing.quantityPcs,
             createdAt: existing.createdAt,
@@ -164,6 +174,13 @@ export function reconcileCatalogue(
         existing?.identifiers.get(primaryKey)?.createdAt ?? null,
       productIdentifierCreatedAt:
         existing?.identifiers.get(productKey)?.createdAt ?? null,
+      demotedPrimaryIdentifiers: existing
+        ? [...existing.identifiers.values()].filter(
+            (identifier) =>
+              identifier.kind === 'primary' &&
+              normalizeIdentifier(identifier.value) !== primaryKey,
+          )
+        : [],
     };
   });
 

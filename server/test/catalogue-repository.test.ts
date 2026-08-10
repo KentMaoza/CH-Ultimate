@@ -77,6 +77,7 @@ function commitHarness(
     existingSkuRows?: Array<{
       sku_id_hex: string;
       primary_identifier: string;
+      price_rupiah?: string;
       row_version: string;
       balance_row_version: string | null;
       quantity_pcs: string | null;
@@ -141,7 +142,10 @@ function commitHarness(
         ] as T;
       }
       if (compact.includes('FROM skus s') && compact.includes('sku_id_hex')) {
-        const rows = options.existingSkuRows ?? [];
+        const rows = (options.existingSkuRows ?? []).map((row) => ({
+          price_rupiah: '14000',
+          ...row,
+        }));
         return (
           compact.includes('WHERE s.archived_at IS NULL')
             ? rows.filter((row) => row.archived_at === null)
@@ -283,6 +287,23 @@ describe('MariaDB catalogue repository', () => {
     );
     expect(insert('audit_events')).toBeDefined();
     expect(insert('change_log')).toBeDefined();
+    const firstChangePayloads = queries
+      .filter(({ sql }) => sql.startsWith('INSERT INTO change_log'))
+      .flatMap(({ values }) => values)
+      .filter(
+        (value): value is string =>
+          typeof value === 'string' && value.startsWith('{'),
+      )
+      .map((value) => JSON.parse(value) as Record<string, unknown>);
+    expect(firstChangePayloads).toContainEqual(
+      expect.objectContaining({
+        id: priceHistoryId,
+        skuId,
+        priceRupiah: '15000',
+        beforePriceRupiah: '15000',
+        source: 'catalogue_import',
+      }),
+    );
     expect(
       queries.some(({ sql }) => sql.startsWith('UPDATE imports SET status =')),
     ).toBe(true);
@@ -482,6 +503,14 @@ describe('MariaDB catalogue repository', () => {
     expect(changePayloads).toContainEqual(
       expect.objectContaining({
         skuId: existingSkuId,
+        priceRupiah: '15000',
+        beforePriceRupiah: '14000',
+        source: 'catalogue_import',
+      }),
+    );
+    expect(changePayloads).toContainEqual(
+      expect.objectContaining({
+        skuId: existingSkuId,
         deltaPcs: '5',
         reason: 'catalogue_reconciliation',
         beforeQuantityPcs: '7',
@@ -523,6 +552,85 @@ describe('MariaDB catalogue repository', () => {
         createdAt: '2026-07-29T02:01:00.000Z',
       }),
     );
+  });
+
+  it('demotes a former primary before promoting a new workbook primary', async () => {
+    const existingSkuId = 'abababab-abab-4bab-8bab-abababababab';
+    const oldPrimaryId = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
+    const productId = 'efefefef-efef-4fef-8fef-efefefefefef';
+    const { queries, repository } = commitHarness({
+      existingSkuRows: [
+        {
+          sku_id_hex: existingSkuId.replaceAll('-', '').toUpperCase(),
+          primary_identifier: 'OLD-PRIMARY',
+          row_version: '1',
+          balance_row_version: '2',
+          quantity_pcs: '12',
+          created_at: new Date('2026-07-29T02:00:00.000Z'),
+          image_hash_hex: null,
+          archived_at: null,
+          identifier_id_hex: oldPrimaryId.replaceAll('-', '').toUpperCase(),
+          identifier_value: 'OLD-PRIMARY',
+          identifier_kind: 'primary',
+          identifier_created_at: new Date('2026-07-29T02:01:00.000Z'),
+        },
+        {
+          sku_id_hex: existingSkuId.replaceAll('-', '').toUpperCase(),
+          primary_identifier: 'OLD-PRIMARY',
+          row_version: '1',
+          balance_row_version: '2',
+          quantity_pcs: '12',
+          created_at: new Date('2026-07-29T02:00:00.000Z'),
+          image_hash_hex: null,
+          archived_at: null,
+          identifier_id_hex: productId.replaceAll('-', '').toUpperCase(),
+          identifier_value: '87000001',
+          identifier_kind: 'product_code',
+          identifier_created_at: new Date('2026-07-29T02:02:00.000Z'),
+        },
+      ],
+    });
+
+    await repository.commit(
+      record,
+      workbook,
+      new Date('2026-07-30T02:00:00.000Z'),
+    );
+
+    expect(
+      queries.some(
+        ({ sql, values }) =>
+          sql.startsWith('UPDATE sku_identifiers SET identifier_kind =') &&
+          values.includes(oldPrimaryId),
+      ),
+    ).toBe(true);
+    const identifierPayloads = queries
+      .filter(({ sql }) => sql.startsWith('INSERT INTO change_log'))
+      .flatMap(({ values }) => values)
+      .filter(
+        (value): value is string =>
+          typeof value === 'string' && value.startsWith('{'),
+      )
+      .map((value) => JSON.parse(value) as Record<string, unknown>)
+      .filter((payload) => 'identifierKind' in payload);
+    expect(identifierPayloads).toContainEqual(
+      expect.objectContaining({
+        id: oldPrimaryId,
+        identifierValue: 'OLD-PRIMARY',
+        identifierKind: 'alias',
+      }),
+    );
+    expect(identifierPayloads).toContainEqual(
+      expect.objectContaining({
+        identifierValue: 'SKU-A',
+        identifierKind: 'primary',
+      }),
+    );
+    expect(
+      identifierPayloads.filter(
+        (payload) => payload.identifierKind === 'primary',
+      ),
+    ).toHaveLength(1);
   });
 
   it('does not create stock movement or balance change for a zero-delta match', async () => {

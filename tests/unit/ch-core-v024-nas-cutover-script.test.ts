@@ -55,12 +55,13 @@ describe('CH Core v0.2.4 NAS cutover helper', () => {
     });
   });
 
-  it('has separate prepare, backup-restore, and deploy phases', async () => {
+  it('has separate prepare, backup-restore, deploy, and validation phases', async () => {
     const script = await readFile(scriptPath, 'utf8');
 
     expect(script).toContain('prepare)');
     expect(script).toContain('backup-restore)');
     expect(script).toContain('deploy)');
+    expect(script).toContain('validate)');
     expect(script).toContain('CH_CORE_RELEASE_COMMIT');
     expect(script).toContain('CH_CORE_RELEASE_ARCHIVE_SHA256');
     expect(script).toContain('CH_CORE_PREVIOUS_PROJECT_ROOT');
@@ -118,7 +119,27 @@ describe('CH Core v0.2.4 NAS cutover helper', () => {
     );
   });
 
-  it('records the fixture-clear predicate without deleting production data', async () => {
+  it('accepts deployment only after measured schema, CA health, and authenticated bootstrap checks', async () => {
+    const script = await readFile(scriptPath, 'utf8');
+    const validate = script.slice(script.indexOf('validate_release()'));
+
+    expect(validate).toContain('CH_CORE_V024_VALIDATION_TOKEN_FILE');
+    expect(validate).toContain('resources/ch-core-ca.pem');
+    expect(validate).toContain('https://192.168.50.14:8443');
+    expect(validate).toContain('SELECT COUNT(*) FROM schema_migrations');
+    expect(validate).toContain('SELECT MAX(version) FROM schema_migrations');
+    expect(validate).toContain('APPLIED_MIGRATIONS=10');
+    expect(validate).toContain('LATEST_SCHEMA_VERSION=10');
+    expect(validate).toContain("apiSchemaVersion !== 2");
+    expect(validate).toContain('Array.isArray(body.stockChecks)');
+    expect(validate).toContain('PUBLIC_HEALTH_LIVE=YES');
+    expect(validate).toContain('PUBLIC_HEALTH_READY=YES');
+    expect(validate).toContain('AUTHENTICATED_BOOTSTRAP_V2=YES');
+    expect(validate).not.toContain('curl -k');
+    expect(script).not.toContain('EXPECTED_SCHEMA_VERSION=10');
+  });
+
+  it('records historical business counts without authorizing fixture deletion', async () => {
     const script = await readFile(scriptPath, 'utf8');
     const lower = script.toLowerCase();
 
@@ -126,8 +147,22 @@ describe('CH Core v0.2.4 NAS cutover helper', () => {
     expect(script).toContain('BUSINESS_COUNT=stock_movements|');
     expect(script).toContain('BUSINESS_COUNT=stock_checks|');
     expect(script).toContain('BUSINESS_COUNT=non_import_price_history|');
-    expect(script).toContain('FIXTURE_CLEAR_SAFE=');
+    expect(script).not.toContain('FIXTURE_CLEAR_SAFE=');
     expect(lower).not.toMatch(/drop\s+database\s+chu\b/);
     expect(lower).not.toMatch(/truncate\s+table|delete\s+from/);
+  });
+
+  it('can create a new commit-bound backup from either schema 9 or schema 10', async () => {
+    const script = await readFile(scriptPath, 'utf8');
+    const counts = script.slice(
+      script.indexOf('capture_predeploy_counts()'),
+      script.indexOf('backup_and_restore()'),
+    );
+
+    expect(counts).toContain('9|10)');
+    expect(counts).toContain('PREDEPLOY_MIGRATIONS=%s');
+    expect(counts).toContain('business_stock_checks=0');
+    expect(counts).toContain('SELECT COUNT(*) FROM stock_checks');
+    expect(counts).not.toContain('[ "$migrations" = 9 ]');
   });
 });

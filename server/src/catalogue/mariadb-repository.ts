@@ -107,11 +107,12 @@ export class MariaDbCatalogueRepository implements CatalogueRepository {
       }
 
       const existingRows = await connection.query<ExistingCatalogueRow[]>(
-        `SELECT HEX(s.id) AS sku_id_hex, s.row_version,
+        `SELECT HEX(s.id) AS sku_id_hex, s.row_version, s.price_rupiah,
                 sb.row_version AS balance_row_version,
                 sb.quantity_pcs, s.created_at,
                 HEX(s.image_hash) AS image_hash_hex, s.archived_at,
                 HEX(si.id) AS identifier_id_hex, si.identifier_value,
+                si.identifier_kind,
                 si.created_at AS identifier_created_at
          FROM skus s
          LEFT JOIN sku_identifiers si ON si.sku_id = s.id

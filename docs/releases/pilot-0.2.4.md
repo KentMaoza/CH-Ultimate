@@ -8,6 +8,10 @@ Payload GitHub prerelease `pilot-v0.2.4` adalah:
 - Android: `CHU-Companion-Mobile-0.2.4-release.apk`
 - Verifikasi: `SHA256SUMS.txt`
 
+Installer Windows memiliki batas yang diketahui: `Authenticode: NotSigned`.
+Checksum wajib diverifikasi sebelum instalasi. Android tetap wajib memiliki
+digest signer permanen yang diperiksa workflow rilis.
+
 ## Kontrak katalog dan Core
 
 1. Impor workbook melakukan rekonsiliasi katalog aman lewat identifier yang
@@ -29,9 +33,16 @@ Payload GitHub prerelease `pilot-v0.2.4` adalah:
 ## Prasyarat operasional
 
 Sebelum impor live, operator wajib menyelesaikan backup dan scratch restore di
-NAS, lalu deploy Core dari commit rilis v0.2.4 yang sama. Pembersihan fixture
-hanya boleh dilakukan setelah tabel live membuktikan tidak ada Nota, pergerakan
-stok, cek stok, atau histori harga manual.
+NAS, lalu deploy Core dari commit rilis v0.2.4 yang sama. Fixture, SKU lama,
+Nota, pergerakan stok, cek stok, dan histori harga tidak boleh dihapus oleh
+proses rilis ini. Perubahan data destruktif memerlukan rencana dan persetujuan
+terpisah; rilis ini tidak memberi wewenang cleanup katalog.
+
+Workflow pertama membuat GitHub draft yang belum dipublikasikan. Aset draft
+yang persis sama harus diverifikasi checksum dan signer-nya, dipasang pada
+Windows serta Android, lalu lulus uji fisik dan technical soak 60 menit. Hanya
+setelah semua gate tersebut lulus, draft yang sama boleh diubah menjadi
+prerelease publik; aset tidak boleh dibangun ulang di antara kedua tahap.
 
 Klien hanya terhubung ke `https://192.168.50.14:8443` pada LAN bisnis. Pilot
 empat hari tidak termasuk; penerimaan menggunakan uji fisik dan technical soak

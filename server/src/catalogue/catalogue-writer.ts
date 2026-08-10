@@ -16,6 +16,7 @@ export interface PreparedCatalogueRow {
   stockMovementId: string;
   existingSku: {
     rowVersion: string;
+    priceRupiah: string;
     balanceRowVersion: string | null;
     quantityPcs: string | null;
     createdAt: string;
@@ -25,6 +26,11 @@ export interface PreparedCatalogueRow {
   existingProductIdentifier: boolean;
   primaryIdentifierCreatedAt: string | null;
   productIdentifierCreatedAt: string | null;
+  demotedPrimaryIdentifiers: Array<{
+    id: string;
+    value: string;
+    createdAt: string;
+  }>;
 }
 
 export interface CatalogueWriteSummary {
@@ -179,6 +185,25 @@ export async function insertCatalogue(
       kind: 'product_code',
     },
   ]);
+  const legacyPrimaryIdentifiers = rows.flatMap((row) =>
+    row.demotedPrimaryIdentifiers
+      .filter(
+        (identifier) =>
+          identifier.id !== row.primaryIdentifierId &&
+          identifier.id !== row.productIdentifierId,
+      )
+      .map((identifier) => ({ row, identifier })),
+  );
+  for (const { row, identifier } of legacyPrimaryIdentifiers) {
+    await connection.query(
+      `UPDATE sku_identifiers
+       SET identifier_kind = 'alias'
+       WHERE id = UNHEX(REPLACE(?, '-', ''))
+         AND sku_id = UNHEX(REPLACE(?, '-', ''))
+         AND identifier_kind = 'primary'`,
+      [identifier.id, row.skuId],
+    );
+  }
   const newIdentifiers = identifiers.filter((identifier) =>
     identifier.kind === 'primary'
       ? !identifier.row.existingPrimaryIdentifier
@@ -332,12 +357,31 @@ export async function insertCatalogue(
       committedAt,
     ],
   );
-  const catalogueChanges = rows.flatMap((row) => [
-    {
+  const catalogueChanges = rows.flatMap((row) => {
+    const demotedChanges = row.demotedPrimaryIdentifiers
+      .filter(
+        (identifier) =>
+          identifier.id !== row.primaryIdentifierId &&
+          identifier.id !== row.productIdentifierId,
+      )
+      .map((identifier) => ({
+        entityType: 'sku_identifier',
+        entityId: identifier.id,
+        payload: identifierPayload(
+          identifier.id,
+          row,
+          identifier.value,
+          'alias',
+          committedAt,
+          identifier.createdAt,
+        ),
+      }));
+    return [{
       entityType: 'sku',
       entityId: row.skuId,
       payload: skuPayload(row, committedAt),
     },
+    ...demotedChanges,
     {
       entityType: 'sku_identifier',
       entityId: row.primaryIdentifierId,
@@ -361,8 +405,22 @@ export async function insertCatalogue(
         committedAt,
         row.productIdentifierCreatedAt,
       ),
+    }];
+  });
+  const priceHistoryChanges = rows.map((row) => ({
+    entityType: 'price_history',
+    entityId: row.priceHistoryId,
+    payload: {
+      id: row.priceHistoryId,
+      skuId: row.skuId,
+      priceRupiah: row.source.selectedPrice.toString(),
+      beforePriceRupiah:
+        row.existingSku?.priceRupiah ?? row.source.selectedPrice.toString(),
+      source: 'catalogue_import',
+      changedByDeviceId: record.createdByDeviceId,
+      effectiveAt: committedAt.toISOString(),
     },
-  ]);
+  }));
   const newBalanceChanges = newRows.map((row) => ({
     entityType: 'stock_balance',
     entityId: row.skuId,
@@ -397,6 +455,7 @@ export async function insertCatalogue(
   ]);
   const changes = [
     ...catalogueChanges,
+    ...priceHistoryChanges,
     ...newBalanceChanges,
     ...adjustedStockChanges,
   ];

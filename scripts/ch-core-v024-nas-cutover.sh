@@ -83,6 +83,7 @@ load_release_context() {
   prepare_receipt="$staging_root/prepare-v024-receipt.txt"
   backup_receipt=${CH_CORE_V024_BACKUP_RECEIPT:-$staging_root/backup-v024-receipt.txt}
   deploy_receipt="$staging_root/deploy-v024-receipt.txt"
+  validation_receipt="$staging_root/validation-v024-receipt.txt"
   backup_root='/volume1/docker/ch-ultimate-backups'
   new_project_name="ch-ultimate-core-$short_commit"
 
@@ -261,6 +262,7 @@ capture_predeploy_counts() {
       write_client_defaults "$defaults" CH_CORE_BACKUP_DATABASE_URL
       database=$(database_name CH_CORE_BACKUP_DATABASE_URL backup)
       mariadb_bin=$(database_binary CH_CORE_MARIADB_BIN mariadb)
+      stock_checks_table_present=0
       tables="schema_migrations devices pairings owner_recovery skus sku_identifiers price_history templates imports image_assets image_jobs notas nota_pages nota_lines nota_postings nota_daily_sequences nota_conflicts revenue_postings stock_movements stock_balances stock_checks idempotency_receipts audit_events client_cursor_acknowledgements change_log business_write_lock"
       for table in $tables; do
         exists=$("$mariadb_bin" --defaults-extra-file="$defaults" --batch --skip-column-names "$database" -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '\''$table'\''")
@@ -270,18 +272,25 @@ capture_predeploy_counts() {
             count=$("$mariadb_bin" --defaults-extra-file="$defaults" --batch --skip-column-names "$database" -e "SELECT COUNT(*) FROM \`$table\`")
             /opt/ch-core-ops/ch-core-v024-count-validator.sh "$count"
             [ "$table" != business_write_lock ] || [ "$count" = 1 ] || die "business_write_lock must have one row."
+            [ "$table" != stock_checks ] || stock_checks_table_present=1
             printf "TABLE_COUNT=%s|%s\\n" "$table" "$count"
             ;;
           *) die "Unexpected table presence for $table." ;;
         esac
       done
       migrations=$("$mariadb_bin" --defaults-extra-file="$defaults" --batch --skip-column-names "$database" -e "SELECT COUNT(*) FROM schema_migrations")
-      [ "$migrations" = 9 ] || die "Predeploy schema must contain exactly migrations 1-9."
-      printf "PREDEPLOY_MIGRATIONS=9\\n"
+      case "$migrations" in
+        9|10) ;;
+        *) die "Predeploy schema must contain exactly migrations 1-9 or 1-10." ;;
+      esac
+      printf "PREDEPLOY_MIGRATIONS=%s\\n" "$migrations"
 
       business_notas=$("$mariadb_bin" --defaults-extra-file="$defaults" --batch --skip-column-names "$database" -e "SELECT COUNT(*) FROM notas")
       business_stock_movements=$("$mariadb_bin" --defaults-extra-file="$defaults" --batch --skip-column-names "$database" -e "SELECT COUNT(*) FROM stock_movements")
       business_stock_checks=0
+      if [ "$stock_checks_table_present" = 1 ]; then
+        business_stock_checks=$("$mariadb_bin" --defaults-extra-file="$defaults" --batch --skip-column-names "$database" -e "SELECT COUNT(*) FROM stock_checks")
+      fi
       business_non_import_price_history=$("$mariadb_bin" --defaults-extra-file="$defaults" --batch --skip-column-names "$database" -e "SELECT COUNT(*) FROM price_history WHERE source <> '\''catalogue_import'\''")
       for business_count in "$business_notas" "$business_stock_movements" "$business_stock_checks" "$business_non_import_price_history"; do
         /opt/ch-core-ops/ch-core-v024-count-validator.sh "$business_count"
@@ -290,14 +299,6 @@ capture_predeploy_counts() {
       printf "BUSINESS_COUNT=stock_movements|%s\\n" "$business_stock_movements"
       printf "BUSINESS_COUNT=stock_checks|%s\\n" "$business_stock_checks"
       printf "BUSINESS_COUNT=non_import_price_history|%s\\n" "$business_non_import_price_history"
-      if [ "$business_notas" = 0 ] &&
-         [ "$business_stock_movements" = 0 ] &&
-         [ "$business_stock_checks" = 0 ] &&
-         [ "$business_non_import_price_history" = 0 ]; then
-        printf "FIXTURE_CLEAR_SAFE=YES\\n"
-      else
-        printf "FIXTURE_CLEAR_SAFE=NO\\n"
-      fi
     '
 }
 
@@ -413,14 +414,102 @@ deploy_release() {
     printf 'SOURCE_COMMIT=%s\n' "$release_commit"
     printf 'PREVIOUS_PROJECT=%s|STOPPED\n' "$previous_project_name"
     printf 'TARGET_PROJECT=%s|RUNNING\n' "$new_project_name"
-    printf 'EXPECTED_SCHEMA_VERSION=10\n'
-    printf 'HEALTH_READY=YES\n'
+    printf 'DEPLOYMENT_STATE=RUNNING_UNVALIDATED\n'
+    printf 'LOOPBACK_HEALTH_READY=YES\n'
   } >"$deploy_receipt"
   chmod 0600 "$deploy_receipt"
   printf 'Deployed v0.2.4 CH Core: %s\n' "$deploy_receipt"
 }
 
-[ "$#" -eq 1 ] || die 'Usage: ch-core-v024-nas-cutover.sh prepare|backup-restore|deploy'
+validate_release() {
+  require_regular_file "$deploy_receipt" 'v0.2.4 deploy receipt'
+  grep -qx "SOURCE_COMMIT=$release_commit" "$deploy_receipt" ||
+    die 'Deploy receipt source commit differs.'
+  grep -qx 'DEPLOYMENT_STATE=RUNNING_UNVALIDATED' "$deploy_receipt" ||
+    die 'Deploy receipt is not awaiting validation.'
+  [ ! -e "$validation_receipt" ] && [ ! -L "$validation_receipt" ] ||
+    die 'Validation receipt already exists or is unsafe.'
+
+  validation_token_file=${CH_CORE_V024_VALIDATION_TOKEN_FILE:-}
+  [ "$validation_token_file" = "$staging_root/.validation-bearer" ] ||
+    die 'CH_CORE_V024_VALIDATION_TOKEN_FILE must be the exact staged bearer path.'
+  require_regular_file "$validation_token_file" 'Validation bearer file'
+  chmod 0600 "$validation_token_file"
+  validation_token=$(tr -d '\r\n' <"$validation_token_file")
+  case "$validation_token" in
+    ''|*[!A-Za-z0-9_-]*) die 'Validation bearer has an invalid format.' ;;
+  esac
+  [ "${#validation_token}" -ge 32 ] || die 'Validation bearer is too short.'
+  unset validation_token
+
+  cd "$project_root"
+  schema_evidence=$(docker compose --project-name "$new_project_name-ops" --profile ops run --rm ch-core-ops \
+    /bin/sh -eu -c '
+      . /opt/ch-core-ops/database-common.sh
+      defaults=$(mktemp "${TMPDIR:-/tmp}/ch-core-schema.XXXXXX")
+      trap '\''rm -f -- "$defaults"'\'' EXIT HUP INT TERM
+      write_client_defaults "$defaults" CH_CORE_BACKUP_DATABASE_URL
+      database=$(database_name CH_CORE_BACKUP_DATABASE_URL backup)
+      mariadb_bin=$(database_binary CH_CORE_MARIADB_BIN mariadb)
+      count=$("$mariadb_bin" --defaults-extra-file="$defaults" --batch --skip-column-names "$database" -e "SELECT COUNT(*) FROM schema_migrations")
+      latest=$("$mariadb_bin" --defaults-extra-file="$defaults" --batch --skip-column-names "$database" -e "SELECT MAX(version) FROM schema_migrations")
+      [ "$count" = 10 ] || die "Applied migration count is not 10."
+      [ "$latest" = 10 ] || die "Latest migration version is not 10."
+      printf "APPLIED_MIGRATIONS=10\nLATEST_SCHEMA_VERSION=10\n"
+    ')
+  printf '%s\n' "$schema_evidence" | grep -qx 'APPLIED_MIGRATIONS=10' ||
+    die 'Measured migration count marker is missing.'
+  printf '%s\n' "$schema_evidence" | grep -qx 'LATEST_SCHEMA_VERSION=10' ||
+    die 'Measured latest migration marker is missing.'
+
+  public_base_url='https://192.168.50.14:8443'
+  ca_cert="$target_root/resources/ch-core-ca.pem"
+  require_regular_file "$ca_cert" 'CH Core CA certificate'
+  live_body=$(curl --fail --silent --show-error --cacert "$ca_cert" "$public_base_url/health/live")
+  ready_body=$(curl --fail --silent --show-error --cacert "$ca_cert" "$public_base_url/health/ready")
+  [ "$live_body" = '{"status":"ok"}' ] || die 'Public CA-validated live health failed.'
+  [ "$ready_body" = '{"status":"ready"}' ] || die 'Public CA-validated ready health failed.'
+
+  bootstrap_evidence=$(docker compose --project-name "$new_project_name" exec -T ch-core \
+    node -e '
+      let token = "";
+      process.stdin.setEncoding("utf8");
+      process.stdin.on("data", (chunk) => { token += chunk; });
+      process.stdin.on("end", async () => {
+        token = token.trim();
+        const response = await fetch("http://127.0.0.1:18080/v1/bootstrap", {
+          headers: { authorization: `Bearer ${token}` },
+          signal: AbortSignal.timeout(5000),
+        });
+        if (!response.ok) process.exit(1);
+        const body = await response.json();
+        if (body.apiSchemaVersion !== 2 || !Array.isArray(body.stockChecks)) process.exit(1);
+        console.log("AUTHENTICATED_BOOTSTRAP_V2=YES");
+        console.log(`STOCK_CHECKS_COUNT=${body.stockChecks.length}`);
+      });
+    ' <"$validation_token_file")
+  printf '%s\n' "$bootstrap_evidence" | grep -qx 'AUTHENTICATED_BOOTSTRAP_V2=YES' ||
+    die 'Authenticated bootstrap v2 marker is missing.'
+  stock_checks_count=$(printf '%s\n' "$bootstrap_evidence" | awk -F= '/^STOCK_CHECKS_COUNT=/{ print $2 }')
+  "$target_root/server/scripts/ch-core-v024-count-validator.sh" "$stock_checks_count"
+
+  umask 077
+  {
+    printf 'CH_CORE_V024_VALIDATION_V1\n'
+    printf 'TIME_WITA=%s\n' "$(TZ=Asia/Makassar date '+%Y-%m-%dT%H:%M:%S%z')"
+    printf 'SOURCE_COMMIT=%s\n' "$release_commit"
+    printf '%s\n' "$schema_evidence"
+    printf 'PUBLIC_HEALTH_LIVE=YES\n'
+    printf 'PUBLIC_HEALTH_READY=YES\n'
+    printf 'AUTHENTICATED_BOOTSTRAP_V2=YES\n'
+    printf 'STOCK_CHECKS_COUNT=%s\n' "$stock_checks_count"
+    printf 'DEPLOYMENT_ACCEPTED=YES\n'
+  } >"$validation_receipt"
+  chmod 0600 "$validation_receipt"
+  printf 'Validated v0.2.4 CH Core: %s\n' "$validation_receipt"
+}
+
+[ "$#" -eq 1 ] || die 'Usage: ch-core-v024-nas-cutover.sh prepare|backup-restore|deploy|validate'
 phase=$1
 require_root_and_approval
 load_release_context
@@ -429,5 +518,6 @@ case "$phase" in
   prepare) prepare_release ;;
   backup-restore) backup_and_restore ;;
   deploy) deploy_release ;;
-  *) die 'Usage: ch-core-v024-nas-cutover.sh prepare|backup-restore|deploy' ;;
+  validate) validate_release ;;
+  *) die 'Usage: ch-core-v024-nas-cutover.sh prepare|backup-restore|deploy|validate' ;;
 esac

@@ -33,10 +33,12 @@ function existing(
   archived = false,
   quantityPcs: unknown = '7',
   balanceRowVersion: unknown = '3',
+  identifierKind: unknown = 'primary',
 ): ExistingCatalogueRow {
   return {
     sku_id_hex: skuId.replaceAll('-', '').toUpperCase(),
     row_version: '2',
+    price_rupiah: '14000',
     balance_row_version: balanceRowVersion,
     quantity_pcs: quantityPcs,
     created_at: new Date('2026-07-29T02:00:00.000Z'),
@@ -44,6 +46,7 @@ function existing(
     archived_at: archived ? new Date('2026-07-30T02:00:00.000Z') : null,
     identifier_id_hex: identifierId.replaceAll('-', '').toUpperCase(),
     identifier_value: identifierValue,
+    identifier_kind: identifierKind,
     identifier_created_at: new Date('2026-07-29T02:01:00.000Z'),
   };
 }
@@ -142,6 +145,30 @@ describe('catalogue reconciliation', () => {
       untouchedExistingCount: 1,
     });
     expect(result.rows[0]?.existingSku).toMatchObject({ quantityPcs: '7' });
+  });
+
+  it('records every former primary that must be demoted for a new workbook primary', () => {
+    const productIdentifier = '67676767-6767-4767-8767-676767676767';
+    const result = reconcileCatalogue(
+      [source()],
+      [
+        existing(skuA, identifierA, 'OLD-PRIMARY', false, '7', '3', 'primary'),
+        existing(skuA, productIdentifier, '87000001', false, '7', '3', 'product_code'),
+      ],
+      uuidSequence(),
+    );
+
+    expect(result.rows[0]).toMatchObject({
+      skuId: skuA,
+      existingPrimaryIdentifier: false,
+      existingProductIdentifier: true,
+      demotedPrimaryIdentifiers: [
+        expect.objectContaining({
+          id: identifierA,
+          value: 'OLD-PRIMARY',
+        }),
+      ],
+    });
   });
 
   it('fails closed when a matched SKU has no tracked balance', () => {

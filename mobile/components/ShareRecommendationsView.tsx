@@ -93,7 +93,7 @@ export function ShareRecommendationsView({
   const [status, setStatus] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
   const report = useMemo(() => buildShareRecommendationReport(snapshot, recommendationDate(date)), [date, snapshot]);
   const groups = tab === 'daily' ? report.groups : groupShareRecommendationItems(report.urgent);
-  const pdfPlan = useMemo(() => buildRecommendationPdfPlan(report, tab), [report, tab]);
+  const pdfPlan = useMemo(() => buildRecommendationPdfPlan(report, tab, coreBacked), [coreBacked, report, tab]);
 
   async function sharePdf() {
     setSharingPdf(true);

@@ -61,7 +61,7 @@ test('hydrates 300 products with two workers without retaining original large da
   }));
   const plan: RecommendationPdfPlan = {
     date: '2026-08-04',
-    demoLabel: 'DATA DEMO · SESSION ONLY',
+    sourceLabel: 'DATA DEMO · SESSION ONLY',
     fileName: 'bounded.pdf',
     groups: [{
       supplierLabel: 'SUP',

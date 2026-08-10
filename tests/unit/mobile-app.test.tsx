@@ -380,6 +380,11 @@ test('offline Core secondary routes and PDF payloads use phase-derived copy', as
     1,
     expect.objectContaining({ shareText: 'CH Core · Data · Offline' }),
   );
+  const recommendationPdfSource = Buffer.from(
+    await sharePdf.mock.calls[0]![0].blob.arrayBuffer(),
+  ).toString('latin1');
+  expect(recommendationPdfSource).toContain('CH CORE');
+  expect(recommendationPdfSource).not.toContain('DATA DEMO');
 
   fireEvent.click(screen.getByRole('button', { name: 'Lainnya' }));
   fireEvent.click(screen.getByRole('button', { name: 'Ekspor Data PDF' }));

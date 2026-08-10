@@ -53,7 +53,7 @@ test('builds a public daily catalogue plan without warehouse fields', () => {
     title: 'Rekomendasi Harian',
     totalAvailable: 2,
     totalIncluded: 2,
-    demoLabel: 'DATA DEMO · SESSION ONLY',
+    sourceLabel: 'DATA DEMO · SESSION ONLY',
   });
   expect(plan.groups.map((group) => group.supplierLabel)).toEqual(['CH009', 'Tanpa kode supplier']);
   expect(plan.groups[0]?.products[0]).toEqual({
@@ -64,6 +64,17 @@ test('builds a public daily catalogue plan without warehouse fields', () => {
     skuNumber: 'SKU-001',
   });
   expect(JSON.stringify(plan)).not.toMatch(/stock|idleDays|lastOutAt|Catatan internal/i);
+});
+
+test('marks a CH Core recommendation catalogue as operational instead of demo data', () => {
+  const plan = buildRecommendationPdfPlan(
+    report([recommendation(1)]),
+    'daily',
+    true,
+  );
+
+  expect(plan.sourceLabel).toBe('CH CORE · DATA OPERASIONAL');
+  expect(JSON.stringify(plan)).not.toContain('DATA DEMO · SESSION ONLY');
 });
 
 test('caps an urgent PDF at 300 products and reports the full urgent count', () => {

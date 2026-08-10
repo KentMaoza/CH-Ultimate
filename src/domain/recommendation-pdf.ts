@@ -21,9 +21,9 @@ export interface RecommendationPdfGroup {
 
 export interface RecommendationPdfPlan {
   date: string;
-  demoLabel: 'DATA DEMO · SESSION ONLY';
   fileName: string;
   groups: RecommendationPdfGroup[];
+  sourceLabel: string;
   title: 'Rekomendasi Harian' | 'SKU Urgent';
   totalAvailable: number;
   totalIncluded: number;
@@ -45,6 +45,7 @@ const CARD_WIDTH = 60;
 export function buildRecommendationPdfPlan(
   report: ShareRecommendationReport,
   mode: RecommendationPdfMode,
+  coreBacked = false,
 ): RecommendationPdfPlan {
   const available = mode === 'daily' ? report.daily : report.urgent;
   const selected = available.slice(0, MAX_PDF_PRODUCTS);
@@ -62,9 +63,9 @@ export function buildRecommendationPdfPlan(
   const fileNameTitle = mode === 'daily' ? 'Rekomendasi-Harian' : 'SKU-Urgent';
   return {
     date: report.date,
-    demoLabel: 'DATA DEMO · SESSION ONLY',
     fileName: `CHU-${fileNameTitle}-${report.date}.pdf`,
     groups,
+    sourceLabel: coreBacked ? 'CH CORE · DATA OPERASIONAL' : 'DATA DEMO · SESSION ONLY',
     title,
     totalAvailable: available.length,
     totalIncluded: selected.length,
@@ -126,7 +127,7 @@ function drawPageHeader(doc: jsPDF, plan: RecommendationPdfPlan): void {
   doc.text(`Tanggal ${plan.date} · ${plan.totalIncluded} dari ${plan.totalAvailable} SKU`, 33, 22);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7);
-  doc.text(plan.demoLabel, PAGE_WIDTH - PAGE_MARGIN, 15, { align: 'right' });
+  doc.text(plan.sourceLabel, PAGE_WIDTH - PAGE_MARGIN, 15, { align: 'right' });
   doc.setDrawColor(17, 17, 17);
   doc.setLineWidth(0.6);
   doc.line(PAGE_MARGIN, 30, PAGE_WIDTH - PAGE_MARGIN, 30);
@@ -208,7 +209,7 @@ export async function createRecommendationPdfBlob(
   const doc = new JsPdf({ compress: false, format: 'a4', orientation: 'portrait', unit: 'mm' });
   doc.setProperties({
     creator: 'CH Ultimate',
-    subject: plan.demoLabel,
+    subject: plan.sourceLabel,
     title: `${plan.title} · ${plan.date}`,
   });
   drawPageHeader(doc, plan);

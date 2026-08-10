@@ -5,6 +5,22 @@ import type { Sku } from '../../src/domain/types';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 import { App } from '../../src/renderer/App';
 
+function coreGateway() {
+  const gateway = new MockOperationsGateway(createRecommendationState);
+  gateway.getSyncSnapshot = () => ({
+    phase: 'online',
+    trustedV2Bootstrap: true,
+    serverRevision: '1',
+    pendingCount: 0,
+    conflictCount: 0,
+  });
+  return gateway;
+}
+
+async function pdfSource(blob: Blob): Promise<string> {
+  return Buffer.from(await blob.arrayBuffer()).toString('latin1');
+}
+
 function sku(id: string, name: string, createdAt: string, stock = 1): Sku {
   return { id, skuNumber: `SKU-${id}`, aliases: [], identifiers: [], name, referencePrice: 25_000, stock, tracked: true, note: '', imageUrl: '', createdAt, archived: false };
 }
@@ -84,4 +100,27 @@ test('downloads one PDF for the active recommendation tab with a stable filename
   expect(downloadedName).toBe('CHU-SKU-Urgent-2026-07-23.pdf');
   expect(revokeObjectURL).toHaveBeenCalledWith('blob:recommendations');
   expect(await screen.findByRole('status')).toHaveTextContent('PDF SKU Urgent berhasil diunduh.');
+});
+
+test('core-backed desktop download embeds an operational source label instead of demo copy', async () => {
+  let downloadedBlob: Blob | undefined;
+  Object.defineProperty(URL, 'createObjectURL', {
+    configurable: true,
+    value: vi.fn((blob: Blob) => {
+      downloadedBlob = blob;
+      return 'blob:core-recommendations';
+    }),
+  });
+  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+  render(<App gateway={coreGateway()} coreBacked />);
+  fireEvent.click(screen.getByRole('button', { name: 'Rekomendasi Share' }));
+  vi.useRealTimers();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Download PDF Harian' }));
+
+  await waitFor(() => expect(downloadedBlob).toBeInstanceOf(Blob));
+  const source = await pdfSource(downloadedBlob!);
+  expect(source).toContain('CH CORE');
+  expect(source).not.toContain('DATA DEMO');
 });

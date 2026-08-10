@@ -53,7 +53,7 @@ function RecommendationGroups({ groups, gateway }: { groups: ShareRecommendation
   })}</div>;
 }
 
-export function ShareRecommendationsPage() {
+export function ShareRecommendationsPage({ coreBacked = false }: { coreBacked?: boolean }) {
   const { state, gateway } = useOperations();
   const [tab, setTab] = useState<RecommendationTab>('daily');
   const [date, setDate] = useState(witaDateToday);
@@ -61,7 +61,7 @@ export function ShareRecommendationsPage() {
   const [downloading, setDownloading] = useState(false);
   const report = useMemo(() => buildShareRecommendationReport(state, recommendationDate(date)), [date, state]);
   const groups = tab === 'daily' ? report.groups : groupShareRecommendationItems(report.urgent);
-  const pdfPlan = useMemo(() => buildRecommendationPdfPlan(report, tab), [report, tab]);
+  const pdfPlan = useMemo(() => buildRecommendationPdfPlan(report, tab, coreBacked), [coreBacked, report, tab]);
 
   async function downloadPdf() {
     setDownloading(true);

@@ -317,6 +317,82 @@ test('Nota title case and empty-stock restock planning stay frontend-only', asyn
   }
 });
 
+test('restock recommendation flows from completed sales into a contained A4 report without changing stock', async () => {
+  const { application, window } = await launch();
+  try {
+    await openNota(window);
+    await finishNota(window);
+    await window.getByRole('button', { name: 'Kembali ke CH Ultimate' }).click();
+    await expect(window.getByTestId('sku-stock-sku-1')).toHaveText('23');
+
+    await window.getByRole('button', { name: 'Barang Kosong' }).click();
+    const recommendations = window.getByTestId('restock-recommendations');
+    await expect(recommendations).toContainText('Beras Hitam Premium 1 kg');
+    await expect(recommendations).toContainText('Laris dan cepat terjual');
+    await recommendations.getByRole('button', { name: 'Masukkan BRS-108-BLK ke laporan' }).click();
+
+    const quantity = window.getByRole('textbox', { name: 'Jumlah restock BRS-108-BLK' });
+    await expect(quantity).toHaveValue('0');
+    await quantity.focus();
+    await quantity.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+    await quantity.pressSequentially('12');
+    await quantity.press('Backspace');
+    await expect(quantity).toHaveValue('1');
+
+    const capturedLayout = window.evaluate(() => new Promise<{
+      page: { left: number; top: number; right: number; bottom: number };
+      cards: Array<{ left: number; top: number; right: number; bottom: number }>;
+      copies: Array<{ left: number; top: number; right: number; bottom: number }>;
+      text: string;
+    }>((resolve) => {
+      const capture = () => {
+        const host = document.querySelector<HTMLElement>('[data-testid="print-document-host"]');
+        const page = host?.querySelector<HTMLElement>('[data-testid="output-restock-page"]');
+        if (!host || !page) return false;
+        const box = (element: Element) => {
+          const rect = element.getBoundingClientRect();
+          return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+        };
+        requestAnimationFrame(() => resolve({
+          page: box(page),
+          cards: [...host.querySelectorAll('[data-testid="output-restock-card"]')].map(box),
+          copies: [...host.querySelectorAll('.output-document__restock-copy')].map(box),
+          text: host.textContent ?? '',
+        }));
+        return true;
+      };
+      if (capture()) return;
+      const observer = new MutationObserver(() => {
+        if (!capture()) return;
+        observer.disconnect();
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    }));
+    await window.getByRole('button', { name: 'Simpan PDF rekomendasi restock' }).click();
+    const layout = await capturedLayout;
+
+    expect(layout.cards).toHaveLength(1);
+    for (const rect of [...layout.cards, ...layout.copies]) {
+      expect(rect.left).toBeGreaterThanOrEqual(layout.page.left);
+      expect(rect.top).toBeGreaterThanOrEqual(layout.page.top);
+      expect(rect.right).toBeLessThanOrEqual(layout.page.right);
+      expect(rect.bottom).toBeLessThanOrEqual(layout.page.bottom);
+    }
+    expect(layout.text).toContain('Beras Hitam Premium 1 kg');
+    expect(layout.text).toContain('1 pcs');
+    expect(layout.text).not.toContain('BRS-108-BLK');
+    expect(layout.text).not.toContain('Stok saat ini');
+    await expect(window.getByRole('status')).toContainText('PDF rekomendasi restock berhasil disimpan.');
+
+    await window.getByRole('button', { name: 'Keluarkan BRS-108-BLK dari laporan' }).click();
+    await expect(window.getByTestId('empty-report-preview')).not.toContainText('Beras Hitam Premium 1 kg');
+    await window.getByRole('button', { name: 'SKU Gudang' }).click();
+    await expect(window.getByTestId('sku-stock-sku-1')).toHaveText('23');
+  } finally {
+    await application.close();
+  }
+});
+
 test('Template Label and Invoice configures a movable session-only invoice preview', async () => {
   const { application, window } = await launch();
   try {

@@ -85,6 +85,27 @@ describe('SKU sales history', () => {
     });
   });
 
+  test('does not keep a cancelled sale as the latest effective sale date', () => {
+    const rows = [
+      lifecyclePosting({ id: 'kept', notaId: 'nota-kept', kind: 'complete', quantity: 3, lifecycleVersion: '2', postedAt: '2026-08-01T02:00:00.000Z' }),
+      lifecyclePosting({ id: 'cancelled-complete', notaId: 'nota-cancelled', kind: 'complete', quantity: 4, lifecycleVersion: '2', postedAt: '2026-08-05T02:00:00.000Z' }),
+      lifecyclePosting({ id: 'cancelled-reversal', notaId: 'nota-cancelled', kind: 'cancel_reversal', quantity: 4, lifecycleVersion: '3', postedAt: '2026-08-06T02:00:00.000Z' }),
+    ];
+
+    const history = buildSkuSalesHistory(
+      stateWithPostings(rows),
+      new Date('2026-08-11T02:00:00.000Z'),
+    ).get(SKU_ID);
+
+    expect(history).toEqual({
+      skuId: SKU_ID,
+      lifetimeSoldPieces: 3,
+      soldPieces30: 3,
+      soldPieces60: 3,
+      lastEffectiveSaleAt: '2026-08-01T02:00:00.000Z',
+    });
+  });
+
   test('includes exact WITA D-29 and D-59 boundaries and excludes one second before them', () => {
     const rows = [
       lifecyclePosting({ id: 'd29-in', notaId: 'nota-d29-in', kind: 'complete', quantity: 2, lifecycleVersion: '2', postedAt: '2026-07-12T16:00:00.000Z' }),

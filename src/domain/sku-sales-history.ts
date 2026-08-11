@@ -10,8 +10,10 @@ export interface SkuSalesHistory {
 }
 
 interface SalesEvent {
+  notaId: string;
   postedAt: string;
   piecesBySku: Map<string, number>;
+  effectivePiecesBySku?: Map<string, number>;
 }
 
 function witaDateKey(value: string | Date): string {
@@ -36,6 +38,12 @@ function addLines(target: Map<string, number>, lines: NotaLine[], direction = 1)
     if (!item.skuId) continue;
     target.set(item.skuId, (target.get(item.skuId) ?? 0) + (linePieces(item) * direction));
   }
+}
+
+function snapshotLines(lines: NotaLine[]): Map<string, number> {
+  const result = new Map<string, number>();
+  addLines(result, lines);
+  return result;
 }
 
 function previousEffectivePosting(
@@ -70,10 +78,19 @@ function postingEvents(state: DemoState): SalesEvent[] {
   const postingById = new Map(postings.map((posting) => [posting.id, posting]));
   return (state.revenuePostings ?? []).flatMap((revenue) => {
     const posting = postingById.get(revenue.notaPostingId);
-    return posting ? [{
+    if (!posting) return [];
+    const replacesEffectiveSnapshot = posting.postingKind.includes('reversal') ||
+      ['complete', 'recomplete', 'restore'].includes(posting.postingKind);
+    return [{
+      notaId: posting.notaId,
       postedAt: revenue.postedAt,
       piecesBySku: postingPieces(postings, posting),
-    }] : [];
+      effectivePiecesBySku: replacesEffectiveSnapshot
+        ? posting.postingKind.includes('reversal')
+          ? new Map()
+          : snapshotLines(posting.lines)
+        : undefined,
+    }];
   });
 }
 
@@ -87,7 +104,12 @@ function transactionEvents(state: DemoState): SalesEvent[] {
         .filter((page) => page.status === 'active')
         .flatMap((page) => page.lines),
     );
-    return [{ postedAt: transaction.completedAt, piecesBySku }];
+    return [{
+      notaId: transaction.id,
+      postedAt: transaction.completedAt,
+      piecesBySku,
+      effectivePiecesBySku: new Map(piecesBySku),
+    }];
   });
 }
 
@@ -101,11 +123,21 @@ export function buildSkuSalesHistory(
   const authoritative = state.notaPostings !== undefined && state.revenuePostings !== undefined;
   const events = authoritative ? postingEvents(state) : transactionEvents(state);
   const result = new Map<string, SkuSalesHistory>();
+  const effectiveSnapshots = new Map<string, {
+    postedAt: string;
+    piecesBySku: Map<string, number>;
+  }>();
 
   for (const event of events.sort((left, right) =>
     left.postedAt.localeCompare(right.postedAt))) {
     const eventDate = witaDateKey(event.postedAt);
     if (eventDate > reportDate) continue;
+    if (event.effectivePiecesBySku !== undefined) {
+      effectiveSnapshots.set(event.notaId, {
+        postedAt: event.postedAt,
+        piecesBySku: event.effectivePiecesBySku,
+      });
+    }
     for (const [skuId, pieces] of event.piecesBySku) {
       if (pieces === 0) continue;
       const current = result.get(skuId) ?? {
@@ -118,8 +150,18 @@ export function buildSkuSalesHistory(
       current.lifetimeSoldPieces += pieces;
       if (eventDate >= start60) current.soldPieces60 += pieces;
       if (eventDate >= start30) current.soldPieces30 += pieces;
-      if (pieces > 0) current.lastEffectiveSaleAt = event.postedAt;
       result.set(skuId, current);
+    }
+  }
+
+  for (const snapshot of effectiveSnapshots.values()) {
+    for (const [skuId, pieces] of snapshot.piecesBySku) {
+      if (pieces <= 0) continue;
+      const current = result.get(skuId);
+      if (
+        current &&
+        (!current.lastEffectiveSaleAt || snapshot.postedAt > current.lastEffectiveSaleAt)
+      ) current.lastEffectiveSaleAt = snapshot.postedAt;
     }
   }
 

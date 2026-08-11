@@ -108,7 +108,7 @@ export const notaLineValue = z
       });
     }
   });
-const notaLineBaseValue = notaLineValue.safeExtend({
+const notaLineDraftValue = notaLineValue.safeExtend({
   description: z.string().max(512),
   quantity: safeInteger.min(0),
 });
@@ -118,8 +118,8 @@ export const updateLineBody = z
     lifecycleVersion: version,
     pageVersion: version,
     lineVersion: nullableVersion,
-    base: notaLineBaseValue.nullable(),
-    mine: notaLineValue,
+    base: notaLineDraftValue.nullable(),
+    mine: notaLineDraftValue,
   })
   .strict()
   .refine(
@@ -132,7 +132,7 @@ export const deleteLineBody = z
     lifecycleVersion: version,
     pageVersion: version,
     lineVersion: version,
-    base: notaLineValue,
+    base: notaLineDraftValue,
   })
   .strict();
 

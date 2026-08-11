@@ -78,6 +78,21 @@ function withLineDescription(
   };
 }
 
+function withLineQuantity(
+  transaction: NotaTransaction,
+  quantity: number,
+): NotaTransaction {
+  return {
+    ...transaction,
+    pages: transaction.pages.map((page) => ({
+      ...page,
+      lines: page.lines.map((line) =>
+        line.id === LINE_ID ? { ...line, quantity } : line,
+      ),
+    })),
+  };
+}
+
 function renderCoreNota() {
   const transport = new ScriptedTransport();
   const storage = new MemoryStorage();
@@ -104,6 +119,91 @@ function renderCoreNota() {
 }
 
 describe('Core-backed Nota typing', () => {
+  it('buffers rapid line typing locally and sends only the final value after blur', async () => {
+    const { gateway, storage, transport } = await renderCoreNota();
+    const initial = gateway.getSnapshot().notaTransactions[0]!;
+    const mutationStarted = deferred<void>();
+    const mutationResponse = deferred<{ status: number; body: unknown }>();
+    transport.enqueue((request) => {
+      mutationStarted.resolve();
+      expect(request.body).toMatchObject({
+        mine: { description: 'Produk Core Baru' },
+      });
+      return mutationResponse.promise;
+    });
+    transport.enqueue(emptyPoll('2'));
+    const savesBeforeTyping = storage.saves.length;
+    const description = screen.getByLabelText('Nama barang baris 1');
+
+    act(() => description.focus());
+    fireEvent.change(description, { target: { value: 'produk core b' } });
+    fireEvent.change(description, { target: { value: 'produk core ba' } });
+    fireEvent.change(description, { target: { value: 'produk core baru' } });
+    await act(async () => { await Promise.resolve(); });
+
+    expect(description).toHaveValue('Produk Core Baru');
+    expect(
+      transport.requests.filter((request) => request.path.includes('/lines/')),
+    ).toHaveLength(0);
+    expect(storage.saves).toHaveLength(savesBeforeTyping);
+
+    fireEvent.blur(description);
+    await mutationStarted.promise;
+    expect(
+      transport.requests.filter((request) => request.path.includes('/lines/')),
+    ).toHaveLength(1);
+    mutationResponse.resolve(
+      acknowledgement(
+        withLineDescription(initial, 'Produk Core Baru'),
+        '2',
+        '1',
+        '2',
+      ),
+    );
+    await waitFor(() => expect(storage.saves.at(-1)?.outbox).toEqual([]));
+    expect(description).toHaveValue('Produk Core Baru');
+    gateway.dispose();
+  });
+
+  it('buffers rapid numeric typing locally and sends one final quantity after blur', async () => {
+    const { gateway, storage, transport } = await renderCoreNota();
+    const initial = gateway.getSnapshot().notaTransactions[0]!;
+    const mutationStarted = deferred<void>();
+    const mutationResponse = deferred<{ status: number; body: unknown }>();
+    transport.enqueue((request) => {
+      mutationStarted.resolve();
+      expect(request.body).toMatchObject({ mine: { quantity: 234 } });
+      return mutationResponse.promise;
+    });
+    transport.enqueue(emptyPoll('2'));
+    const savesBeforeTyping = storage.saves.length;
+    const quantity = screen.getByLabelText('Jumlah baris 1');
+
+    act(() => quantity.focus());
+    fireEvent.change(quantity, { target: { value: '2' } });
+    fireEvent.change(quantity, { target: { value: '23' } });
+    fireEvent.change(quantity, { target: { value: '234' } });
+    await act(async () => { await Promise.resolve(); });
+
+    expect(quantity).toHaveValue('234');
+    expect(
+      transport.requests.filter((request) => request.path.includes('/lines/')),
+    ).toHaveLength(0);
+    expect(storage.saves).toHaveLength(savesBeforeTyping);
+
+    fireEvent.blur(quantity);
+    await mutationStarted.promise;
+    expect(
+      transport.requests.filter((request) => request.path.includes('/lines/')),
+    ).toHaveLength(1);
+    mutationResponse.resolve(
+      acknowledgement(withLineQuantity(initial, 234), '2', '1', '2'),
+    );
+    await waitFor(() => expect(storage.saves.at(-1)?.outbox).toEqual([]));
+    expect(quantity).toHaveValue('234');
+    gateway.dispose();
+  });
+
   it('keeps the customer field focused and enabled while characters wait for the LAN', async () => {
     const { gateway, storage, transport } = await renderCoreNota();
     const initial = gateway.getSnapshot().notaTransactions[0]!;

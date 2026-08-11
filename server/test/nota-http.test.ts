@@ -139,6 +139,97 @@ describe('Nota HTTP boundary', () => {
 
   it.each([
     {
+      description: 'Produk Uji',
+      kind: '',
+    },
+    {
+      description: '',
+      kind: 'Ukuran Besar',
+    },
+  ])('accepts an in-progress Nota line while the operator is still typing', async ({ description, kind }) => {
+    const { app, nota } = harness();
+    const payload = {
+      lifecycleVersion: '1',
+      pageVersion: '1',
+      lineVersion: '1',
+      base: {
+        linePosition: 0,
+        skuId: null,
+        description: '',
+        kind: '',
+        quantity: 0,
+        unit: 'pcs',
+        pcsPrice: 0,
+        lsnPrice: 0,
+      },
+      mine: {
+        linePosition: 0,
+        skuId: null,
+        description,
+        kind,
+        quantity: 0,
+        unit: 'pcs',
+        pcsPrice: 0,
+        lsnPrice: 0,
+      },
+    };
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/v1/notas/${NOTA_ID}/pages/${PAGE_ID}/lines/${LINE_ID}`,
+      headers,
+      payload,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(nota.updateLine).toHaveBeenCalledWith(
+      { deviceId: DEVICE_ID, idempotencyKey: KEY },
+      NOTA_ID,
+      PAGE_ID,
+      LINE_ID,
+      payload,
+    );
+    await app.close();
+  });
+
+  it('accepts clearing a partially typed Nota line', async () => {
+    const { app, nota } = harness();
+    const payload = {
+      lifecycleVersion: '1',
+      pageVersion: '1',
+      lineVersion: '2',
+      base: {
+        linePosition: 0,
+        skuId: null,
+        description: 'Produk Uji',
+        kind: '',
+        quantity: 0,
+        unit: 'pcs',
+        pcsPrice: 0,
+        lsnPrice: 0,
+      },
+    };
+
+    const response = await app.inject({
+      method: 'DELETE',
+      url: `/v1/notas/${NOTA_ID}/pages/${PAGE_ID}/lines/${LINE_ID}`,
+      headers,
+      payload,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(nota.deleteLine).toHaveBeenCalledWith(
+      { deviceId: DEVICE_ID, idempotencyKey: KEY },
+      NOTA_ID,
+      PAGE_ID,
+      LINE_ID,
+      payload,
+    );
+    await app.close();
+  });
+
+  it.each([
+    {
       method: 'POST',
       url: `/v1/notas/${NOTA_ID}/pages`,
       payload: { lifecycleVersion: '1', structureVersion: '1' },

@@ -8,6 +8,7 @@ import { WarehouseSkuPanel } from './WarehouseSkuPanel';
 
 const numberFormat = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 });
 const fields = ['description', 'kind', 'quantity', 'pcs', 'lsn', 'pcsPrice', 'lsnPrice', 'total'];
+const INPUT_COMMIT_DELAY_MS = 500;
 
 function format(value: number) { return numberFormat.format(value); }
 function normalizePrice(value: string) {
@@ -22,6 +23,53 @@ function validInteger(value: string, positive: boolean) {
 }
 function blank(line: NotaLine) { return !line.skuId && !line.description && !line.kind && !line.quantity && !line.pcsPrice && !line.lsnPrice; }
 export interface NotaGridHandle { focusField(lineId: string, field: NotaNumericField): void; }
+
+function BufferedNotaTextInput({
+  ariaLabel,
+  rowIndex,
+  field,
+  value,
+  disabled,
+  onCommit,
+}: {
+  ariaLabel: string;
+  rowIndex: number;
+  field: 'description' | 'kind';
+  value: string;
+  disabled: boolean;
+  onCommit: (value: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  const committed = useRef(value);
+  const timer = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    const previous = committed.current;
+    committed.current = value;
+    setDraft((current) => current === previous ? value : current);
+  }, [value]);
+  useEffect(() => {
+    if (draft === value) return;
+    timer.current = window.setTimeout(() => onCommit(draft), INPUT_COMMIT_DELAY_MS);
+    return () => window.clearTimeout(timer.current);
+  }, [draft, onCommit, value]);
+
+  const commitNow = () => {
+    window.clearTimeout(timer.current);
+    if (draft !== value) onCommit(draft);
+  };
+
+  return <input
+    aria-label={ariaLabel}
+    data-grid-editable
+    data-row-index={rowIndex}
+    data-field={field}
+    disabled={disabled}
+    value={draft}
+    onChange={(event) => setDraft(formatTitleCaseInput(event.currentTarget))}
+    onBlur={commitNow}
+  />;
+}
 
 export const NotaGrid = forwardRef<NotaGridHandle, {
   lines: NotaLine[];
@@ -42,10 +90,14 @@ export const NotaGrid = forwardRef<NotaGridHandle, {
   const pendingCaret = useRef<{ key: string; digits: number } | null>(null);
   const numericOnFocus = useRef<Record<string, number>>({});
   const suppressVoiceCommit = useRef<string | null>(null);
+  const numericCommitTimers = useRef<Record<string, number>>({});
   const firstBlankRow = lines.findIndex(blank);
   const targetRow = selectedRow ?? firstBlankRow;
 
   useEffect(() => { setSelectedRow(null); setPanelMessage(''); }, [suffix]);
+  useEffect(() => () => {
+    Object.values(numericCommitTimers.current).forEach((timer) => window.clearTimeout(timer));
+  }, []);
 
   useLayoutEffect(() => {
     const pending = pendingCaret.current;
@@ -91,7 +143,14 @@ export const NotaGrid = forwardRef<NotaGridHandle, {
     setRaw((current) => ({ ...current, [key]: nextValue }));
     const valid = normalized !== null && validInteger(nextValue, positive);
     onInvalidChange(line.id, field, valid ? null : value);
-    if (valid) onUpdate(line, { [field]: nextValue ? Number(nextValue) : 0 });
+    window.clearTimeout(numericCommitTimers.current[key]);
+    if (valid) {
+      const committedValue = nextValue ? Number(nextValue) : 0;
+      numericCommitTimers.current[key] = window.setTimeout(() => {
+        delete numericCommitTimers.current[key];
+        if (line[field] !== committedValue) onUpdate(line, { [field]: committedValue });
+      }, INPUT_COMMIT_DELAY_MS);
+    }
   }
   function numericFocus(line: NotaLine, field: NotaNumericField, value: string) {
     const key = `${line.id}:${field}`;
@@ -101,6 +160,8 @@ export const NotaGrid = forwardRef<NotaGridHandle, {
   }
   function numericBlur(line: NotaLine, field: NotaNumericField, value: string, rowIndex?: number, nextTarget?: EventTarget | null) {
     const key = `${line.id}:${field}`;
+    window.clearTimeout(numericCommitTimers.current[key]);
+    delete numericCommitTimers.current[key];
     setFocusedNumericField((current) => current === key ? null : current);
     const focusedValue = numericOnFocus.current[key];
     delete numericOnFocus.current[key];
@@ -108,8 +169,10 @@ export const NotaGrid = forwardRef<NotaGridHandle, {
     const suppress = suppressVoiceCommit.current === line.id || (nextTarget instanceof Element && nextTarget.closest('[data-nota-delete]'));
     if (suppress) suppressVoiceCommit.current = null;
     const normalized = field === 'quantity' ? value : normalizePrice(value);
-    if (normalized === null || !/^\d+$/.test(normalized)) return;
-    const committedValue = Number(normalized);
+    if (normalized === null || !validInteger(normalized, field === 'quantity')) return;
+    const committedValue = normalized ? Number(normalized) : 0;
+    if (line[field] !== committedValue) onUpdate(line, { [field]: committedValue });
+    if (!/^\d+$/.test(normalized)) return;
     const changed = focusedValue !== undefined && focusedValue !== committedValue;
     const activePriceField: NotaNumericField = line.unit === 'lsn' ? 'lsnPrice' : 'pcsPrice';
     const relevantPriceCommit = field === activePriceField || (line.unit === 'lsn' && field === 'pcsPrice');
@@ -198,9 +261,9 @@ export const NotaGrid = forwardRef<NotaGridHandle, {
         const linkedSku = skus.find((sku) => sku.id === line.skuId);
         return <tr key={line.id} data-testid={`nota-grid-row-${number}`} className={targetRow === index ? 'chu-nota-workspace__row--target' : undefined} onFocusCapture={() => setSelectedRow(index)} onMouseDown={() => setSelectedRow(index)}>
           <td>{number}{suffix}</td>
-          <td className="chu-nota-workspace__sku-cell"><input aria-label={`Nama barang baris ${number}`} data-grid-editable data-row-index={index} data-field="description" disabled={!editable || busy} value={line.description} onChange={(event) => onUpdate(line, { description: formatTitleCaseInput(event.currentTarget), skuId: undefined })} />{linkedSku && <span className="chu-nota-workspace__linked-sku">{linkedSku.skuNumber}</span>}
+          <td className="chu-nota-workspace__sku-cell"><BufferedNotaTextInput ariaLabel={`Nama barang baris ${number}`} rowIndex={index} field="description" disabled={!editable || busy} value={line.description} onCommit={(description) => onUpdate(line, { description, skuId: undefined })} />{linkedSku && <span className="chu-nota-workspace__linked-sku">{linkedSku.skuNumber}</span>}
           </td>
-          <td><input aria-label={`Jenis baris ${number}`} data-grid-editable data-row-index={index} data-field="kind" disabled={!editable || busy} value={line.kind} onChange={(event) => onUpdate(line, { kind: formatTitleCaseInput(event.currentTarget) })} /></td>
+          <td><BufferedNotaTextInput ariaLabel={`Jenis baris ${number}`} rowIndex={index} field="kind" disabled={!editable || busy} value={line.kind} onCommit={(kind) => onUpdate(line, { kind })} /></td>
           <td><input aria-label={`Jumlah baris ${number}`} inputMode="numeric" data-grid-editable data-line-id={line.id} data-row-index={index} data-field="quantity" disabled={!editable || busy} value={fieldValue(line, 'quantity')} aria-invalid={!numericValid(line, 'quantity') || undefined} onFocus={(event) => numericFocus(line, 'quantity', event.currentTarget.value)} onBlur={(event) => numericBlur(line, 'quantity', event.currentTarget.value, index, event.relatedTarget)} onChange={(event) => numericChange(line, 'quantity', event.target.value)} /></td>
           <td><button className={line.unit === 'pcs' ? 'chu-nota-workspace__unit--selected' : undefined} aria-label={`PCS baris ${number}`} aria-pressed={line.unit === 'pcs'} data-grid-editable data-row-index={index} data-field="pcs" disabled={!editable || busy} onClick={() => onUpdate(line, { unit: 'pcs' as Unit })} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); onUpdate(line, { unit: 'pcs' as Unit }); } }}>PCS</button></td>
           <td><button className={line.unit === 'lsn' ? 'chu-nota-workspace__unit--selected' : undefined} aria-label={`LSN baris ${number}`} aria-pressed={line.unit === 'lsn'} data-grid-editable data-row-index={index} data-field="lsn" disabled={!editable || busy} onClick={() => onUpdate(line, { unit: 'lsn' as Unit })} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); onUpdate(line, { unit: 'lsn' as Unit }); } }}>LSN</button></td>

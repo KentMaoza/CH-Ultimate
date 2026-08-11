@@ -49,7 +49,9 @@ test('first active price commit and later quantity revision speak the complete P
   const player = voice.players[0]!;
   const page = gateway.getSnapshot().notaTransactions[0]!.pages[0]!;
   const row = page.lines[2]!;
-  fireEvent.change(screen.getByLabelText('Nama barang baris 3'), { target: { value: 'Kopi' } });
+  const name = screen.getByLabelText('Nama barang baris 3');
+  fireEvent.change(name, { target: { value: 'Kopi' } });
+  fireEvent.blur(name);
 
   commitQuantity(3, '2');
   expect(player.speak).not.toHaveBeenCalled();

@@ -51,6 +51,25 @@ test('trusted Nota host renders invoice identity, content, and a prominent draft
   expect(host).toHaveTextContent('CHU-20260804-0001A');
 });
 
+test('trusted host defines the exact logical page size for the native print pipeline', () => {
+  const plan = notaPlan();
+  const { rerender } = render(<PrintDocumentHost plan={plan} />);
+
+  expect(screen.getByTestId('output-page-style')).toHaveTextContent(
+    `@page { size: ${plan.widthMm}mm ${plan.heightMm}mm; margin: 0; }`,
+  );
+
+  const state = createInitialState();
+  const a4Plan = buildLabelDocumentPlan(state.skus[0]!, {
+    ...state.labelTemplate,
+    medium: 'a4',
+  }, 1);
+  rerender(<PrintDocumentHost plan={a4Plan} />);
+  expect(screen.getByTestId('output-page-style')).toHaveTextContent(
+    '@page { size: 210mm 297mm; margin: 0; }',
+  );
+});
+
 test('completed host has no draft marker', () => {
   render(<PrintDocumentHost plan={notaPlan('completed')} />);
   expect(screen.queryByText('DRAF')).not.toBeInTheDocument();

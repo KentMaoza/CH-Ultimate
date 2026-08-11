@@ -191,6 +191,9 @@ export function PrintDocumentHost({ plan }: { plan: OutputDocumentPlan }) {
     data-document-kind={plan.kind}
     aria-hidden="true"
   >
+    <style data-testid="output-page-style">{
+      `@page { size: ${plan.widthMm}mm ${plan.heightMm}mm; margin: 0; }`
+    }</style>
     {content}
   </div>;
 }

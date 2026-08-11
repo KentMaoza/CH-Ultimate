@@ -12,6 +12,7 @@ import type {
   UpdateHeaderRequest,
   UpdateLineRequest,
 } from './validation.js';
+import { notaLineValue } from './validation.js';
 
 import { writeOperationAudit, writeOperationChange } from '../catalogue/mariadb-operation-writes.js';
 import {
@@ -38,6 +39,7 @@ import {
   editable,
   emitNota,
   hexToUuid,
+  lineValue,
   mutationBody,
   notaVersionState,
   nullableHexToUuid,
@@ -232,11 +234,23 @@ export class MariaDbNotaLifecycleRepository {
         .filter((page) => String(page.status) === 'active')
         .map((page) => hexToUuid(page.id_hex)),
     );
-    const lines = (await readLines(connection, id)).filter(
+    const activeLines = (await readLines(connection, id)).filter(
       (line) =>
         !line.deleted_at &&
-        activePageIds.has(hexToUuid(line.page_id_hex)) &&
-        BigInt(String(line.quantity_pcs)) > 0n,
+        activePageIds.has(hexToUuid(line.page_id_hex)),
+    );
+    for (const line of activeLines) {
+      const value = lineValue(line);
+      if (isPopulatedLine(value) && !notaLineValue.safeParse(value).success) {
+        throw new NotaOperationError(
+          'INVALID_REQUEST',
+          422,
+          'Nota contains an incomplete active line',
+        );
+      }
+    }
+    const lines = activeLines.filter(
+      (line) => BigInt(String(line.quantity_pcs)) > 0n,
     );
     const trackedSkuIds = new Set<string>();
     for (const skuId of new Set(
@@ -477,4 +491,15 @@ export class MariaDbNotaLifecycleRepository {
     }
     throw error;
   }
+}
+
+function isPopulatedLine(value: Record<string, unknown>): boolean {
+  return (
+    Boolean(value.skuId) ||
+    Boolean(String(value.description ?? '').trim()) ||
+    Boolean(String(value.kind ?? '').trim()) ||
+    Number(value.quantity) !== 0 ||
+    Number(value.pcsPrice) !== 0 ||
+    Number(value.lsnPrice) !== 0
+  );
 }

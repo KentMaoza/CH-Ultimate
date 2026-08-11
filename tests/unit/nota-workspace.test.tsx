@@ -83,10 +83,18 @@ test('Nota totals seeded values across active transaction pages', async () => {
 
 test('basic fields, unit, and dual prices update the in-memory Nota total', () => {
   openNota();
-  fireEvent.change(screen.getByLabelText('Nama barang baris 3'), { target: { value: 'Kopi' } });
-  fireEvent.change(screen.getByLabelText('Jenis baris 3'), { target: { value: 'Minuman' } });
-  fireEvent.change(screen.getByLabelText('Jumlah baris 3'), { target: { value: '2' } });
-  fireEvent.change(screen.getByLabelText('Harga LSN baris 3'), { target: { value: '150000' } });
+  const name = screen.getByLabelText('Nama barang baris 3');
+  const kind = screen.getByLabelText('Jenis baris 3');
+  const quantity = screen.getByLabelText('Jumlah baris 3');
+  const lsnPrice = screen.getByLabelText('Harga LSN baris 3');
+  fireEvent.change(name, { target: { value: 'Kopi' } });
+  fireEvent.blur(name);
+  fireEvent.change(kind, { target: { value: 'Minuman' } });
+  fireEvent.blur(kind);
+  fireEvent.change(quantity, { target: { value: '2' } });
+  fireEvent.blur(quantity);
+  fireEvent.change(lsnPrice, { target: { value: '150000' } });
+  fireEvent.blur(lsnPrice);
   fireEvent.click(screen.getByRole('button', { name: 'LSN baris 3' }));
 
   expect(screen.getByLabelText('Nama barang baris 3')).toHaveValue('Kopi');
@@ -202,6 +210,7 @@ test('keyboard selection from SKU Gudang links the active row and manual edits u
   let row = gateway.getSnapshot().notaTransactions[0]!.pages[0]!.lines[2]!;
   expect(row).toMatchObject({ skuId: 'sku-1', description: 'Beras Hitam Premium 1 kg', pcsPrice: 42_000, lsnPrice: 504_000, unit: 'pcs' });
   fireEvent.change(name, { target: { value: 'Beras eceran' } });
+  fireEvent.blur(name);
   row = gateway.getSnapshot().notaTransactions[0]!.pages[0]!.lines[2]!;
   expect(row.skuId).toBeUndefined();
 });
@@ -333,6 +342,7 @@ test('linked SKU number appears in the grid and disappears with a manual edit', 
   expect(screen.getByTestId('nota-grid-row-3')).toHaveTextContent('BRS-108-BLK');
   expect(gateway.getSnapshot().notaTransactions[0]!.pages[0]!.lines[2]).toMatchObject({ skuId: 'sku-1' });
   fireEvent.change(name, { target: { value: 'Beras eceran' } });
+  fireEvent.blur(name);
   expect(screen.getByTestId('nota-grid-row-3')).not.toHaveTextContent('BRS-108-BLK');
   expect(gateway.getSnapshot().notaTransactions[0]!.pages[0]!.lines[2]?.skuId).toBeUndefined();
 });
@@ -368,8 +378,12 @@ test('SKU Gudang uses the first blank row by default and preserves operator fiel
   fireEvent.keyDown(search, { key: 'Enter' });
   expect(gateway.getSnapshot().notaTransactions[0]!.pages[0]!.lines[2]).toMatchObject({ skuId: 'sku-1' });
 
-  fireEvent.change(screen.getByLabelText('Jenis baris 3'), { target: { value: 'Grosir' } });
-  fireEvent.change(screen.getByLabelText('Jumlah baris 3'), { target: { value: '4' } });
+  const kind = screen.getByLabelText('Jenis baris 3');
+  const quantity = screen.getByLabelText('Jumlah baris 3');
+  fireEvent.change(kind, { target: { value: 'Grosir' } });
+  fireEvent.blur(kind);
+  fireEvent.change(quantity, { target: { value: '4' } });
+  fireEvent.blur(quantity);
   fireEvent.click(screen.getByRole('button', { name: 'LSN baris 3' }));
   fireEvent.focus(screen.getByLabelText('Jenis baris 3'));
   fireEvent.change(search, { target: { value: 'Kemeja' } });
@@ -408,7 +422,9 @@ test('shows a separate live total for every active Nota page', async () => {
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Halaman B' })); });
   await act(async () => {
     fireEvent.change(screen.getByLabelText('Jumlah baris 1'), { target: { value: '2' } });
+    fireEvent.blur(screen.getByLabelText('Jumlah baris 1'));
     fireEvent.change(screen.getByLabelText('Harga PCS baris 1'), { target: { value: '12000' } });
+    fireEvent.blur(screen.getByLabelText('Harga PCS baris 1'));
   });
   expect(screen.getByTestId('nota-page-total-A')).toHaveTextContent(/Rp\s*47\.000/);
   expect(screen.getByTestId('nota-page-total-B')).toHaveTextContent(/Rp\s*24\.000/);
@@ -420,6 +436,7 @@ test('shows a separate live total for every active Nota page', async () => {
 test('unit buttons preserve dual overrides while the active unit controls total', () => {
   openNota();
   fireEvent.change(screen.getByLabelText('Jumlah baris 3'), { target: { value: '2' } });
+  fireEvent.blur(screen.getByLabelText('Jumlah baris 3'));
   fireEvent.change(screen.getByLabelText('Harga PCS baris 3'), { target: { value: '12000' } });
   fireEvent.change(screen.getByLabelText('Harga LSN baris 3'), { target: { value: '130000' } });
   fireEvent.blur(screen.getByLabelText('Harga PCS baris 3'));
@@ -435,8 +452,10 @@ test('unit buttons preserve dual overrides while the active unit controls total'
 test('derives the lsn total from twelve pieces when only Harga PCS is entered', () => {
   openNota();
   fireEvent.change(screen.getByLabelText('Jumlah baris 3'), { target: { value: '5' } });
+  fireEvent.blur(screen.getByLabelText('Jumlah baris 3'));
   fireEvent.click(screen.getByRole('button', { name: 'LSN baris 3' }));
   fireEvent.change(screen.getByLabelText('Harga PCS baris 3'), { target: { value: '165000' } });
+  fireEvent.blur(screen.getByLabelText('Harga PCS baris 3'));
 
   expect(screen.getByLabelText('Harga LSN baris 3')).toHaveValue('');
   expect(screen.getByLabelText('Total baris 3')).toHaveTextContent('9.900.000');

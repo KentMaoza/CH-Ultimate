@@ -188,7 +188,8 @@ function drawProductCard(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(90, 90, 90);
-  doc.text(product.skuNumber, x + 3, identityY);
+  const identityLines = doc.splitTextToSize(product.skuNumber, CARD_WIDTH - 6).slice(0, 1) as string[];
+  doc.text(identityLines, x + 3, identityY);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(17, 17, 17);

@@ -94,6 +94,7 @@ describe('CH output main boundary', () => {
       silent: false,
       printBackground: true,
       pageSize: { width: 190_000, height: 120_000 },
+      margins: { marginType: 'none' },
     }, expect.any(Function));
     expect(waitForPrintSpool).toHaveBeenCalledTimes(1);
   });

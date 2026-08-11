@@ -4,6 +4,7 @@ import type { ShareRecommendationReport } from '../../src/domain/share-recommend
 const pdfCapture = vi.hoisted(() => ({
   instances: [] as Array<{
     properties: Record<string, string>;
+    splitTextCalls: Array<{ text: string; width: number }>;
     texts: string[];
   }>,
 }));
@@ -11,6 +12,7 @@ const pdfCapture = vi.hoisted(() => ({
 vi.mock('jspdf', () => ({
   jsPDF: class FakeJsPdf {
     properties: Record<string, string> = {};
+    splitTextCalls: Array<{ text: string; width: number }> = [];
     texts: string[] = [];
 
     constructor() {
@@ -18,6 +20,10 @@ vi.mock('jspdf', () => ({
     }
 
     setProperties(properties: Record<string, string>) { this.properties = properties; }
+    splitTextToSize(text: string, width: number) {
+      this.splitTextCalls.push({ text, width });
+      return [text];
+    }
     text(value: string | string[]) {
       this.texts.push(...(Array.isArray(value) ? value : [value]));
     }
@@ -63,4 +69,30 @@ test.each([
   expect(pdfCapture.instances).toHaveLength(1);
   expect(pdfCapture.instances[0]?.texts).toContain(expectedLabel);
   expect(pdfCapture.instances[0]?.properties.subject).toBe(expectedLabel);
+});
+
+test('bounds the product identity to the recommendation card width', async () => {
+  await createRecommendationPdfBlob({
+    date: '2026-08-11',
+    fileName: 'acceptance.pdf',
+    groups: [{
+      supplierLabel: 'CH002',
+      products: [{
+        id: 'long-identity',
+        imageUrl: '',
+        name: 'Tas bayi dengan nama cukup panjang',
+        referencePrice: 84_000,
+        skuNumber: 'BJT1073 Baby Joy Tas Medium Baby Moo Series-Coklat CH002',
+      }],
+    }],
+    sourceLabel: 'CH CORE · DATA OPERASIONAL',
+    title: 'Rekomendasi Harian',
+    totalAvailable: 1,
+    totalIncluded: 1,
+  });
+
+  expect(pdfCapture.instances[0]?.splitTextCalls).toContainEqual({
+    text: 'BJT1073 Baby Joy Tas Medium Baby Moo Series-Coklat CH002',
+    width: 54,
+  });
 });

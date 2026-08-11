@@ -78,7 +78,6 @@ export function WarehouseSkuPanel({ skus, targetLabel, disabled, onSelect }: {
           aria-selected={highlight === index}
           disabled={disabled}
           key={sku.id}
-          onMouseDown={(event) => event.preventDefault()}
           onClick={() => onSelect(sku)}
         >
           <GatewaySkuImage gateway={gateway} sku={sku} className="chu-nota-workspace__sku-image chu-nota-workspace__sku-placeholder" alt="" />

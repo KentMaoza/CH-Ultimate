@@ -539,6 +539,34 @@ test('Ekspor Data uses deterministic filters and the fake PDF bridge without nat
   }
 });
 
+test('Nota SKU cards keep the selected row stable when Nama Barang or Jenis owns focus', async () => {
+  const { application, window } = await launch();
+  try {
+    await openNota(window);
+
+    const row3Name = window.getByLabel('Nama barang baris 3', { exact: true });
+    await row3Name.focus();
+    await expect(window.getByText('Target baris 3A', { exact: true })).toBeVisible();
+    await window.getByRole('option', { name: /BRS-108-BLK/ }).click();
+    await expect(row3Name).toHaveValue('Beras Hitam Premium 1 kg');
+    await window.waitForTimeout(750);
+    await expect(row3Name).toHaveValue('Beras Hitam Premium 1 kg');
+    await expect(window.getByTestId('nota-grid-row-3')).toContainText('BRS-108-BLK');
+
+    const row4Kind = window.getByLabel('Jenis baris 4', { exact: true });
+    await row4Kind.focus();
+    await expect(window.getByText('Target baris 4A', { exact: true })).toBeVisible();
+    await window.getByRole('option', { name: /FSH-LINEN-WHT/ }).click();
+    await expect(window.getByLabel('Nama barang baris 4', { exact: true })).toHaveValue('Kemeja Linen Putih');
+    await window.waitForTimeout(750);
+    await expect(window.getByLabel('Nama barang baris 4', { exact: true })).toHaveValue('Kemeja Linen Putih');
+    await expect(window.getByTestId('nota-grid-row-4')).toContainText('FSH-LINEN-WHT');
+    await expect(row3Name).toHaveValue('Beras Hitam Premium 1 kg');
+  } finally {
+    await application.close();
+  }
+});
+
 test('Nota lifecycle posts linked and ad-hoc lines, then import resets the session at reload', async ({}, testInfo) => {
   const { application, window } = await launch();
   try {

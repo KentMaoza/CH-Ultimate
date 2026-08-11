@@ -1,5 +1,6 @@
 import { lineTotal } from './nota';
 import type { OperationalPdfPlan } from './operational-exports';
+import type { RestockRecommendationDocumentPlan } from './restock-recommendation-document';
 import type {
   InvoiceTemplate,
   InvoiceElementId,
@@ -176,7 +177,8 @@ export type OutputDocumentPlan =
   | NotaDocumentPlan
   | LabelDocumentPlan
   | BarcodeDocumentPlan
-  | OperationalPdfPlan;
+  | OperationalPdfPlan
+  | RestockRecommendationDocumentPlan;
 
 function safeFilePart(value: string): string {
   return value

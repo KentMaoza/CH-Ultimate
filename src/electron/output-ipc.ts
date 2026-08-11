@@ -63,6 +63,7 @@ const DOCUMENT_KINDS = new Set<OutputDocumentKind>([
   'label',
   'barcode',
   'operational-data',
+  'restock-recommendation',
 ]);
 const MIN_PAGE_MM = 15;
 const MAX_PAGE_MM = 420;

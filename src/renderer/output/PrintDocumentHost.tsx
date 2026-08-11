@@ -10,6 +10,7 @@ import type {
   ProductLabelItem,
 } from '../../domain/output-documents';
 import type { OperationalPdfPlan } from '../../domain/operational-exports';
+import type { RestockRecommendationDocumentPlan } from '../../domain/restock-recommendation-document';
 import { formatRupiah } from '../format';
 
 function StoreIdentity({ identity }: { identity: NotaDocumentLayout['identity'] }) {
@@ -174,6 +175,46 @@ function OperationalHost({ plan }: { plan: OperationalPdfPlan }) {
   </article>)}</>;
 }
 
+function RestockRecommendationHost({
+  plan,
+}: {
+  plan: RestockRecommendationDocumentPlan;
+}) {
+  return <>{plan.pages.map((page, pageIndex) => <article
+    className="output-document__page output-document__restock"
+    style={{ width: `${plan.widthMm}mm`, height: `${plan.heightMm}mm` }}
+    data-testid="output-restock-page"
+    key={`${page.supplierCode ?? 'none'}-${pageIndex}`}
+  >
+    <header className="output-document__restock-header">
+      <div><b>CHU · REKOMENDASI RESTOCK</b><span>{plan.generatedDate}</span></div>
+      <span>Halaman {pageIndex + 1}/{plan.pages.length}</span>
+    </header>
+    <h1 className="output-document__restock-supplier">
+      {page.supplierCode ? `Supplier ${page.supplierCode}` : 'Tanpa kode supplier'}
+    </h1>
+    <section className="output-document__restock-grid">
+      {page.items.map((item) => <article
+        className="output-document__restock-card"
+        data-rank={item.rank}
+        data-testid="output-restock-card"
+        style={{ width: '93mm', height: '56mm' }}
+        key={item.id}
+      >
+        <div className="output-document__restock-image">
+          {item.thumbnailDataUrl
+            ? <img src={item.thumbnailDataUrl} alt="" />
+            : <b>CHU</b>}
+        </div>
+        <div className="output-document__restock-copy">
+          <strong>{item.name}</strong>
+          <b>{item.quantity} pcs</b>
+        </div>
+      </article>)}
+    </section>
+  </article>)}</>;
+}
+
 export function PrintDocumentHost({ plan }: { plan: OutputDocumentPlan }) {
   let content;
   if (plan.kind === 'label') {
@@ -182,6 +223,8 @@ export function PrintDocumentHost({ plan }: { plan: OutputDocumentPlan }) {
     content = <BarcodeHost plan={plan} />;
   } else if (plan.kind === 'operational-data') {
     content = <OperationalHost plan={plan} />;
+  } else if (plan.kind === 'restock-recommendation') {
+    content = <RestockRecommendationHost plan={plan} />;
   } else {
     content = <NotaHost plan={plan} />;
   }

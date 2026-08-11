@@ -9,7 +9,9 @@ import {
   buildLabelDocumentPlan,
   buildNotaDocumentPlan,
 } from '../../src/domain/output-documents';
+import { buildRestockRecommendationDocumentPlan } from '../../src/domain/restock-recommendation-document';
 import { createInitialState } from '../../src/domain/operations';
+import type { RestockRecommendationItem } from '../../src/domain/restock-recommendations';
 import type { ChOutputBridge } from '../../src/electron/output-contract';
 import {
   OutputProvider,
@@ -156,6 +158,49 @@ test('minimum barcode uses a fixed card without shrinking its QR', () => {
     height: '8mm',
     flexShrink: '0',
   });
+});
+
+test('restock recommendation host renders portrait supplier pages with only allowed product copy', () => {
+  const state = createInitialState();
+  const selected: RestockRecommendationItem = {
+    sku: { ...state.skus[0]!, skuNumber: 'SECRET-SKU-NUMBER', stock: -9 },
+    supplierCode: 'CH01',
+    soldPieces30: 42,
+    soldPieces60: 60,
+    lastEffectiveSaleAt: '2026-08-10T00:00:00.000Z',
+    recommendedQuantity: 18,
+    rank: 'green',
+    reasons: ['zero-stock-recent', 'top-seller'],
+  };
+  const plan = buildRestockRecommendationDocumentPlan(
+    [selected],
+    { [selected.sku.id]: 18 },
+    '2026-08-11',
+  );
+  render(<PrintDocumentHost plan={plan} />);
+
+  const host = screen.getByTestId('print-document-host');
+  expect(host).toHaveAttribute('data-document-kind', 'restock-recommendation');
+  expect(screen.getByTestId('output-page-style')).toHaveTextContent(
+    '@page { size: 210mm 297mm; margin: 0; }',
+  );
+  expect(screen.getByTestId('output-restock-page')).toHaveStyle({
+    width: '210mm',
+    height: '297mm',
+  });
+  expect(screen.getByTestId('output-restock-card')).toHaveAttribute('data-rank', 'green');
+  expect(screen.getByTestId('output-restock-card')).toHaveStyle({
+    width: '93mm',
+    height: '56mm',
+  });
+  expect(host).toHaveTextContent('Supplier CH01');
+  expect(host).toHaveTextContent(selected.sku.name);
+  expect(host).toHaveTextContent('18 pcs');
+  expect(host).toHaveTextContent('CHU');
+  expect(host).not.toHaveTextContent('SECRET-SKU-NUMBER');
+  expect(host).not.toHaveTextContent('Stok');
+  expect(host).not.toHaveTextContent('42');
+  expect(host).not.toHaveTextContent('60');
 });
 
 function OutputHarness({ plan }: { plan: ReturnType<typeof notaPlan> }) {

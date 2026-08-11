@@ -10,7 +10,8 @@ export type OutputDocumentKind =
   | 'invoice'
   | 'label'
   | 'barcode'
-  | 'operational-data';
+  | 'operational-data'
+  | 'restock-recommendation';
 
 export interface PrintDocumentRequest {
   kind: OutputDocumentKind;

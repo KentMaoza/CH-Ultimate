@@ -103,7 +103,7 @@ describe('CH output main boundary', () => {
     const { event, handlers, print } = harness();
 
     await expect(handlers.get(CH_OUTPUT_IPC_CHANNELS.print)!(event, {
-      kind: 'label', widthMm: 210, heightMm: 297,
+      kind: 'restock-recommendation', widthMm: 210, heightMm: 297,
     })).resolves.toEqual({ status: 'printed' });
 
     expect(print).toHaveBeenCalledWith({

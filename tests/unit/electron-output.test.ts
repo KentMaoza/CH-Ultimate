@@ -99,6 +99,21 @@ describe('CH output main boundary', () => {
     expect(waitForPrintSpool).toHaveBeenCalledTimes(1);
   });
 
+  it('uses the Windows standard A4 paper name for an exact A4 document', async () => {
+    const { event, handlers, print } = harness();
+
+    await expect(handlers.get(CH_OUTPUT_IPC_CHANNELS.print)!(event, {
+      kind: 'label', widthMm: 210, heightMm: 297,
+    })).resolves.toEqual({ status: 'printed' });
+
+    expect(print).toHaveBeenCalledWith({
+      silent: false,
+      printBackground: true,
+      pageSize: 'A4',
+      margins: { marginType: 'none' },
+    }, expect.any(Function));
+  });
+
   it('rejects another frame and every renderer-controlled output escape hatch', async () => {
     const { event, handlers, print, webContents } = harness();
     const printHandler = handlers.get(CH_OUTPUT_IPC_CHANNELS.print)!;

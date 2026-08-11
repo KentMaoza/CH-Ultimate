@@ -21,7 +21,7 @@ interface TrustedWebContents {
     options: {
       silent: false;
       printBackground: true;
-      pageSize: { width: number; height: number };
+      pageSize: 'A4' | { width: number; height: number };
       margins: { marginType: 'none' };
     },
     callback: (success: boolean, failureReason?: string) => void,
@@ -169,6 +169,7 @@ function parseSaveSpreadsheetRequest(input: unknown): SaveSpreadsheetRequest {
 }
 
 function printPageSize(input: PrintDocumentRequest) {
+  if (input.widthMm === 210 && input.heightMm === 297) return 'A4' as const;
   return {
     width: Math.round(input.widthMm * 1_000),
     height: Math.round(input.heightMm * 1_000),

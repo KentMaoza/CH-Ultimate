@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEvent, type MouseEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, type KeyboardEvent, type MouseEvent } from 'react';
 
 const focusable = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -12,7 +12,7 @@ export function useAccessibleModal<T extends HTMLElement = HTMLElement>(open: bo
     dialogRef.current?.querySelector<HTMLElement>('[data-modal-initial-focus]')?.focus();
   }, [open, restoreFocusTo]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const active = document.activeElement;
     if (open && !canClose && (!active || !dialogRef.current?.contains(active) || active instanceof HTMLElement && active.matches(':disabled'))) dialogRef.current?.focus();
   }, [open, canClose]);

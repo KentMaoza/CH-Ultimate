@@ -94,8 +94,13 @@ test('empty stock combines supplier and search filters while preserving earlier 
   fireEvent.change(supplier, { target: { value: 'CH002' } });
   fireEvent.change(screen.getByLabelText('Cari nama / nomor SKU'), { target: { value: 'SKU-BLUE' } });
   fireEvent.click(screen.getByRole('button', { name: 'Pilih semua hasil filter' }));
-  expect(screen.getByTestId('empty-report-preview')).toHaveTextContent('SKU-RED');
+  expect(screen.getByTestId('empty-report-preview')).not.toHaveTextContent('SKU-RED');
   expect(screen.getByTestId('empty-report-preview')).toHaveTextContent('SKU-BLUE');
+  expect(screen.getByText('1 dipilih di luar filter')).toBeInTheDocument();
+
+  fireEvent.change(supplier, { target: { value: 'CH02' } });
+  expect(screen.getByTestId('empty-report-preview')).toHaveTextContent('SKU-RED');
+  expect(screen.getByTestId('empty-report-preview')).not.toHaveTextContent('SKU-BLUE');
 
   fireEvent.change(screen.getByLabelText('Cari nama / nomor SKU'), { target: { value: '' } });
   fireEvent.change(supplier, { target: { value: '__none__' } });

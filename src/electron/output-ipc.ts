@@ -22,6 +22,7 @@ interface TrustedWebContents {
       silent: false;
       printBackground: true;
       pageSize: { width: number; height: number };
+      margins: { marginType: 'none' };
     },
     callback: (success: boolean, failureReason?: string) => void,
   ): void;
@@ -235,6 +236,7 @@ export function registerOutputIpcHandlers({
         silent: false,
         printBackground: true,
         pageSize: printPageSize(request),
+        margins: { marginType: 'none' },
       }, (success, reason) => {
         if (success) resolve();
         else reject(new Error(reason || 'Dokumen tidak dapat dicetak.'));

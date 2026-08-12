@@ -17,8 +17,8 @@ Use parallel agents only for independent, read-only, or separate-worktree tasks.
 ## Agent model and concurrency routing
 
 - The root orchestrator uses the model and reasoning level selected by the user in the task composer beside the microphone. Do not replace or second-guess that selection from an agent workflow.
-- Subagents must not inherit or reuse the orchestrator model. Every subagent dispatch must explicitly use model `gpt-5.6-luna` with reasoning effort `max`, including implementers, reviewers, nested reviewers, and agents spawned by other subagents.
-- Do not override the global subagent route with Sol, Terra, the session default, or skill-specific cost-tier routing unless the user explicitly requests a different subagent model for that task.
+- Subagents must not inherit or reuse the orchestrator model. Every subagent dispatch must explicitly use model `gpt-5.6-terra` with reasoning effort `max`, including implementers, reviewers, nested reviewers, and agents spawned by other subagents.
+- Do not override the global subagent route with Luna, Sol, the session default, or skill-specific cost-tier routing unless the user explicitly requests a different subagent model for that task.
 - The concurrency ceiling is six active agents total per session: one root orchestrator plus at most five active subagents. Nested subagents count toward the same five-subagent allowance. Check the live agent tree before spawning and never exceed this total.
 - A model-routing or concurrency configuration change is not retroactive. Existing agents keep their launch model and running sessions may require a new task or application reload before a changed runtime cap is available.
 

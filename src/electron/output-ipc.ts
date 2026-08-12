@@ -233,21 +233,23 @@ export function registerOutputIpcHandlers({
 
   ipcMain.handle(CH_OUTPUT_IPC_CHANNELS.print, authorized(async (input) => {
     const request = parsePrintRequest(input);
-    await new Promise<void>((resolve, reject) => {
+    const result = await new Promise<{ status: 'printed' | 'cancelled' }>((resolve, reject) => {
       webContents.print({
         silent: false,
         printBackground: true,
         pageSize: printPageSize(request),
         margins: { marginType: 'none' },
       }, (success, reason) => {
-        if (success) resolve();
+        if (success) resolve({ status: 'printed' });
+        else if (reason === 'Print job canceled') resolve({ status: 'cancelled' });
         else reject(new Error(reason || 'Dokumen tidak dapat dicetak.'));
       });
     });
+    if (result.status === 'cancelled') return result;
     // Electron can report success before Windows has consumed the rendered
     // document. Keep the operation and its renderer host alive briefly.
     await waitForPrintSpool();
-    return { status: 'printed' as const };
+    return result;
   }));
 
   ipcMain.handle(CH_OUTPUT_IPC_CHANNELS.savePdf, authorized(async (input) => {

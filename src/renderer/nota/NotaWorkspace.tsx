@@ -90,7 +90,7 @@ export function NotaWorkspace({ coreBacked = false, syncLabel, onBack, initialSe
         : await output.savePdf(plan);
       setMessage(
         result.status === 'cancelled'
-          ? 'Penyimpanan PDF dibatalkan.'
+          ? action === 'print' ? 'Print Nota dibatalkan.' : 'Penyimpanan PDF dibatalkan.'
           : action === 'print'
             ? 'Dialog print Nota dibuka.'
             : 'PDF Nota tersimpan.',

@@ -35,7 +35,7 @@ export function LabelPage({ coreBacked = false }: { coreBacked?: boolean }) {
     try {
       const plan = buildLabelDocumentPlan(sku, template, quantity);
       const result = action === 'print' ? await output.print(plan) : await output.savePdf(plan);
-      setMessage(result.status === 'cancelled' ? 'Penyimpanan PDF dibatalkan.' : action === 'print' ? 'Dialog print label dibuka.' : 'PDF label tersimpan.');
+      setMessage(result.status === 'cancelled' ? action === 'print' ? 'Print label dibatalkan.' : 'Penyimpanan PDF dibatalkan.' : action === 'print' ? 'Dialog print label dibuka.' : 'PDF label tersimpan.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Output label gagal dibuat.');
     }

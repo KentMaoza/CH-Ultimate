@@ -223,7 +223,7 @@ export function InventoryPage() {
     try {
       const plan = buildBarcodeDocumentPlan(printing, state.labelTemplate, parsedPrintQuantity);
       const result = action === 'print' ? await output.print(plan) : await output.savePdf(plan);
-      setMessage(result.status === 'cancelled' ? 'Penyimpanan PDF dibatalkan.' : action === 'print' ? 'Dialog print barcode dibuka.' : 'PDF barcode tersimpan.');
+      setMessage(result.status === 'cancelled' ? action === 'print' ? 'Print barcode dibatalkan.' : 'Penyimpanan PDF dibatalkan.' : action === 'print' ? 'Dialog print barcode dibuka.' : 'PDF barcode tersimpan.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Output barcode gagal dibuat.');
     }

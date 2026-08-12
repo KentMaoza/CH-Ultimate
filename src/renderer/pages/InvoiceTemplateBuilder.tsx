@@ -71,7 +71,7 @@ export function InvoiceTemplateBuilder({ coreBacked = false }: { coreBacked?: bo
         kind: 'invoice', scope: printScope, currentPageId: selectedPage.id,
       });
       const result = action === 'print' ? await output.print(plan) : await output.savePdf(plan);
-      setMessage(result.status === 'cancelled' ? 'Penyimpanan PDF dibatalkan.' : action === 'print' ? 'Dialog print invoice dibuka.' : 'PDF invoice tersimpan.');
+      setMessage(result.status === 'cancelled' ? action === 'print' ? 'Print invoice dibatalkan.' : 'Penyimpanan PDF dibatalkan.' : action === 'print' ? 'Dialog print invoice dibuka.' : 'PDF invoice tersimpan.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Output invoice gagal dibuat.');
     }

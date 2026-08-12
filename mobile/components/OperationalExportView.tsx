@@ -7,7 +7,10 @@ import {
   type OperationalFilters,
 } from '../../src/domain/operational-exports';
 import type { OperationsGateway } from '../../src/gateway/operations-gateway';
-import { hydrateOperationalPdfImages } from '../../src/renderer/operational-pdf-images';
+import {
+  createOperationalPdfThumbnail,
+  hydrateOperationalPdfImages,
+} from '../../src/renderer/operational-pdf-images';
 import { useOperationsSnapshot } from '../../src/renderer/use-operations-snapshot';
 import type { PdfSharePort } from '../ports';
 import { BackIcon, ShareIcon } from './Icons';
@@ -44,9 +47,16 @@ export function OperationalExportView({ gateway, share, coreBacked = false, sync
 
   async function sharePdf() {
     setBusy(true);
-    setStatus('');
+    setStatus(plan.dataset === 'sku-stock'
+      ? `Memproses gambar 0/${plan.rows.length}…`
+      : 'Membuat PDF…');
     try {
-      const hydrated = await hydrateOperationalPdfImages(plan, snapshot.skus, gateway);
+      const hydrated = await hydrateOperationalPdfImages(plan, snapshot.skus, gateway, {
+        thumbnail: createOperationalPdfThumbnail,
+        onProgress: (completed, total) => {
+          setStatus(`Memproses gambar ${completed}/${total}…`);
+        },
+      });
       await share.sharePdf({
         blob: await createOperationalPdfBlob(hydrated),
         fileName: plan.fileName,

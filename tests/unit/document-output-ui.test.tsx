@@ -124,6 +124,19 @@ test('warehouse barcode uses the trusted bridge for print and PDF with visible p
   })));
 });
 
+test('warehouse barcode reports native print cancellation without an internal error', async () => {
+  const output = outputBridge();
+  output.printDocument.mockResolvedValueOnce({ status: 'cancelled' } as never);
+  render(<App gateway={new MockOperationsGateway()} outputBridge={output.bridge} />);
+
+  const row = screen.getAllByRole('row')[1]!;
+  fireEvent.click(within(row).getByRole('button', { name: /^Print barcode / }));
+  fireEvent.click(screen.getByRole('button', { name: 'Print barcode sekarang' }));
+
+  expect(await screen.findByRole('status')).toHaveTextContent('Print barcode dibatalkan.');
+  expect(screen.queryByText(/Error invoking remote method/i)).not.toBeInTheDocument();
+});
+
 test('completed archive Nota prints current or all active pages without a DRAF marker', async () => {
   const output = outputBridge();
   const gateway = new MockOperationsGateway();

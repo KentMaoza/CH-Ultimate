@@ -33,7 +33,7 @@ export interface SaveGeneratedPdfRequest {
   bytes: Uint8Array;
 }
 
-export type PrintDocumentResult = { status: 'printed' };
+export type PrintDocumentResult = { status: 'printed' | 'cancelled' };
 export type SavePdfResult = { status: 'saved' | 'cancelled' };
 export type SaveSpreadsheetResult = { status: 'saved' | 'cancelled' };
 

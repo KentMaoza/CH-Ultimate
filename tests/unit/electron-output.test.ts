@@ -180,6 +180,16 @@ describe('CH output main boundary', () => {
     expect(waitForPrintSpool).not.toHaveBeenCalled();
   });
 
+  it('treats closing the native print dialog as a normal cancellation', async () => {
+    const { event, handlers, print, waitForPrintSpool } = harness();
+    print.mockImplementation((_options, callback) => callback(false, 'Print job canceled'));
+
+    await expect(handlers.get(CH_OUTPUT_IPC_CHANNELS.print)!(event, {
+      kind: 'barcode', widthMm: 54, heightMm: 34,
+    })).resolves.toEqual({ status: 'cancelled' });
+    expect(waitForPrintSpool).not.toHaveBeenCalled();
+  });
+
   it('writes validated Electron PDF bytes only to the native dialog choice', async () => {
     const { event, handlers, printToPDF, showSaveDialog, writeFile } = harness();
 

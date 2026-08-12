@@ -380,10 +380,10 @@ td small { display: block; margin-top: 3px; color: #777; font-size: 9px; }
 .output-document__logo img { max-width: 24mm; max-height: 16mm; object-fit: contain; }
 .output-document__heading { display: flex; justify-content: space-between; gap: 12px; margin: 8px 0; }
 .output-document__heading > div { display: grid; gap: 3px; }
-.output-document__heading dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
-.output-document__heading dl div { display: grid; }
+.output-document__heading dl { display: grid; min-width: 0; flex: 1; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.output-document__heading dl div { display: grid; min-width: 0; }
 .output-document__heading dt { color: #666; font-size: .8em; }
-.output-document__heading dd { margin: 0; font-weight: 700; }
+.output-document__heading dd { min-width: 0; margin: 0; overflow-wrap: anywhere; font-weight: 700; }
 .output-document__table { width: 100%; border-collapse: collapse; }
 .output-document__table th, .output-document__table td { border: 1px solid #111; padding: 3px; text-align: left; }
 .output-document__totals { display: flex; justify-content: flex-end; gap: 14px; padding-top: 7px; }

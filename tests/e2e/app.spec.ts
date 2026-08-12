@@ -387,6 +387,10 @@ test('Template Label and Invoice configures a movable session-only invoice previ
   const { application, window } = await launch();
   try {
     await openNota(window);
+    const longCustomerName = 'ACCEPTANCE_TEST_ONLY_CUSTOMER_NAME_WITH_UNDERSCORES';
+    const longCustomerPlace = 'ACCEPTANCE_TEST_ONLY_CUSTOMER_PLACE';
+    await window.getByLabel('Pelanggan', { exact: true }).fill(longCustomerName);
+    await window.getByLabel('Tempat', { exact: true }).fill(longCustomerPlace);
     await window.getByRole('button', { name: 'Halaman B', exact: true }).click();
     await window.getByLabel('Nama barang baris 1', { exact: true }).fill('Barang Nota B');
     await window.getByLabel('Jenis baris 1', { exact: true }).fill('Layanan');
@@ -424,8 +428,8 @@ test('Template Label and Invoice configures a movable session-only invoice previ
     await expect(preview.getByTestId('invoice-price-lsn-1B')).toHaveText('1.344.000');
     await expect(preview.getByTestId('invoice-unit-1B')).toHaveText('PCS');
     await expect(preview.getByTestId('invoice-unit-1B')).not.toHaveClass(/is-active/);
-    await expect(preview.getByTestId('invoice-customer-name')).toHaveText('Amelia');
-    await expect(preview.getByTestId('invoice-customer-place')).toHaveText('Saibah');
+    await expect(preview.getByTestId('invoice-customer-name')).toHaveText(longCustomerName);
+    await expect(preview.getByTestId('invoice-customer-place')).toHaveText(longCustomerPlace);
     await expect(preview.getByTestId('invoice-customer-date')).toHaveText(/\d{4}-\d{2}-\d{2}/);
     const gridCellStyle = await preview.locator('tbody td').first().evaluate((cell) => {
       const style = getComputedStyle(cell);
@@ -465,8 +469,46 @@ test('Template Label and Invoice configures a movable session-only invoice previ
       'invoice-element-logo', 'invoice-element-address', 'invoice-element-bank', 'invoice-element-phone',
     ]);
     await expect(window.getByRole('button', { name: 'Print invoice' })).toBeEnabled();
+    await window.evaluate(() => {
+      const testWindow = globalThis as typeof globalThis & {
+        __chuOriginalAnimationFrame?: typeof globalThis.requestAnimationFrame;
+      };
+      testWindow.__chuOriginalAnimationFrame = globalThis.requestAnimationFrame;
+      globalThis.requestAnimationFrame = (callback) => Number(globalThis.setTimeout(
+        () => callback(globalThis.performance.now()),
+        250,
+      ));
+    });
     await window.getByRole('button', { name: 'Print invoice' }).click();
+    const outputHost = window.getByTestId('print-document-host');
+    await outputHost.waitFor({ state: 'attached' });
+    const metadataLayout = await outputHost.evaluate((host) => {
+      const entries = [...host.querySelectorAll<HTMLElement>('.output-document__heading dl > div')];
+      return entries.map((entry) => {
+        const value = entry.querySelector<HTMLElement>('dd')!;
+        const entryRect = entry.getBoundingClientRect();
+        const valueRect = value.getBoundingClientRect();
+        return {
+          valueFits: value.scrollWidth <= value.clientWidth + 1,
+          contained: valueRect.left >= entryRect.left && valueRect.right <= entryRect.right,
+        };
+      });
+    });
+    expect(metadataLayout).toEqual([
+      { valueFits: true, contained: true },
+      { valueFits: true, contained: true },
+      { valueFits: true, contained: true },
+    ]);
     await expect(window.getByRole('status')).toHaveText('Dialog print invoice dibuka.');
+    await window.evaluate(() => {
+      const testWindow = globalThis as typeof globalThis & {
+        __chuOriginalAnimationFrame?: typeof globalThis.requestAnimationFrame;
+      };
+      if (testWindow.__chuOriginalAnimationFrame) {
+        globalThis.requestAnimationFrame = testWindow.__chuOriginalAnimationFrame;
+        delete testWindow.__chuOriginalAnimationFrame;
+      }
+    });
     await window.getByRole('button', { name: 'Simpan PDF invoice' }).click();
     await expect(window.getByRole('status')).toHaveText('PDF invoice tersimpan.');
   } finally {

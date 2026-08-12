@@ -101,6 +101,21 @@ test('output provider mounts trusted content before print and reuses it for PDF 
   }));
 });
 
+test('output provider keeps the trusted host mounted after print resolves for the Windows spooler', async () => {
+  const plan = notaPlan();
+  const printDocument = vi.fn().mockResolvedValue({ status: 'printed' as const });
+  const bridge: ChOutputBridge = {
+    printDocument,
+    savePdf: vi.fn().mockResolvedValue({ status: 'saved' as const }),
+  };
+  render(<OutputProvider bridge={bridge}><OutputHarness plan={plan} /></OutputProvider>);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Print' }));
+
+  await waitFor(() => expect(printDocument).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(screen.getByTestId('print-document-host')).toHaveTextContent('Beras Hitam'));
+});
+
 test('print CSS exposes only the trusted output host, not the interactive barcode preview', () => {
   const css = readFileSync(resolve(process.cwd(), 'src/renderer/styles.css'), 'utf8');
   expect(css).not.toContain('.barcode-print-sheet, .barcode-print-sheet * { visibility: visible !important; }');

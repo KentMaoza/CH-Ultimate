@@ -67,7 +67,9 @@ export function OutputProvider({
       await waitForHostReady();
       return await invoke(bridge);
     } finally {
-      setPlan(null);
+      // Keep the last trusted document mounted after the native print callback.
+      // Windows can finish spooling after Electron reports success; removing the
+      // host here lets a fast Print-to-PDF save capture a blank page.
       setBusy(false);
       busyRef.current = false;
     }

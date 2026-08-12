@@ -194,9 +194,16 @@ function populated(line: NotaLine): boolean {
   );
 }
 
-function productCodeFor(sku: Sku): string {
+export function skuProductCode(sku: Sku): string {
   return sku.identifiers.find((identifier) => identifier.kind === 'product_code')
     ?.value.trim() || sku.skuNumber;
+}
+
+function boundedPdfName(prefix: string, value: string, suffix: string): string {
+  const maximumPartLength = 120 - prefix.length - suffix.length;
+  const part = safeFilePart(value).slice(0, maximumPartLength)
+    .replace(/[\uD800-\uDBFF]$/u, '');
+  return `${prefix}${part}${suffix}`;
 }
 
 export function buildNotaDocumentPlan(
@@ -306,7 +313,8 @@ export function buildLabelDocumentPlan(
   quantity: number,
 ): LabelDocumentPlan {
   const count = requireQuantity(quantity);
-  const productCode = productCodeFor(sku);
+  const productCode = skuProductCode(sku);
+  const fileSuffix = `-x${count}.pdf`;
   return {
     kind: 'label',
     ...sheetLayout(template, count),
@@ -317,7 +325,7 @@ export function buildLabelDocumentPlan(
     fontSize: template.fontSize,
     alignment: template.alignment,
     fields: [...template.fields],
-    fileName: `CHU-Label-${safeFilePart(sku.skuNumber)}-x${count}.pdf`,
+    fileName: boundedPdfName('CHU-Label-', sku.skuNumber, fileSuffix),
     items: Array.from({ length: count }, () => ({
       qrValue: productCode,
       productCode,
@@ -333,7 +341,8 @@ export function buildBarcodeDocumentPlan(
   quantity: number,
 ): BarcodeDocumentPlan {
   const count = requireQuantity(quantity);
-  const productCode = productCodeFor(sku);
+  const productCode = skuProductCode(sku);
+  const fileSuffix = `-x${count}.pdf`;
   return {
     kind: 'barcode',
     ...sheetLayout(template, count),
@@ -342,7 +351,7 @@ export function buildBarcodeDocumentPlan(
     marginMm: template.marginMm,
     gapMm: template.gapMm,
     fontSize: template.fontSize,
-    fileName: `CHU-Barcode-${safeFilePart(sku.skuNumber)}-x${count}.pdf`,
+    fileName: boundedPdfName('CHU-Barcode-', sku.skuNumber, fileSuffix),
     items: Array.from({ length: count }, () => ({
       qrValue: productCode,
       productCode,

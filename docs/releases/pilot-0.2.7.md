@@ -38,6 +38,9 @@ digest signer permanen yang diperiksa workflow rilis.
 3. Kartu barcode 20 x 15 mm memakai copy compact yang dapat membungkus baris,
    tanpa prefix yang menghabiskan ruang.
 4. Gate browser mengukur overflow copy pada satu kartu thermal dan 51 kartu A4.
+5. Preview, QR, dan output dokumen memakai identifier yang sama; nama file PDF
+   dibatasi 120 karakter agar SKU gudang panjang tetap dapat disimpan melalui
+   dialog Windows tanpa mengubah payload barcode.
    PDF nyata dari aplikasi Windows terpasang tetap wajib diperiksa sebelum draft
    dipublikasikan.
 

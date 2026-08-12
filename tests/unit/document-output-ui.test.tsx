@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { expect, test, vi } from 'vitest';
 
 import type { ChOutputBridge } from '../../src/electron/output-contract';
+import { createInitialState } from '../../src/domain/operations';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 import { App } from '../../src/renderer/App';
 
@@ -87,17 +88,35 @@ test('label output uses chosen template, SKU, and exact quantity', async () => {
 
 test('warehouse barcode uses the trusted bridge for print and PDF with visible product code', async () => {
   const output = outputBridge();
-  render(<App gateway={new MockOperationsGateway()} outputBridge={output.bridge} />);
-  const row = screen.getByRole('row', { name: /BRS-108-BLK/ });
-  fireEvent.click(within(row).getByRole('button', { name: 'Print barcode BRS-108-BLK' }));
+  const longSkuNumber = `SKU-${'PANJANG-'.repeat(20)}CH049`;
+  const gateway = new MockOperationsGateway(() => {
+    const state = createInitialState();
+    state.skus[0] = {
+      ...state.skus[0]!,
+      skuNumber: longSkuNumber,
+      identifiers: [{
+        id: 'product-code-identifier',
+        skuId: state.skus[0]!.id,
+        value: '87002109',
+        kind: 'product_code',
+        createdAt: '2026-08-12T00:00:00.000Z',
+      }],
+    };
+    return state;
+  });
+  render(<App gateway={gateway} outputBridge={output.bridge} />);
+  const row = screen.getByRole('row', { name: new RegExp(longSkuNumber) });
+  fireEvent.click(within(row).getByRole('button', { name: `Print barcode ${longSkuNumber}` }));
   const dialog = screen.getByRole('dialog', { name: 'Print barcode produk' });
+  expect(within(dialog).getByTestId('barcode-product-qr')).toHaveAttribute('data-value', '87002109');
+  expect(within(dialog).getByText('Kode Produk: 87002109')).toBeInTheDocument();
   fireEvent.change(within(dialog).getByLabelText('Jumlah barcode'), { target: { value: '2' } });
 
   fireEvent.click(within(dialog).getByRole('button', { name: 'Print barcode sekarang' }));
   await waitFor(() => expect(output.printDocument).toHaveBeenCalledWith({
     kind: 'barcode', widthMm: 54, heightMm: 34,
   }));
-  expect((output.rendered[0]!.match(/Kode Produk: BRS-108-BLK/g) ?? [])).toHaveLength(2);
+  expect((output.rendered[0]!.match(/Kode Produk: 87002109/g) ?? [])).toHaveLength(2);
 
   fireEvent.click(within(dialog).getByRole('button', { name: 'Simpan PDF barcode' }));
   await waitFor(() => expect(output.savePdf).toHaveBeenCalledWith(expect.objectContaining({

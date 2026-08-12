@@ -151,6 +151,22 @@ describe('label and product-barcode plans', () => {
     expect(plan.fileName).toBe('CHU-Barcode-BRS-108-BLK-x3.pdf');
   });
 
+  it('keeps barcode and label PDF file names valid for a maximum-length warehouse SKU', () => {
+    const state = createInitialState();
+    const sku = {
+      ...state.skus[0]!,
+      skuNumber: `SKU-${'PANJANG-'.repeat(24)}CH049`,
+    };
+
+    const barcode = buildBarcodeDocumentPlan(sku, state.labelTemplate, 1);
+    const label = buildLabelDocumentPlan(sku, state.labelTemplate, 1);
+
+    expect(barcode.fileName.length).toBeLessThanOrEqual(120);
+    expect(barcode.fileName).toMatch(/^CHU-Barcode-.+-x1\.pdf$/);
+    expect(label.fileName.length).toBeLessThanOrEqual(120);
+    expect(label.fileName).toMatch(/^CHU-Label-.+-x1\.pdf$/);
+  });
+
   it('rejects zero, fractional, and over-limit quantities', () => {
     const state = createInitialState();
     for (const quantity of [0, 1.5, 10_001]) {

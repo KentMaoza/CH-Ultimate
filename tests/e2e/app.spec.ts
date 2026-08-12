@@ -204,18 +204,8 @@ test('SKU changes record price and quantity history and export filtered prices',
 
     await window.getByRole('button', { name: 'Perubahan SKU' }).click();
     await expect(window.getByRole('row', { name: /BRS-108-BLK.*42\.000.*52\.000/ })).toBeVisible();
-    await window.evaluate(() => {
-      HTMLAnchorElement.prototype.click = function captureSkuExport() {
-        const anchor = this;
-        (window as typeof window & { skuExportCapture?: Promise<{ filename: string; content: string }> }).skuExportCapture = fetch(anchor.href)
-          .then((response) => response.text())
-          .then((content) => ({ filename: anchor.download, content }));
-      };
-    });
     await window.getByRole('button', { name: 'Ekspor perubahan harga CSV' }).click();
-    const exported = await window.evaluate(() => (window as typeof window & { skuExportCapture: Promise<{ filename: string; content: string }> }).skuExportCapture);
-    expect(exported.filename).toMatch(/^perubahan-harga-sku-\d{4}-\d{2}-\d{2}\.csv$/);
-    expect(exported.content).toContain('BRS-108-BLK;Beras Hitam Premium 1 kg;42000;52000');
+    await expect(window.getByRole('status')).toHaveText('CSV perubahan harga berhasil disimpan.');
 
     await window.getByRole('tab', { name: 'Perubahan jumlah' }).click();
     await expect(window.getByRole('row', { name: /BRS-108-BLK.*Manual.*24.*\+4.*28/ })).toBeVisible();

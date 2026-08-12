@@ -50,7 +50,7 @@ describe('CH output preload contract', () => {
     const bridge = createChOutputBridge(invoke);
 
     expect(Object.keys(bridge).sort()).toEqual([
-      'printDocument', 'saveGeneratedPdf', 'savePdf', 'saveSpreadsheet',
+      'printDocument', 'saveCsv', 'saveGeneratedPdf', 'savePdf', 'saveSpreadsheet',
     ]);
     expect(bridge).not.toHaveProperty('invoke');
     expect(bridge).not.toHaveProperty('print');
@@ -66,6 +66,10 @@ describe('CH output preload contract', () => {
       fileName: 'CHU-Ekspor.xlsx',
       bytes: new Uint8Array([0x50, 0x4b, 0x03, 0x04]),
     });
+    await bridge.saveCsv!({
+      fileName: 'perubahan-harga.csv',
+      bytes: new TextEncoder().encode('\uFEFFTanggal;SKU\n12 Agu;BRS-108'),
+    });
 
     expect(invoke.mock.calls).toEqual([
       [CH_OUTPUT_IPC_CHANNELS.print, { kind: 'nota', widthMm: 210, heightMm: 148 }],
@@ -77,6 +81,10 @@ describe('CH output preload contract', () => {
       [CH_OUTPUT_IPC_CHANNELS.saveSpreadsheet, {
         fileName: 'CHU-Ekspor.xlsx',
         bytes: new Uint8Array([0x50, 0x4b, 0x03, 0x04]),
+      }],
+      [CH_OUTPUT_IPC_CHANNELS.saveCsv, {
+        fileName: 'perubahan-harga.csv',
+        bytes: new TextEncoder().encode('\uFEFFTanggal;SKU\n12 Agu;BRS-108'),
       }],
     ]);
   });
@@ -230,6 +238,23 @@ describe('CH output main boundary', () => {
     expect(writeFile).toHaveBeenCalledWith('/chosen/CHU-Ekspor-Data.xlsx', bytes);
   });
 
+  it('writes validated CSV bytes only to the native dialog choice', async () => {
+    const { event, handlers, showSaveDialog, writeFile } = harness();
+    const bytes = new Uint8Array(Buffer.from('\uFEFFTanggal;SKU\n12 Agu;BRS-108', 'utf8'));
+    showSaveDialog.mockResolvedValue({ canceled: false, filePath: '/chosen/perubahan-harga.csv' });
+
+    await expect(handlers.get(CH_OUTPUT_IPC_CHANNELS.saveCsv)!(event, {
+      fileName: 'perubahan-harga.csv', bytes,
+    })).resolves.toEqual({ status: 'saved' });
+
+    expect(showSaveDialog).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Simpan CSV',
+      defaultPath: 'perubahan-harga.csv',
+      filters: [{ name: 'CSV', extensions: ['csv'] }],
+    }));
+    expect(writeFile).toHaveBeenCalledWith('/chosen/perubahan-harga.csv', bytes);
+  });
+
   it('writes validated generated PDF bytes only to the native dialog choice', async () => {
     const { event, handlers, showSaveDialog, writeFile } = harness();
     const bytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31]);
@@ -308,7 +333,27 @@ describe('CH output main boundary', () => {
     expect(unsafe.writeFile).not.toHaveBeenCalled();
   });
 
-  it('removes only its four fixed handlers on close', () => {
+  it('does not write cancelled, unsafe, or binary CSV output', async () => {
+    const cancel = harness();
+    cancel.showSaveDialog.mockResolvedValue({ canceled: true });
+    await expect(cancel.handlers.get(CH_OUTPUT_IPC_CHANNELS.saveCsv)!(cancel.event, {
+      fileName: 'perubahan-harga.csv',
+      bytes: new Uint8Array(Buffer.from('Tanggal;SKU', 'utf8')),
+    })).resolves.toEqual({ status: 'cancelled' });
+    expect(cancel.writeFile).not.toHaveBeenCalled();
+
+    const unsafe = harness();
+    const handler = unsafe.handlers.get(CH_OUTPUT_IPC_CHANNELS.saveCsv)!;
+    await expect(handler(unsafe.event, {
+      fileName: '../perubahan-harga.csv', bytes: new Uint8Array(Buffer.from('Tanggal;SKU', 'utf8')),
+    })).rejects.toThrow('Permintaan output tidak valid.');
+    await expect(handler(unsafe.event, {
+      fileName: 'perubahan-harga.csv', bytes: new Uint8Array([0x41, 0x00, 0x42]),
+    })).rejects.toThrow('CSV tidak valid.');
+    expect(unsafe.writeFile).not.toHaveBeenCalled();
+  });
+
+  it('removes only its fixed handlers on close', () => {
     const { ipcMain, unregister } = harness();
     unregister();
     expect(ipcMain.removeHandler.mock.calls.map(([channel]) => channel).sort()).toEqual(

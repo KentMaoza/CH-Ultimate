@@ -3,6 +3,7 @@ import type { Sku, SkuPriceChange, StockAdjustment } from '../../domain/types';
 import { formatRupiah } from '../format';
 import { useOperations } from '../operations-context';
 import { GatewaySkuImage } from '../components/GatewaySkuImage';
+import { useOutput } from '../output-context';
 
 type ChangeTab = 'price' | 'quantity';
 
@@ -24,7 +25,10 @@ function inRange(createdAt: string, from: string, to: string): boolean {
 }
 
 function csvCell(value: string | number): string {
-  const text = String(value);
+  const raw = String(value);
+  const text = typeof value === 'string' && /^[\t\r ]*[=+\-@]/.test(raw)
+    ? `'${raw}`
+    : raw;
   return /[;"\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
@@ -41,30 +45,36 @@ const adjustmentSource: Record<StockAdjustment['source'], string> = { manual: 'M
 
 export function SkuChangesPage({ coreBacked = false }: { coreBacked?: boolean }) {
   const { state, gateway } = useOperations();
+  const output = useOutput();
   const [tab, setTab] = useState<ChangeTab>('price');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [notice, setNotice] = useState('');
   const skuById = useMemo(() => new Map(state.skus.map((sku) => [sku.id, sku])), [state.skus]);
   const prices = useMemo(() => state.priceChanges.filter((change) => inRange(change.createdAt, from, to)).slice().reverse(), [from, state.priceChanges, to]);
   const quantities = useMemo(() => state.adjustments.filter((change) => inRange(change.createdAt, from, to)).slice().reverse(), [from, state.adjustments, to]);
 
-  function exportPrices() {
-    const blob = new Blob([`\uFEFF${priceChangesCsv(prices, state.skus)}`], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `perubahan-harga-sku-${witaDate(new Date().toISOString())}.csv`;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 100);
+  async function exportPrices() {
+    setNotice('');
+    try {
+      const result = await output.saveCsv({
+        fileName: `perubahan-harga-sku-${witaDate(new Date().toISOString())}.csv`,
+        bytes: new TextEncoder().encode(`\uFEFF${priceChangesCsv(prices, state.skus)}`),
+      });
+      setNotice(result.status === 'saved'
+        ? 'CSV perubahan harga berhasil disimpan.'
+        : 'Penyimpanan CSV dibatalkan.');
+    } catch {
+      setNotice('CSV perubahan harga belum dapat disimpan.');
+    }
   }
 
   return <div className="feature-page sku-changes-page">
     <div className="feature-toolbar">
       <div><strong>Riwayat perubahan SKU</strong><span>{coreBacked ? 'Catatan terpusat harga dan jumlah stok · WITA' : 'Catatan sesi harga dan jumlah stok · WITA'}</span></div>
-      {tab === 'price' && <button className="button primary" disabled={!prices.length} aria-label="Ekspor perubahan harga CSV" onClick={exportPrices}>Ekspor CSV</button>}
+      {tab === 'price' && <button className="button primary" disabled={!prices.length || output.busy} aria-label="Ekspor perubahan harga CSV" onClick={() => void exportPrices()}>Ekspor CSV</button>}
     </div>
+    {notice ? <p className="action-status" role="status">{notice}</p> : null}
     <div className="change-tabs" role="tablist" aria-label="Jenis perubahan SKU">
       <button role="tab" aria-selected={tab === 'price'} onClick={() => setTab('price')}>Perubahan harga</button>
       <button role="tab" aria-selected={tab === 'quantity'} onClick={() => setTab('quantity')}>Perubahan jumlah</button>

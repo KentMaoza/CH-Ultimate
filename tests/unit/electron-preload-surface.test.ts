@@ -46,6 +46,7 @@ describe('CH Core preload surface', () => {
     )!;
     expect(Object.keys(outputBridge).sort()).toEqual([
       'printDocument',
+      'saveCsv',
       'saveGeneratedPdf',
       'savePdf',
       'saveSpreadsheet',
@@ -79,6 +80,10 @@ describe('CH Core preload surface', () => {
       await expect(outputBridge.saveSpreadsheet({
         fileName: 'CHU-Ekspor.xlsx',
         bytes: new Uint8Array([0x50, 0x4b, 0x03, 0x04]),
+      })).resolves.toEqual({ status: 'saved' });
+      await expect(outputBridge.saveCsv({
+        fileName: 'CHU-Perubahan.csv',
+        bytes: new TextEncoder().encode('SKU,Harga\r\nTEST,1000\r\n'),
       })).resolves.toEqual({ status: 'saved' });
       expect(invoke).not.toHaveBeenCalled();
     } finally {

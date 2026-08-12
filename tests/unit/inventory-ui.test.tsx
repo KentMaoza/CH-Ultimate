@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { App } from '../../src/renderer/App';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
+import type { SaveCsvRequest } from '../../src/electron/output-contract';
 import type {
   CatalogueValidationResult,
   OperationsGateway,
@@ -95,8 +96,15 @@ test('confirms successful archive and restore mutations', async () => {
 
 test('lists filtered price and quantity changes and exposes price export', async () => {
   const gateway = new MockOperationsGateway();
+  const saveCsv = vi.fn(async (_request: SaveCsvRequest) => ({ status: 'saved' as const }));
   await gateway.updateSku('sku-1', { imageUrl: 'https://example.test/beras.jpg' });
-  render(<App gateway={gateway} />);
+  render(<App gateway={gateway} outputBridge={{
+    printDocument: async () => ({ status: 'printed' }),
+    savePdf: async () => ({ status: 'saved' }),
+    saveGeneratedPdf: async () => ({ status: 'saved' }),
+    saveSpreadsheet: async () => ({ status: 'saved' }),
+    saveCsv,
+  }} />);
   const row = screen.getByRole('row', { name: /BRS-108-BLK/ });
   fireEvent.click(within(row).getByRole('button', { name: 'Edit BRS-108-BLK' }));
   fireEvent.change(screen.getByLabelText('Edit harga referensi'), { target: { value: '52000' } });
@@ -112,16 +120,12 @@ test('lists filtered price and quantity changes and exposes price export', async
   const priceRow = screen.getByRole('row', { name: /BRS-108-BLK.*Rp\s*42\.000.*Rp\s*52\.000/i });
   expect(priceRow).toBeInTheDocument();
   expect(within(priceRow).getByRole('img', { name: 'Gambar BRS-108-BLK' })).toHaveAttribute('src', 'https://example.test/beras.jpg');
-  const createObjectURL = vi.fn(() => 'blob:price-history');
-  const revokeObjectURL = vi.fn();
-  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
-  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
-  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
   fireEvent.click(screen.getByRole('button', { name: 'Ekspor perubahan harga CSV' }));
-  expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
-  expect(click).toHaveBeenCalledOnce();
-  await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:price-history'));
-  click.mockRestore();
+  await waitFor(() => expect(saveCsv).toHaveBeenCalledOnce());
+  const csv = saveCsv.mock.calls[0]?.[0];
+  expect(csv?.fileName).toMatch(/^perubahan-harga-sku-\d{4}-\d{2}-\d{2}\.csv$/);
+  expect(new TextDecoder().decode(csv?.bytes)).toContain('BRS-108-BLK;Beras Hitam Premium 1 kg;42000;52000');
+  expect(screen.getByRole('status')).toHaveTextContent('CSV perubahan harga berhasil disimpan.');
 
   fireEvent.click(screen.getByRole('tab', { name: 'Perubahan jumlah' }));
   const quantityRow = screen.getByRole('row', { name: /BRS-108-BLK.*24.*\+3.*27/ });

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { createInitialState } from '../../src/domain/operations';
 import type { Sku } from '../../src/domain/types';
+import type { ChOutputBridge, SaveGeneratedPdfRequest } from '../../src/electron/output-contract';
 import { MockOperationsGateway } from '../../src/gateway/operations-gateway';
 import { App } from '../../src/renderer/App';
 
@@ -19,6 +20,17 @@ function coreGateway() {
 
 async function pdfSource(blob: Blob): Promise<string> {
   return Buffer.from(await blob.arrayBuffer()).toString('latin1');
+}
+
+function outputBridge(
+  saveGeneratedPdf: (input: SaveGeneratedPdfRequest) => Promise<{ status: 'saved' | 'cancelled' }>,
+): ChOutputBridge {
+  return {
+    printDocument: async () => ({ status: 'printed' }),
+    savePdf: async () => ({ status: 'saved' }),
+    saveGeneratedPdf,
+    saveSpreadsheet: async () => ({ status: 'saved' }),
+  };
 }
 
 function sku(id: string, name: string, createdAt: string, stock = 1): Sku {
@@ -51,8 +63,6 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
-  Reflect.deleteProperty(URL, 'createObjectURL');
-  Reflect.deleteProperty(URL, 'revokeObjectURL');
 });
 
 test('shows daily share recommendations grouped by supplier and a separate urgent section', () => {
@@ -79,48 +89,48 @@ test('shows daily share recommendations grouped by supplier and a separate urgen
   expect(screen.getByRole('button', { name: 'Download PDF Urgent' })).toBeInTheDocument();
 });
 
-test('downloads one PDF for the active recommendation tab with a stable filename', async () => {
-  let downloadedName = '';
-  const createObjectURL = vi.fn((_blob: Blob) => 'blob:recommendations');
-  const revokeObjectURL = vi.fn();
-  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
-  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
-  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function click(this: HTMLAnchorElement) {
-    downloadedName = this.download;
-  });
-  render(<App gateway={new MockOperationsGateway(createRecommendationState)} />);
+test('saves one PDF for the active recommendation tab through the native output bridge', async () => {
+  const saveGeneratedPdf = vi.fn(async (_request: SaveGeneratedPdfRequest) => ({ status: 'saved' as const }));
+  render(<App gateway={new MockOperationsGateway(createRecommendationState)} outputBridge={outputBridge(saveGeneratedPdf)} />);
   fireEvent.click(screen.getByRole('button', { name: 'Rekomendasi Share' }));
   vi.useRealTimers();
 
   fireEvent.click(screen.getByRole('tab', { name: 'SKU Urgent' }));
   fireEvent.click(screen.getByRole('button', { name: 'Download PDF Urgent' }));
 
-  await waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce());
-  expect(createObjectURL.mock.calls[0]?.[0]).toBeInstanceOf(Blob);
-  expect(downloadedName).toBe('CHU-SKU-Urgent-2026-07-23.pdf');
-  expect(revokeObjectURL).toHaveBeenCalledWith('blob:recommendations');
-  expect(await screen.findByRole('status')).toHaveTextContent('PDF SKU Urgent berhasil diunduh.');
+  await waitFor(() => expect(saveGeneratedPdf).toHaveBeenCalledOnce());
+  const request = saveGeneratedPdf.mock.calls[0]?.[0];
+  expect(request?.fileName).toBe('CHU-SKU-Urgent-2026-07-23.pdf');
+  expect(String.fromCharCode(...(request?.bytes.slice(0, 4) ?? []))).toBe('%PDF');
+  expect(await screen.findByRole('status')).toHaveTextContent('PDF SKU Urgent berhasil disimpan.');
 });
 
-test('core-backed desktop download embeds an operational source label instead of demo copy', async () => {
-  let downloadedBlob: Blob | undefined;
-  Object.defineProperty(URL, 'createObjectURL', {
-    configurable: true,
-    value: vi.fn((blob: Blob) => {
-      downloadedBlob = blob;
-      return 'blob:core-recommendations';
-    }),
-  });
-  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
-  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-  render(<App gateway={coreGateway()} coreBacked />);
+test('does not report success when the native PDF save dialog is cancelled', async () => {
+  const saveGeneratedPdf = vi.fn(async (_request: SaveGeneratedPdfRequest) => ({ status: 'cancelled' as const }));
+  render(<App gateway={new MockOperationsGateway(createRecommendationState)} outputBridge={outputBridge(saveGeneratedPdf)} />);
   fireEvent.click(screen.getByRole('button', { name: 'Rekomendasi Share' }));
   vi.useRealTimers();
 
   fireEvent.click(screen.getByRole('button', { name: 'Download PDF Harian' }));
 
-  await waitFor(() => expect(downloadedBlob).toBeInstanceOf(Blob));
-  const source = await pdfSource(downloadedBlob!);
+  expect(await screen.findByRole('status')).toHaveTextContent('Penyimpanan PDF dibatalkan.');
+  expect(screen.queryByText(/berhasil diunduh/i)).not.toBeInTheDocument();
+});
+
+test('core-backed desktop download embeds an operational source label instead of demo copy', async () => {
+  let savedRequest: SaveGeneratedPdfRequest | undefined;
+  const saveGeneratedPdf = vi.fn(async (request: SaveGeneratedPdfRequest) => {
+    savedRequest = request;
+    return { status: 'saved' as const };
+  });
+  render(<App gateway={coreGateway()} coreBacked outputBridge={outputBridge(saveGeneratedPdf)} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Rekomendasi Share' }));
+  vi.useRealTimers();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Download PDF Harian' }));
+
+  await waitFor(() => expect(savedRequest).toBeDefined());
+  const source = Buffer.from(savedRequest!.bytes).toString('latin1');
   expect(source).toContain('CH CORE');
   expect(source).not.toContain('DATA DEMO');
 });

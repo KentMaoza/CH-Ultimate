@@ -10,6 +10,7 @@ import { formatDate, formatRupiah } from '../format';
 import { useOperations } from '../operations-context';
 import { GatewaySkuImage } from '../components/GatewaySkuImage';
 import { hydrateRecommendationPdfImages } from '../recommendation-pdf-images';
+import { useOutput } from '../output-context';
 
 type RecommendationTab = RecommendationPdfMode;
 const reasonLabels = {
@@ -55,6 +56,7 @@ function RecommendationGroups({ groups, gateway }: { groups: ShareRecommendation
 
 export function ShareRecommendationsPage({ coreBacked = false }: { coreBacked?: boolean }) {
   const { state, gateway } = useOperations();
+  const output = useOutput();
   const [tab, setTab] = useState<RecommendationTab>('daily');
   const [date, setDate] = useState(witaDateToday);
   const [message, setMessage] = useState('');
@@ -70,15 +72,13 @@ export function ShareRecommendationsPage({ coreBacked = false }: { coreBacked?: 
       const blob = await createRecommendationPdfBlob(
         await hydrateRecommendationPdfImages(pdfPlan, state.skus, gateway),
       );
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = pdfPlan.fileName;
-      document.body.append(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      setMessage(`PDF ${pdfPlan.title} berhasil diunduh.`);
+      const result = await output.saveGeneratedPdf({
+        fileName: pdfPlan.fileName,
+        bytes: new Uint8Array(await blob.arrayBuffer()),
+      });
+      setMessage(result.status === 'saved'
+        ? `PDF ${pdfPlan.title} berhasil disimpan.`
+        : 'Penyimpanan PDF dibatalkan.');
     } catch {
       setMessage('PDF belum dapat dibuat. Coba lagi.');
     } finally {
@@ -93,7 +93,7 @@ export function ShareRecommendationsPage({ coreBacked = false }: { coreBacked?: 
         <label><span>Tanggal rekomendasi</span><input type="date" value={date} onChange={(event) => { setDate(event.target.value); setMessage(''); }} /></label>
         <button
           className="button primary share-recommendation__pdf"
-          disabled={downloading || pdfPlan.totalIncluded === 0}
+          disabled={downloading || output.busy || pdfPlan.totalIncluded === 0}
           onClick={() => void downloadPdf()}
         >
           {downloading ? 'Membuat PDF…' : `Download PDF ${tab === 'daily' ? 'Harian' : 'Urgent'}`}

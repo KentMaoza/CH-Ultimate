@@ -3,6 +3,7 @@ export const CH_OUTPUT_IPC_CHANNELS = {
   savePdf: 'ch-output:save-pdf',
   saveGeneratedPdf: 'ch-output:save-generated-pdf',
   saveSpreadsheet: 'ch-output:save-spreadsheet',
+  saveCsv: 'ch-output:save-csv',
 } as const;
 
 export type OutputDocumentKind =
@@ -28,6 +29,11 @@ export interface SaveSpreadsheetRequest {
   bytes: Uint8Array;
 }
 
+export interface SaveCsvRequest {
+  fileName: string;
+  bytes: Uint8Array;
+}
+
 export interface SaveGeneratedPdfRequest {
   fileName: string;
   bytes: Uint8Array;
@@ -36,12 +42,14 @@ export interface SaveGeneratedPdfRequest {
 export type PrintDocumentResult = { status: 'printed' | 'cancelled' };
 export type SavePdfResult = { status: 'saved' | 'cancelled' };
 export type SaveSpreadsheetResult = { status: 'saved' | 'cancelled' };
+export type SaveCsvResult = { status: 'saved' | 'cancelled' };
 
 export interface ChOutputBridge {
   printDocument(input: PrintDocumentRequest): Promise<PrintDocumentResult>;
   savePdf(input: SavePdfRequest): Promise<SavePdfResult>;
   saveGeneratedPdf?(input: SaveGeneratedPdfRequest): Promise<SavePdfResult>;
   saveSpreadsheet(input: SaveSpreadsheetRequest): Promise<SaveSpreadsheetResult>;
+  saveCsv?(input: SaveCsvRequest): Promise<SaveCsvResult>;
 }
 
 type BridgeInvoke = (channel: string, input: unknown) => Promise<unknown>;
@@ -64,6 +72,10 @@ export function createChOutputBridge(invoke: BridgeInvoke): ChOutputBridge {
       CH_OUTPUT_IPC_CHANNELS.saveSpreadsheet,
       input,
     ) as Promise<SaveSpreadsheetResult>,
+    saveCsv: (input) => invoke(
+      CH_OUTPUT_IPC_CHANNELS.saveCsv,
+      input,
+    ) as Promise<SaveCsvResult>,
   };
 }
 
@@ -73,5 +85,6 @@ export function createE2eChOutputBridge(): ChOutputBridge {
     savePdf: async () => ({ status: 'saved' }),
     saveGeneratedPdf: async () => ({ status: 'saved' }),
     saveSpreadsheet: async () => ({ status: 'saved' }),
+    saveCsv: async () => ({ status: 'saved' }),
   };
 }

@@ -13,6 +13,8 @@ import type {
   ChOutputBridge,
   PrintDocumentResult,
   SaveGeneratedPdfRequest,
+  SaveCsvRequest,
+  SaveCsvResult,
   SavePdfResult,
   SaveSpreadsheetRequest,
   SaveSpreadsheetResult,
@@ -25,6 +27,7 @@ interface OutputContextValue {
   savePdf(plan: OutputDocumentPlan): Promise<SavePdfResult>;
   saveGeneratedPdf(input: SaveGeneratedPdfRequest): Promise<SavePdfResult>;
   saveSpreadsheet(input: SaveSpreadsheetRequest): Promise<SaveSpreadsheetResult>;
+  saveCsv(input: SaveCsvRequest): Promise<SaveCsvResult>;
 }
 
 const OutputContext = createContext<OutputContextValue | null>(null);
@@ -125,6 +128,19 @@ export function OutputProvider({
     }
   }, [bridge]);
 
+  const saveCsv = useCallback(async (input: SaveCsvRequest): Promise<SaveCsvResult> => {
+    if (!bridge?.saveCsv) throw new Error('Output desktop tidak tersedia.');
+    if (busyRef.current) throw new Error('Output lain masih diproses.');
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      return await bridge.saveCsv(input);
+    } finally {
+      setBusy(false);
+      busyRef.current = false;
+    }
+  }, [bridge]);
+
   const value = useMemo<OutputContextValue>(() => ({
     busy,
     print: (nextPlan) => run(nextPlan, (activeBridge) => activeBridge.printDocument({
@@ -140,7 +156,8 @@ export function OutputProvider({
     })),
     saveGeneratedPdf,
     saveSpreadsheet,
-  }), [busy, run, saveGeneratedPdf, saveSpreadsheet]);
+    saveCsv,
+  }), [busy, run, saveCsv, saveGeneratedPdf, saveSpreadsheet]);
 
   return <OutputContext.Provider value={value}>
     {children}

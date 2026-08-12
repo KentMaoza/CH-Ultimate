@@ -194,6 +194,11 @@ function populated(line: NotaLine): boolean {
   );
 }
 
+function productCodeFor(sku: Sku): string {
+  return sku.identifiers.find((identifier) => identifier.kind === 'product_code')
+    ?.value.trim() || sku.skuNumber;
+}
+
 export function buildNotaDocumentPlan(
   transaction: NotaTransaction,
   template: InvoiceTemplate,
@@ -301,6 +306,7 @@ export function buildLabelDocumentPlan(
   quantity: number,
 ): LabelDocumentPlan {
   const count = requireQuantity(quantity);
+  const productCode = productCodeFor(sku);
   return {
     kind: 'label',
     ...sheetLayout(template, count),
@@ -313,8 +319,8 @@ export function buildLabelDocumentPlan(
     fields: [...template.fields],
     fileName: `CHU-Label-${safeFilePart(sku.skuNumber)}-x${count}.pdf`,
     items: Array.from({ length: count }, () => ({
-      qrValue: sku.skuNumber,
-      productCode: sku.skuNumber,
+      qrValue: productCode,
+      productCode,
       name: sku.name,
       referencePrice: sku.referencePrice,
     })),
@@ -327,6 +333,7 @@ export function buildBarcodeDocumentPlan(
   quantity: number,
 ): BarcodeDocumentPlan {
   const count = requireQuantity(quantity);
+  const productCode = productCodeFor(sku);
   return {
     kind: 'barcode',
     ...sheetLayout(template, count),
@@ -337,8 +344,8 @@ export function buildBarcodeDocumentPlan(
     fontSize: template.fontSize,
     fileName: `CHU-Barcode-${safeFilePart(sku.skuNumber)}-x${count}.pdf`,
     items: Array.from({ length: count }, () => ({
-      qrValue: sku.skuNumber,
-      productCode: sku.skuNumber,
+      qrValue: productCode,
+      productCode,
     })),
   };
 }

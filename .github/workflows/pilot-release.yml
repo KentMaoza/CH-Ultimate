@@ -13,7 +13,7 @@ on:
         description: Fresh unpublished candidate tag; increment r2 to r3 only after a failed partial draft
         required: true
         type: string
-        default: pilot-v0.2.6-r2
+        default: pilot-v0.2.7-r2
 
 permissions:
   contents: read
@@ -76,8 +76,8 @@ jobs:
             throw "Expected exactly one Setup.exe, found $($setups.Count)."
           }
           New-Item -ItemType Directory -Path release -Force | Out-Null
-          Copy-Item $setups[0].FullName release/CH-Ultimate-0.2.6-Setup.exe
-          Get-FileHash -Algorithm SHA256 release/CH-Ultimate-0.2.6-Setup.exe
+          Copy-Item $setups[0].FullName release/CH-Ultimate-0.2.7-Setup.exe
+          Get-FileHash -Algorithm SHA256 release/CH-Ultimate-0.2.7-Setup.exe
 
   android-apk:
     needs: source-gates
@@ -238,11 +238,11 @@ jobs:
             throw "Expected exactly one release APK, found $($apks.Count)."
           }
           New-Item -ItemType Directory -Path release -Force | Out-Null
-          Copy-Item $setups[0].FullName release/CH-Ultimate-0.2.6-Setup.exe
-          Copy-Item $apks[0].FullName release/CHU-Companion-Mobile-0.2.6-release.apk
+          Copy-Item $setups[0].FullName release/CH-Ultimate-0.2.7-Setup.exe
+          Copy-Item $apks[0].FullName release/CHU-Companion-Mobile-0.2.7-release.apk
           $names = @(
-            'CH-Ultimate-0.2.6-Setup.exe',
-            'CHU-Companion-Mobile-0.2.6-release.apk'
+            'CH-Ultimate-0.2.7-Setup.exe',
+            'CHU-Companion-Mobile-0.2.7-release.apk'
           )
           $lines = foreach ($name in $names) {
             $hash = (Get-FileHash -Algorithm SHA256 (Join-Path release $name)).Hash.ToLowerInvariant()

@@ -321,8 +321,7 @@ Confirm `catalogue-real.acceptance.test.ts` pins the approved filename, SHA, 3,1
 Run:
 
 ```bash
-CH_CORE_CATALOGUE_ACCEPTANCE=1 \
-CH_CORE_CATALOGUE_XLSX='/Users/hamlet/Downloads/SKU_Gudang20260808075120732.xlsx' \
+CH_CATALOGUE_ACCEPTANCE_XLSX='/Users/hamlet/Downloads/SKU_Gudang20260808075120732.xlsx' \
 npm --workspace @ch-ultimate/core test -- --run test/catalogue-real.acceptance.test.ts
 ```
 

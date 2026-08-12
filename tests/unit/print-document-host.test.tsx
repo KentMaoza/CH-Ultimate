@@ -103,6 +103,50 @@ test('trusted barcode host renders every QR with a human-readable Kode Produk', 
   }
 });
 
+test('barcode plan encodes and prints the official product-code identifier', () => {
+  const state = createInitialState();
+  const sku = {
+    ...state.skus[0]!,
+    skuNumber: 'SK-BT-TOOTHPASTE-ORG Nama SKU Gudang yang sangat panjang CH049',
+    identifiers: [{
+      id: 'identifier-product-code',
+      skuId: state.skus[0]!.id,
+      value: '87000032',
+      kind: 'product_code' as const,
+      createdAt: '2026-08-12T00:00:00.000Z',
+    }],
+  };
+
+  const plan = buildBarcodeDocumentPlan(sku, state.labelTemplate, 1);
+
+  expect(plan.items[0]).toEqual({
+    qrValue: '87000032',
+    productCode: '87000032',
+  });
+});
+
+test('product-label plan encodes and prints the official product-code identifier', () => {
+  const state = createInitialState();
+  const sku = {
+    ...state.skus[0]!,
+    skuNumber: 'SK-BT-TOOTHPASTE-ORG Nama SKU Gudang yang sangat panjang CH049',
+    identifiers: [{
+      id: 'identifier-product-code',
+      skuId: state.skus[0]!.id,
+      value: '87000032',
+      kind: 'product_code' as const,
+      createdAt: '2026-08-12T00:00:00.000Z',
+    }],
+  };
+
+  const plan = buildLabelDocumentPlan(sku, state.labelTemplate, 1);
+
+  expect(plan.items[0]).toMatchObject({
+    qrValue: '87000032',
+    productCode: '87000032',
+  });
+});
+
 test('printed product label keeps its QR at a scannable physical size', () => {
   const state = createInitialState();
   const plan = buildLabelDocumentPlan(state.skus[0]!, state.labelTemplate, 1);
@@ -157,6 +201,13 @@ test('minimum barcode uses a fixed card without shrinking its QR', () => {
     width: '8mm',
     height: '8mm',
     flexShrink: '0',
+  });
+  expect(screen.getByTestId('output-product-copy')).toHaveTextContent('BRS-108-BLK');
+  expect(screen.getByTestId('output-product-copy')).not.toHaveTextContent('Kode Produk:');
+  expect(screen.getByTestId('output-product-copy')).toHaveStyle({
+    fontSize: '4px',
+    whiteSpace: 'normal',
+    overflowWrap: 'anywhere',
   });
 });
 

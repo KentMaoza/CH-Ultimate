@@ -119,6 +119,7 @@ function LabelHost({ plan }: { plan: LabelDocumentPlan }) {
 
 function BarcodeHost({ plan }: { plan: BarcodeDocumentPlan }) {
   const qrSizeMm = Math.max(8, Math.min(18, plan.cardHeightMm - 8, plan.cardWidthMm - 8));
+  const compactCopy = plan.cardWidthMm <= 20 && plan.cardHeightMm <= 15;
   const pages = Array.from(
     { length: plan.pageCount },
     (_, pageIndex) => plan.items.slice(
@@ -150,7 +151,16 @@ function BarcodeHost({ plan }: { plan: BarcodeDocumentPlan }) {
       marginSize={0}
       style={{ width: `${qrSizeMm}mm`, height: `${qrSizeMm}mm`, flexShrink: 0 }}
     />
-    <strong className="output-document__product-copy" data-testid="output-product-copy">Kode Produk: {item.productCode}</strong>
+    <strong
+      className="output-document__product-copy"
+      data-testid="output-product-copy"
+      style={compactCopy ? {
+        fontSize: '4px',
+        lineHeight: 1,
+        overflowWrap: 'anywhere',
+        whiteSpace: 'normal',
+      } : undefined}
+    >{compactCopy ? item.productCode : `Kode Produk: ${item.productCode}`}</strong>
   </article>)}</section>)}</>;
 }
 

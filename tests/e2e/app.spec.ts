@@ -487,6 +487,15 @@ test('Template Label and Invoice configures a movable session-only invoice previ
 test('minimum thermal and A4 label cards contain fixed QR and copy bounds', async () => {
   const { application, window } = await launch();
   try {
+    const longSkuNumber = 'ACCEPT-R6-20260811-1713';
+    await window.getByRole('button', { name: 'Buat SKU' }).click();
+    await window.getByLabel('Nomor SKU').fill(longSkuNumber);
+    await window.getByLabel('Nama SKU').fill('Acceptance Test Only Barcode');
+    await window.getByLabel('Harga Referensi').fill('13001');
+    await window.getByLabel('Stok Awal').fill('2');
+    await window.getByRole('button', { name: 'Simpan SKU' }).click();
+    await expect(window.getByRole('status')).toContainText(longSkuNumber);
+
     await window.getByRole('button', { name: 'Template Label & Invoice' }).click();
     await window.getByLabel('Lebar (mm)').fill('20');
     await window.getByLabel('Tinggi (mm)').fill('15');
@@ -525,6 +534,9 @@ test('minimum thermal and A4 label cards contain fixed QR and copy bounds', asyn
               cardWidth: cardRect.width,
               cardHeight: cardRect.height,
               qrWidth: qrRect.width,
+              copyFullyVisible:
+                copy.scrollWidth <= copy.clientWidth + 1 &&
+                copy.scrollHeight <= copy.clientHeight + 1,
               contained:
                 cardRect.left >= pageRect.left - tolerance &&
                 cardRect.top >= pageRect.top - tolerance &&
@@ -544,6 +556,7 @@ test('minimum thermal and A4 label cards contain fixed QR and copy bounds', asyn
             pageCount: pages.length,
             cardCount: cards.length,
             allContained: measurements.every((row) => row.contained),
+            allCopyFullyVisible: measurements.every((row) => row.copyFullyVisible),
             allCardsExact:
               measurements.every((row) => Math.abs(row.cardWidth - (20 * millimetre)) <= tolerance) &&
               measurements.every((row) => Math.abs(row.cardHeight - (15 * millimetre)) <= tolerance),
@@ -572,10 +585,17 @@ test('minimum thermal and A4 label cards contain fixed QR and copy bounds', asyn
     await expect(window.getByTestId('print-document-host')).toHaveCount(0);
 
     await window.getByRole('button', { name: 'SKU Gudang' }).click();
-    await window.getByRole('row', { name: /BRS-108-BLK/ }).getByRole('button', { name: 'Print barcode BRS-108-BLK' }).click();
+    await window.getByPlaceholder('Nama / nomor SKU / scan QR').fill(longSkuNumber);
+    await window.getByRole('button', { name: `Print barcode ${longSkuNumber}` }).click();
     await window.getByLabel('Jumlah barcode').fill('1');
     const thermalBarcode = await captureLayout('Print barcode sekarang');
-    expect(thermalBarcode).toMatchObject({ pageCount: 1, cardCount: 1, allContained: true, allCardsExact: true });
+    expect(thermalBarcode).toMatchObject({
+      pageCount: 1,
+      cardCount: 1,
+      allContained: true,
+      allCardsExact: true,
+      allCopyFullyVisible: true,
+    });
     expect(thermalBarcode.minimumQrWidth).toBeGreaterThanOrEqual(thermalBarcode.expectedQrWidth - 0.75);
     await window.getByRole('button', { name: 'Tutup print barcode' }).click();
 
@@ -587,10 +607,17 @@ test('minimum thermal and A4 label cards contain fixed QR and copy bounds', asyn
     expect(a4.minimumQrWidth).toBeGreaterThanOrEqual(a4.expectedQrWidth - 0.75);
 
     await window.getByRole('button', { name: 'SKU Gudang' }).click();
-    await window.getByRole('row', { name: /BRS-108-BLK/ }).getByRole('button', { name: 'Print barcode BRS-108-BLK' }).click();
+    await window.getByPlaceholder('Nama / nomor SKU / scan QR').fill(longSkuNumber);
+    await window.getByRole('button', { name: `Print barcode ${longSkuNumber}` }).click();
     await window.getByLabel('Jumlah barcode').fill('51');
     const a4Barcode = await captureLayout('Print barcode sekarang');
-    expect(a4Barcode).toMatchObject({ pageCount: 1, cardCount: 51, allContained: true, allCardsExact: true });
+    expect(a4Barcode).toMatchObject({
+      pageCount: 1,
+      cardCount: 51,
+      allContained: true,
+      allCardsExact: true,
+      allCopyFullyVisible: true,
+    });
     expect(a4Barcode.minimumQrWidth).toBeGreaterThanOrEqual(a4Barcode.expectedQrWidth - 0.75);
   } finally {
     await application.close();

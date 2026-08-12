@@ -1,10 +1,10 @@
 const { existsSync } = require('node:fs');
 const { spawnSync } = require('node:child_process');
 
-const RELEASE_NOTES = 'docs/releases/pilot-0.2.6.md';
+const RELEASE_NOTES = 'docs/releases/pilot-0.2.7.md';
 const RELEASE_ASSETS = [
-  'release/CH-Ultimate-0.2.6-Setup.exe',
-  'release/CHU-Companion-Mobile-0.2.6-release.apk',
+  'release/CH-Ultimate-0.2.7-Setup.exe',
+  'release/CHU-Companion-Mobile-0.2.7-release.apk',
   'release/SHA256SUMS.txt',
 ];
 
@@ -42,10 +42,10 @@ function stagePilotDraft({
   if (!/^[0-9a-f]{40}$/i.test(commitSha || '')) {
     throw new Error('GITHUB_SHA is invalid.');
   }
-  const releaseMatch = /^pilot-v0\.2\.6-r([2-9]|[1-9][0-9])$/.exec(releaseTag || '');
+  const releaseMatch = /^pilot-v0\.2\.7-r([2-9]|[1-9][0-9])$/.exec(releaseTag || '');
   if (!releaseMatch) throw new Error('CHU_PILOT_RELEASE_TAG is invalid.');
   const candidateNumber = Number(releaseMatch[1]);
-  const releaseTitle = `CH Ultimate pilot v0.2.6 r${releaseMatch[1]}`;
+  const releaseTitle = `CH Ultimate pilot v0.2.7 r${releaseMatch[1]}`;
   for (const path of [...RELEASE_ASSETS, RELEASE_NOTES]) {
     if (!fileExists(path)) throw new Error(`Required release file is missing: ${path}`);
   }
@@ -74,7 +74,7 @@ function stagePilotDraft({
   }
   if (exactRefs.length > 0) throw new Error(`Tag ${releaseTag} already exists.`);
   if (candidateNumber > 2) {
-    const previousTag = `pilot-v0.2.6-r${candidateNumber - 1}`;
+    const previousTag = `pilot-v0.2.7-r${candidateNumber - 1}`;
     const previous = releases.filter((release) => release?.tag_name === previousTag);
     const previousAssetsValid = Array.isArray(previous[0]?.assets) &&
       previous[0].assets.every((asset) =>

@@ -103,7 +103,7 @@ test('uses truthful CH Core copy across persisted desktop workflows', () => {
   expect(screen.getByText('Tersimpan terpusat di NAS')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Reset data demo' })).not.toBeInTheDocument();
   expect(screen.getByText(/Node API · MariaDB/)).toBeInTheDocument();
-  expect(screen.getByText('CH Ultimate 0.2.6')).toBeInTheDocument();
+  expect(screen.getByText('CH Ultimate 0.2.7')).toBeInTheDocument();
   expect(
     screen.getByText(
       'Data bisnis disinkronkan melalui CH Core pada NAS lokal. Auto-update belum tersedia. Cetak dan Simpan PDF memakai dialog sistem.',
